@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,6 +25,35 @@
 namespace Access {
 
 namespace Martian {
+
+MartianResources::~MartianResources() {
+	delete _font6x6;
+	delete _font3x5;
+}
+
+void MartianResources::load(Common::SeekableReadStream &s) {
+	Resources::load(s);
+	uint count;
+
+	// Get the offset of the general shared data for the game
+	uint entryOffset = findEntry(_vm->getGameID(), 2, 0, (Common::Language)0);
+	s.seek(entryOffset);
+
+	// Read in the cursor list
+	count = s.readUint16LE();
+	CURSORS.resize(count);
+	for (uint idx = 0; idx < count; ++idx) {
+		uint count2 = s.readUint16LE();
+		CURSORS[idx].resize(count2);
+		s.read(&CURSORS[idx][0], count2);
+	}
+
+	// Load font data
+	_font6x6 = new MartianFont(6, s);
+	_font3x5 = new MartianFont(5, s);
+}
+
+/*------------------------------------------------------------------------*/
 
 const int SIDEOFFR[] = {  4, 0, 7, 10,  3, 1, 2, 13, 0, 0, 0, 0 };
 const int SIDEOFFL[] = { 11, 6, 1,  4, 10, 6, 1,  4, 0, 0, 0, 0 };

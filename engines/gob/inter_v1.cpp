@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -252,7 +251,7 @@ void Inter_v1::checkSwitchTable(uint32 &offset) {
 	len = _vm->_game->_script->readInt8();
 	while (len != -5) {
 		for (int i = 0; i < len; i++) {
-			_vm->_game->_script->evalExpr(0);
+			_vm->_game->_script->evalExpr(nullptr);
 
 			if (_terminate)
 				return;
@@ -471,12 +470,12 @@ void Inter_v1::o1_initMult() {
 		delete[] _vm->_mult->_objects;
 		delete[] _vm->_mult->_renderData;
 
-		_vm->_mult->_objects = 0;
-		_vm->_mult->_renderObjs = 0;
+		_vm->_mult->_objects = nullptr;
+		_vm->_mult->_renderObjs = nullptr;
 
 	}
 
-	if (_vm->_mult->_objects == 0) {
+	if (_vm->_mult->_objects == nullptr) {
 		_vm->_mult->_renderData = new int16[_vm->_mult->_objCount * 9];
 		memset(_vm->_mult->_renderData, 0,
 				_vm->_mult->_objCount * 9 * sizeof(int16));
@@ -497,6 +496,10 @@ void Inter_v1::o1_initMult() {
 
 			_vm->_mult->_objects[i].pAnimData->isStatic = 1;
 			_vm->_mult->_objects[i].tick = 0;
+			_vm->_mult->_objects[i].animName[0] = '\0';
+			_vm->_mult->_objects[i].videoSlot = 0;
+			_vm->_mult->_objects[i].animVariables = nullptr;
+			_vm->_mult->_objects[i].ownAnimVariables = false;
 			_vm->_mult->_objects[i].lastLeft = -1;
 			_vm->_mult->_objects[i].lastRight = -1;
 			_vm->_mult->_objects[i].lastTop = -1;
@@ -701,6 +704,13 @@ void Inter_v1::o1_callSub(OpFuncParams &params) {
 		return;
 	}
 
+	// Skipping the copy protection screen in Adibou 1
+	if (!_vm->_copyProtection && (_vm->getGameType() == kGameTypeAdibou1) && (offset == 1746) &&
+		_vm->isCurrentTot("base.tot")) {
+		debugC(2, kDebugGameFlow, "Skipping copy protection screen");
+		return;
+	}
+
 	_vm->_game->_script->call(offset);
 
 	if ((params.counter == params.cmdCount) && (params.retFlag == 2)) {
@@ -830,7 +840,7 @@ void Inter_v1::o1_if(OpFuncParams &params) {
 	byte cmd;
 	bool boolRes;
 
-	// WORKAROUND: Gob1 goblin stuck on reload bugs present in original - bugs #3018918 and 3065914
+	// WORKAROUND: Gob1 goblin stuck on reload bugs present in original - bugs #4909 and 3065914
 	if ((_vm->getGameType() == kGameTypeGob1) && (_vm->_game->_script->pos() == 2933) &&
 			_vm->isCurrentTot("inter.tot") && VAR(285) != 0) {
 		warning("Workaround for Gob1 Goblin Stuck On Reload Bug applied...");
@@ -901,6 +911,8 @@ void Inter_v1::o1_assign(OpFuncParams &params) {
 			WRITE_VARO_STR(dest, _vm->_game->_script->getResultStr());
 		break;
 
+	default:
+		break;
 	}
 }
 
@@ -960,14 +972,17 @@ void Inter_v1::o1_printText(OpFuncParams &params) {
 			switch (_vm->_game->_script->peekByte()) {
 			case TYPE_VAR_INT32:
 			case TYPE_ARRAY_INT32:
-				sprintf(buf + i, "%d",
+				Common::sprintf_s(buf + i, sizeof(buf) - i, "%d",
 					(int32)VAR_OFFSET(_vm->_game->_script->readVarIndex()));
 				break;
 
 			case TYPE_VAR_STR:
 			case TYPE_ARRAY_STR:
-				sprintf(buf + i, "%s",
+				Common::sprintf_s(buf + i, sizeof(buf) - i, "%s",
 					GET_VARO_STR(_vm->_game->_script->readVarIndex()));
+				break;
+
+			default:
 				break;
 			}
 			_vm->_game->_script->skip(1);
@@ -1059,6 +1074,9 @@ void Inter_v1::o1_palLoad(OpFuncParams &params) {
 			return;
 		}
 		break;
+
+	default:
+		break;
 	}
 
 	if ((cmd & 0x7F) == 0x30) {
@@ -1139,6 +1157,19 @@ void Inter_v1::o1_palLoad(OpFuncParams &params) {
 		memset((char *)_vm->_draw->_vgaPalette, 0, 768);
 		break;
 
+	case 55:
+		// TODO case 55 implementation
+		warning("STUB: o1_palLoad case 55 not implemented");
+		_vm->_game->_script->skip(2);
+		_vm->_draw->_applyPal = false;
+		return;
+
+	case 56:
+		// TODO case 56 implementation
+		warning("STUB: o1_palLoad case 56 not implemented");
+		_vm->_game->_script->skip(2);
+		break;
+
 	case 61:
 		index1 =  _vm->_game->_script->readByte();
 		index2 = (_vm->_game->_script->readByte() - index1 + 1) * 3;
@@ -1158,15 +1189,35 @@ void Inter_v1::o1_palLoad(OpFuncParams &params) {
 			_vm->_draw->_vgaPalette[0].blue  = 0;
 		}
 
+		if (_vm->getGameType() == kGameTypeAdibou2) {
+			_vm->_draw->_vgaPalette[0].red = 0;
+			_vm->_draw->_vgaPalette[0].green = 0;
+			_vm->_draw->_vgaPalette[0].blue = 0;
+			_vm->_draw->_vgaPalette[255].red = 63;
+			_vm->_draw->_vgaPalette[255].green = 63;
+			_vm->_draw->_vgaPalette[255].blue = 63;
+		}
+
 		if (_vm->_draw->_applyPal) {
 			_vm->_draw->_applyPal = false;
 			_vm->_video->setFullPalette(_vm->_global->_pPaletteDesc);
 			return;
 		}
 		break;
+
+	default:
+		break;
 	}
 
 	if (!_vm->_draw->_applyPal) {
+		if (_vm->getGameType() == kGameTypeAdibou2) {
+			if (_vm->_global->_pPaletteDesc)
+				_vm->_video->setFullPalette(_vm->_global->_pPaletteDesc);
+			else
+				_vm->_util->clearPalette();
+			return;
+		}
+
 		_vm->_global->_pPaletteDesc->unused2 = _vm->_draw->_unusedPalette2;
 		_vm->_global->_pPaletteDesc->unused1 = _vm->_draw->_unusedPalette1;
 
@@ -1197,7 +1248,7 @@ void Inter_v1::o1_keyFunc(OpFuncParams &params) {
 
 	handleBusyWait();
 
-	// WORKAROUND for bug #1726130: Ween busy-waits in the intro for a counter
+	// WORKAROUND for bug #3205: Ween busy-waits in the intro for a counter
 	// to become 5000. We deliberately slow down busy-waiting, so we shorten
 	// the counting, too.
 	if ((_vm->getGameType() == kGameTypeWeen) && (VAR(59) < 4000) &&
@@ -1208,9 +1259,6 @@ void Inter_v1::o1_keyFunc(OpFuncParams &params) {
 	int16 key;
 
 	switch (cmd) {
-	case -1:
-		break;
-
 	case 0:
 		_vm->_draw->_showCursor &= ~2;
 		_vm->_util->longDelay(1);
@@ -1220,9 +1268,27 @@ void Inter_v1::o1_keyFunc(OpFuncParams &params) {
 		_vm->_util->clearKeyBuf();
 		break;
 
+	case -1:
+		if (_vm->getGameType() != kGameTypeAdibou2)
+			break;
+		// fall through
 	case 1:
-		if (_vm->getGameType() != kGameTypeFascination)
+		if (_vm->getGameType() != kGameTypeFascination && _vm->getGameType() != kGameTypeAdibou2)
 			_vm->_util->forceMouseUp(true);
+
+		// FIXME This is a hack to fix an issue with "text" tool in Adibou2 paint game.
+		// keyFunc() is called twice in a loop before testing its return value.
+		// If the first keyFunc call catches the key event, the second call will reset
+		// the key buffer, and the loop continues.
+		// Strangely in the original game it seems that the event is always caught by the
+		// second keyFunc.
+		if (_vm->getGameType() == kGameTypeAdibou2
+			&&
+			(_vm->_game->_script->pos() == 18750 || _vm->_game->_script->pos() == 18955)
+			&&
+			_vm->isCurrentTot("palette.tot"))
+			break;
+
 		key = _vm->_game->checkKeys(&_vm->_global->_inter_mouseX,
 				&_vm->_global->_inter_mouseY, &_vm->_game->_mouseButtons, 0);
 		storeKey(key);
@@ -1324,7 +1390,7 @@ void Inter_v1::o1_goblinFunc(OpFuncParams &params) {
 	int16 cmd;
 
 	gobParams.extraData = 0;
-	gobParams.objDesc = 0;
+	gobParams.objDesc = nullptr;
 	gobParams.retVarPtr.set(*_variables, 236);
 
 	cmd = _vm->_game->_script->readInt16();
@@ -1362,7 +1428,7 @@ void Inter_v1::o1_goblinFunc(OpFuncParams &params) {
 	checking if it is zero. If it was not set, we do not return. This
 	fixes a crash in the EGA version if the life bar is depleted, because
 	interFunc is called multiple times with cmd == 39.
-	Bug #1324814
+	Bug #2246
 */
 
 	if ((cmd < 40) && objDescSet && !gobParams.objDesc)
@@ -1620,7 +1686,7 @@ void Inter_v1::o1_insertStr(OpFuncParams &params) {
 	int16 strVar;
 
 	strVar = _vm->_game->_script->readVarIndex();
-	_vm->_game->_script->evalExpr(0);
+	_vm->_game->_script->evalExpr(nullptr);
 	pos = _vm->_game->_script->readValExpr();
 
 	char *str = GET_VARO_FSTR(strVar);
@@ -1644,7 +1710,7 @@ void Inter_v1::o1_strstr(OpFuncParams &params) {
 	int16 pos;
 
 	strVar = _vm->_game->_script->readVarIndex();
-	_vm->_game->_script->evalExpr(0);
+	_vm->_game->_script->evalExpr(nullptr);
 	resVar = _vm->_game->_script->readVarIndex();
 
 	char *res = strstr(GET_VARO_STR(strVar), _vm->_game->_script->getResultStr());
@@ -1712,7 +1778,7 @@ void Inter_v1::o1_freeFont(OpFuncParams &params) {
 	}
 
 	delete _vm->_draw->_fonts[index];
-	_vm->_draw->_fonts[index] = 0;
+	_vm->_draw->_fonts[index] = nullptr;
 }
 
 void Inter_v1::o1_readData(OpFuncParams &params) {
@@ -1764,7 +1830,7 @@ void Inter_v1::o1_manageDataFile(OpFuncParams &params) {
 	Common::String file = _vm->_game->_script->evalString();
 
 	if (!file.empty()) {
-		_vm->_dataIO->openArchive(file, true);
+		_vm->_dataIO->openArchive(Common::Path(file, '\\').toString('/'), true);
 	} else {
 		_vm->_dataIO->closeArchive(true);
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -37,11 +36,11 @@ bool Animation::loadAnimation(const Common::String &file) {
 	if (!fileData)
 		return false;
 
-	strcpy(_name, "not_loaded");
-	if (strncmp((char *)fileData, "KevinAguilar", 12))
+	Common::strlcpy(_name, "not_loaded", sizeof(_name));
+	if (!Common::String((char *)fileData, 12).equals("KevinAguilar"))
 		return false;
 
-	Common::strlcpy(_name, file.c_str(), 32);
+	Common::strlcpy(_name, file.c_str(), sizeof(_name));
 
 	uint32 headerSize = READ_LE_UINT32(fileData + 16);
 	uint32 uncompressedBytes = READ_LE_UINT32(fileData + 20);
@@ -245,9 +244,7 @@ void Animation::drawFrameWithMaskAndScale(Graphics::Surface &surface, int32 fram
 	uint8 *curRow = (uint8 *)surface.getPixels();
 	uint8 *curRowMask = mask->getDataPtr();
 
-	bool shadowFlag = false;
-	if (strstr(_name, "SHADOW"))
-		shadowFlag = true;
+	bool shadowFlag = Common::String(_name).contains("SHADOW");
 
 	for (int16 y = yy1; y < yy2; y++) {
 		for (int16 x = xx1; x < xx2; x++) {

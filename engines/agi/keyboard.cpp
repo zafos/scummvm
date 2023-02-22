@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -131,11 +130,6 @@ void AgiEngine::processScummVMEvents() {
 			}
 			break;
 		case Common::EVENT_KEYDOWN:
-			if (event.kbd.hasFlags(Common::KBD_CTRL | Common::KBD_SHIFT) && event.kbd.keycode == Common::KEYCODE_d) {
-				_console->attach();
-				break;
-			}
-
 			key = event.kbd.ascii;
 			if (event.kbd.keycode >= Common::KEYCODE_KP0 && event.kbd.keycode <= Common::KEYCODE_KP9) {
 				if (!(event.kbd.flags & Common::KBD_NUM)) {
@@ -143,6 +137,71 @@ void AgiEngine::processScummVMEvents() {
 					// We shouldn't get a valid ascii code in these cases. We fix it here, so that cursor keys
 					// on the numpad work properly.
 					key = 0;
+				}
+			}
+
+			if (_game._vm->getLanguage() == Common::HE_ISR && key >= 0x05d0 && key <= 0x05ea) {
+				// convert to WIN-1255
+				key = key - 0x05d0 + 0xe0;
+			}
+
+			if (_game._vm->getLanguage() == Common::RU_RUS) {
+				// Convert UTF16 to CP866
+				if (key >= 0x400 && key <= 0x4ff) {
+					if (key >= 0x440)
+						key = key - 0x410 + 0xb0;
+					else
+						key = key - 0x410 + 0x80;
+				}
+			}
+
+			if (_game._vm->getLanguage() == Common::FR_FRA) {
+				// Convert to CP858
+				if (key >= 0x80 && key <= 0xff) {
+					switch (key) {
+					case 0xe9:
+						key = 0x82;
+						break;
+					case 0xe8:
+						key = 0x8a;
+						break;
+					case 0xe7:
+						key = 0x87;
+						break;
+					case 0xe0:
+						key = 0x85;
+						break;
+					case 0xf9:
+						key = 0x97;
+						break;
+					case 0xf4:
+						key = 0x93;
+						break;
+					case 0xee:
+						key = 0x8c;
+						break;
+					case 0xef:
+						key = 0x8b;
+						break;
+					case 0xea:
+						key = 0x88;
+						break;
+					case 0xeb:
+						key = 0x89;
+						break;
+					case 0xe2:
+						key = 0x83;
+						break;
+					case 0xe4:
+						key = 0x84;
+						break;
+					case 0xfb:
+						key = 0x96;
+						break;
+					case 0xfc:
+						key = 0x81;
+						break;
+					}
 				}
 			}
 
@@ -454,11 +513,6 @@ bool AgiEngine::handleController(uint16 key) {
 		// Otherwise go on and look for the ESC controller
 	}
 
-	// AGI 3.149 games, The Black Cauldron and King's Quest 4 need KEY_ESCAPE to use menus
-	// Games with the GF_ESCPAUSE flag need KEY_ESCAPE to pause the game
-	//		(key == KEY_ESCAPE && getVersion() != 0x3149 && getGameID() != GID_BC && getGameID() != GID_KQ4 && !(getFeatures() & GF_ESCPAUSE)) )
-	//		return false;
-
 	if ((getGameID() == GID_MH1 || getGameID() == GID_MH2) && (key == AGI_KEY_ENTER) &&
 	        (!_text->promptIsEnabled())) {
 		key = 0x20; // Set Enter key to Space in Manhunter when prompt is disabled
@@ -469,7 +523,7 @@ bool AgiEngine::handleController(uint16 key) {
 	for (uint16 curMapping = 0; curMapping < MAX_CONTROLLER_KEYMAPPINGS; curMapping++) {
 		if (_game.controllerKeyMapping[curMapping].keycode == key) {
 			debugC(3, kDebugLevelInput, "event %d: key press", _game.controllerKeyMapping[curMapping].controllerSlot);
-			_game.controllerOccured[_game.controllerKeyMapping[curMapping].controllerSlot] = true;
+			_game.controllerOccurred[_game.controllerKeyMapping[curMapping].controllerSlot] = true;
 			return true;
 		}
 	}
@@ -512,7 +566,7 @@ bool AgiEngine::handleController(uint16 key) {
 				if (key == AGI_MOUSE_BUTTON_LEFT) {
 					if (getGameID() == GID_PQ1 && getVar(VM_VAR_CURRENT_ROOM) == 116) {
 						// WORKAROUND: Special handling for mouse clicks in the newspaper
-						// screen of PQ1. Fixes bug #3018770.
+						// screen of PQ1. Fixes bug #4908.
 						newDirection = 3;   // fake a right arrow key (next page)
 
 					} else {
@@ -559,9 +613,7 @@ bool AgiEngine::handleController(uint16 key) {
 bool AgiEngine::showPredictiveDialog() {
 	GUI::PredictiveDialog predictiveDialog;
 
-	inGameTimerPause();
-	predictiveDialog.runModal();
-	inGameTimerResume();
+	runDialog(predictiveDialog);
 
 	Common::String predictiveResult(predictiveDialog.getResult());
 	uint16 predictiveResultLen = predictiveResult.size();

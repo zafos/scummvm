@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,16 +26,24 @@
 #include "backends/networking/curl/connectionmanager.h"
 #include "common/debug.h"
 #include "common/file.h"
-#include <common/translation.h>
+#include "common/translation.h"
 #include "common/osd_message_queue.h"
 
 namespace Cloud {
 
 Storage::Storage():
 	_runningRequestsCount(0), _savesSyncRequest(nullptr), _syncRestartRequestsed(false),
-	_downloadFolderRequest(nullptr) {}
+	_downloadFolderRequest(nullptr), _isEnabled(false) {}
 
 Storage::~Storage() {}
+
+bool Storage::isEnabled() const {
+	return _isEnabled;
+}
+
+void Storage::enable() {
+	_isEnabled = true;
+}
 
 Networking::ErrorCallback Storage::getErrorPrintingCallback() {
 	return new Common::Callback<Storage, Networking::ErrorResponse>(this, &Storage::printErrorResponse);
@@ -121,6 +128,12 @@ Networking::Request *Storage::downloadById(Common::String remoteId, Common::Stri
 }
 
 Networking::Request *Storage::downloadFolder(Common::String remotePath, Common::String localPath, FileArrayCallback callback, Networking::ErrorCallback errorCallback, bool recursive) {
+	if (!_isEnabled) {
+		warning("Storage::downloadFolder: cannot be run while Storage is disabled");
+		if (errorCallback)
+			(*errorCallback)(Networking::ErrorResponse(nullptr, false, true, "Storage is disabled.", -1));
+		return nullptr;
+	}
 	if (!errorCallback)
 		errorCallback = getErrorPrintingCallback();
 	return addRequest(new FolderDownloadRequest(this, callback, errorCallback, remotePath, localPath, recursive));
@@ -128,6 +141,13 @@ Networking::Request *Storage::downloadFolder(Common::String remotePath, Common::
 
 SavesSyncRequest *Storage::syncSaves(BoolCallback callback, Networking::ErrorCallback errorCallback) {
 	_runningRequestsMutex.lock();
+	if (!_isEnabled) {
+		warning("Storage::syncSaves: cannot be run while Storage is disabled");
+		if (errorCallback)
+			(*errorCallback)(Networking::ErrorResponse(nullptr, false, true, "Storage is disabled.", -1));
+		_runningRequestsMutex.unlock();
+		return nullptr;
+	}
 	if (_savesSyncRequest) {
 		warning("Storage::syncSaves: there is a sync in progress already");
 		_syncRestartRequestsed = true;
@@ -169,6 +189,14 @@ double Storage::getSyncDownloadingProgress() {
 	return result;
 }
 
+void Storage::getSyncDownloadingInfo(SyncDownloadingInfo& info) {
+	_runningRequestsMutex.lock();
+	if (_savesSyncRequest) {
+		_savesSyncRequest->getDownloadingInfo(info);
+	}
+	_runningRequestsMutex.unlock();
+}
+
 double Storage::getSyncProgress() {
 	double result = 1;
 	_runningRequestsMutex.lock();
@@ -194,13 +222,6 @@ void Storage::cancelSync() {
 	_runningRequestsMutex.unlock();
 }
 
-void Storage::setSyncTarget(GUI::CommandReceiver *target) {
-	_runningRequestsMutex.lock();
-	if (_savesSyncRequest)
-		_savesSyncRequest->setTarget(target);
-	_runningRequestsMutex.unlock();
-}
-
 void Storage::savesSyncDefaultCallback(BoolResponse response) {
 	_runningRequestsMutex.lock();
 	_savesSyncRequest = nullptr;
@@ -208,7 +229,6 @@ void Storage::savesSyncDefaultCallback(BoolResponse response) {
 
 	if (!response.value)
 		warning("SavesSyncRequest called success callback with `false` argument");
-	Common::OSDMessageQueue::instance().addMessage(_("Saved games sync complete."));
 }
 
 void Storage::savesSyncDefaultErrorCallback(Networking::ErrorResponse error) {
@@ -323,13 +343,13 @@ void Storage::directoryDownloadedCallback(FileArrayResponse response) {
 	_downloadFolderRequest = nullptr;
 	_runningRequestsMutex.unlock();
 
-	Common::String message;
+	Common::U32String message;
 	if (response.value.size()) {
-		message = Common::String::format(_("Download complete.\nFailed to download %u files."), response.value.size());
+		message = Common::U32String::format(_("Download complete.\nFailed to download %u files."), response.value.size());
 	} else {
 		message = _("Download complete.");
 	}
-	Common::OSDMessageQueue::instance().addMessage(message.c_str());
+	Common::OSDMessageQueue::instance().addMessage(message);
 }
 
 void Storage::directoryDownloadedErrorCallback(Networking::ErrorResponse error) {

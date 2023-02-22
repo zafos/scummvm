@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,24 +15,23 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "titanic/star_control/star_ref.h"
-#include "titanic/star_control/star_camera.h"
+#include "titanic/star_control/camera.h"
 #include "titanic/star_control/surface_area.h"
 
 namespace Titanic {
 
-void CBaseStarRef::process(CSurfaceArea *surface, CStarCamera *camera) {
+void CBaseStarRef::process(CSurfaceArea *surface, CCamera *camera) {
 	if (_stars->_data.empty())
 		return;
 
 	const double MAX_VAL = 1.0e9 * 1.0e9;
 	FPose pose = camera->getPose();
-	double threshold = camera->getThreshold();
+	double threshold = camera->getFrontClip();
 	double vWidth2 = (double)surface->_width * 0.5;
 	double vHeight2 = (double)surface->_height * 0.5;
 	FVector vTemp, vector1, vector2;

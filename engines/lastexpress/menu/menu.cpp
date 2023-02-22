@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -142,10 +141,10 @@ static const struct {
 // Menu
 //////////////////////////////////////////////////////////////////////////
 Menu::Menu(LastExpressEngine *engine) : _engine(engine),
-	_seqTooltips(NULL), _seqEggButtons(NULL), _seqButtons(NULL), _seqAcorn(NULL), _seqCity1(NULL), _seqCity2(NULL), _seqCity3(NULL), _seqCredits(NULL),
+	_seqTooltips(nullptr), _seqEggButtons(nullptr), _seqButtons(nullptr), _seqAcorn(nullptr), _seqCity1(nullptr), _seqCity2(nullptr), _seqCity3(nullptr), _seqCredits(nullptr),
 	_gameId(kGameBlue), _hasShownStartScreen(false), _hasShownIntro(false),
 	_isShowingCredits(false), _isGameStarted(false), _isShowingMenu(false),
-	_creditsSequenceIndex(0), _checkHotspotsTicks(15),  _mouseFlags(Common::EVENT_INVALID), _lastHotspot(NULL),
+	_creditsSequenceIndex(0), _checkHotspotsTicks(15),  _mouseFlags(Common::EVENT_INVALID), _lastHotspot(nullptr),
 	_currentTime(kTimeNone), _lowerTime(kTimeNone), _time(kTimeNone), _currentIndex(0), _index(0), _lastIndex(0), _delta(0), _handleTimeDelta(false) {
 
 	_clock = new Clock(_engine);
@@ -165,7 +164,7 @@ Menu::~Menu() {
 	SAFE_DELETE(_seqCity3);
 	SAFE_DELETE(_seqCredits);
 
-	_lastHotspot = NULL;
+	_lastHotspot = nullptr;
 
 	// Cleanup frames
 	for (MenuFrames::iterator it = _frames.begin(); it != _frames.end(); it++)
@@ -174,7 +173,7 @@ Menu::~Menu() {
 	_frames.clear();
 
 	// Zero passed pointers
-	_engine = NULL;
+	_engine = nullptr;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -252,7 +251,7 @@ void Menu::eventMouse(const Common::Event &ev) {
 		}
 	} else {
 		// Check for hotspots
-		SceneHotspot *hotspot = NULL;
+		SceneHotspot *hotspot = nullptr;
 		getScenes()->get(getState()->scene)->checkHotSpot(ev.mouse, &hotspot);
 
 		if (_lastHotspot != hotspot || ev.type == Common::EVENT_LBUTTONUP) {
@@ -309,16 +308,16 @@ void Menu::show(bool doSavegame, SavegameType type, uint32 value) {
 			if (!_hasShownIntro) {
 				// Show Broderbrund logo
 				Animation animation;
-				if (animation.load(getArchive("1930.nis")))
+				if (animation.load(getArchiveMember("1930.nis")))
 					animation.play();
 
 				getFlags()->mouseRightClick = false;
 
 				// Play intro music
-				getSound()->playSoundWithSubtitles("MUS001.SND", kFlagMusic, kEntityPlayer);
+				getSound()->playSoundWithSubtitles("MUS001.SND", kSoundTypeIntro | kVolumeFull, kEntityPlayer);
 
 				// Show The Smoking Car logo
-				if (animation.load(getArchive("1931.nis")))
+				if (animation.load(getArchiveMember("1931.nis")))
 					animation.play();
 
 				_hasShownIntro = true;
@@ -326,7 +325,7 @@ void Menu::show(bool doSavegame, SavegameType type, uint32 value) {
 		} else {
 			// Only show the quick intro
 			if (!_hasShownStartScreen) {
-				getSound()->playSoundWithSubtitles("MUS018.SND", kFlagMusic, kEntityPlayer);
+				getSound()->playSoundWithSubtitles("MUS018.SND", kSoundTypeIntro | kVolumeFull, kEntityPlayer);
 				getScenes()->loadScene(kSceneStartScreen);
 
 				// Original game waits 60 frames and loops Sound::unknownFunction1 unless the right button is pressed
@@ -349,10 +348,10 @@ void Menu::show(bool doSavegame, SavegameType type, uint32 value) {
 	init(doSavegame, type, value);
 
 	// Setup sound
-	getSoundQueue()->resetQueue();
-	getSoundQueue()->resetQueue(kSoundType11, kSoundType13);
+	getSoundQueue()->stopAmbient();
+	getSoundQueue()->stopAllExcept(kSoundTagIntro, kSoundTagMenu);
 	if (getSoundQueue()->isBuffered("TIMER"))
-		getSoundQueue()->removeFromQueue("TIMER");
+		getSoundQueue()->stop("TIMER");
 
 	// Init flags & misc
 	_isShowingCredits = false;
@@ -412,7 +411,7 @@ bool Menu::handleEvent(StartMenuAction action, Common::EventType type) {
 		if (clicked) {
 			showFrame(kOverlayButtons, kButtonQuitPushed, true);
 
-			getSoundQueue()->clearStatus();
+			getSoundQueue()->stopAll();
 			getSoundQueue()->updateQueue();
 			getSound()->playSound(kEntityPlayer, "LIB046");
 
@@ -485,7 +484,7 @@ bool Menu::handleEvent(StartMenuAction action, Common::EventType type) {
 		setLogicEventHandlers();
 
 		if (_index) {
-			getSoundQueue()->processEntry(kSoundType11);
+			getSoundQueue()->fade(kSoundTagIntro);
 		} else {
 			if (!getFlags()->mouseRightClick) {
 				getScenes()->loadScene((SceneIndex)(5 * _gameId + 3));
@@ -497,11 +496,11 @@ bool Menu::handleEvent(StartMenuAction action, Common::EventType type) {
 						getScenes()->loadScene((SceneIndex)(5 * _gameId + 5));
 
 						if (!getFlags()->mouseRightClick) {
-							getSoundQueue()->processEntry(kSoundType11);
+							getSoundQueue()->fade(kSoundTagIntro);
 
 							// Show intro
 							Animation animation;
-							if (animation.load(getArchive("1601.nis")))
+							if (animation.load(getArchiveMember("1601.nis")))
 								animation.play();
 
 							getEvent(kEventIntro) = 1;
@@ -513,7 +512,7 @@ bool Menu::handleEvent(StartMenuAction action, Common::EventType type) {
 			if (!getEvent(kEventIntro))	{
 				getEvent(kEventIntro) = 1;
 
-				getSoundQueue()->processEntry(kSoundType11);
+				getSoundQueue()->fade(kSoundTagIntro);
 			}
 		}
 
@@ -961,7 +960,7 @@ void Menu::checkHotspots() {
 	if (_isShowingCredits)
 		return;
 
-	SceneHotspot *hotspot = NULL;
+	SceneHotspot *hotspot = nullptr;
 	getScenes()->get(getState()->scene)->checkHotSpot(getCoords(), &hotspot);
 
 	if (hotspot)
@@ -971,7 +970,7 @@ void Menu::checkHotspots() {
 }
 
 void Menu::hideOverlays() {
-	_lastHotspot = NULL;
+	_lastHotspot = nullptr;
 
 	// Hide all menu overlays
 	for (MenuFrames::iterator it = _frames.begin(); it != _frames.end(); it++)
@@ -1119,9 +1118,9 @@ void Menu::updateTime(uint32 time) {
 
 	if (_time != time) {
 		if (getSoundQueue()->isBuffered(kEntityChapters))
-			getSoundQueue()->removeFromQueue(kEntityChapters);
+			getSoundQueue()->stop(kEntityChapters);
 
-		getSound()->playSoundWithSubtitles((_currentTime >= _time) ? "LIB042" : "LIB041", kFlagMenuClock, kEntityChapters);
+		getSound()->playSoundWithSubtitles((_currentTime >= _time) ? "LIB042" : "LIB041", kSoundTypeMenu | kSoundFlagFixedVolume | kVolumeFull, kEntityChapters);
 		adjustIndex(_currentTime, _time, false);
 	}
 }
@@ -1251,7 +1250,7 @@ void Menu::adjustTime() {
 	}
 
 	if (_currentTime == _time && getSoundQueue()->isBuffered(kEntityChapters))
-		getSoundQueue()->removeFromQueue(kEntityChapters);
+		getSoundQueue()->stop(kEntityChapters);
 
 	_clock->draw(_time);
 	_trainLine->draw(_time);

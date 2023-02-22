@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -89,20 +88,20 @@ protected:
 	/**
 	 * Display the talk interface window
 	 */
-	virtual void talkInterface(const byte *&str);
+	void talkInterface(const byte *&str) override;
 
 	/**
 	 * Called when a character being spoken to has no talk options to display
 	 */
-	virtual void nothingToSay();
+	void nothingToSay() override;
 
 	/**
 	 * Show the talk display
 	 */
-	virtual void showTalk();
+	void showTalk() override;
 public:
 	TattooTalk(SherlockEngine *vm);
-	virtual ~TattooTalk() {}
+	~TattooTalk() override {}
 
 	/**
 	 * Called whenever a conversation or item script needs to be run. For standard conversations,
@@ -112,28 +111,28 @@ public:
 	 *	In their case, the conversation display is simply suppressed, and control is passed on to
 	 *	doScript to implement whatever action is required.
 	 */
-	virtual void talkTo(const Common::String filename);
+	void talkTo(const Common::String filename) override;
 
 	/**
 	 * Push the details of a passed object onto the saved sequences stack
 	 */
-	virtual void pushSequenceEntry(Object *obj);
+	void pushSequenceEntry(Object *obj) override;
 
 	/**
 	 * Pulls a background object sequence from the sequence stack and restore's the
 	 * object's sequence
 	 */
-	virtual void pullSequence(int slot = -1);
+	void pullSequence(int slot = -1) override;
 
 	/**
 	 * Returns true if the script stack is empty
 	 */
-	virtual bool isSequencesEmpty() const;
+	bool isSequencesEmpty() const override;
 
 	/**
 	 * Clears the stack of pending object sequences associated with speakers in the scene
 	 */
-	virtual void clearSequences();
+	void clearSequences() override;
 };
 
 } // End of namespace Tattoo

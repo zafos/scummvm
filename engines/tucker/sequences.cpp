@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -142,8 +141,10 @@ void TuckerEngine::handleCreditsSequence() {
 				case 5:
 					filename = "loc78.pcx";
 					break;
+				default:
+					break;
 				}
-				if (filename != "")
+				if (!filename.empty())
 					loadImage(filename.c_str(), _quadBackgroundGfxBuf, 2);
 			}
 			_spritesCount = _creditsSequenceSpriteCounts[num];
@@ -228,7 +229,7 @@ void TuckerEngine::handleNewPartSequence() {
 	default:
 		break;
 	}
-	_sprC02Table[1] = loadFile(filename.c_str(), 0);
+	_sprC02Table[1] = loadFile(filename.c_str(), nullptr);
 	startSpeechSound(9000, 60);
 	_fadePaletteCounter = 0;
 	do {
@@ -517,7 +518,7 @@ void AnimationSequencePlayer::mainLoop() {
 		{ 13, 2, &AnimationSequencePlayer::loadIntroSeq13_14, &AnimationSequencePlayer::playIntroSeq13_14 },
 		{ 15, 2, &AnimationSequencePlayer::loadIntroSeq15_16, &AnimationSequencePlayer::playIntroSeq15_16 },
 		{ 27, 2, &AnimationSequencePlayer::loadIntroSeq27_28, &AnimationSequencePlayer::playIntroSeq27_28 },
-		{  1, 0, 0, 0 }
+		{  1, 0, nullptr,                                     nullptr                                     }
 	};
 	static const SequenceUpdateFunc _gameSeqUpdateFuncs[] = {
 		{ 17, 1, &AnimationSequencePlayer::loadIntroSeq17_18, &AnimationSequencePlayer::playIntroSeq17_18 },
@@ -525,7 +526,7 @@ void AnimationSequencePlayer::mainLoop() {
 		{  3, 2, &AnimationSequencePlayer::loadIntroSeq3_4,   &AnimationSequencePlayer::playIntroSeq3_4   },
 		{  9, 2, &AnimationSequencePlayer::loadIntroSeq9_10,  &AnimationSequencePlayer::playIntroSeq9_10  },
 		{ 21, 2, &AnimationSequencePlayer::loadIntroSeq21_22, &AnimationSequencePlayer::playIntroSeq21_22 },
-		{  1, 0, 0, 0 }
+		{  1, 0, nullptr,                                     nullptr                                     }
 	};
 	switch (_seqNum) {
 	case kFirstAnimationSequenceDemo:
@@ -533,6 +534,8 @@ void AnimationSequencePlayer::mainLoop() {
 		break;
 	case kFirstAnimationSequenceGame:
 		_updateFunc = _gameSeqUpdateFuncs;
+		break;
+	default:
 		break;
 	}
 	_updateFuncIndex = 0;
@@ -581,7 +584,7 @@ void AnimationSequencePlayer::syncTime() {
 				}
 				break;
 			case Common::EVENT_QUIT:
-			case Common::EVENT_RTL:
+			case Common::EVENT_RETURN_TO_LAUNCHER:
 				_seqNum = 1;
 				break;
 			default:
@@ -599,14 +602,14 @@ Audio::RewindableAudioStream *AnimationSequencePlayer::loadSound(int index, Anim
 		return stream;
 
 	Common::String fileName = Common::String::format("audio/%s", _audioFileNamesTable[index]);
-	Common::File f;
-	if (f.open(fileName)) {
+	Common::File *f = new Common::File();
+	if (f->open(fileName)) {
 		int size = 0, rate = 0;
 		uint8 flags = 0;
 		switch (type) {
 		case kAnimationSoundType8BitsRAW:
 		case kAnimationSoundType16BitsRAW:
-			size = f.size();
+			size = f->size();
 			rate = 22050;
 			flags = Audio::FLAG_UNSIGNED;
 			if (type == kAnimationSoundType16BitsRAW)
@@ -615,16 +618,21 @@ Audio::RewindableAudioStream *AnimationSequencePlayer::loadSound(int index, Anim
 			if (size != 0) {
 				uint8 *sampleData = (uint8 *)malloc(size);
 				if (sampleData) {
-					f.read(sampleData, size);
+					f->read(sampleData, size);
 					stream = Audio::makeRawStream(sampleData, size, rate, flags);
 				}
 			}
+			delete f;
 			break;
 		case kAnimationSoundTypeWAV:
-			stream = Audio::makeWAVStream(&f, DisposeAfterUse::NO);
+			stream = Audio::makeWAVStream(f, DisposeAfterUse::YES);
+			break;
+		default:
+			delete f;
 			break;
 		}
-
+	} else {
+		delete f;
 	}
 	return stream;
 }
@@ -632,7 +640,7 @@ Audio::RewindableAudioStream *AnimationSequencePlayer::loadSound(int index, Anim
 void AnimationSequencePlayer::loadSounds(int num) {
 	if (_soundSeqDataList[num].musicVolume != 0) {
 		Audio::AudioStream *s;
-		if ((s = loadSound(_soundSeqDataList[num].musicIndex, kAnimationSoundType8BitsRAW)) != 0) {
+		if ((s = loadSound(_soundSeqDataList[num].musicIndex, kAnimationSoundType8BitsRAW)) != nullptr) {
 			_mixer->playStream(Audio::Mixer::kMusicSoundType, &_musicHandle, s, -1, scaleMixerVolume(_soundSeqDataList[num].musicVolume));
 		}
 	}
@@ -642,17 +650,17 @@ void AnimationSequencePlayer::loadSounds(int num) {
 }
 
 void AnimationSequencePlayer::updateSounds() {
-	Audio::RewindableAudioStream *s = 0;
+	Audio::RewindableAudioStream *s = nullptr;
 	const SoundSequenceData *p = &_soundSeqData[_soundSeqDataIndex];
 	while (_soundSeqDataIndex < _soundSeqDataCount && p->timestamp <= _frameCounter) {
 		switch (p->opcode) {
 		case 0:
-			if ((s = loadSound(p->num, kAnimationSoundTypeWAV)) != 0) {
+			if ((s = loadSound(p->num, kAnimationSoundTypeWAV)) != nullptr) {
 				_mixer->playStream(Audio::Mixer::kSFXSoundType, &_soundsHandle[p->index], s, -1, scaleMixerVolume(p->volume));
 			}
 			break;
 		case 1:
-			if ((s = loadSound(p->num, kAnimationSoundTypeWAV)) != 0) {
+			if ((s = loadSound(p->num, kAnimationSoundTypeWAV)) != nullptr) {
 				_mixer->playStream(Audio::Mixer::kSFXSoundType, &_soundsHandle[p->index], Audio::makeLoopingAudioStream(s, 0),
 				                        -1, scaleMixerVolume(p->volume));
 			}
@@ -665,18 +673,18 @@ void AnimationSequencePlayer::updateSounds() {
 			break;
 		case 4:
 			_mixer->stopHandle(_musicHandle);
-			if ((s = loadSound(p->num, kAnimationSoundType8BitsRAW)) != 0) {
+			if ((s = loadSound(p->num, kAnimationSoundType8BitsRAW)) != nullptr) {
 				_mixer->playStream(Audio::Mixer::kMusicSoundType, &_musicHandle, s, -1, scaleMixerVolume(p->volume));
 			}
 			break;
 		case 5:
-			if ((s = loadSound(p->num, kAnimationSoundTypeWAV)) != 0) {
+			if ((s = loadSound(p->num, kAnimationSoundTypeWAV)) != nullptr) {
 				_mixer->playStream(Audio::Mixer::kSFXSoundType, &_sfxHandle, s, -1, scaleMixerVolume(p->volume));
 			}
 			break;
 		case 6:
 			_mixer->stopHandle(_musicHandle);
-			if ((s = loadSound(p->num, kAnimationSoundType16BitsRAW)) != 0) {
+			if ((s = loadSound(p->num, kAnimationSoundType16BitsRAW)) != nullptr) {
 				_mixer->playStream(Audio::Mixer::kMusicSoundType, &_musicHandle, s, -1, scaleMixerVolume(p->volume));
 			}
 			break;
@@ -810,7 +818,7 @@ void AnimationSequencePlayer::playIntroSeq19_20() {
 	// The intro credits animation. This uses 2 animations: the foreground one, which
 	// is the actual intro credits, and the background one, which is an animation of
 	// cogs, and is being replayed when an intro credit appears
-	const ::Graphics::Surface *surface = 0;
+	const ::Graphics::Surface *surface = nullptr;
 
 	if (_flicPlayer[0].getCurFrame() >= 115) {
 		surface = _flicPlayer[1].decodeNextFrame();

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -38,39 +37,64 @@ protected:
 	int _objectIDMapSize;
 	ObjectNameId *_objectIDMap;
 
+	struct StampShot {
+		int slot;
+		int boxX;
+		int boxY;
+		int boxWidth;
+		int boxHeight;
+		int brightness;
+	};
+
+	int _savegameThumbnailV8Palette[256];
+	byte _savegameThumbnailV8[160 * 120]; // One fourth of the nominal 640x480 resolution
+	StampShot _stampShots[20];
+	int _stampShotsInQueue = 0;
+
 	int _keyScriptKey, _keyScriptNo;
 
 public:
 	ScummEngine_v8(OSystem *syst, const DetectorResult &dr);
-	~ScummEngine_v8();
+	~ScummEngine_v8() override;
+
+	void setKeyScriptVars(int _keyScriptKey, int _keyScriptNo);
+	void stampShotDequeue();
 
 protected:
-	virtual void setupOpcodes();
+	void setupOpcodes() override;
 
-	virtual void printString(int m, const byte *msg);
+	void printString(int m, const byte *msg) override;
 
-	virtual void scummLoop_handleSaveLoad();
+	void scummLoop_handleSaveLoad() override;
 
-	virtual void setupScummVars();
-	virtual void resetScummVars();
-	virtual void decodeParseString(int m, int n);
-	virtual void readArrayFromIndexFile();
+	void setupScummVars() override;
+	void resetScummVars() override;
+	void decodeParseString(int m, int n) override;
+	void readArrayFromIndexFile() override;
 
-	virtual void readMAXS(int blockSize);
-	virtual void readGlobalObjects();
+	void readMAXS(int blockSize) override;
+	void readGlobalObjects() override;
 
-	virtual uint fetchScriptWord();
-	virtual int fetchScriptWordSigned();
+	uint fetchScriptWord() override;
+	int fetchScriptWordSigned() override;
 
-	virtual int readVar(uint var);
-	virtual void writeVar(uint var, int value);
+	int readVar(uint var) override;
+	void writeVar(uint var, int value) override;
 
-	virtual int getObjectIdFromOBIM(const byte *obim);
+	int getObjectIdFromOBIM(const byte *obim) override;
 
-	virtual void processKeyboard(Common::KeyState lastKeyHit);
-
+	void processKeyboard(Common::KeyState lastKeyHit) override;
+	void setDefaultCursor() override;
 	void desaturatePalette(int hueScale, int satScale, int lightScale, int startColor, int endColor);
 
+	void stampShotEnqueue(int slot, int boxX, int boxY, int boxWidth, int boxHeight, int brightness);
+	void stampScreenShot(int slot, int boxX, int boxY, int boxWidth, int boxHeight, int brightness);
+	void saveLoadWithSerializer(Common::Serializer &s) override;
+	void createInternalSaveStateThumbnail();
+	bool fetchInternalSaveStateThumbnail(int slotId, bool isHeapSave);
+	uint32 *fetchScummVMSaveStateThumbnail(int slotId, bool isHeapSave, int brightness);
+
+	const char *getGUIString(int stringId) override;
 
 	/* Version 8 script opcodes */
 	void o8_mod();

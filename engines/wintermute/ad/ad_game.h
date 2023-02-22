@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -44,15 +43,18 @@ class AdResponseContext;
 class AdResponseBox;
 class AdGame : public BaseGame {
 public:
-	virtual bool onScriptShutdown(ScScript *script) override;
+	bool onScriptShutdown(ScScript *script) override;
 
-	virtual bool onMouseLeftDown() override;
-	virtual bool onMouseLeftUp() override;
-	virtual bool onMouseLeftDblClick() override;
-	virtual bool onMouseRightDown() override;
-	virtual bool onMouseRightUp() override;
+	bool onMouseLeftDown() override;
+	bool onMouseLeftUp() override;
+	bool onMouseLeftDblClick() override;
+	bool onMouseRightDown() override;
+	bool onMouseRightUp() override;
 
-	virtual bool displayDebugInfo() override;
+	bool handleCustomActionStart(BaseGameCustomAction action) override;
+	bool handleCustomActionEnd(BaseGameCustomAction action) override;
+
+	bool displayDebugInfo() override;
 
 	bool addSpeechDir(const char *dir);
 	bool removeSpeechDir(const char *dir);
@@ -61,7 +63,7 @@ public:
 	bool deleteItem(AdItem *Item);
 	char *_itemsFile;
 	bool _tempDisableSaveState;
-	virtual bool resetContent();
+	bool resetContent() override;
 	bool addItem(AdItem *item);
 	AdItem *getItemByName(const char *name) const;
 
@@ -69,7 +71,7 @@ public:
 	bool isItemTaken(char *itemName);
 	bool registerInventory(AdInventory *inv);
 	bool unregisterInventory(AdInventory *inv);
-	virtual bool displayContent(bool update = true, bool displayAll = false) override;
+	bool displayContent(bool update = true, bool displayAll = false) override;
 
 	bool gameResponseUsed(int ID) const;
 	bool addGameResponse(int ID);
@@ -80,8 +82,8 @@ public:
 	bool clearBranchResponses(char *name);
 	bool startDlgBranch(const char *branchName, const char *scriptName, const char *eventName);
 	bool endDlgBranch(const char *branchName, const char *scriptName, const char *eventName);
-	virtual bool windowLoadHook(UIWindow *win, char **buf, char **params) override;
-	virtual bool windowScriptMethodHook(UIWindow *win, ScScript *script, ScStack *stack, const char *name) override;
+	bool windowLoadHook(UIWindow *win, char **buf, char **params) override;
+	bool windowScriptMethodHook(UIWindow *win, ScScript *script, ScStack *stack, const char *name) override;
 
 	AdSceneState *getSceneState(const char *filename, bool saving);
 	BaseViewport *_sceneViewport;
@@ -92,18 +94,28 @@ public:
 	int32 _texTalkLifeTime;
 
 	TTalkSkipButton _talkSkipButton;
+	TVideoSkipButton _videoSkipButton;
 
-	virtual bool getVersion(byte *verMajor, byte *verMinor, byte *extMajor, byte *extMinor) const override;
+	virtual bool getLayerSize(int *layerWidth, int *layerHeight, Rect32 *viewport, bool *customViewport) override;
+#ifdef ENABLE_WME3D
+	uint32 getAmbientLightColor() override;
+
+	TShadowType getMaxShadowType(BaseObject *object) override;
+
+	bool getFogParams(bool *fogEnabled, uint32 *fogColor, float *start, float *end) override;
+#endif
+
+	bool getVersion(byte *verMajor, byte *verMinor, byte *extMajor, byte *extMinor) const override;
 	bool scheduleChangeScene(const char *filename, bool fadeIn);
 	void setPrevSceneName(const char *name);
 	void setPrevSceneFilename(const char *name);
 
 	AdItem *_selectedItem;
-	bool cleanup();
+	bool cleanup() override;
 	DECLARE_PERSISTENT(AdGame, BaseGame)
 
 	void finishSentences();
-	bool showCursor();
+	bool showCursor() override;
 
 	TGameStateEx _stateEx;
 
@@ -115,24 +127,24 @@ public:
 	AdScene *_scene;
 	bool initLoop();
 	AdGame(const Common::String &gameId);
-	virtual ~AdGame();
+	~AdGame() override;
 
 	BaseArray<AdObject *> _objects;
 
-	virtual bool loadFile(const char *filename);
-	virtual bool loadBuffer(char *buffer, bool complete = true);
+	bool loadFile(const char *filename) override;
+	bool loadBuffer(char *buffer, bool complete = true) override;
 
 	bool loadItemsFile(const char *filename, bool merge = false);
 	bool loadItemsBuffer(char *buffer, bool merge = false);
 
 	// scripting interface
-	virtual ScValue *scGetProperty(const Common::String &name) override;
-	virtual bool scSetProperty(const char *name, ScValue *value) override;
-	virtual bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
+	ScValue *scGetProperty(const Common::String &name) override;
+	bool scSetProperty(const char *name, ScValue *value) override;
+	bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
 	bool validMouse();
 	Common::String debuggerToString() const override;
 private:
-	virtual bool externalCall(ScScript *script, ScStack *stack, ScStack *thisStack, char *name) override;
+	bool externalCall(ScScript *script, ScStack *stack, ScStack *thisStack, char *name) override;
 
 	AdObject *_invObject;
 	BaseArray<AdInventory *> _inventories;

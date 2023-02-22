@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,41 +15,46 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef BACKENDS_CLOUD_ONEDRIVE_ONEDRIVESTORAGE_H
 #define BACKENDS_CLOUD_ONEDRIVE_ONEDRIVESTORAGE_H
 
-#include "backends/cloud/storage.h"
+#include "backends/cloud/basestorage.h"
 #include "backends/networking/curl/curljsonrequest.h"
 
 namespace Cloud {
 namespace OneDrive {
 
-class OneDriveStorage: public Cloud::Storage {
-	static char *KEY, *SECRET;
-
-	static void loadKeyAndSecret();
-
-	Common::String _token, _uid, _refreshToken;
-
+class OneDriveStorage: public Cloud::BaseStorage {
 	/** This private constructor is called from loadFromConfig(). */
-	OneDriveStorage(Common::String token, Common::String uid, Common::String refreshToken);
-
-	void tokenRefreshed(BoolCallback callback, Networking::JsonResponse response);
-	void codeFlowComplete(BoolResponse response);
-	void codeFlowFailed(Networking::ErrorResponse error);
+	OneDriveStorage(Common::String token, Common::String refreshToken, bool enabled);
 
 	/** Constructs StorageInfo based on JSON response from cloud. */
 	void infoInnerCallback(StorageInfoCallback outerCallback, Networking::JsonResponse json);
 
 	void fileInfoCallback(Networking::NetworkReadStreamCallback outerCallback, Networking::JsonResponse response);
+
+protected:
+	/**
+	 * @return "onedrive"
+	 */
+	virtual Common::String cloudProvider();
+
+	/**
+	 * @return kStorageOneDriveId
+	 */
+	virtual uint32 storageIndex();
+
+	virtual bool needsRefreshToken();
+
+	virtual bool canReuseRefreshToken();
+
 public:
 	/** This constructor uses OAuth code flow to get tokens. */
-	OneDriveStorage(Common::String code);
+	OneDriveStorage(Common::String code, Networking::ErrorCallback cb);
 	virtual ~OneDriveStorage();
 
 	/**
@@ -93,16 +98,14 @@ public:
 
 	/**
 	 * Load token and user id from configs and return OneDriveStorage for those.
-	 * @return pointer to the newly created OneDriveStorage or 0 if some problem occured.
+	 * @return pointer to the newly created OneDriveStorage or 0 if some problem occurred.
 	 */
 	static OneDriveStorage *loadFromConfig(Common::String keyPrefix);
 
 	/**
-	 * Gets new access_token. If <code> passed is "", refresh_token is used.
-	 * Use "" in order to refresh token and pass a callback, so you could
-	 * continue your work when new token is available.
+	 * Remove all OneDriveStorage-related data from config.
 	 */
-	void getAccessToken(BoolCallback callback, Networking::ErrorCallback errorCallback = nullptr, Common::String code = "");
+	static void removeFromConfig(Common::String keyPrefix);
 
 	Common::String accessToken() const { return _token; }
 };

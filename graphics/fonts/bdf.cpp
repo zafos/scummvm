@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -56,6 +55,10 @@ const char *BdfFont::getFontSlant() const {
 
 int BdfFont::getFontHeight() const {
 	return _data.height;
+}
+
+int BdfFont::getFontAscent() const {
+	return _data.ascent;
 }
 
 int BdfFont::getFontSize() const {
@@ -203,6 +206,9 @@ byte *loadCharacter(Common::SeekableReadStream &stream, int &encoding, int &adva
 
 	while (true) {
 		line = stream.readLine();
+		line.trim(); 	// BDF files created from unifont tools (make hex)
+						// have a rogue space character after the "BITMAP" label
+
 		if (stream.err() || stream.eos()) {
 			warning("BdfFont::loadCharacter: Premature end of file");
 			delete[] bitmap;
@@ -249,6 +255,12 @@ byte *loadCharacter(Common::SeekableReadStream &stream, int &encoding, int &adva
 			box.yOffset = yOffset;
 		} else if (line == "BITMAP") {
 			const uint bytesPerRow = (box.width + 7) / 8;
+
+			if (bitmap) {
+				warning("Bdf::loadCharacter(): Double BITMAP definitions");
+				delete[] bitmap;
+			}
+
 			byte *dst = bitmap = new byte[box.height * bytesPerRow];
 
 			for (int y = 0; y < box.height; ++y) {
@@ -385,16 +397,16 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 			byte *bitmap = loadCharacter(stream, encoding, advance, box);
 
 			// Ignore all characters above 255.
-			if (encoding < -1 || encoding >= font.numCharacters) {
+			if (encoding < 0 || encoding >= font.numCharacters) {
 				delete[] bitmap;
-				encoding = -1;
+				continue;
 			}
 
 			// Calculate the max advance
-			if (encoding != -1 && advance > font.maxAdvance)
+			if (advance > font.maxAdvance)
 				font.maxAdvance = advance;
 
-			if (!bitmap && encoding != -1) {
+			if (!bitmap) {
 				warning("BdfFont::loadFont: Character %d invalid", encoding);
 				freeBitmaps(bitmaps, font.numCharacters);
 				delete[] bitmaps;
@@ -405,14 +417,16 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 				return 0;
 			}
 
-			if (encoding != -1) {
-				bitmaps[encoding] = bitmap;
-				advances[encoding] = advance;
-				boxes[encoding] = box;
-			}
+			bitmaps[encoding] = bitmap;
+			advances[encoding] = advance;
+			boxes[encoding] = box;
 		} else if (line.hasPrefix("FAMILY_NAME \"")) {
-			familyName = new char[line.size()]; // We will definitely fit here
-			Common::strlcpy(familyName, &line.c_str()[13], line.size());
+			if (familyName != nullptr) {
+				warning("BdfFont::loadFont: Duplicated FAMILY_NAME");
+				delete[] familyName;
+			}
+			familyName = new char[line.size()];
+			Common::strlcpy(familyName, line.c_str() + 13, line.size() - 12);	// strlcpy() copies at most size-1 characters and then add a '\0'
 			char *p = &familyName[strlen(familyName)];
 			while (p != familyName && *p != '"')
 				p--;
@@ -428,8 +442,12 @@ BdfFont *BdfFont::loadFont(Common::SeekableReadStream &stream) {
 			}
 			*p = '\0'; // Remove last quote
 		} else if (line.hasPrefix("SLANT \"")) {
-			slant = new char[line.size()]; // We will definitely fit here
-			Common::strlcpy(slant, &line.c_str()[7], line.size());
+			if (slant != nullptr) {
+				warning("BdfFont::loadFont: Duplicated SLANT");
+				delete[] slant;
+			}
+			slant = new char[line.size()];
+			Common::strlcpy(slant, line.c_str() + 7, line.size() - 6);  // strlcpy() copies at most size-1 characters and then add a '\0'
 			char *p = &slant[strlen(slant)];
 			while (p != slant && *p != '"')
 				p--;
@@ -624,11 +642,11 @@ bool BdfFont::cacheFontData(const BdfFont &font, const Common::String &filename)
 BdfFont *BdfFont::loadFromCache(Common::SeekableReadStream &stream) {
 	const uint32 magic = stream.readUint32BE();
 	if (magic != BDF_FONTCACHE_TAG)
-		return 0;
+		return nullptr;
 
 	const uint32 version = stream.readUint32BE();
 	if (version != BDF_FONTCACHE_VERSION)
-		return 0;
+		return nullptr;
 
 	BdfFontData data;
 
@@ -644,7 +662,12 @@ BdfFont *BdfFont::loadFromCache(Common::SeekableReadStream &stream) {
 	data.numCharacters = stream.readUint16BE();
 
 	if (stream.err() || stream.eos())
-		return 0;
+		return nullptr;
+
+	if (data.numCharacters == 0) {
+		warning("BdfFont::loadFromCache(): Requested to load 0 characters font");
+		return nullptr;
+	}
 
 	byte **bitmaps = new byte *[data.numCharacters];
 	byte *advances = 0;
@@ -656,7 +679,7 @@ BdfFont *BdfFont::loadFromCache(Common::SeekableReadStream &stream) {
 			for (int j = 0; j < i; ++j)
 				delete[] bitmaps[i];
 			delete[] bitmaps;
-			return 0;
+			return nullptr;
 		}
 
 		if (size) {
@@ -689,7 +712,7 @@ BdfFont *BdfFont::loadFromCache(Common::SeekableReadStream &stream) {
 		delete[] bitmaps;
 		delete[] advances;
 		delete[] boxes;
-		return 0;
+		return nullptr;
 	}
 
 	data.bitmaps = bitmaps;
@@ -697,18 +720,24 @@ BdfFont *BdfFont::loadFromCache(Common::SeekableReadStream &stream) {
 	data.boxes = boxes;
 	data.familyName = nullptr;
 	data.slant = nullptr;
+	data.size = data.height;
 	return new BdfFont(data, DisposeAfterUse::YES);
 }
 
 BdfFont *BdfFont::scaleFont(BdfFont *src, int newSize) {
 	if (!src) {
-		warning("Empty font reference in scale font");
-		return NULL;
+		warning("BdfFont::scaleFont(): Empty font reference in scale font");
+		return nullptr;
 	}
 
 	if (src->getFontSize() == 0) {
-		warning("Requested to scale 0 size font");
-		return NULL;
+		warning("BdfFont::scaleFont(): Requested to scale 0 size font");
+		return nullptr;
+	}
+
+	if (src->_data.numCharacters == 0) {
+		warning("BdfFont::scaleFont(): Requested to scale 0 characters font");
+		return nullptr;
 	}
 
 	float scale = (float)newSize / (float)src->getFontSize();
@@ -717,6 +746,7 @@ BdfFont *BdfFont::scaleFont(BdfFont *src, int newSize) {
 
 	data.maxAdvance = (int)((float)src->_data.maxAdvance * scale);
 	data.height = (int)((float)src->_data.height * scale);
+	data.size = (int)((float)src->_data.size * scale);
 	data.defaultBox.width = (int)((float)src->_data.defaultBox.width * scale);
 	data.defaultBox.height = (int)((float)src->_data.defaultBox.height * scale);
 	data.defaultBox.xOffset = (int)((float)src->_data.defaultBox.xOffset * scale);
@@ -725,8 +755,14 @@ BdfFont *BdfFont::scaleFont(BdfFont *src, int newSize) {
 	data.firstCharacter = src->_data.firstCharacter;
 	data.defaultCharacter = src->_data.defaultCharacter;
 	data.numCharacters = src->_data.numCharacters;
-	data.familyName = strdup(src->_data.familyName);
-	data.slant = strdup(src->_data.slant);
+	uint sz = 1 + strlen(src->_data.familyName);
+	char *familyName = new char[sz];
+	Common::strcpy_s(familyName, sz, src->_data.familyName);
+	data.familyName = familyName;
+	sz = 1 + strlen(src->_data.slant);
+	char *slant = new char[sz];
+	Common::strcpy_s(slant, sz, src->_data.slant);
+	data.slant = slant;
 
 	BdfBoundingBox *boxes = new BdfBoundingBox[data.numCharacters];
 	for (int i = 0; i < data.numCharacters; ++i) {
@@ -764,17 +800,17 @@ BdfFont *BdfFont::scaleFont(BdfFont *src, int newSize) {
 				byte b = 0;
 
 				for (int x = 0; x < box.width; x++) {
+					b <<= 1;
+
 					int sx = (int)((float)x / scale);
 
 					if (srcd[sx / 8] & (0x80 >> (sx % 8)))
 						b |= 1;
 
-					if (!(x % 8) && x) {
+					if (x % 8 == 7) {
 						*dst++ = b;
 						b = 0;
 					}
-
-					b <<= 1;
 				}
 
 				if (((box.width - 1) % 8)) {

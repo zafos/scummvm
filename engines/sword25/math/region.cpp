@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -266,10 +265,10 @@ Vertex Region::findClosestPointOnLine(const Vertex &lineStart, const Vertex &lin
 	float vector1Y = static_cast<float>(point.y - lineStart.y);
 	float vector2X = static_cast<float>(lineEnd.x - lineStart.x);
 	float vector2Y = static_cast<float>(lineEnd.y - lineStart.y);
-	float vector2Length = sqrtf(vector2X * vector2X + vector2Y * vector2Y);
+	float vector2Length = sqrt(vector2X * vector2X + vector2Y * vector2Y);
 	vector2X /= vector2Length;
 	vector2Y /= vector2Length;
-	float distance = sqrtf(static_cast<float>((lineStart.x - lineEnd.x) * (lineStart.x - lineEnd.x) +
+	float distance = sqrt(static_cast<float>((lineStart.x - lineEnd.x) * (lineStart.x - lineEnd.x) +
 	                       (lineStart.y - lineEnd.y) * (lineStart.y - lineEnd.y)));
 	float dot = vector1X * vector2X + vector1Y * vector2Y;
 

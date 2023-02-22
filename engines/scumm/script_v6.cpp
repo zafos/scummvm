@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,7 +26,7 @@
 #include "scumm/charset.h"
 #include "scumm/file.h"
 #include "scumm/imuse/imuse.h"
-#include "scumm/imuse_digi/dimuse.h"
+#include "scumm/imuse_digi/dimuse_engine.h"
 #include "scumm/insane/insane.h"
 #include "scumm/object.h"
 #include "scumm/resource.h"
@@ -373,7 +372,7 @@ int ScummEngine_v6::findFreeArrayId() {
 ScummEngine_v6::ArrayHeader *ScummEngine_v6::getArray(int array) {
 	ArrayHeader *ah = (ArrayHeader *)getResourceAddress(rtString, readVar(array));
 	if (!ah)
-		return 0;
+		return nullptr;
 
 	if (_game.heversion == 0) {
 		// Workaround for a long standing bug where we saved array headers in native
@@ -397,7 +396,7 @@ int ScummEngine_v6::readArray(int array, int idx, int base) {
 	if (!ah)
 		error("readArray: invalid array %d (%d)", array, readVar(array));
 
-	// WORKAROUND bug #645711. This is clearly a script bug, as this script
+	// WORKAROUND bug #600. This is clearly a script bug, as this script
 	// excerpt shows nicely:
 	// ...
 	// [03A7] (5D)         if (isAnyOf(array-447[localvar13][localvar14],[0,4])) {
@@ -718,9 +717,13 @@ void ScummEngine_v6::o6_jump() {
 			_scummVars[202] = 35;
 	}
 
-	// WORKAROUND bug #2826144: Talking to the guard at the bigfoot party, after
+	// WORKAROUND bug #4464: Talking to the guard at the bigfoot party, after
 	// he's let you inside, will cause the game to hang, if you end the conversation.
-	// This is a script bug, due to a missing jump in one segment of the script.
+	// This is a script bug, due to a missing jump in one segment of the script,
+	// and it also happens with the original interpreters.
+	//
+	// Intentionally not using `_enableEnhancements`, since having the game hang
+	// is not useful to anyone.
 	if (_game.id == GID_SAMNMAX && vm.slot[_currentScript].number == 101 && readVar(0x8000 + 97) == 1 && offset == 1) {
 		offset = -18;
 	}
@@ -736,52 +739,47 @@ void ScummEngine_v6::o6_startScript() {
 	script = pop();
 	flags = pop();
 
-	// WORKAROUND bug #556558: At Dino Bungee National Memorial, the buttons for
-	// the Wally and Rex dinosaurs will always restart their speech, instead of
-	// stopping and starting their speech. This was a script bug in the original
-	// game.
-	if (_game.id == GID_SAMNMAX && _roomResource == 59 &&
-		vm.slot[_currentScript].number == 201 && script == 48) {
-		o6_breakHere();
-	}
-
-	// WORKAROUND bug #903223: In Puerto Pollo, if you have Guybrush examine
-	// the church clock, he'll read out the current time. Nice touch, only that
-	// it sounds crap in the german version (and maybe others, too). It seems
-	// the original engine of the german version played just a simple fixed
-	// text in this spot, for the above reason. Since the data files are
-	// unchanged, it must have been an engine hack job. No idea how they did
-	// it exactly, but this here is how we do it :-)
-	if (_game.id == GID_CMI && script == 204 &&
-		_currentRoom == 15 && vm.slot[_currentScript].number == 421 &&
-		_language == Common::DE_DEU) {
-
-		_actorToPrintStrFor = 1;
-		_string[0].loadDefault();
-		actorTalk((const byte *)"/VDSO325/Whoa! Look at the time. Gotta scoot.");
-
+	// WORKAROUND: In DOTT, when Jefferson builds the fire, `startScript(1,106,[91,5])`
+	// is called, which randomly changes the state of the fire object between 1 and 5,
+	// as long as Hoagie doesn't exit this room. This makes him randomly fail
+	// interacting with it, saying "I can't reach it." instead of the intended "No.
+	// Fire bad." line. It looks like the 1-5 states for the fire object are useless
+	// leftovers which can be safely ignored in order to make sure that Hoagie's
+	// comment is always available (maybe the fire was meant to be displayed
+	// differently when it's just been lit, but then the idea was dropped?).
+	// This also happens with the original interpreters and with the remaster.
+	if (_game.id == GID_TENTACLE && _roomResource == 13 &&
+		vm.slot[_currentScript].number == 21 && script == 106 &&
+		args[0] == 91 && _enableEnhancements) {
 		return;
 	}
 
-	// WORKAROUND bug #1878514: When turning pages in the recipe book
-	// (found on Blood Island), there is a brief moment where it displays
-	// text from two different pages at the same time.
+	// WORKAROUND for a bug also present in the original EXE: After greasing (or oiling?)
+	// the cannonballs in the Plunder Town Theater, during the juggling show, the game
+	// cuts from room 18 (backstage) to room 19 (stage).
 	//
-	// The content of the books is drawing (in an endless loop) by local
-	// script 2007. Changing the page is handled by script 2006, which
-	// first stops script 2007; then switches the page; then restarts
-	// script 2007. But it fails to clear the blast texts beforehand.
-	// Hence, the next time blast text is drawn, both the old one (from
-	// the old instance of script 2007) and the new text (from the new
-	// instance) are briefly drawn simultaneously.
+	// Usually, when loading a room script 29 handles the change of background music,
+	// based on which room we've just loaded.
+	// Unfortunately, during this particular cutscene, script 29 is not executing,
+	// therefore the music is unchanged from room 18 to 19 (the muffled backstage
+	// version is played), and is not coherent with the drums fill played afterwards
+	// (sequence 2225), which is unmuffled.
 	//
-	// This looks like a script bug to me (a missing call to clearTextQueue).
-	// But this could also hint at a subtle bug in ScummVM; we should check
-	// whether this bug occurs with the original engine or not.
-	if (_game.id == GID_CMI && script == 2007 &&
-		_currentRoom == 62 && vm.slot[_currentScript].number == 2006) {
+	// This fix checks for this situation happening (and only this one), and makes a call
+	// to a soundKludge operation like script 29 would have done.
+	if (_game.id == GID_CMI && _currentRoom == 19 &&
+		vm.slot[_currentScript].number == 168 && script == 118 && _enableEnhancements) {
+		int list[16] = { 4096, 1278, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		_sound->soundKludge(list, 2);
+	}
 
-		removeBlastTexts();
+	// WORKAROUND bug #269: At Dino Bungee National Memorial, the buttons for
+	// the Wally and Rex dinosaurs will always restart their speech, instead of
+	// stopping and starting their speech. This was a script bug in the original
+	// game, which would also block the "That was informative" reaction from Sam.
+	if (_game.id == GID_SAMNMAX && _roomResource == 59 &&
+		vm.slot[_currentScript].number == 201 && script == 48 && _enableEnhancements) {
+		o6_breakHere();
 	}
 
 	runScript(script, (flags & 1) != 0, (flags & 2) != 0, args);
@@ -850,7 +848,7 @@ void ScummEngine_v6::o6_drawObjectAt() {
 	int x = pop();
 	int obj = pop();
 
-	// WORKAROUND bug #1846746 : Adjust x and y position of
+	// WORKAROUND bug #3487 : Adjust x and y position of
 	// objects in credits sequence, to match other ports
 	if (_game.id == GID_PUTTMOON && _game.platform == Common::kPlatform3DO &&
 		_roomResource == 38 && vm.slot[_currentScript].number == 206) {
@@ -1084,7 +1082,6 @@ void ScummEngine_v6::o6_setCameraAt() {
 		int x, y;
 
 		camera._follows = 0;
-		VAR(VAR_CAMERA_FOLLOWED_ACTOR) = 0;
 
 		y = pop();
 		x = pop();
@@ -1097,7 +1094,21 @@ void ScummEngine_v6::o6_setCameraAt() {
 
 void ScummEngine_v6::o6_loadRoom() {
 	int room = pop();
-	startScene(room, 0, 0);
+
+	// WORKAROUND bug #13378: During Sam's reactions to Max beating up the
+	// scientist in the intro, we sometimes have to slow down animations
+	// artificially. This is where we speed them back up again.
+	if (_game.id == GID_SAMNMAX && vm.slot[_currentScript].number == 65 && room == 6 && _enableEnhancements) {
+		int actors[] = { 2, 3, 10 };
+
+		for (int i = 0; i < ARRAYSIZE(actors); i++) {
+			Actor *a = derefActorSafe(actors[i], "o6_animateActor");
+			if (a && a->getAnimSpeed() > 0)
+				a->setAnimSpeed(0);
+		}
+	}
+
+	startScene(room, nullptr, 0);
 	if (_game.heversion >= 61) {
 		setCameraAt(camera._cur.x, 0);
 	}
@@ -1132,13 +1143,11 @@ void ScummEngine_v6::o6_walkActorToObj() {
 		getObjectXYPos(obj, x, y, dir);
 		a->startWalkActor(x, y, dir);
 	} else {
-		a2 = derefActorSafe(obj, "o6_walkActorToObj(2)");
-		if (_game.id == GID_SAMNMAX && a2 == 0) {
-			// WORKAROUND bug #742676 SAM: Fish Farm. Note quite sure why it
-			// happens, whether it's normal or due to a bug in the ScummVM code.
-			debug(0, "o6_walkActorToObj: invalid actor %d", obj);
+		if (!isValidActor(obj))
 			return;
-		}
+
+		a2 = derefActor(obj, "o6_walkActorToObj(2)");
+
 		if (!a->isInCurrentRoom() || !a2->isInCurrentRoom())
 			return;
 		if (dist == 0) {
@@ -1213,26 +1222,37 @@ void ScummEngine_v6::o6_faceActor() {
 void ScummEngine_v6::o6_animateActor() {
 	int anim = pop();
 	int act = pop();
-	if (_game.id == GID_TENTACLE && _roomResource == 57 &&
-		vm.slot[_currentScript].number == 19 && act == 593) {
-		// WORKAROUND bug #743363: This very odd case (animateActor(593,250))
-		// occurs in DOTT, in the cutscene after George cuts down the "cherry
-		// tree" and the tree Laverne is trapped in vanishes...
-		// Not sure if this means animateActor somehow also must work for objects
-		// (593 is the time machine in room 57), or if this is simply a script bug.
-		act = 6;
-	}
-	if (_game.id == GID_SAMNMAX && _roomResource == 35 &&
-		vm.slot[_currentScript].number == 202 && act == 4 && anim == 14) {
-		// WORKAROUND bug #1223621 (Animation glitch at World of Fish).
+
+	if (_game.id == GID_SAMNMAX && _roomResource == 35 && vm.slot[_currentScript].number == 202 &&
+		act == 4 && anim == 14 && _enableEnhancements) {
+		// WORKAROUND bug #2068 (Animation glitch at World of Fish).
 		// Before starting animation 14 of the fisherman, make sure he isn't
-		// talking anymore. This appears to be a bug in the original game as well.
+		// talking anymore, otherwise the fishing line may appear twice when Max
+		// grabs it and subtitles (at a slow speed) and voices are both enabled.
+		// This bug exists in the original game as well.
 		if (getTalkingActor() == 4) {
 			stopTalk();
 		}
 	}
-	Actor *a = derefActor(act, "o6_animateActor");
-	a->animateActor(anim);
+
+	if (_game.id == GID_SAMNMAX && _roomResource == 47 && vm.slot[_currentScript].number == 202 &&
+		act == 2 && anim == 249 && _enableEnhancements) {
+		// WORKAROUND for bug #3832: parts of Bruno are left on the screen when he
+		// escapes Bumpusville with Trixie. Bruno (act. 11) and Trixie (act. 12) are
+		// properly removed from the scene by the script, but not the combined actor
+		// which is used by this animation (act. 6).
+		Actor *a = derefActorSafe(6, "o6_animateActor");
+		if (a && a->_costume == 243)
+			a->putActor(0, 0, 0);
+	}
+
+	// Since there have been cases of the scripts sending garbage data
+	// as the actor number (see bug #813), we handle these cases cleanly
+	// by not crashing ScummVM and returning a nullptr Actor instead.
+	Actor *a = derefActorSafe(act, "o6_animateActor");
+	if (a) {
+		a->animateActor(anim);
+	}
 }
 
 void ScummEngine_v6::o6_doSentence() {
@@ -1302,8 +1322,8 @@ void ScummEngine_v6::o6_loadRoomWithEgo() {
 }
 
 void ScummEngine_v6::o6_getRandomNumber() {
-	int rnd;
-	rnd = _rnd.getRandomNumber(ABS(pop()));
+	int rnd = _rnd.getRandomNumber(0x7fff);
+	rnd = rnd % (pop() + 1);
 	if (VAR_RANDOM_NR != 0xFF)
 		VAR(VAR_RANDOM_NR) = rnd;
 	push(rnd);
@@ -1312,7 +1332,8 @@ void ScummEngine_v6::o6_getRandomNumber() {
 void ScummEngine_v6::o6_getRandomNumberRange() {
 	int max = pop();
 	int min = pop();
-	int rnd = _rnd.getRandomNumberRng(min, max);
+	int rnd = _rnd.getRandomNumber(0x7fff);
+	rnd = min + (rnd % (max - min + 1));
 	if (VAR_RANDOM_NR != 0xFF)
 		VAR(VAR_RANDOM_NR) = rnd;
 	push(rnd);
@@ -1390,7 +1411,28 @@ void ScummEngine_v6::o6_getActorAnimCounter() {
 void ScummEngine_v6::o6_getAnimateVariable() {
 	int var = pop();
 	Actor *a = derefActor(pop(), "o6_getAnimateVariable");
-	push(a->getAnimVar(var));
+
+	// WORKAROUND: In Backyard Baseball 2001 and 2003,
+	// bunting a foul ball as Pete Wheeler may softlock the game
+	// with an animation loop if the ball goes way into
+	// the left or right field line.
+	//
+	// This is a script bug because Pete's actor variable never
+	// sets to 1 in this condition and script room-4-2105
+	// (or room-3-2105 in 2003) will always break.
+	// We fix that by forcing Pete to play the return animation
+	// regardless if the ball's foul or not.
+	if ((_game.id == GID_BASEBALL2001 || _game.id == GID_BASEBALL2003) && \
+			_currentRoom == ((_game.id == GID_BASEBALL2001) ? 4 : 3) && \
+			vm.slot[_currentScript].number == 2105 && \
+			a->_costume == ((_game.id == GID_BASEBALL2001) ? 107 : 99) && \
+			// Room variable 5 to ensure this workaround executes only once at
+			// the beginning of the script and room variable 22 to check if we
+			// are bunting.
+			readVar(0x8000 + 5) != 0 && readVar(0x8000 + 22) == 4)
+		push(1);
+	else
+		push(a->getAnimVar(var));
 }
 
 void ScummEngine_v6::o6_isActorInBox() {
@@ -1440,6 +1482,19 @@ void ScummEngine_v6::o6_getVerbFromXY() {
 }
 
 void ScummEngine_v6::o6_beginOverride() {
+	// WORKAROUND (bug in the original):
+	// When Guybrush gets on the Sea Cucumber for the first time and the monkeys show up on deck,
+	// if the ESC key is pressed before the "Any last words, Threepwood?" dialogue, the music will
+	// continue playing indefinitely throughout the game (or until another "sequence" music is played).
+	//
+	// To amend this, we intercept this exact script override and we force the playback of sound 2277,
+	// which is the iMUSE sequence which would have been played after the dialogue.
+	if (_enableEnhancements && _game.id == GID_CMI && _currentRoom == 37 && vm.slot[_currentScript].number == 251 &&
+		_sound->isSoundRunning(2275) != 0 && (_scriptPointer - _scriptOrgPointer) == 0x1A) {
+		int list[16] = {0x1001, 2277, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+		_sound->soundKludge(list, 2);
+	}
+
 	beginOverride();
 	_skipVideo = 0;
 }
@@ -1737,7 +1792,16 @@ void ScummEngine_v6::o6_actorOps() {
 
 	switch (subOp) {
 	case 76:		// SO_COSTUME
-		a->setActorCostume(pop());
+		i = pop();
+		// WORKAROUND: There's a small continuity error in DOTT; the fire that
+		// makes Washington leave the room can only exist if he's wearing the
+		// chattering teeth, but yet when he comes back he's not wearing them
+		// during this cutscene.
+		if (_game.id == GID_TENTACLE && _currentRoom == 13 && vm.slot[_currentScript].number == 211 &&
+			a->_number == 8 && i == 53 && _enableEnhancements) {
+			i = 69;
+		}
+		a->setActorCostume(i);
 		break;
 	case 77:		// SO_STEP_DIST
 		j = pop();
@@ -1788,7 +1852,7 @@ void ScummEngine_v6::o6_actorOps() {
 		a->_talkColor = pop();
 		break;
 	case 88:		// SO_ACTOR_NAME
-		loadPtrToResource(rtActorName, a->_number, NULL);
+		loadPtrToResource(rtActorName, a->_number, nullptr);
 		break;
 	case 89:		// SO_INIT_ANIMATION
 		a->_initFrame = pop();
@@ -1897,7 +1961,7 @@ void ScummEngine_v6::o6_verbOps() {
 		}
 		break;
 	case 125:		// SO_VERB_NAME
-		loadPtrToResource(rtVerb, slot, NULL);
+		loadPtrToResource(rtVerb, slot, nullptr);
 		vs->type = kTextVerbType;
 		vs->imgindex = 0;
 		break;
@@ -1909,7 +1973,7 @@ void ScummEngine_v6::o6_verbOps() {
 		break;
 	case 128:		// SO_VERB_AT
 		vs->curRect.top = pop();
-		vs->curRect.left = pop();
+		vs->curRect.left = vs->origLeft = pop();
 		break;
 	case 129:		// SO_VERB_ON
 		vs->curmode = 1;
@@ -2180,7 +2244,7 @@ void ScummEngine_v6::o6_wait() {
 			break;
 		return;
 	case 232:		// SO_WAIT_FOR_TURN
-		// WORKAROUND for bug #744441: An angle will often be received as the
+		// WORKAROUND for bug #819: An angle will often be received as the
 		// actor number due to script bugs in The Dig. In all cases where this
 		// occurs, _curActor is set just before it, so we can use it instead.
 		//
@@ -2209,7 +2273,7 @@ void ScummEngine_v6::o6_soundKludge() {
 
 	_sound->soundKludge(list, num);
 
-	// WORKAROUND for bug #1398195: The room-11-2016 script contains a
+	// WORKAROUND for bug #2438: The room-11-2016 script contains a
 	// slight bug causing it to busy-wait for a sound to finish. Even under
 	// the best of circumstances, this will cause the game to hang briefly.
 	// On platforms where threading is cooperative, it will cause the game
@@ -2315,7 +2379,7 @@ void ScummEngine_v6::o6_printEgo() {
 void ScummEngine_v6::o6_talkActor() {
 	int offset = _scriptPointer - _scriptOrgPointer;
 
-	// WORKAROUND for bug #896489: see below for detailed description
+	// WORKAROUND for missing waitForMessage() calls; see below
 	if (_forcedWaitForMessage) {
 		if (VAR(VAR_HAVE_MSG)) {
 			_scriptPointer--;
@@ -2329,21 +2393,76 @@ void ScummEngine_v6::o6_talkActor() {
 		return;
 	}
 
+	// WORKAROUND: If Sam tries to buy an object at Snuckey's without having
+	// any money, Max's comment on capitalism may be cut too early because the
+	// employee reacts immediately after Max without any prior waitForMessage().
+	// The magic values below come from scripts 11-67 and 11-205.
+	//
+	// This call can't just be inserted after Max's line; it needs to be done
+	// just before the employee's line, otherwise the timing with Sam's moves
+	// will feel off -- so we can't use the _forcedWaitForMessage trick.
+	if (_game.id == GID_SAMNMAX && _roomResource == 11 && vm.slot[_currentScript].number == 67
+		&& getOwner(70) != 2 && !readVar(0x8000 + 67) && !readVar(0x8000 + 39) && readVar(0x8000 + 12) == 1
+		&& !getClass(126, 6) && _enableEnhancements) {
+		if (VAR(VAR_HAVE_MSG)) {
+			_scriptPointer--;
+			o6_breakHere();
+			return;
+		}
+	}
+
 	_actorToPrintStrFor = pop();
 
-	// WORKAROUND for bug #2016521: "DOTT: Bernard impersonating LaVerne"
+	// WORKAROUND for bug #3803: "DOTT: Bernard impersonating LaVerne"
 	// Original script did not check for VAR_EGO == 2 before executing
 	// a talkActor opcode.
 	if (_game.id == GID_TENTACLE && vm.slot[_currentScript].number == 307
-			&& VAR(VAR_EGO) != 2 && _actorToPrintStrFor == 2) {
+			&& VAR(VAR_EGO) != 2 && _actorToPrintStrFor == 2
+			&& _enableEnhancements) {
 		_scriptPointer += resStrLen(_scriptPointer) + 1;
 		return;
+	}
+
+	// WORKAROUND: In the French release of Full Throttle, a "piano-low-kick"
+	// string appears in the text when Ben looks at one of the small pictures
+	// above the piano in the bar. Probably an original placeholder which
+	// hasn't been properly replaced... Fixed in the 2017 remaster, though.
+	if (_game.id == GID_FT && _language == Common::FR_FRA
+		&& _roomResource == 7 && vm.slot[_currentScript].number == 77
+		&& _actorToPrintStrFor == 1 && _enableEnhancements) {
+		const int len = resStrLen(_scriptPointer) + 1;
+		if (len == 93 && memcmp(_scriptPointer + 16 + 18, "piano-low-kick", 14) == 0) {
+			byte *tmpBuf = new byte[len - 14 + 3];
+			memcpy(tmpBuf, _scriptPointer, 16 + 18);
+			memcpy(tmpBuf + 16 + 18, ", 1", 3);
+			memcpy(tmpBuf + 16 + 18 + 3, _scriptPointer + 16 + 18 + 14, len - (16 + 18 + 14));
+
+			_string[0].loadDefault();
+			actorTalk(tmpBuf);
+			delete[] tmpBuf;
+			_scriptPointer += len;
+			return;
+		}
 	}
 
 	_string[0].loadDefault();
 	actorTalk(_scriptPointer);
 
-	// WORKAROUND for bug #896489: "DIG: Missing subtitles when talking to Brink"
+	// WORKAROUND: Dr Fred's first reaction line about Hoagie's and Laverne's
+	// units after receiving a new diamond is unused because of missing
+	// wait.waitForMessage() calls. We always simulate this opcode when
+	// triggering Dr Fred's lines in this part of the script, since there is
+	// no stable offset for all the floppy, CD and translated versions, and
+	// no easy way to only target the impacted lines.
+	if (_game.id == GID_TENTACLE && vm.slot[_currentScript].number == 9
+		&& vm.localvar[_currentScript][0] == 216 && _actorToPrintStrFor == 4 && _enableEnhancements) {
+		_forcedWaitForMessage = true;
+		_scriptPointer--;
+
+		return;
+	}
+
+	// WORKAROUND for bug #1452: "DIG: Missing subtitles when talking to Brink"
 	// Original script does not have wait.waitForMessage() after several messages:
 	//
 	// [011A] (5D)   if (getActorCostume(VAR_EGO) == 1) {
@@ -2354,7 +2473,7 @@ void ScummEngine_v6::o6_talkActor() {
 	// [0166] (73)   } else {
 	//
 	// Here we simulate that opcode.
-	if (_game.id == GID_DIG && vm.slot[_currentScript].number == 88) {
+	if (_game.id == GID_DIG && vm.slot[_currentScript].number == 88 && _enableEnhancements) {
 		if (offset == 0x158 || offset == 0x214 || offset == 0x231 || offset == 0x278) {
 			_forcedWaitForMessage = true;
 			_scriptPointer--;
@@ -2362,6 +2481,24 @@ void ScummEngine_v6::o6_talkActor() {
 			return;
 		}
 	}
+
+	// WORKAROUND bug #4410: Restore a missing subtitle when Low is inside the
+	// tomb and he finds the purpose of the crypt ("/TOMB.022/Now that I know
+	// what I'm looking for"...). Also happens in the original interpreters.
+	// We used to do this in actorTalk(), but then Low's proper walking
+	// animation was lost and he would just glide over the floor. Having him
+	// wait before he moves is less disturbing, since that's something he
+	// already does in the game.
+	if (_game.id == GID_DIG && _roomResource == 58 && vm.slot[_currentScript].number == 402
+		&& _actorToPrintStrFor == 3 && vm.localvar[_currentScript][0] == 0
+		&& readVar(0x8000 + 94) && readVar(0x8000 + 78) && !readVar(0x8000 + 97)
+		&& _scummVars[269] == 3 && getState(388) == 2 && _enableEnhancements) {
+		_forcedWaitForMessage = true;
+		_scriptPointer--;
+
+		return;
+	}
+
 	_scriptPointer += resStrLen(_scriptPointer) + 1;
 }
 
@@ -2514,9 +2651,6 @@ void ScummEngine_v7::o6_kernelSetFunctions() {
 				if ((_game.id == GID_FT) && (_game.features & GF_DEMO) && (_game.platform == Common::kPlatformMacintosh) &&
 					(!strcmp(videoname, "jumpgorge.san")))
 					_splayer->play("jumpgorg.san", _smushFrameRate);
-				// WORKAROUND: A faster frame rate is required, to keep audio/video in sync in this video
-				else if (_game.id == GID_DIG && !strcmp(videoname, "sq3.san"))
-					_splayer->play(videoname, 14);
 				else
 					_splayer->play(videoname, _smushFrameRate);
 
@@ -2546,7 +2680,7 @@ void ScummEngine_v7::o6_kernelSetFunctions() {
 		break;
 	case 16:
 	case 17:
-		enqueueText(getStringAddressVar(VAR_STRING2DRAW), args[3], args[4], args[2], args[1], (args[0] == 16));
+		enqueueText(getStringAddressVar(VAR_STRING2DRAW), args[3], args[4], args[2], args[1], (args[0] == 16) ? kStyleAlignCenter : kStyleAlignLeft);
 		break;
 	case 20:
 		_imuseDigital->setRadioChatterSFX(args[1]);
@@ -2704,7 +2838,7 @@ void ScummEngine_v6::o6_kernelGetFunctions() {
 
 	switch (args[0]) {
 	case 113:
-		// WORKAROUND for bug #899249: The scripts used for screen savers
+		// WORKAROUND for bug #1465: The scripts used for screen savers
 		// in Sam & Max use hard coded values for the maximum height and width.
 		// This causes problems in rooms (ie. Credits) where their values are
 		// lower, so we set result to zero if out of bounds.
@@ -2819,7 +2953,25 @@ int ScummEngine::getKeyState(int key) {
 	}
 }
 
+int ScummEngine::getActionState(ScummAction action) {
+	return (_actionMap[action]) ? 1 : 0;
+}
+
 void ScummEngine_v6::o6_delayFrames() {
+	// WORKAROUND:  At startup, Moonbase Commander will pause for 20 frames before
+	// showing the Infogrames logo.  The purpose of this break is to give time for the
+	// GameSpy Arcade application to fill with the online game infomation.
+	//
+	// [0000] (84) localvar2 = max(readConfigFile.number(":var263:","user","wait-for-gamespy"),10)
+	// [0029] (08) delayFrames((localvar2 * 2))
+	//
+	// But since we don't support GameSpy and have our own online support, this break
+	// has become redundant and only wastes time.
+	if (_game.id == GID_MOONBASE && vm.slot[_currentScript].number == 69) {
+		pop();
+		return;
+	}
+
 	ScriptSlot *ss = &vm.slot[_currentScript];
 	if (ss->delayFrameCount == 0) {
 		ss->delayFrameCount = pop();
@@ -3010,7 +3162,7 @@ void ScummEngine_v6::o6_getPixel() {
 
 	VirtScreen *vs = findVirtScreen(y);
 
-	if (vs == NULL || x > _screenWidth - 1 || x < 0) {
+	if (vs == nullptr || x > _screenWidth - 1 || x < 0) {
 		push(-1);
 		return;
 	}
@@ -3023,7 +3175,7 @@ void ScummEngine_v6::o6_setBoxSet() {
 	int arg = pop() - 1;
 
 	const byte *room = getResourceAddress(rtRoom, _roomResource);
-	const byte *boxd = NULL, *boxm = NULL;
+	const byte *boxd = nullptr, *boxm = nullptr;
 	int32 dboxSize, mboxSize;
 	int i;
 

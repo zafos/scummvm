@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -65,6 +64,8 @@ void Scene1000::Action1::signal() {
 	}
 	case 3:
 		g_globals->_sceneManager.changeScene(1400);
+		break;
+	default:
 		break;
 	}
 
@@ -126,7 +127,13 @@ void Scene1000::Action3::signal() {
 			// Prompt user for whether to start play or watch introduction
 			g_globals->_player.enableControl();
 
-			if (MessageDialog::show2(WATCH_INTRO_MSG, START_PLAY_BTN_STRING, INTRODUCTION_BTN_STRING) == 0) {
+			int rc;
+			if (g_vm->getLanguage() == Common::ES_ESP) {
+				rc = MessageDialog::show2(ESP_WATCH_INTRO_MSG, ESP_START_PLAY_BTN_STRING, ESP_INTRODUCTION_BTN_STRING);
+			} else {
+				rc = MessageDialog::show2(WATCH_INTRO_MSG, START_PLAY_BTN_STRING, INTRODUCTION_BTN_STRING);
+			}
+			if (rc == 0) {
 				_actionIndex = 20;
 				g_globals->_soundHandler.fadeOut(this);
 			} else {
@@ -509,6 +516,8 @@ void Scene1001::Action1::signal() {
 	case 24:
 		g_globals->_sceneManager.changeScene(2000);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -551,6 +560,8 @@ void Scene1250::Action1::signal() {
 		scene->_object1.animate(ANIM_MODE_5, this);
 		_actionIndex = 0;
 		break;
+	default:
+		break;
 	}
 }
 
@@ -569,6 +580,8 @@ void Scene1250::Action2::signal() {
 		case 2:
 			scene->_object2.setPosition(Common::Point(267, 20));
 			break;
+		default:
+			break;
 		}
 
 		setDelay(30);
@@ -576,6 +589,8 @@ void Scene1250::Action2::signal() {
 	case 1:
 		scene->_object2.animate(ANIM_MODE_5, this);
 		_actionIndex = 0;
+		break;
+	default:
 		break;
 	}
 }
@@ -596,6 +611,8 @@ void Scene1250::Action3::signal() {
 	case 3:
 		g_globals->_sceneManager.changeScene(1000);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -614,6 +631,8 @@ void Scene1250::Action4::signal() {
 		break;
 	case 3:
 		g_globals->_sceneManager.changeScene(2000);
+		break;
+	default:
 		break;
 	}
 }
@@ -742,6 +761,8 @@ void Scene1400::Action1::signal() {
 
 		g_globals->_sceneManager.changeScene(1500);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -863,6 +884,8 @@ void Scene1500::Action1::signal() {
 		g_globals->_soundHandler.play(127);
 		g_globals->_sceneManager.changeScene(2000);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -900,6 +923,8 @@ void Scene1500::Action2::signal() {
 		scene->_soundHandler.release();
 		g_globals->_stripNum = 1505;
 		g_globals->_sceneManager.changeScene(2400);
+		break;
+	default:
 		break;
 	}
 }

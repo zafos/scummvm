@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -42,7 +41,7 @@ private:
 	Audio::AudioStream *_audioSource;
 public:
 	MusicHandle() : _fading(0), _audioSource(NULL) {}
-	virtual int readBuffer(int16 *buffer, const int numSamples);
+	int readBuffer(int16 *buffer, const int numSamples) override;
 	bool play(const Common::String &filename, bool loop);
 	bool playPSX(uint16 id, bool loop);
 	void stop();
@@ -50,29 +49,29 @@ public:
 	void fadeDown();
 	bool streaming() const;
 	int32 fading() { return _fading; }
-	bool endOfData() const;
-	bool endOfStream() const { return false; }
-	bool isStereo() const;
-	int getRate() const;
+	bool endOfData() const override;
+	bool endOfStream() const override { return false; }
+	bool isStereo() const override;
+	int getRate() const override;
 };
 
 class Music : public Audio::AudioStream {
 public:
 	Music(Audio::Mixer *pMixer);
-	~Music();
+	~Music() override;
 	void startMusic(int32 tuneId, int32 loopFlag);
 	void fadeDown();
 	void setVolume(uint8 volL, uint8 volR);
 	void giveVolume(uint8 *volL, uint8 *volR);
 
 	// AudioStream API
-	int readBuffer(int16 *buffer, const int numSamples) {
+	int readBuffer(int16 *buffer, const int numSamples) override {
 		mixer(buffer, numSamples / 2);
 		return numSamples;
 	}
-	bool isStereo() const { return true; }
-	bool endOfData() const { return false; }
-	int getRate() const { return _sampleRate; }
+	bool isStereo() const override { return true; }
+	bool endOfData() const override { return false; }
+	int getRate() const override { return _sampleRate; }
 
 private:
 	Audio::st_volume_t _volumeL, _volumeR;

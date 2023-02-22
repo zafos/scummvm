@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -52,7 +51,7 @@ public:
 	void resize(const GfxSurface &surface, int xp, int yp, int percent);
 	void expandPanes();
 
-	virtual void synchronize(Serializer &s);
+	void synchronize(Serializer &s) override;
 };
 
 class GfxColors {
@@ -89,7 +88,7 @@ private:
 	  * Override the addDirtyRect from Graphics::Screen, since for standard
 	  * surfaces we don't need dirty rects to be tracked
 	  */
-	 virtual void addDirtyRect(const Common::Rect &r) {}
+	 void addDirtyRect(const Common::Rect &r) override {}
 public:
 	Common::Point _centroid;
 	int _transColor;
@@ -98,12 +97,12 @@ public:
 public:
 	GfxSurface();
 	GfxSurface(const GfxSurface &s);
-	virtual ~GfxSurface();
+	~GfxSurface() override;
 
 	Graphics::ManagedSurface &lockSurface();
 	void unlockSurface();
 	void synchronize(Serializer &s);
-	virtual void create(uint16 width, uint16 height);
+	void create(int16 width, int16 height) override;
 	void setBounds(const Rect &bounds);
 	const Rect &getBounds() const { return _bounds; }
 
@@ -215,9 +214,9 @@ public:
 
 	void setDetails(int resNum, int rlbNum, int cursorNum);
 
-	virtual void setDefaults();
-	virtual void draw();
-	virtual bool process(Event &event) { return false; }
+	void setDefaults() override;
+	void draw() override;
+	bool process(Event &event) override { return false; }
 };
 
 class GfxMessage : public GfxElement {
@@ -227,12 +226,12 @@ public:
 	int _width;
 public:
 	GfxMessage();
-	virtual ~GfxMessage() {}
+	~GfxMessage() override {}
 
 	void set(const Common::String &s, int width, TextAlign textAlign);
 
-	virtual void setDefaults();
-	virtual void draw();
+	void setDefaults() override;
+	void draw() override;
 };
 
 class GfxButton : public GfxElement {
@@ -242,7 +241,7 @@ public:
 	Common::String _message;
 public:
 	GfxButton() : GfxElement() {}
-	virtual ~GfxButton() {}
+	~GfxButton() override {}
 
 	void setText(const Common::String &s) {
 		_message = s;
@@ -250,9 +249,9 @@ public:
 	}
 
 	// Virtual table method
-	virtual void setDefaults();
-	virtual void draw();
-	virtual bool process(Event &event);
+	void setDefaults() override;
+	void draw() override;
+	bool process(Event &event) override;
 };
 
 class GfxManager {
@@ -324,7 +323,7 @@ public:
 	GfxSurface *_savedArea;
 public:
 	GfxDialog();
-	virtual ~GfxDialog();
+	~GfxDialog() override;
 
 	void add(GfxElement *element);
 	void addElements(GfxElement *ge, ...);
@@ -336,9 +335,9 @@ public:
 	}
 	GfxButton *execute(GfxButton *defaultButton = NULL);
 
-	virtual void setDefaults();
-	virtual void remove();
-	virtual void draw();
+	void setDefaults() override;
+	void remove() override;
+	void draw() override;
 
 	static void setPalette();
 

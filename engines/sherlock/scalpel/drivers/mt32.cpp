@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,41 +40,41 @@ const byte mt32ReverbDataSysEx[] = {
 class MidiDriver_MT32 : public MidiDriver {
 public:
 	MidiDriver_MT32() {
-		_driver = NULL;
+		_driver = nullptr;
 		_isOpen = false;
 		_nativeMT32 = false;
 		_baseFreq = 250;
 
 		memset(_MIDIchannelActive, 1, sizeof(_MIDIchannelActive));
 	}
-	virtual ~MidiDriver_MT32();
+	~MidiDriver_MT32() override;
 
 	// MidiDriver
-	int open();
-	void close();
-	bool isOpen() const { return _isOpen; }
+	int open() override;
+	void close() override;
+	bool isOpen() const override { return _isOpen; }
 
-	void send(uint32 b);
+	void send(uint32 b) override;
 
 	void newMusicData(byte *musicData, int32 musicDataSize);
 
-	MidiChannel *allocateChannel() {
+	MidiChannel *allocateChannel() override {
 		if (_driver)
 			return _driver->allocateChannel();
-		return NULL;
+		return nullptr;
 	}
-	MidiChannel *getPercussionChannel() {
+	MidiChannel *getPercussionChannel() override {
 		if (_driver)
 			return _driver->getPercussionChannel();
-		return NULL;
+		return nullptr;
 	}
 
-	void setTimerCallback(void *timer_param, Common::TimerManager::TimerProc timer_proc) {
+	void setTimerCallback(void *timer_param, Common::TimerManager::TimerProc timer_proc) override {
 		if (_driver)
 			_driver->setTimerCallback(timer_param, timer_proc);
 	}
 
-	uint32 getBaseTempo() {
+	uint32 getBaseTempo() override {
 		if (_driver) {
 			return _driver->getBaseTempo();
 		}
@@ -103,11 +102,11 @@ public:
 MidiDriver_MT32::~MidiDriver_MT32() {
 	Common::StackLock lock(_mutex);
 	if (_driver) {
-		_driver->setTimerCallback(0, 0);
+		_driver->setTimerCallback(nullptr, nullptr);
 		_driver->close();
 		delete _driver;
 	}
-	_driver = NULL;
+	_driver = nullptr;
 }
 
 int MidiDriver_MT32::open() {
@@ -247,7 +246,7 @@ void MidiDriver_MT32::mt32SysEx(const byte *&dataPtr, int32 &bytesLeft) {
 	g_system->delayMillis(delay);
 }
 
-// MIDI messages can be found at http://www.midi.org/techspecs/midimessages.php
+// MIDI messages can be found at https://web.archive.org/web/20120128110425/http://www.midi.org/techspecs/midimessages.php
 void MidiDriver_MT32::send(uint32 b) {
 	byte command = b & 0xf0;
 	byte channel = b & 0xf;

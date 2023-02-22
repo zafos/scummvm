@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -73,13 +72,13 @@ void DownloadRequest::streamErrorCallback(Networking::ErrorResponse error) {
 void DownloadRequest::handle() {
 	if (!_localFile) {
 		warning("DownloadRequest: no file to write");
-		finishError(Networking::ErrorResponse(this, false, true, "", -1));
+		finishError(Networking::ErrorResponse(this, false, true, "DownloadRequest::handle: no file to write into", -1));
 		return;
 	}
 
 	if (!_localFile->isOpen()) {
 		warning("DownloadRequest: failed to open file to write");
-		finishError(Networking::ErrorResponse(this, false, true, "", -1));
+		finishError(Networking::ErrorResponse(this, false, true, "DownloadRequest::handle: failed to open file to write", -1));
 		return;
 	}
 
@@ -93,7 +92,7 @@ void DownloadRequest::handle() {
 	if (readBytes != 0)
 		if (_localFile->write(_buffer, readBytes) != readBytes) {
 			warning("DownloadRequest: unable to write all received bytes into output file");
-			finishError(Networking::ErrorResponse(this, false, true, "", -1));
+			finishError(Networking::ErrorResponse(this, false, true, "DownloadRequest::handle: failed to write all bytes into a file", -1));
 			return;
 		}
 
@@ -113,7 +112,7 @@ void DownloadRequest::handle() {
 
 void DownloadRequest::restart() {
 	warning("DownloadRequest: can't restart as there are no means to reopen DumpFile");
-	finishError(Networking::ErrorResponse(this, false, true, "", -1));
+	finishError(Networking::ErrorResponse(this, false, true, "DownloadRequest::restart: can't restart as there are no means to reopen DumpFile", -1));
 	//start();
 }
 
@@ -123,7 +122,7 @@ void DownloadRequest::finishDownload(bool success) {
 		(*_boolCallback)(Storage::BoolResponse(this, success));
 }
 
-void DownloadRequest::finishError(Networking::ErrorResponse error) {
+void DownloadRequest::finishError(Networking::ErrorResponse error, Networking::RequestState state) {
 	if (_localFile)
 		_localFile->close();
 	Request::finishError(error);

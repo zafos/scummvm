@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,6 +23,7 @@
 #define SCUMM_DIALOGS_H
 
 #include "common/str.h"
+#include "common/ustr.h"
 #include "common/keyboard.h"
 #include "gui/dialog.h"
 #include "engines/dialogs.h"
@@ -36,6 +36,11 @@ class StaticTextWidget;
 
 namespace Scumm {
 
+struct ResString {
+	int num;
+	char string[80];
+};
+
 class ScummEngine;
 
 class ScummDialog : public GUI::Dialog {
@@ -45,14 +50,15 @@ public:
 
 protected:
 	typedef Common::String String;
+	typedef Common::U32String U32String;
 };
 
 #ifndef DISABLE_HELP
 class ScummMenuDialog : public MainMenuDialog {
 public:
 	ScummMenuDialog(ScummEngine *scumm);
-	~ScummMenuDialog();
-	virtual void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data);
+	~ScummMenuDialog() override;
+	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
 protected:
 	GUI::Dialog		*_helpDialog;
@@ -68,32 +74,35 @@ protected:
 class InfoDialog : public ScummDialog {
 protected:
 	ScummEngine		*_vm;
-	String _message;
+	U32String _message;
 	GUI::StaticTextWidget *_text;
+	GUI::ThemeEngine::FontStyle _style;
 
 public:
 	// arbitrary message
-	InfoDialog(ScummEngine *scumm, const String& message);
+	InfoDialog(ScummEngine *scumm, const U32String &message);
 	// from resources
 	InfoDialog(ScummEngine *scumm, int res);
 
-	void setInfoText(const String& message);
+	void setInfoText(const U32String &message);
 
-	virtual void handleMouseDown(int x, int y, int button, int clickCount) {
+	void handleMouseDown(int x, int y, int button, int clickCount) override {
 		setResult(0);
 		close();
 	}
-	virtual void handleKeyDown(Common::KeyState state) {
+	void handleKeyDown(Common::KeyState state) override {
 		setResult(state.ascii);
 		close();
 	}
 
-	virtual void reflowLayout();
+	void reflowLayout() override;
+	const char *getPlainEngineString(int stringno, bool forceHardcodedString = false);
 
 protected:
-
 	// Query a string from the resources
-	const String queryResString(int stringno);
+	const U32String queryResString(int stringno);
+	// Query hard coded string (copied over from the executable)
+	const ResString &getStaticResString(Common::Language lang, int stringno);
 };
 
 /**
@@ -103,7 +112,7 @@ protected:
 class PauseDialog : public InfoDialog {
 public:
 	PauseDialog(ScummEngine *scumm, int res);
-	virtual void handleKeyDown(Common::KeyState state);
+	void handleKeyDown(Common::KeyState state) override;
 };
 
 /**
@@ -113,7 +122,7 @@ public:
 class ConfirmDialog : public InfoDialog {
 public:
 	ConfirmDialog(ScummEngine *scumm, int res);
-	virtual void handleKeyDown(Common::KeyState state);
+	void handleKeyDown(Common::KeyState state) override;
 
 protected:
 	char _yesKey, _noKey;
@@ -125,23 +134,23 @@ protected:
  */
 class ValueDisplayDialog : public GUI::Dialog {
 public:
-	ValueDisplayDialog(const Common::String& label, int minVal, int maxVal, int val, uint16 incKey, uint16 decKey);
+	ValueDisplayDialog(const Common::U32String &label, int minVal, int maxVal, int val, uint16 incKey, uint16 decKey);
 
-	virtual void open() override;
+	void open() override;
 	void drawDialog(GUI::DrawLayer layerToDraw) override;
-	virtual void handleTickle() override;
-	virtual void handleMouseDown(int x, int y, int button, int clickCount) override {
+	void handleTickle() override;
+	void handleMouseDown(int x, int y, int button, int clickCount) override {
 		close();
 	}
-	virtual void handleKeyDown(Common::KeyState state) override;
+	void handleKeyDown(Common::KeyState state) override;
 
-	virtual void reflowLayout() override;
+	void reflowLayout() override;
 
 protected:
 	enum {
 		kDisplayDelay = 1500
 	};
-	Common::String _label;
+	Common::U32String _label;
 	const int _min, _max;
 	const uint16 _incKey, _decKey;
 	int _percentBarWidth;
@@ -157,12 +166,12 @@ class SubtitleSettingsDialog : public InfoDialog {
 public:
 	SubtitleSettingsDialog(ScummEngine *scumm, int value);
 
-	virtual void open();
-	virtual void handleTickle();
-	virtual void handleMouseDown(int x, int y, int button, int clickCount) {
+	void open() override;
+	void handleTickle() override;
+	void handleMouseDown(int x, int y, int button, int clickCount) override {
 		close();
 	}
-	virtual void handleKeyDown(Common::KeyState state);
+	void handleKeyDown(Common::KeyState state) override;
 protected:
 	int _value;
 	uint32 _timer;
@@ -174,13 +183,13 @@ protected:
 class Indy3IQPointsDialog : public InfoDialog {
 public:
 	Indy3IQPointsDialog(ScummEngine *scumm, char* text);
-	virtual void handleKeyDown(Common::KeyState state);
+	void handleKeyDown(Common::KeyState state) override;
 };
 
 class DebugInputDialog : public InfoDialog {
 public:
 	DebugInputDialog(ScummEngine *scumm, char* text);
-	virtual void handleKeyDown(Common::KeyState state);
+	void handleKeyDown(Common::KeyState state) override;
 	bool done;
 	Common::String buffer;
 	Common::String mainText;
@@ -195,7 +204,7 @@ public:
 
 	int getSelectedDifficulty() const { return _difficulty; }
 protected:
-	virtual void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data);
+	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
 private:
 	enum {
@@ -205,6 +214,108 @@ private:
 	};
 
 	int _difficulty;
+};
+
+/**
+ * Common options widget stuff.
+ */
+class ScummOptionsContainerWidget : public GUI::OptionsContainerWidget {
+public:
+	ScummOptionsContainerWidget(GuiObject *boss, const Common::String &name, const Common::String &dialogLayout, const Common::String &domain) :
+		OptionsContainerWidget(boss, name, dialogLayout, false, domain) {
+	}
+
+	GUI::CheckboxWidget *createEnhancementsCheckbox(GuiObject *boss, const Common::String &name);
+	GUI::CheckboxWidget *createOriginalGUICheckbox(GuiObject *boss, const Common::String &name);
+	void updateAdjustmentSlider(GUI::SliderWidget *slider, GUI::StaticTextWidget *value);
+};
+
+/**
+ * Options widget for EGA Loom.
+ */
+class LoomEgaGameOptionsWidget : public ScummOptionsContainerWidget {
+public:
+	LoomEgaGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain);
+	~LoomEgaGameOptionsWidget() override {};
+
+	void load() override;
+	bool save() override;
+
+private:
+	enum {
+		kOvertureTicksChanged = 'OTCH'
+	};
+
+	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
+	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
+
+	GUI::CheckboxWidget *_enableEnhancementsCheckbox;
+	GUI::CheckboxWidget *_enableOriginalGUICheckbox;
+
+	GUI::SliderWidget *_overtureTicksSlider;
+	GUI::StaticTextWidget *_overtureTicksValue;
+
+	void updateOvertureTicksValue();
+};
+
+/**
+ * Options widget for VGA Loom (DOS CD).
+ */
+class LoomVgaGameOptionsWidget : public ScummOptionsContainerWidget {
+public:
+	LoomVgaGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain);
+	~LoomVgaGameOptionsWidget() override {};
+
+	void load() override;
+	bool save() override;
+
+private:
+	enum {
+		kPlaybackAdjustmentChanged = 'PBAC'
+	};
+
+	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
+	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
+
+	GUI::CheckboxWidget *_enableEnhancementsCheckbox;
+	GUI::CheckboxWidget *_enableOriginalGUICheckbox;
+
+	GUI::SliderWidget *_playbackAdjustmentSlider;
+	GUI::StaticTextWidget *_playbackAdjustmentValue;
+
+	void updatePlaybackAdjustmentValue();
+};
+
+/**
+ * Options widget for CD Monkey Island 1.
+ */
+class MI1CdGameOptionsWidget : public ScummOptionsContainerWidget {
+public:
+	MI1CdGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain);
+	~MI1CdGameOptionsWidget() override {};
+
+	void load() override;
+	bool save() override;
+
+private:
+	enum {
+		kIntroAdjustmentChanged = 'IACH',
+		kOutlookAdjustmentChanged = 'OACH'
+	};
+
+	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
+	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
+
+	GUI::CheckboxWidget *_enableEnhancementsCheckbox;
+	GUI::CheckboxWidget *_enableOriginalGUICheckbox;
+
+	GUI::SliderWidget *_introAdjustmentSlider;
+	GUI::StaticTextWidget *_introAdjustmentValue;
+	GUI::SliderWidget *_outlookAdjustmentSlider;
+	GUI::StaticTextWidget *_outlookAdjustmentValue;
+
+	void updateIntroAdjustmentValue();
+	void updateOutlookAdjustmentValue();
 };
 
 } // End of namespace Scumm

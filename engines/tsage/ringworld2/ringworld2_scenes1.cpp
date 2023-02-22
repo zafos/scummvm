@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,11 +15,11 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
+#include "common/math.h"
 #include "graphics/cursorman.h"
 
 #include "tsage/scenes.h"
@@ -453,6 +453,9 @@ void Scene1000::signal() {
 		R2_GLOBALS._sound2.fadeOut2(NULL);
 		R2_GLOBALS._scenePalette.loadPalette(0);
 		R2_GLOBALS._sceneManager.changeScene(3500);
+		break;
+
+	default:
 		break;
 	}
 }
@@ -1474,7 +1477,7 @@ void Scene1500::dispatch() {
 	if (_sceneMode > 10) {
 		float yDiff = sqrt((float) (_smallShip._position.x * _smallShip._position.x) + (_smallShip._position.y * _smallShip._position.y));
 		if (yDiff > 6)
-			_smallShip.setPosition(_smallShip._position, (int) yDiff);
+			_smallShip.setPosition(_smallShip._position, (int)yDiff);
 	}
 
 	Scene::dispatch();
@@ -3882,10 +3885,6 @@ void Scene1575::synchronize(Serializer &s) {
 	s.syncAsSint16LE(_field41A);
 }
 
-double hypotenuse(double v1, double v2) {
-	return sqrt(v1 * v1 + v2 * v2);
-}
-
 void Scene1575::postInit(SceneObjectList *OwnerList) {
 	loadScene(1575);
 	R2_GLOBALS._uiElements._active = false;
@@ -3911,8 +3910,8 @@ void Scene1575::postInit(SceneObjectList *OwnerList) {
 		_arrActor[i].postInit();
 		_arrActor[i].setup(1575, 2, k5A7F6[3 * i + 2]);
 
-		double v1 = hypotenuse(2.0, 3 - k5A7F6[3 * i]);
-		v1 += hypotenuse(2.0, 3 - k5A7F6[3 * i + 1]);
+		double v1 = Common::hypotenuse<double>(2.0, 3 - k5A7F6[3 * i]);
+		v1 += Common::hypotenuse<double>(2.0, 3 - k5A7F6[3 * i + 1]);
 		int yp = (int)(sqrt(v1) * 75.0 / 17.0 - 161.0);
 
 		int angle = R2_GLOBALS._gfxManagerInstance.getAngle(

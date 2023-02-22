@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 #include "common/system.h"
 
 #include "sci/sci.h"	// for INCLUDE_OLDGFX
 #include "sci/debug.h"	// for g_debug_sleeptime_factor
+#include "sci/engine/features.h"
 #include "sci/engine/file.h"
 #include "sci/engine/guest_additions.h"
 #include "sci/engine/kernel.h"
@@ -88,10 +88,13 @@ void EngineState::reset(bool isRestoring) {
 
 	_delayedRestoreGameId = -1;
 
+	_kq7MacSaveGameId = -1;
+	_kq7MacSaveGameDescription.clear();
+
 	executionStackBase = 0;
 	_executionStackPosChanged = false;
-	stack_base = 0;
-	stack_top = 0;
+	stack_base = nullptr;
+	stack_top = nullptr;
 
 	r_acc = NULL_REG;
 	r_prev = NULL_REG;
@@ -101,12 +104,10 @@ void EngineState::reset(bool isRestoring) {
 
 	gcCountDown = 0;
 
-#ifdef ENABLE_SCI32
 	_eventCounter = 0;
-#endif
+	_paletteSetIntensityCounter = 0;
 	_throttleLastTime = 0;
 	_throttleTrigger = false;
-	_gameIsBenchmarking = false;
 
 	_lastSaveVirtualId = SAVEGAMEID_OFFICIALRANGE_START;
 	_lastSaveNewId = 0;
@@ -134,14 +135,26 @@ void EngineState::speedThrottler(uint32 neededSleep) {
 	}
 }
 
-int EngineState::wait(int16 ticks) {
+uint16 EngineState::wait(uint16 ticks) {
 	uint32 time = g_system->getMillis();
-	const int tickDelta = ((long)time - (long)lastWaitTime) * 60 / 1000;
-	lastWaitTime = time;
 
+	uint32 ms = ticks * 1000 / 60;
+	uint32 duration = time - lastWaitTime;
+	if (ms > duration) {
+		uint32 sleepTime = ms - duration;
+		sleepTime *= g_debug_sleeptime_factor;
+		g_sci->sleep(sleepTime);
+		time += sleepTime;
+	}
+
+	uint16 tickDelta = (uint16)(((long)time - lastWaitTime) * 60 / 1000);
+	lastWaitTime = time;
+	return tickDelta;
+}
+
+void EngineState::sleep(uint16 ticks) {
 	ticks *= g_debug_sleeptime_factor;
 	g_sci->sleep(ticks * 1000 / 60);
-	return tickDelta;
 }
 
 void EngineState::initGlobals() {
@@ -153,6 +166,13 @@ void EngineState::initGlobals() {
 	variablesSegment[VAR_GLOBAL] = script_000->getLocalsSegment();
 	variablesBase[VAR_GLOBAL] = variables[VAR_GLOBAL] = script_000->getLocalsBegin();
 	variablesMax[VAR_GLOBAL] = script_000->getLocalsCount();
+
+	// The KQ5 CD Windows interpreter set global 400 to tell the scripts that the
+	//  platform was Windows. The global determines which cursors the scripts use,
+	//  so we only set this if the user has chosen to use Windows cursors.
+	if (g_sci->getGameId() == GID_KQ5 && g_sci->isCD()) {
+		variables[VAR_GLOBAL][400].setOffset(g_sci->_features->useWindowsCursors());
+	}
 }
 
 uint16 EngineState::currentRoomNumber() const {
@@ -197,6 +217,9 @@ static kLanguage charToLanguage(const char c) {
 Common::String SciEngine::getSciLanguageString(const Common::String &str, kLanguage requestedLanguage, kLanguage *secondaryLanguage, uint16 *languageSplitter) const {
 	kLanguage foundLanguage = K_LANG_NONE;
 	const byte *textPtr = (const byte *)str.c_str();
+	if (secondaryLanguage) {
+		*secondaryLanguage = K_LANG_NONE;
+	}
 	byte curChar = 0;
 	byte curChar2 = 0;
 
@@ -237,22 +260,8 @@ Common::String SciEngine::getSciLanguageString(const Common::String &str, kLangu
 				switch (curChar) {
 				case 0: // Terminator NUL
 					return fullWidth;
-				case '\\':
-					// "\n", "\N", "\r" and "\R" were overwritten with SPACE + 0x0D in PC-9801 SSCI
-					//  inside GetLongest() (text16). We do it here, because it's much cleaner and
-					//  we have to process the text here anyway.
-					//  Occurs for example in Police Quest 2 intro
-					curChar2 = *(textPtr + 1);
-					switch (curChar2) {
-					case 'n':
-					case 'N':
-					case 'r':
-					case 'R':
-						fullWidth += ' ';
-						fullWidth += 0x0D; // CR
-						textPtr += 2;
-						continue;
-					}
+				default:
+					break;
 				}
 
 				textPtr++;
@@ -306,6 +315,13 @@ kLanguage SciEngine::getSciLanguage() {
 			switch (getLanguage()) {
 			case Common::FR_FRA:
 				lang = K_LANG_FRENCH;
+				// WORKAROUND: The French version of LSL1VGA is a fan patch that's based
+				// on the official Spanish version, with the Spanish content replaced
+				// with French content. The game scripts require printLang to be Spanish
+				// in order to use the French text and load the correct views.
+				if (g_sci->getGameId() == GID_LSL1) {
+					lang = K_LANG_SPANISH;
+				}
 				break;
 			case Common::ES_ESP:
 				lang = K_LANG_SPANISH;
@@ -352,7 +368,7 @@ Common::String SciEngine::strSplitLanguage(const char *str, uint16 *languageSpli
 
 	// Don't add subtitle when separator is not set, subtitle language is not set, or
 	// string contains only one language
-	if ((sep == NULL) || (subtitleLanguage == K_LANG_NONE) || (foundLanguage == K_LANG_NONE))
+	if ((sep == nullptr) || (subtitleLanguage == K_LANG_NONE) || (foundLanguage == K_LANG_NONE))
 		return retval;
 
 	// Add subtitle, unless the subtitle language doesn't match the languages in the string

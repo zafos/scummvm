@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -106,10 +105,10 @@ public:
 	static const uint32 kID = MKTAG('P','M','E','M');
 
 	SavePartMem(uint32 size);
-	~SavePartMem();
+	~SavePartMem() override;
 
-	bool read(Common::ReadStream &stream);
-	bool write(Common::WriteStream &stream) const;
+	bool read(Common::ReadStream &stream) override;
+	bool write(Common::WriteStream &stream) const override;
 
 	/** Read size bytes of data into the part at the specified offset. */
 	bool readFrom(const byte *data, uint32 offset, uint32 size);
@@ -128,10 +127,10 @@ public:
 	static const uint32 kID = MKTAG('V','A','R','S');
 
 	SavePartVars(GobEngine *vm, uint32 size);
-	~SavePartVars();
+	~SavePartVars() override;
 
-	bool read(Common::ReadStream &stream);
-	bool write(Common::WriteStream &stream) const;
+	bool read(Common::ReadStream &stream) override;
+	bool write(Common::WriteStream &stream) const override;
 
 	/** Read size bytes of variables starting at var into the part at the specified offset. */
 	bool readFrom(uint32 var, uint32 offset, uint32 size);
@@ -139,7 +138,12 @@ public:
 	bool writeInto(uint32 var, uint32 offset, uint32 size) const;
 
 	/** Read size bytes of raw data into the part. */
-	bool readFromRaw(const byte *data, uint32 size);
+	bool readFromRaw(const byte *data, uint32 offset, uint32 size);
+
+	/** Write size bytes of the part at the specified offset into a raw buffer. */
+	bool writeIntoRaw(byte *data, uint32 offset, uint32 size) const;
+
+	const byte* data() const { return _data; }
 
 private:
 	GobEngine *_vm;
@@ -155,10 +159,10 @@ public:
 	static const uint32 kID = MKTAG('S','P','R','T');
 
 	SavePartSprite(uint32 width, uint32 height, bool trueColor = false);
-	~SavePartSprite();
+	~SavePartSprite() override;
 
-	bool read(Common::ReadStream &stream);
-	bool write(Common::WriteStream &stream) const;
+	bool read(Common::ReadStream &stream) override;
+	bool write(Common::WriteStream &stream) const override;
 
 	/** Read a palette into the part. */
 	bool readPalette(const byte *palette);
@@ -202,7 +206,7 @@ public:
 	 */
 	SavePartInfo(uint32 descMaxLength, uint32 gameID,
 			uint32 gameVersion, byte endian, uint32 varCount);
-	~SavePartInfo();
+	~SavePartInfo() override;
 
 	/** Return the save's description. */
 	const char *getDesc() const;
@@ -216,8 +220,8 @@ public:
 	/** Set the save's description. */
 	void setDesc(const byte *desc, uint32 size);
 
-	bool read(Common::ReadStream &stream);
-	bool write(Common::WriteStream &stream) const;
+	bool read(Common::ReadStream &stream) override;
+	bool write(Common::WriteStream &stream) const override;
 
 private:
 	char *_desc;
@@ -336,6 +340,7 @@ public:
 	bool writePart(uint32 partN, const SavePart *part);
 
 	bool save(Common::WriteStream &stream);
+	bool deleteFile();
 
 protected:
 	bool save();

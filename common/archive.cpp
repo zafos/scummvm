@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,17 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "common/archive.h"
+#include "common/file.h"
 #include "common/fs.h"
 #include "common/system.h"
 #include "common/textconsole.h"
+#include "common/memstream.h"
+#include "common/punycode.h"
 
 namespace Common {
 
@@ -40,18 +42,20 @@ SeekableReadStream *GenericArchiveMember::createReadStream() const {
 }
 
 
-int Archive::listMatchingMembers(ArchiveMemberList &list, const String &pattern) const {
+int Archive::listMatchingMembers(ArchiveMemberList &list, const Path &pattern, bool matchPathComponents) const {
 	// Get all "names" (TODO: "files" ?)
 	ArchiveMemberList allNames;
 	listMembers(allNames);
 
+	String patternString = pattern.toString();
 	int matches = 0;
+	const char *wildcardExclusions = matchPathComponents ? NULL : "/";
 
 	ArchiveMemberList::const_iterator it = allNames.begin();
 	for (; it != allNames.end(); ++it) {
 		// TODO: We match case-insenstivie for now, our API does not define whether that's ok or not though...
 		// For our use case case-insensitive is probably what we want to have though.
-		if ((*it)->getName().matchString(pattern, true, true)) {
+		if ((*it)->getName().matchString(patternString, true, wildcardExclusions)) {
 			list.push_back(*it);
 			matches++;
 		}
@@ -60,6 +64,84 @@ int Archive::listMatchingMembers(ArchiveMemberList &list, const String &pattern)
 	return matches;
 }
 
+void Archive::dumpArchive(String destPath) {
+	Common::ArchiveMemberList files;
+
+	listMembers(files);
+
+	byte *data = nullptr;
+	uint dataSize = 0;
+
+	for (auto &f : files) {
+		Common::String filename = Common::punycode_encodefilename(f->getName());
+		warning("File: %s", filename.c_str());
+
+		Common::SeekableReadStream *stream = f->createReadStream();
+
+		uint32 len = stream->size();
+		if (dataSize < len) {
+			free(data);
+			data = (byte *)malloc(stream->size());
+			dataSize = stream->size();
+		}
+
+		stream->read(data, len);
+
+		Common::DumpFile out;
+		Common::String outname = destPath + filename;
+		if (!out.open(outname, true)) {
+			warning("Archive::dumpArchive(): Can not open dump file %s", outname.c_str());
+		} else {
+			out.write(data, len);
+			out.flush();
+			out.close();
+		}
+
+		delete stream;
+	}
+
+	free(data);
+}
+
+SeekableReadStream *MemcachingCaseInsensitiveArchive::createReadStreamForMember(const Path &path) const {
+	String translated = translatePath(path);
+	bool isNew = false;
+	if (!_cache.contains(translated)) {
+		_cache[translated] = readContentsForPath(translated);
+		isNew = true;
+	}
+
+	SharedArchiveContents* entry = &_cache[translated];
+
+	// Errors and missing files. Just return nullptr,
+	// no need to create stream.
+	if (entry->isFileMissing())
+		return nullptr;
+
+	// Check whether the entry is still valid as WeakPtr might have expired.
+	if (!entry->makeStrong()) {
+		// If it's expired, recreate the entry.
+		_cache[translated] = readContentsForPath(translated);
+		entry = &_cache[translated];
+		isNew = true;
+	}
+
+	// It's possible that recreation failed in case of e.g. network
+	// share going offline.
+	if (entry->isFileMissing())
+		return nullptr;
+
+	// Now we have a valid contents reference. Make stream for it.
+	Common::MemoryReadStream *memStream = new Common::MemoryReadStream(entry->getContents(), entry->getSize());
+
+	// If the entry was just created and it's too big for strong caching,
+	// mark the copy in cache as weak
+	if (isNew && entry->getSize() > _maxStronglyCachedSize) {
+		entry->makeWeak();
+	}
+
+	return memStream;
+}
 
 
 SearchSet::ArchiveNodeList::iterator SearchSet::find(const String &name) {
@@ -81,9 +163,9 @@ SearchSet::ArchiveNodeList::const_iterator SearchSet::find(const String &name) c
 }
 
 /*
-    Keep the nodes sorted according to descending priorities.
-    In case two or node nodes have the same priority, insertion
-    order prevails.
+	Keep the nodes sorted according to descending priorities.
+	In case two or node nodes have the same priority, insertion
+	order prevails.
 */
 void SearchSet::insert(const Node &node) {
 	ArchiveNodeList::iterator it = _list.begin();
@@ -115,7 +197,7 @@ void SearchSet::addDirectory(const String &name, const FSNode &dir, int priority
 	if (!dir.exists() || !dir.isDirectory())
 		return;
 
-	add(name, new FSDirectory(dir, depth, flat), priority);
+	add(name, new FSDirectory(dir, depth, flat, _ignoreClashes), priority);
 }
 
 void SearchSet::addSubDirectoriesMatching(const FSNode &directory, String origPattern, bool ignoreCase, int priority, int depth, bool flat) {
@@ -180,6 +262,15 @@ bool SearchSet::hasArchive(const String &name) const {
 	return (find(name) != _list.end());
 }
 
+Archive *SearchSet::getArchive(const String &name) const {
+	auto arch = find(name);
+
+	if (arch == _list.end())
+		return nullptr;
+
+	return arch->_arc;
+}
+
 void SearchSet::clear() {
 	for (ArchiveNodeList::iterator i = _list.begin(); i != _list.end(); ++i) {
 		if (i->_autoFree)
@@ -205,25 +296,25 @@ void SearchSet::setPriority(const String &name, int priority) {
 	insert(node);
 }
 
-bool SearchSet::hasFile(const String &name) const {
-	if (name.empty())
+bool SearchSet::hasFile(const Path &path) const {
+	if (path.empty())
 		return false;
 
 	ArchiveNodeList::const_iterator it = _list.begin();
 	for (; it != _list.end(); ++it) {
-		if (it->_arc->hasFile(name))
+		if (it->_arc->hasFile(path))
 			return true;
 	}
 
 	return false;
 }
 
-int SearchSet::listMatchingMembers(ArchiveMemberList &list, const String &pattern) const {
+int SearchSet::listMatchingMembers(ArchiveMemberList &list, const Path &pattern, bool matchPathComponents) const {
 	int matches = 0;
 
 	ArchiveNodeList::const_iterator it = _list.begin();
 	for (; it != _list.end(); ++it)
-		matches += it->_arc->listMatchingMembers(list, pattern);
+		matches += it->_arc->listMatchingMembers(list, pattern, matchPathComponents);
 
 	return matches;
 }
@@ -238,26 +329,26 @@ int SearchSet::listMembers(ArchiveMemberList &list) const {
 	return matches;
 }
 
-const ArchiveMemberPtr SearchSet::getMember(const String &name) const {
-	if (name.empty())
+const ArchiveMemberPtr SearchSet::getMember(const Path &path) const {
+	if (path.empty())
 		return ArchiveMemberPtr();
 
 	ArchiveNodeList::const_iterator it = _list.begin();
 	for (; it != _list.end(); ++it) {
-		if (it->_arc->hasFile(name))
-			return it->_arc->getMember(name);
+		if (it->_arc->hasFile(path))
+			return it->_arc->getMember(path);
 	}
 
 	return ArchiveMemberPtr();
 }
 
-SeekableReadStream *SearchSet::createReadStreamForMember(const String &name) const {
-	if (name.empty())
+SeekableReadStream *SearchSet::createReadStreamForMember(const Path &path) const {
+	if (path.empty())
 		return nullptr;
 
 	ArchiveNodeList::const_iterator it = _list.begin();
 	for (; it != _list.end(); ++it) {
-		SeekableReadStream *stream = it->_arc->createReadStreamForMember(name);
+		SeekableReadStream *stream = it->_arc->createReadStreamForMember(path);
 		if (stream)
 			return stream;
 	}
@@ -279,9 +370,12 @@ void SearchManager::clear() {
 	if (g_system)
 		g_system->addSysArchivesToSearchSet(*this, -1);
 
+#ifndef __ANDROID__
 	// Add the current dir as a very last resort.
-	// See also bug #2137680.
+	// See also bug #3984.
+	// But don't do this for Android platform, since it may lead to crashes
 	addDirectory(".", ".", -2);
+#endif
 }
 
 DECLARE_SINGLETON(SearchManager);

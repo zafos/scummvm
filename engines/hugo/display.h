@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -150,23 +149,23 @@ private:
 class Screen_v1d : public Screen {
 public:
 	Screen_v1d(HugoEngine *vm);
-	~Screen_v1d();
+	~Screen_v1d() override;
 
-	void loadFont(int16 fontId);
-	void loadFontArr(Common::ReadStream &in);
+	void loadFont(int16 fontId) override;
+	void loadFontArr(Common::ReadStream &in) override;
 protected:
-	OverlayState findOvl(Seq *seqPtr, ImagePtr dstPtr, uint16 y);
+	OverlayState findOvl(Seq *seqPtr, ImagePtr dstPtr, uint16 y) override;
 };
 
 class Screen_v1w : public Screen {
 public:
 	Screen_v1w(HugoEngine *vm);
-	~Screen_v1w();
+	~Screen_v1w() override;
 
-	void loadFont(int16 fontId);
-	void loadFontArr(Common::ReadStream &in);
+	void loadFont(int16 fontId) override;
+	void loadFontArr(Common::ReadStream &in) override;
 protected:
-	OverlayState findOvl(Seq *seqPtr, ImagePtr dstPtr, uint16 y);
+	OverlayState findOvl(Seq *seqPtr, ImagePtr dstPtr, uint16 y) override;
 };
 
 } // End of namespace Hugo

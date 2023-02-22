@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -55,38 +54,42 @@ class DialogueMenu {
 
 	BladeRunnerEngine *_vm;
 
-	TextResource         *_textResource;
-	Common::Array<Shape>  _shapes;
-	bool                  _isVisible;
-	bool                  _waitingForInput;
-	int                   _selectedItemIndex;
-	int                   _listSize;
+	TextResource *_textResource;
+	Shapes       *_shapes;
+	bool          _isVisible;
+	bool          _waitingForInput;
+	int           _selectedItemIndex;
+	int           _listSize;
 
 	// These track whether a dialogue option
 	// has previously been selected
-	int                   _neverRepeatListSize;
-	int                   _neverRepeatValues[kMaxRepeatHistory];
-	bool                  _neverRepeatWasSelected[kMaxRepeatHistory];
+	int           _neverRepeatListSize;
+	int           _neverRepeatValues[kMaxRepeatHistory];
+	bool          _neverRepeatWasSelected[kMaxRepeatHistory];
 
-	int                   _centerX;
-	int                   _centerY;
-	int                   _screenX;
-	int                   _screenY;
-	int                   _maxItemWidth;
-	DialogueItem          _items[kMaxItems];
+	int           _centerX;
+	int           _centerY;
+	int           _screenX;
+	int           _screenY;
+	int           _maxItemWidth;
+	DialogueItem  _items[kMaxItems];
 
-	int                   _fadeInItemIndex;
+	int           _fadeInItemIndex;
 
 public:
 	DialogueMenu(BladeRunnerEngine *vm);
 	~DialogueMenu();
 
-	bool loadText(const Common::String &name);
+	void clear();
+
+	bool loadResources();
 
 	bool show();
 	bool hide();
 	bool addToList(int answer, bool done, int priorityPolite, int priorityNormal, int prioritySurly);
+	bool clearNeverRepeatWasSelectedFlag(int answer); // aux function - used in cut content mode to re-use some dialogue options for different characters
 	bool addToListNeverRepeatOnceSelected(int answer, int priorityPolite, int priorityNormal, int prioritySurly);
+	bool removeFromList(int answer);
 	bool clearList();
 	int  queryInput();
 	int  listSize() const;
@@ -106,7 +109,6 @@ private:
 	int  getAnswerIndex(int answer) const;
 	const char *getText(int id) const;
 	void calculatePosition(int unusedX = 0, int unusedY = 0);
-	void clear();
 	void reset();
 
 	static void darkenRect(Graphics::Surface &s, int x1, int y1, int x2, int y2);

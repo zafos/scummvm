@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -55,6 +54,8 @@ uint32 AsScene2803LightCord::handleMessage(int messageNum, const MessageParam &p
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -64,6 +65,8 @@ uint32 AsScene2803LightCord::hmPulled(int messageNum, const MessageParam &param,
 	switch (messageNum) {
 	case NM_ANIMATION_STOP:
 		gotoNextState();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -113,6 +116,8 @@ uint32 AsScene2803TestTubeOne::handleMessage(int messageNum, const MessageParam 
 		else
 			startAnimation(_fileHash1, 0, -1);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -143,6 +148,8 @@ uint32 AsScene2803Rope::handleMessage(int messageNum, const MessageParam &param,
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -158,6 +165,8 @@ uint32 AsScene2803Rope::hmReleased(int messageNum, const MessageParam &param, En
 		break;
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -202,6 +211,8 @@ uint32 SsScene2804RedButton::handleMessage(int messageNum, const MessageParam &p
 		}
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -227,6 +238,8 @@ uint32 SsScene2804LightCoil::handleMessage(int messageNum, const MessageParam &p
 		updatePosition();
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -251,6 +264,8 @@ uint32 SsScene2804LightTarget::handleMessage(int messageNum, const MessageParam 
 		setVisible(false);
 		updatePosition();
 		messageResult = 1;
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -436,6 +451,8 @@ uint32 SsScene2804CrystalButton::handleMessage(int messageNum, const MessagePara
 		}
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -479,6 +496,8 @@ uint32 AsScene2804BeamCoil::handleMessage(int messageNum, const MessageParam &pa
 		hide();
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -512,6 +531,8 @@ uint32 AsScene2804BeamCoil::hmBeaming(int messageNum, const MessageParam &param,
 	case NM_ANIMATION_STOP:
 		gotoNextState();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -542,6 +563,8 @@ uint32 AsScene2804BeamTarget::handleMessage(int messageNum, const MessageParam &
 		stopAnimation();
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -569,6 +592,8 @@ uint32 AsScene2806Spew::handleMessage(int messageNum, const MessageParam &param,
 	case NM_ANIMATION_STOP:
 		stopAnimation();
 		setVisible(false);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -635,6 +660,8 @@ uint32 SsScene2808Dispenser::handleMessage(int messageNum, const MessageParam &p
 		sendMessage(_parentScene, 0x2000, _testTubeIndex);
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -693,6 +720,8 @@ uint32 AsScene2808TestTube::handleMessage(int messageNum, const MessageParam &pa
 	case 0x1011:
 		fill();
 		messageResult = 1;
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -757,6 +786,8 @@ uint32 AsScene2808Handle::handleMessage(int messageNum, const MessageParam &para
 		}
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -766,6 +797,8 @@ uint32 AsScene2808Handle::hmActivating(int messageNum, const MessageParam &param
 	switch (messageNum) {
 	case NM_ANIMATION_STOP:
 		gotoNextState();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -809,6 +842,8 @@ uint32 AsScene2808Flow::hmFlowing(int messageNum, const MessageParam &param, Ent
 	switch (messageNum) {
 	case NM_ANIMATION_STOP:
 		gotoNextState();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -874,6 +909,8 @@ uint32 AsScene2809Spew::handleMessage(int messageNum, const MessageParam &param,
 		stopAnimation();
 		setVisible(false);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -901,6 +938,8 @@ uint32 AsScene2810Rope::handleMessage(int messageNum, const MessageParam &param,
 		break;
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -933,6 +972,8 @@ uint32 AsScene2812Winch::handleMessage(int messageNum, const MessageParam &param
 	case NM_ANIMATION_STOP:
 		startAnimation(0x20DA08A0, 7, -1);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -962,6 +1003,8 @@ uint32 AsScene2812Rope::handleMessage(int messageNum, const MessageParam &param,
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -971,6 +1014,8 @@ uint32 AsScene2812Rope::hmRopingDown(int messageNum, const MessageParam &param, 
 	switch (messageNum) {
 	case NM_ANIMATION_STOP:
 		gotoNextState();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -996,6 +1041,8 @@ uint32 AsScene2812TrapDoor::handleMessage(int messageNum, const MessageParam &pa
 		startAnimation(0x805D0029, 0, -1);
 		playSound(0, 0xEA005F40);
 		_newStickFrameIndex = STICK_LAST_FRAME;
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -1066,6 +1113,8 @@ uint32 KmScene2801::xHandleMessage(int messageNum, const MessageParam &param) {
 	case 0x4837:
 		stopWalking();
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -1128,6 +1177,8 @@ uint32 KmScene2803::xHandleMessage(int messageNum, const MessageParam &param) {
 	case 0x4838:
 		GotoState(&Klaymen::stJumpToGrabRelease);
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -1181,6 +1232,8 @@ uint32 KmScene2803Small::xHandleMessage(int messageNum, const MessageParam &para
 	case 0x4830:
 		GotoState(&KmScene2803Small::stShrink);
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -1193,6 +1246,8 @@ uint32 KmScene2803Small::hmShrink(int messageNum, const MessageParam &param, Ent
 			sendMessage(_parentScene, NM_MOVE_TO_BACK, 0);
 		else if (param.asInteger() == 0x33288344)
 			playSound(2, 0x10688664);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -1262,6 +1317,8 @@ uint32 KmScene2805::xHandleMessage(int messageNum, const MessageParam &param) {
 	case 0x483E:
 		teleporterDisappear(0xD82A4094);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1272,7 +1329,6 @@ KmScene2806::KmScene2806(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16
 
 	if (needsLargeSurface) {
 		NDimensions dimensions = _animResource.loadSpriteDimensions(0x2838C010);
-		delete _surface;
 		createSurface(1000, dimensions.width, dimensions.height);
 		loadSound(3, 0x58E0C341);
 		loadSound(4, 0x40A00342);
@@ -1320,6 +1376,8 @@ uint32 KmScene2806::xHandleMessage(int messageNum, const MessageParam &param) {
 		else
 			GotoState(&Klaymen::stUseTube);
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -1330,7 +1388,6 @@ KmScene2809::KmScene2809(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16
 
 	if (needsLargeSurface) {
 		NDimensions dimensions = _animResource.loadSpriteDimensions(0x2838C010);
-		delete _surface;
 		createSurface(1000, dimensions.width, dimensions.height);
 		loadSound(3, 0x58E0C341);
 		loadSound(4, 0x40A00342);
@@ -1377,6 +1434,8 @@ uint32 KmScene2809::xHandleMessage(int messageNum, const MessageParam &param) {
 			GotoState(&Klaymen::stDrinkPotion);
 		else
 			GotoState(&Klaymen::stUseTube);
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -1426,6 +1485,8 @@ uint32 KmScene2810Small::xHandleMessage(int messageNum, const MessageParam &para
 		break;
 	case 0x4837:
 		stopWalking();
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -1519,6 +1580,8 @@ uint32 KmScene2810::xHandleMessage(int messageNum, const MessageParam &param) {
 	case 0x4837:
 		stopWalking();
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -1608,6 +1671,8 @@ uint32 KmScene2812::xHandleMessage(int messageNum, const MessageParam &param) {
 		break;
 	case 0x4840:
 		startSpecialWalkLeft(param.asInteger());
+		break;
+	default:
 		break;
 	}
 	return 0;

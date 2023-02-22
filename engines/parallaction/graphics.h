@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,6 +26,7 @@
 #include "common/rect.h"
 #include "common/hashmap.h"
 #include "common/hash-str.h"
+#include "common/str.h"
 #include "common/stream.h"
 #include "common/array.h"
 
@@ -66,9 +66,7 @@ public:
 	virtual uint32 getStringWidth(const char *s) = 0;
 	virtual uint16 height() = 0;
 
-	virtual void drawString(byte* buffer, uint32 pitch, const char *s) = 0;
-
-
+	virtual void drawString(Graphics::Surface *dst, int x, int y, const char *s) = 0;
 };
 
 
@@ -93,30 +91,30 @@ public:
 	SurfaceToFrames(Graphics::Surface *surf) : _surf(surf) {
 	}
 
-	~SurfaceToFrames() {
+	~SurfaceToFrames() override {
 		_surf->free();
 		delete _surf;
 	}
 
-	uint16	getNum() {
+	uint16	getNum() override {
 		return 1;
 	}
-	byte*	getData(uint16 index) {
+	byte*	getData(uint16 index) override {
 		assert(index == 0);
 		return (byte *)_surf->getBasePtr(0,0);
 	}
-	void	getRect(uint16 index, Common::Rect &r) {
+	void	getRect(uint16 index, Common::Rect &r) override {
 		assert(index == 0);
 		r.left = 0;
 		r.top = 0;
 		r.setWidth(_surf->w);
 		r.setHeight(_surf->h);
 	}
-	uint	getRawSize(uint16 index) {
+	uint	getRawSize(uint16 index) override {
 		assert(index == 0);
 		return getSize(index);
 	}
-	uint	getSize(uint16 index) {
+	uint	getSize(uint16 index) override {
 		assert(index == 0);
 		return _surf->w * _surf->h;
 	}
@@ -130,21 +128,35 @@ struct Cnv : public Frames {
 	byte**	field_8;	// unused
 	byte*	_data;
 	bool	_freeData;
+	Graphics::Surface *_surf;
 
 public:
 	Cnv() {
 		_width = _height = _count = 0;
 		_data = NULL;
+		_surf = NULL;
+		_freeData = false;
+		field_8 = 0;
 	}
 
-	Cnv(uint16 numFrames, uint16 width, uint16 height, byte* data, bool freeData = false)
-		: _count(numFrames), _width(width), _height(height), _data(data), _freeData(freeData), field_8(0) {
-
+	Cnv(uint16 numFrames, uint16 width, uint16 height, byte *data, bool freeData = false)
+		: _count(numFrames), _width(width), _height(height), _data(data), _freeData(freeData), field_8(0), _surf(NULL) {
 	}
 
-	~Cnv() {
-		if (_freeData)
-			delete[] _data;
+	Cnv(uint16 numFrames, uint16 width, uint16 height, Graphics::Surface *surf)
+		: _count(numFrames), _width(width), _height(height), _data(NULL), _freeData(true), field_8(0), _surf(surf) {
+		_data = (byte *)_surf->getBasePtr(0, 0);
+	}
+
+	~Cnv() override {
+		if (_freeData) {
+			if (_surf) {
+				_surf->free();
+				delete _surf;
+			} else {
+				delete[] _data;
+			}
+		}
 	}
 
 	byte* getFramePtr(uint16 index) {
@@ -153,25 +165,25 @@ public:
 		return &_data[index * _width * _height];
 	}
 
-	uint16	getNum() {
+	uint16	getNum() override {
 		return _count;
 	}
 
-	byte	*getData(uint16 index) {
+	byte	*getData(uint16 index) override {
 		return getFramePtr(index);
 	}
 
-	void getRect(uint16 index, Common::Rect &r) {
+	void getRect(uint16 index, Common::Rect &r) override {
 		r.left = 0;
 		r.top = 0;
 		r.setWidth(_width);
 		r.setHeight(_height);
 	}
-	uint	getRawSize(uint16 index) {
+	uint	getRawSize(uint16 index) override {
 		assert(index < _count);
 		return getSize(index);
 	}
-	uint	getSize(uint16 index) {
+	uint	getSize(uint16 index) override {
 		assert(index < _count);
 		return _width * _height;
 	}
@@ -286,7 +298,7 @@ enum {
 };
 
 class GfxObj {
-	char *_name;
+	Common::String _name;
 	Frames *_frames;
 
 public:

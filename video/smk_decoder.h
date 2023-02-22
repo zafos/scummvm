@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,16 +15,17 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef VIDEO_SMK_PLAYER_H
 #define VIDEO_SMK_PLAYER_H
 
+#include "common/bitarray.h"
 #include "common/bitstream.h"
 #include "common/rational.h"
+#include "common/rect.h"
 #include "graphics/pixelformat.h"
 #include "graphics/surface.h"
 #include "video/video_decoder.h"
@@ -42,12 +43,17 @@ namespace Video {
 
 class BigHuffmanTree;
 
+// Because the maximum number of bits read from a bitstream is 16, and the data is 8-bit, the container only
+// needs to hold up to 23 bits at any given time. As such, we use a bitstream with a 32-bit container to
+// avoid the overhead of 64-bit maths on systems that don't support it natively.
+typedef Common::BitStreamImpl<Common::BitStreamMemoryStream, uint32, 8, false, false> SmackerBitStream;
+
 /**
  * Decoder for Smacker v2/v4 videos.
  *
  * Based on http://wiki.multimedia.cx/index.php?title=Smacker
  * and the FFmpeg Smacker decoder (libavcodec/smacker.c), revision 16143
- * http://svn.ffmpeg.org/ffmpeg/trunk/libavcodec/smacker.c?revision=16143&view=markup
+ * https://git.ffmpeg.org/gitweb/ffmpeg.git/commit/40a19c443430de520d86bbd644033c8e2ca87e9b
  *
  * Video decoder used in engines:
  *  - agos
@@ -56,6 +62,8 @@ class BigHuffmanTree;
  *  - sword1
  *  - sword2
  *  - toon
+ *  - trecision
+ *  - twine
  */
 class SmackerDecoder : public VideoDecoder {
 public:
@@ -64,8 +72,12 @@ public:
 
 	virtual bool loadStream(Common::SeekableReadStream *stream);
 	void close();
-
+	void forceSeekToFrame(uint frame);
 	bool rewind();
+
+	Common::Rational getFrameRate() const;
+
+	virtual const Common::Rect *getNextDirtyRect();
 
 protected:
 	void readNextPacket();
@@ -74,9 +86,11 @@ protected:
 
 	virtual void handleAudioTrack(byte track, uint32 chunkSize, uint32 unpackedSize);
 
+	virtual uint32 getSignatureVersion(uint32 signature) const;
+
 	class SmackerVideoTrack : public FixedRateVideoTrack {
 	public:
-		SmackerVideoTrack(uint32 width, uint32 height, uint32 frameCount, const Common::Rational &frameRate, uint32 flags, uint32 signature);
+		SmackerVideoTrack(uint32 width, uint32 height, uint32 frameCount, const Common::Rational &frameRate, uint32 flags, uint32 version);
 		~SmackerVideoTrack();
 
 		bool isRewindable() const { return true; }
@@ -91,19 +105,21 @@ protected:
 		const byte *getPalette() const { _dirtyPalette = false; return _palette; }
 		bool hasDirtyPalette() const { return _dirtyPalette; }
 
-		void readTrees(Common::BitStreamMemory8LSB &bs, uint32 mMapSize, uint32 mClrSize, uint32 fullSize, uint32 typeSize);
+		void readTrees(SmackerBitStream &bs, uint32 mMapSize, uint32 mClrSize, uint32 fullSize, uint32 typeSize);
 		void increaseCurFrame() { _curFrame++; }
-		void decodeFrame(Common::BitStreamMemory8LSB &bs);
+		void decodeFrame(SmackerBitStream &bs);
 		void unpackPalette(Common::SeekableReadStream *stream);
 
-	protected:
 		Common::Rational getFrameRate() const { return _frameRate; }
 
+		const Common::Rect *getNextDirtyRect();
+
+	protected:
 		Graphics::Surface *_surface;
 
 	private:
 		Common::Rational _frameRate;
-		uint32 _flags, _signature;
+		uint32 _flags, _version;
 
 		byte _palette[3 * 256];
 		mutable bool _dirtyPalette;
@@ -116,11 +132,14 @@ protected:
 		BigHuffmanTree *_FullTree;
 		BigHuffmanTree *_TypeTree;
 
+		Common::BitArray _dirtyBlocks;
+		Common::Rect _lastDirtyRect;
+
 		// Possible runs of blocks
 		static uint getBlockRun(int index) { return (index <= 58) ? index + 1 : 128 << (index - 59); }
 	};
 
-	virtual SmackerVideoTrack *createVideoTrack(uint32 width, uint32 height, uint32 frameCount, const Common::Rational &frameRate, uint32 flags, uint32 signature) const;
+	virtual SmackerVideoTrack *createVideoTrack(uint32 width, uint32 height, uint32 frameCount, const Common::Rational &frameRate, uint32 flags, uint32 version) const;
 
 	Common::SeekableReadStream *_fileStream;
 
@@ -175,6 +194,16 @@ private:
 		AudioInfo _audioInfo;
 	};
 
+	class SmackerEmptyTrack : public Track {
+		VideoDecoder::Track::TrackType getTrackType() const { return VideoDecoder::Track::kTrackTypeNone; }
+
+		bool endOfTrack() const { return true; }
+
+		bool isSeekable() const { return true; }
+		bool seek(const Audio::Timestamp &time) { return true; }
+	};
+
+protected:
 	// The FrameTypes section of a Smacker file contains an array of bytes, where
 	// the 8 bits of each byte describe the contents of the corresponding frame.
 	// The highest 7 bits correspond to audio frames (bit 7 is track 6, bit 6 track 5
@@ -182,6 +211,7 @@ private:
 	// (bit 0) is set, it denotes a frame that contains a palette record
 	byte *_frameTypes;
 
+private:
 	uint32 _firstFrameStart;
 };
 

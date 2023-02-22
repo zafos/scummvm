@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -98,31 +97,31 @@ private:
 class VariablesLE : public Variables {
 public:
 	VariablesLE(uint32 size);
-	~VariablesLE();
+	~VariablesLE() override;
 
 protected:
-	void write8(byte *buf, uint8 data) const;
-	void write16(byte *buf, uint16 data) const;
-	void write32(byte *buf, uint32 data) const;
+	void write8(byte *buf, uint8 data) const override;
+	void write16(byte *buf, uint16 data) const override;
+	void write32(byte *buf, uint32 data) const override;
 
-	uint8 read8(const byte *buf) const;
-	uint16 read16(const byte *buf) const;
-	uint32 read32(const byte *buf) const;
+	uint8 read8(const byte *buf) const override;
+	uint16 read16(const byte *buf) const override;
+	uint32 read32(const byte *buf) const override;
 };
 
 class VariablesBE : public Variables {
 public:
 	VariablesBE(uint32 size);
-	~VariablesBE();
+	~VariablesBE() override;
 
 protected:
-	void write8(byte *buf, uint8 data) const;
-	void write16(byte *buf, uint16 data) const;
-	void write32(byte *buf, uint32 data) const;
+	void write8(byte *buf, uint8 data) const override;
+	void write16(byte *buf, uint16 data) const override;
+	void write32(byte *buf, uint32 data) const override;
 
-	uint8 read8(const byte *buf) const;
-	uint16 read16(const byte *buf) const;
-	uint32 read32(const byte *buf) const;
+	uint8 read8(const byte *buf) const override;
+	uint16 read16(const byte *buf) const override;
+	uint32 read32(const byte *buf) const override;
 };
 
 class VariableReference {

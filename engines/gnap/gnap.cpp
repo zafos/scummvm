@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -30,6 +29,9 @@
 #include "common/config-manager.h"
 #include "common/debug-channels.h"
 #include "common/timer.h"
+#include "common/formats/winexe_pe.h"
+
+#include "graphics/wincursor.h"
 
 #include "engines/util.h"
 
@@ -90,8 +92,6 @@ static const char *kSceneNames[] = {
 
 GnapEngine::GnapEngine(OSystem *syst, const ADGameDescription *gd) :
 	Engine(syst), _gameDescription(gd) {
-
-	DebugMan.addDebugChannel(kDebugBasic, "basic", "Basic debug level");
 
 	_random = new Common::RandomSource("gnap");
 
@@ -233,7 +233,7 @@ Common::Error GnapEngine::run() {
 		error("Could not load ufos.exe");
 
 #ifdef USE_FREETYPE2
-	Common::SeekableReadStream *stream = _exe->getResource(Common::kPEFont, 2000);
+	Common::SeekableReadStream *stream = _exe->getResource(Common::kWinFont, 2000);
 	_font = Graphics::loadTTFFont(*stream, 24);
 	if (!_font)
 		warning("Unable to load font");
@@ -249,6 +249,7 @@ Common::Error GnapEngine::run() {
 	_gameSys = new GameSys(this);
 	_soundMan = new SoundMan(this);
 	_debugger = new Debugger();
+	setDebugger(_debugger);
 	_gnap = new PlayerGnap(this);
 	_plat = new PlayerPlat(this);
 
@@ -265,7 +266,7 @@ Common::Error GnapEngine::run() {
 	delete _soundCache;
 	delete _spriteCache;
 	delete _dat;
-	delete _debugger;
+	//delete _debugger; Debugger is deleted by Engine
 	delete _font;
 	delete _exe;
 
@@ -278,13 +279,6 @@ void GnapEngine::updateEvents() {
 	while (_eventMan->pollEvent(event)) {
 		switch (event.type) {
 		case Common::EVENT_KEYDOWN:
-			// Check for debugger
-			if (event.kbd.keycode == Common::KEYCODE_d && (event.kbd.flags & Common::KBD_CTRL)) {
-				// Attach to the debugger
-				_debugger->attach();
-				_debugger->onFrame();
-			}
-
 			_keyPressState[event.kbd.keycode] = true;
 			_keyDownState[event.kbd.keycode] = true;
 			break;
@@ -457,7 +451,7 @@ void GnapEngine::updateCursorByHotspot() {
 		if (_debugger->_showHotspotNumber) {
 			// NOTE This causes some display glitches
 			char t[256];
-			sprintf(t, "hotspot = %2d", hotspotIndex);
+			Common::sprintf_s(t, "hotspot = %2d", hotspotIndex);
 			if (!_font)
 				_gameSys->fillSurface(nullptr, 10, 10, 80, 16, 0, 0, 0);
 			else
@@ -544,12 +538,10 @@ void GnapEngine::setVerbCursor(int verbCursor) {
 void GnapEngine::setCursor(int cursorIndex) {
 	if (_cursorIndex != cursorIndex) {
 		const char *cursorName = kCursorNames[cursorIndex];
-		Graphics::WinCursorGroup *cursorGroup = Graphics::WinCursorGroup::createCursorGroup(*_exe, Common::WinResourceID(cursorName));
+		Graphics::WinCursorGroup *cursorGroup = Graphics::WinCursorGroup::createCursorGroup(_exe, Common::WinResourceID(cursorName));
 		if (cursorGroup) {
 			Graphics::Cursor *cursor = cursorGroup->cursors[0].cursor;
-			CursorMan.replaceCursor(cursor->getSurface(), cursor->getWidth(), cursor->getHeight(),
-				cursor->getHotspotX(), cursor->getHotspotY(), cursor->getKeyColor());
-			CursorMan.replaceCursorPalette(cursor->getPalette(), 0, 256);
+			CursorMan.replaceCursor(cursor);
 			delete cursorGroup;
 		}
 		_cursorIndex = cursorIndex;
@@ -758,6 +750,8 @@ void GnapEngine::initGameFlags(int num) {
 		setFlag(kGFKeysTaken);
 		setFlag(kGFGrassTaken);
 		setFlag(kGFBarnPadlockOpen);
+		break;
+	default:
 		break;
 	}
 }
@@ -1056,6 +1050,8 @@ void GnapEngine::doCallback(int callback) {
 	case 10:
 	case 20:
 		_scene->updateAnimationsCb();
+		break;
+	default:
 		break;
 	}
 }

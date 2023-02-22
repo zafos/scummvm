@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -39,15 +38,18 @@
 #include "audio/mixer.h"
 #include "audio/decoders/raw.h"
 #include "audio/decoders/wave.h"
+#include "audio/decoders/mp3.h"
+#include "audio/decoders/vorbis.h"
+#include "audio/decoders/flac.h"
 
 namespace Scumm {
 
 SoundHE::SoundHE(ScummEngine *parent, Audio::Mixer *mixer)
 	:
-	Sound(parent, mixer),
+	Sound(parent, mixer, false),
 	_vm((ScummEngine_v60he *)parent),
 	_overrideFreq(0),
-	_heMusic(0),
+	_heMusic(nullptr),
 	_heMusicTracks(0) {
 
 	memset(_heChannel, 0, sizeof(_heChannel));
@@ -508,7 +510,7 @@ byte *findSoundTag(uint32 tag, byte *ptr) {
 	}
 
 	if (READ_BE_UINT32(ptr) != MKTAG('R','I','F','F'))
-		return NULL;
+		return nullptr;
 
 	endPtr = (ptr + 12);
 	size = READ_LE_UINT32(ptr + 4);
@@ -528,11 +530,11 @@ byte *findSoundTag(uint32 tag, byte *ptr) {
 		endPtr = endPtr + offset + 8;
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 void SoundHE::playHESound(int soundID, int heOffset, int heChannel, int heFlags, int heFreq, int hePan, int heVol) {
-	Audio::RewindableAudioStream *stream = 0;
+	Audio::RewindableAudioStream *stream = nullptr;
 	byte *ptr, *spoolPtr;
 	int size = -1;
 	int priority, rate;
@@ -578,7 +580,13 @@ void SoundHE::playHESound(int soundID, int heOffset, int heChannel, int heFlags,
 		musicFile.close();
 
 		if (_vm->_game.heversion == 70) {
-			stream = Audio::makeRawStream(spoolPtr, size, 11025, flags, DisposeAfterUse::NO);
+			// Try to load high quality audio file if found
+			stream = tryLoadAudioOverride(soundID);
+
+			if (!stream) {
+				stream = Audio::makeRawStream(spoolPtr, size, 11025, flags, DisposeAfterUse::NO);
+			}
+
 			_mixer->playStream(type, &_heSoundChannels[heChannel], stream, soundID);
 			return;
 		}
@@ -598,12 +606,13 @@ void SoundHE::playHESound(int soundID, int heOffset, int heChannel, int heFlags,
 	if (READ_BE_UINT32(ptr) == MKTAG('R','I','F','F') || READ_BE_UINT32(ptr) == MKTAG('W','S','O','U')) {
 		uint16 compType;
 		int blockAlign;
+		int samplesPerBlock;
 		int codeOffs = -1;
 
 		priority = (soundID > _vm->_numSounds) ? 255 : *(ptr + 18);
 
 		byte *sbngPtr = findSoundTag(MKTAG('S','B','N','G'), ptr);
-		if (sbngPtr != NULL) {
+		if (sbngPtr != nullptr) {
 			codeOffs = sbngPtr - ptr + 8;
 		}
 
@@ -621,7 +630,7 @@ void SoundHE::playHESound(int soundID, int heOffset, int heChannel, int heFlags,
 		size = READ_LE_UINT32(ptr + 4);
 		Common::MemoryReadStream memStream(ptr, size);
 
-		if (!Audio::loadWAVFromStream(memStream, size, rate, flags, &compType, &blockAlign)) {
+		if (!Audio::loadWAVFromStream(memStream, size, rate, flags, &compType, &blockAlign, &samplesPerBlock)) {
 			error("playHESound: Not a valid WAV file (%d)", soundID);
 		}
 
@@ -647,11 +656,15 @@ void SoundHE::playHESound(int soundID, int heOffset, int heChannel, int heFlags,
 
 		_mixer->stopHandle(_heSoundChannels[heChannel]);
 		if (compType == 17) {
-			Audio::AudioStream *voxStream = Audio::makeADPCMStream(&memStream, DisposeAfterUse::NO, size, Audio::kADPCMMSIma, rate, (flags & Audio::FLAG_STEREO) ? 2 : 1, blockAlign);
+			int nChan = (flags & Audio::FLAG_STEREO) ? 2 : 1;
+			Audio::AudioStream *voxStream = Audio::makeADPCMStream(&memStream, DisposeAfterUse::NO, size, Audio::kADPCMMSIma, rate, nChan, blockAlign);
 
 			// FIXME: Get rid of this crude hack to turn a ADPCM stream into a raw stream.
 			// It seems it is only there to allow looping -- if that is true, we certainly
 			// can do without it, using a LoopingAudioStream.
+
+			if (_heChannel[heChannel].timer)
+				_heChannel[heChannel].timer = (int)(((int64)size * samplesPerBlock * 1000) / ((int64)rate * blockAlign * nChan));
 
 			byte *sound = (byte *)malloc(size * 4);
 			/* On systems where it matters, malloc will return
@@ -661,10 +674,6 @@ void SoundHE::playHESound(int soundID, int heOffset, int heChannel, int heFlags,
 			size = voxStream->readBuffer((int16 *)(void *)sound, size * 2);
 			size *= 2; // 16bits.
 			delete voxStream;
-
-			_heChannel[heChannel].rate = rate;
-			if (_heChannel[heChannel].timer)
-				_heChannel[heChannel].timer = size * 1000 / (rate * blockAlign);
 
 			// makeADPCMStream returns a stream in native endianness, but RawMemoryStream
 			// defaults to big endian. If we're on a little endian system, set the LE flag.
@@ -716,6 +725,14 @@ void SoundHE::playHESound(int soundID, int heOffset, int heChannel, int heFlags,
 			_overrideFreq = 0;
 		}
 
+		// Try to load high quality audio file if found
+		int newDuration;
+		stream = tryLoadAudioOverride(soundID, &newDuration);
+		if (stream != nullptr && soundID == 1) {
+			// Disable lip sync if the speech audio was overriden
+			codeOffs = -1;
+		}
+
 		_vm->setHETimer(heChannel + 4);
 		_heChannel[heChannel].sound = soundID;
 		_heChannel[heChannel].priority = priority;
@@ -728,12 +745,18 @@ void SoundHE::playHESound(int soundID, int heOffset, int heChannel, int heFlags,
 		if (heFlags & 1) {
 			_heChannel[heChannel].timer = 0;
 		} else {
-			_heChannel[heChannel].timer = size * 1000 / rate;
+			if (stream != nullptr) {
+				_heChannel[heChannel].timer = newDuration;
+			} else {
+				_heChannel[heChannel].timer = size * 1000 / rate;
+			}
 		}
 
 		_mixer->stopHandle(_heSoundChannels[heChannel]);
 
-		stream = Audio::makeRawStream(ptr + heOffset + 8, size, rate, flags, DisposeAfterUse::NO);
+		if (!stream) {
+			stream = Audio::makeRawStream(ptr + heOffset + 8, size, rate, flags, DisposeAfterUse::NO);
+		}
 		_mixer->playStream(type, &_heSoundChannels[heChannel],
 						Audio::makeLoopingAudioStream(stream, (heFlags & 1) ? 0 : 1), soundID);
 	}
@@ -755,7 +778,7 @@ void SoundHE::playHESound(int soundID, int heOffset, int heChannel, int heFlags,
 		_currentMusic = soundID;
 
 		stream = Audio::makeRawStream(sound, size, rate, 0);
-		_mixer->playStream(Audio::Mixer::kMusicSoundType, NULL, stream, soundID);
+		_mixer->playStream(Audio::Mixer::kMusicSoundType, nullptr, stream, soundID);
 	}
 	else if (READ_BE_UINT32(ptr) == MKTAG('M','I','D','I')) {
 		if (_vm->_imuse) {
@@ -771,6 +794,87 @@ void SoundHE::playHESound(int soundID, int heOffset, int heChannel, int heFlags,
 			_vm->_musicEngine->startSoundWithTrackID(soundID, heOffset);
 		}
 	}
+}
+
+Audio::RewindableAudioStream *SoundHE::tryLoadAudioOverride(int soundID, int *duration) {
+	if (!_vm->_enableAudioOverride) {
+		return nullptr;
+	}
+
+	const char *formats[] = {
+#ifdef USE_FLAC
+	    "flac",
+#endif
+	    "wav",
+#ifdef USE_VORBIS
+		"ogg",
+#endif
+#ifdef USE_MAD
+	    "mp3",
+#endif
+	};
+
+	Audio::SeekableAudioStream *(*formatDecoders[])(Common::SeekableReadStream *, DisposeAfterUse::Flag) = {
+#ifdef USE_FLAC
+	    Audio::makeFLACStream,
+#endif
+	    Audio::makeWAVStream,
+#ifdef USE_VORBIS
+	    Audio::makeVorbisStream,
+#endif
+#ifdef USE_MAD
+	    Audio::makeMP3Stream,
+#endif
+	};
+
+	STATIC_ASSERT(
+	    ARRAYSIZE(formats) == ARRAYSIZE(formatDecoders),
+	    formats_formatDecoders_must_have_same_size
+	);
+
+	const char *type;
+	if (soundID == 1) {
+		// Speech audio doesn't have a unique ID,
+		// so we use the file offset instead.
+		// _heTalkOffset is set at startHETalkSound.
+		type = "speech";
+		soundID = _heTalkOffset;
+	} else {
+		// Music and sfx share the same prefix.
+		type = "sound";
+	}
+
+	for (int i = 0; i < ARRAYSIZE(formats); i++) {
+		Common::Path pathDir(Common::String::format("%s%d.%s", type, soundID, formats[i]));
+		Common::Path pathSub(Common::String::format("%s/%d.%s", type, soundID, formats[i]));
+
+		debug(5, "tryLoadAudioOverride: %s or %s", pathSub.toString().c_str(), pathDir.toString().c_str());
+
+		// First check if the file exists before opening it to
+		// reduce the amount of "opening %s failed" in the console.
+		// Prefer files in subdirectory.
+		Common::File soundFileOverride;
+		bool foundFile = (soundFileOverride.exists(pathSub) && soundFileOverride.open(pathSub)) ||
+						 (soundFileOverride.exists(pathDir) && soundFileOverride.open(pathDir));
+		if (foundFile) {
+			soundFileOverride.seek(0, SEEK_SET);
+			Common::SeekableReadStream *oStr = soundFileOverride.readStream(soundFileOverride.size());
+			soundFileOverride.close();
+
+			Audio::SeekableAudioStream *seekStream = formatDecoders[i](oStr, DisposeAfterUse::YES);
+			if (duration != nullptr) {
+				*duration = seekStream->getLength().msecs();
+			}
+
+			debug(5, "tryLoadAudioOverride: %s loaded from %s", formats[i], soundFileOverride.getName());
+
+			return seekStream;
+		}
+	}
+
+	debug(5, "tryLoadAudioOverride: file not found");
+
+	return nullptr;
 }
 
 void SoundHE::startHETalkSound(uint32 offset) {
@@ -794,11 +898,16 @@ void SoundHE::startHETalkSound(uint32 offset) {
 	}
 	file.setEnc(_sfxFileEncByte);
 
+	// Speech audio doesn't have a unique ID,
+	// so we use the file offset instead.
+	// _heTalkOffset is used at tryLoadSoundOverride.
+	_heTalkOffset = offset;
+
 	_sfxMode |= 2;
 	_vm->_res->nukeResource(rtSound, 1);
 
 	file.seek(offset + 4, SEEK_SET);
-	 size = file.readUint32BE();
+	size = file.readUint32BE();
 	file.seek(offset, SEEK_SET);
 
 	_vm->_res->createResource(rtSound, 1, size);

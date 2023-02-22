@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,20 +24,25 @@
 #include "bladerunner/bladerunner.h"
 
 #include "common/timer.h"
+#include "common/system.h"
 
 namespace BladeRunner {
 
 Time::Time(BladeRunnerEngine *vm) {
 	_vm = vm;
 
-	_start = _vm->getTotalPlayTime();
+	_start = currentSystem();
 	_pauseCount = 0;
-	_offset = 0;
-	_pauseStart = 0;
+	_offset = 0u;
+	_pauseStart = 0u;
 }
 
-int Time::current() {
-	int time = _vm->getTotalPlayTime() - _offset;
+uint32 Time::currentSystem() {
+	return _vm->getTotalPlayTime();
+}
+
+uint32 Time::current() {
+	uint32 time = currentSystem() - _offset;
 	return time - _start;
 }
 
@@ -49,11 +53,11 @@ int Time::pause() {
 	return ++_pauseCount;
 }
 
-int Time::getPauseStart() {
+uint32 Time::getPauseStart() {
 	return _pauseStart;
 }
 
-int Time::unpause() {
+int Time::resume() {
 	assert(_pauseCount > 0);
 	if (--_pauseCount == 0) {
 		_offset += current() - _pauseStart;
@@ -63,6 +67,15 @@ int Time::unpause() {
 
 bool Time::isLocked() {
 	return _pauseCount > 0;
+}
+
+// To be called before loading a new game, since
+// the offset should be reset to zero and _pauseStart should be current() (ie currentSystem() - _start)
+// TODO Explore if it would make sense to only use the Engine methods for time accounting (pauseEngine, get/setTotalPlatTime)
+//      or do we need separated/independent time accounting and pausing?
+void Time::resetPauseStart() {
+	_offset = 0u;
+	_pauseStart = current();
 }
 
 } // End of namespace BladeRunner

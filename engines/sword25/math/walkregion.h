@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -51,9 +50,9 @@ protected:
 	WalkRegion(InputPersistenceBlock &Reader, uint handle);
 
 public:
-	virtual ~WalkRegion();
+	~WalkRegion() override;
 
-	virtual bool init(const Polygon &contour, const Common::Array<Polygon> *pHoles = 0);
+	bool init(const Polygon &contour, const Common::Array<Polygon> *pHoles = 0) override;
 
 	/**
 	 * Get the shortest path between two points in the region
@@ -83,7 +82,7 @@ public:
 	*/
 	bool queryPath(Vertex startPoint, Vertex endPoint, BS_Path &path);
 
-	virtual void setPos(int x, int y);
+	void setPos(int x, int y) override;
 
 	const Common::Array<Vertex> &getNodes() const {
 		return _nodes;
@@ -92,8 +91,8 @@ public:
 		return _visibilityMatrix;
 	}
 
-	virtual bool persist(OutputPersistenceBlock &writer);
-	virtual bool unpersist(InputPersistenceBlock &reader);
+	bool persist(OutputPersistenceBlock &writer) override;
+	bool unpersist(InputPersistenceBlock &reader) override;
 
 private:
 	Common::Array<Vertex> _nodes;

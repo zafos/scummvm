@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -36,11 +35,9 @@
 #include "bladerunner/ui/kia.h"
 #include "bladerunner/ui/kia_log.h"
 #include "bladerunner/ui/kia_section_suspects.h"
-#include "bladerunner/ui/kia_shapes.h"
 #include "bladerunner/ui/ui_container.h"
 #include "bladerunner/ui/ui_image_picker.h"
 #include "bladerunner/ui/ui_scroll_box.h"
-
 
 #include "graphics/surface.h"
 
@@ -71,14 +68,15 @@ KIASectionCrimes::KIASectionCrimes(BladeRunnerEngine *vm, ActorClues *clues) : K
 
 	_suspectSelected = -1;
 	_suspectPhotoShapeId = -1;
-	_suspectPhotoShape = nullptr;
+	_suspectPhotoNotUsed = -1;
+	_suspectPhotoShapes = new Shapes(vm);
 	_suspectsFoundCount = 0;
 	_suspectsFound.resize(_vm->_gameInfo->getSuspectCount());
 	_suspectsWithIdentity.resize(_vm->_gameInfo->getSuspectCount());
 }
 
 KIASectionCrimes::~KIASectionCrimes() {
-	delete _suspectPhotoShape;
+	delete _suspectPhotoShapes;
 
 	_uiContainer->clear();
 
@@ -87,8 +85,22 @@ KIASectionCrimes::~KIASectionCrimes() {
 	delete _uiContainer;
 }
 
+void KIASectionCrimes::reset() {
+	_acquiredClueCount = 0;
+	_crimesFoundCount = 0;
+	_suspectsFoundCount = 0;
+	_mouseX = 0;
+	_mouseY = 0;
+	_suspectSelected = -1;
+	_crimeSelected = -1;
+	_suspectPhotoShapeId = -1;
+	_suspectPhotoNotUsed = -1;
+}
+
 void KIASectionCrimes::open() {
 	_scheduledSwitch = false;
+
+	_suspectPhotoShapes->load("photos.shp");
 
 	_buttons->resetImages();
 	_buttons->defineImage(0, Common::Rect(136, 326, 185, 342), nullptr, _vm->_kia->_shapes->get(32), _vm->_kia->_shapes->get(36), _vm->_textKIA->getText(32));
@@ -116,29 +128,26 @@ void KIASectionCrimes::close() {
 	_isOpen = false;
 	_buttons->deactivate();
 	_cluesScrollBox->hide();
-	if (_suspectPhotoShapeId != -1) {
-		delete _suspectPhotoShape;
-		_suspectPhotoShape = nullptr;
-		_suspectPhotoShapeId = -1;
-	}
+	_suspectPhotoShapes->unload();
 }
 
 void KIASectionCrimes::draw(Graphics::Surface &surface) {
 	const char *text = nullptr;
 	if (_suspectPhotoShapeId != -1) {
-		_suspectPhotoShape->draw(surface, 201 - _suspectPhotoShape->getWidth() / 2, 223 - _suspectPhotoShape->getHeight() / 2);
+		const Shape *shape = _suspectPhotoShapes->get(_suspectPhotoShapeId);
+		shape->draw(surface, 201 - shape->getWidth() / 2, 223 - shape->getHeight() / 2);
 	}
 	if (_suspectPhotoShapeId == 14 || _suspectPhotoShapeId == 13) {
 		text = _vm->_textKIA->getText(49);
-		_vm->_mainFont->drawColor(text, surface, 201 - _vm->_mainFont->getTextWidth(text) / 2, 218, 0x7FFF);
+		_vm->_mainFont->drawString(&surface, text, 201 - _vm->_mainFont->getStringWidth(text) / 2, 218, surface.w, surface.format.RGBToColor(255, 255, 255));
 	}
 
 	surface.fillRect(Common::Rect(120, 134, 250, 145), 0);
-	surface.hLine(120, 133, 250, 0x18A5);
-	surface.hLine(120, 146, 250, 0x2D4C);
-	surface.vLine(119, 134, 145, 0x18A5);
-	surface.vLine(251, 134, 145, 0x2D4C);
-	surface.hLine(251, 146, 251, 0x2509);
+	surface.hLine(120, 133, 250, surface.format.RGBToColor(48, 40, 40));
+	surface.hLine(120, 146, 250, surface.format.RGBToColor(88, 80, 96));
+	surface.vLine(119, 134, 145, surface.format.RGBToColor(48, 40, 40));
+	surface.vLine(251, 134, 145, surface.format.RGBToColor(88, 80, 96));
+	surface.hLine(251, 146, 251, surface.format.RGBToColor(72, 64, 72));
 
 	if (_crimeSelected == -1) {
 		text = _vm->_textKIA->getText(49);
@@ -146,16 +155,16 @@ void KIASectionCrimes::draw(Graphics::Surface &surface) {
 		text = _vm->_textCrimes->getText(_crimeSelected);
 	}
 
-	_vm->_mainFont->drawColor(text, surface, 185 - _vm->_mainFont->getTextWidth(text) / 2, 136, 0x46BF);
+	_vm->_mainFont->drawString(&surface, text, 185 - _vm->_mainFont->getStringWidth(text) / 2, 136, surface.w, surface.format.RGBToColor(136, 168, 255));
 
 	surface.fillRect(Common::Rect(136, 304, 266, 315), 0);
-	surface.hLine(136, 303, 266, 0x18A5);
-	surface.hLine(136, 316, 266, 0x2D4C);
-	surface.vLine(135, 304, 315, 0x18A5);
-	surface.vLine(267, 304, 315, 0x2D4C);
-	surface.hLine(267, 316, 267, 0x2509);
+	surface.hLine(136, 303, 266, surface.format.RGBToColor(48, 40, 40));
+	surface.hLine(136, 316, 266, surface.format.RGBToColor(88, 80, 96));
+	surface.vLine(135, 304, 315, surface.format.RGBToColor(48, 40, 40));
+	surface.vLine(267, 304, 315, surface.format.RGBToColor(88, 80, 96));
+	surface.hLine(267, 316, 267, surface.format.RGBToColor(72, 64, 72));
 
-	char generatedText[64];
+	Common::String generatedText;
 	if (_suspectSelected == -1) {
 		text = _vm->_textKIA->getText(22);
 	} else {
@@ -163,14 +172,14 @@ void KIASectionCrimes::draw(Graphics::Surface &surface) {
 		if (_suspectsWithIdentity[_suspectSelected]) {
 			text = suspectName;
 		} else if (_vm->_suspectsDatabase->get(_suspectSelected)->getSex()) {
-			sprintf(generatedText, "%s %s", _vm->_textKIA->getText(20), KIASectionSuspects::scrambleSuspectsName(suspectName));
-			text = generatedText;
+			generatedText = Common::String::format("%s %s", _vm->_textKIA->getText(20), _vm->_kia->scrambleSuspectsName(suspectName));
+			text = generatedText.c_str();
 		} else {
-			sprintf(generatedText, "%s %s", _vm->_textKIA->getText(21), KIASectionSuspects::scrambleSuspectsName(suspectName));
-			text = generatedText;
+			generatedText = Common::String::format("%s %s", _vm->_textKIA->getText(21), _vm->_kia->scrambleSuspectsName(suspectName));
+			text = generatedText.c_str();
 		}
 	}
-	_vm->_mainFont->drawColor(text, surface, 201 - _vm->_mainFont->getTextWidth(text) / 2, 306, 0x46BF);
+	_vm->_mainFont->drawString(&surface, text, 201 - _vm->_mainFont->getStringWidth(text) / 2, 306, surface.w, surface.format.RGBToColor(136, 168, 255));
 
 	_uiContainer->draw(surface);
 	_buttons->draw(surface);
@@ -196,6 +205,10 @@ void KIASectionCrimes::handleMouseUp(bool mainButton) {
 		_buttons->handleMouseAction(_mouseX, _mouseY, false, true, false);
 	}
 	_uiContainer->handleMouseUp(!mainButton);
+}
+
+void KIASectionCrimes::handleMouseScroll(int direction) {
+	_uiContainer->handleMouseScroll(direction);
 }
 
 void KIASectionCrimes::saveToLog() {
@@ -224,7 +237,7 @@ void KIASectionCrimes::scrollBoxCallback(void *callbackData, void *source, int l
 	if (source == self->_cluesScrollBox && lineData >= 0) {
 		if (mouseButton) {
 			if (self->_vm->_gameFlags->query(kFlagKIAPrivacyAddon)) {
-				self->_vm->_audioPlayer->playAud(self->_vm->_gameInfo->getSfxTrack(511), 70, 0, 0, 50, 0);
+				self->_vm->_audioPlayer->playAud(self->_vm->_gameInfo->getSfxTrack(kSfxBEEP15), 70, 0, 0, 50, 0);
 
 				if (self->_clues->isPrivate(lineData)) {
 					self->_clues->setPrivate(lineData, false);
@@ -271,13 +284,14 @@ void KIASectionCrimes::onButtonPressed(int buttonId) {
 void KIASectionCrimes::populateAcquiredClues() {
 	_acquiredClueCount = 0;
 	for (int i = 0; i < kClueCount; ++i) {
-		if (_clues->isAcquired(i)) {
-			_acquiredClues[_acquiredClueCount].clueId = i;
-			_acquiredClues[_acquiredClueCount].actorId = _clues->getFromActorId(i);
+		int clueId = i;
+		if (_clues->isAcquired(clueId)) {
+			_acquiredClues[_acquiredClueCount].clueId = clueId;
+			_acquiredClues[_acquiredClueCount].actorId = _clues->getFromActorId(clueId);
 			++_acquiredClueCount;
 		}
 	}
-	// sort clues by name, is it necessary
+	// sort clues by name, is it necessary?
 }
 
 void KIASectionCrimes::populateCrimes() {
@@ -359,18 +373,31 @@ void KIASectionCrimes::populateSuspects() {
 void KIASectionCrimes::populateVisibleClues() {
 	_cluesScrollBox->clearLines();
 	if (_crimeSelected != -1) {
-		for (uint i = 0; i < _vm->_gameInfo->getClueCount(); ++i) {
-			if (_vm->_crimesDatabase->getAssetType(i) != -1
-			 && _vm->_crimesDatabase->getCrime(i) == _crimeSelected
-			 && _clues->isAcquired(i)
+		for (int i = 0; i < kClueCount; ++i) {
+			int clueId = i;
+			if (_vm->_crimesDatabase->getAssetType(clueId) != kClueTypeIntangible
+			 && _vm->_crimesDatabase->getCrime(clueId) == _crimeSelected
+			 && _clues->isAcquired(clueId)
 			) {
 				int flags = 0x30;
-				if (_clues->isPrivate(i)) {
+#if BLADERUNNER_ORIGINAL_BUGS
+				if (_clues->isPrivate(clueId)) {
 					flags = 0x08;
-				} else if (_clues->isViewed(i)) {
+				} else if (_clues->isViewed(clueId)) {
 					flags = 0x10;
 				}
-				_cluesScrollBox->addLine(_vm->_crimesDatabase->getClueText(i), i, flags);
+#else
+				if (_clues->isPrivate(clueId)) {
+					flags |= 0x08;
+				}
+				if (_clues->isViewed(clueId)) {
+					flags &= ~0x20;
+				}
+				if (_vm->_cutContent && _clues->isSharedWithMainframe(clueId)) {
+					flags |= 0x40;
+				}
+#endif // BLADERUNNER_ORIGINAL_BUGS
+				_cluesScrollBox->addLine(_vm->_crimesDatabase->getClueText(clueId), clueId, flags);
 			}
 		}
 		_cluesScrollBox->sortLines();
@@ -378,11 +405,6 @@ void KIASectionCrimes::populateVisibleClues() {
 }
 
 void KIASectionCrimes::updateSuspectPhoto() {
-	if (_suspectPhotoShapeId != -1) {
-		delete _suspectPhotoShape;
-		_suspectPhotoShape = nullptr;
-	}
-
 	if (_suspectSelected == -1) {
 		_suspectPhotoShapeId = -1;
 		return;
@@ -391,28 +413,25 @@ void KIASectionCrimes::updateSuspectPhoto() {
 	SuspectDatabaseEntry *suspect = _vm->_suspectsDatabase->get(_suspectSelected);
 
 	_suspectPhotoShapeId = -1;
+	_suspectPhotoNotUsed = -1;
 	int photoCluesCount = suspect->getPhotoCount();
 	if (photoCluesCount > 0) {
-		for (int i = 0 ; i < photoCluesCount; i++) {
-			//TODO: weird stuff going on here... it's using index instead id, also some field is used but its always -1
+		for (int i = 0 ; i < photoCluesCount; ++i) {
+			//TODO: weird stuff going on here... original game is using internal clue index instead id
 			if (_clues->isAcquired(suspect->getPhotoClueId(i))) {
 				_suspectPhotoShapeId = suspect->getPhotoShapeId(i);
+				_suspectPhotoNotUsed = suspect->getPhotoNotUsed(i);
 				break;
 			}
 		}
 	}
 
-	if (_suspectPhotoShapeId == -1) {
+	if (_suspectPhotoShapeId == -1 && _suspectPhotoNotUsed == -1) {
 		if (suspect->getSex()) {
 			_suspectPhotoShapeId = 14;
 		} else {
 			_suspectPhotoShapeId = 13;
 		}
-	}
-
-	if (_suspectPhotoShapeId != -1) {
-		_suspectPhotoShape = new Shape(_vm);
-		_suspectPhotoShape->open("photos.shp", _suspectPhotoShapeId);
 	}
 }
 
@@ -420,7 +439,7 @@ void KIASectionCrimes::nextCrime() {
 	if (_crimesFoundCount >= 2) {
 		while (true) {
 			++_crimeSelected;
-			if (_crimeSelected >= (int)_vm->_gameInfo->getCrimeCount()){
+			if (_crimeSelected >= (int)_vm->_gameInfo->getCrimeCount()) {
 				_crimeSelected = 0;
 			}
 
@@ -452,7 +471,7 @@ void KIASectionCrimes::nextSuspect() {
 	if (_suspectsFoundCount >= 2) {
 		while (true) {
 			++_suspectSelected;
-			if (_suspectSelected >= (int)_vm->_gameInfo->getSuspectCount()){
+			if (_suspectSelected >= (int)_vm->_gameInfo->getSuspectCount()) {
 				_suspectSelected = 0;
 			}
 
@@ -468,7 +487,7 @@ void KIASectionCrimes::prevSuspect() {
 	if (_suspectsFoundCount >= 2) {
 		while (true) {
 			--_suspectSelected;
-			if (_suspectSelected < 0){
+			if (_suspectSelected < 0) {
 				_suspectSelected = _vm->_gameInfo->getSuspectCount() - 1;
 			}
 

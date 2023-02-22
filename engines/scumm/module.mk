@@ -13,10 +13,11 @@ MODULE_OBJS := \
 	costume.o \
 	cursor.o \
 	debugger.o \
-	detection.o \
 	dialogs.o \
 	file.o \
 	file_nes.o \
+	gfx_gui.o \
+	gfx_mac.o \
 	gfx_towns.o \
 	gfx.o \
 	he/resource_he.o \
@@ -28,11 +29,16 @@ MODULE_OBJS := \
 	imuse/imuse_part.o \
 	imuse/imuse_player.o \
 	imuse/instrument.o \
-	imuse/mac_m68k.o \
-	imuse/pcspk.o \
 	imuse/sysex_samnmax.o \
 	imuse/sysex_scumm.o \
+	imuse/drivers/amiga.o \
+	imuse/drivers/fmtowns.o \
+	imuse/drivers/midi.o \
+	imuse/drivers/mac_m68k.o \
+	imuse/drivers/pcspk.o \
 	input.o \
+	ks_check.o \
+	metaengine.o \
 	midiparser_ro.o \
 	object.o \
 	palette.o \
@@ -83,29 +89,36 @@ endif
 ifdef ENABLE_SCUMM_7_8
 MODULE_OBJS += \
 	nut_renderer.o \
+	string_v7.o \
 	script_v8.o \
-	imuse_digi/dimuse.o \
 	imuse_digi/dimuse_bndmgr.o \
 	imuse_digi/dimuse_codecs.o \
-	imuse_digi/dimuse_music.o \
 	imuse_digi/dimuse_sndmgr.o \
-	imuse_digi/dimuse_script.o \
-	imuse_digi/dimuse_track.o \
 	imuse_digi/dimuse_tables.o \
+	imuse_digi/dimuse_engine.o \
+	imuse_digi/dimuse_cmds.o \
+	imuse_digi/dimuse_dispatch.o \
+	imuse_digi/dimuse_fades.o \
+	imuse_digi/dimuse_files.o \
+	imuse_digi/dimuse_groups.o \
+	imuse_digi/dimuse_internalmixer.o \
+	imuse_digi/dimuse_scripts.o \
+	imuse_digi/dimuse_streamer.o \
+	imuse_digi/dimuse_tracks.o \
+	imuse_digi/dimuse_triggers.o \
+	imuse_digi/dimuse_utils.o \
+	imuse_digi/dimuse_wave.o \
+	imuse_digi/dimuse_waveout.o \
 	insane/insane.o \
 	insane/insane_ben.o \
 	insane/insane_enemy.o \
 	insane/insane_scenes.o \
 	insane/insane_iact.o \
-	smush/channel.o \
 	smush/codec1.o \
+	smush/codec20.o \
 	smush/codec37.o \
 	smush/codec47.o \
-	smush/imuse_channel.o \
-	smush/smush_player.o \
-	smush/saud_channel.o \
-	smush/smush_mixer.o \
-	smush/smush_font.o
+	smush/smush_player.o
 
 ifdef USE_ARM_SMUSH_ASM
 MODULE_OBJS += \
@@ -133,6 +146,7 @@ MODULE_OBJS += \
 	he/script_v100he.o \
 	he/sprite_he.o \
 	he/wiz_he.o \
+	he/localizer.o \
 	he/logic/baseball2001.o \
 	he/logic/basketball.o \
 	he/logic/football.o \
@@ -152,7 +166,7 @@ MODULE_OBJS += \
 	he/moonbase/moonbase.o \
 	he/moonbase/moonbase_fow.o
 
-ifdef USE_SDL_NET
+ifdef USE_LIBCURL
 MODULE_OBJS += \
 	he/moonbase/net_main.o
 endif
@@ -165,3 +179,13 @@ endif
 
 # Include common rules
 include $(srcdir)/rules.mk
+
+# Detection objects
+DETECT_OBJS += $(MODULE)/detection.o
+
+# Skip building the following objects if a static
+# module is enabled, because it already has the contents.
+ifneq ($(ENABLE_SCUMM), STATIC_PLUGIN)
+DETECT_OBJS += $(MODULE)/file.o
+DETECT_OBJS += $(MODULE)/file_nes.o
+endif

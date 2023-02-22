@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -33,89 +32,89 @@ class CutScene;
 class Scene16: public CutScene {
 public:
 	Scene16(GnapEngine *vm);
-	virtual ~Scene16() {}
+	~Scene16() override {}
 
-	virtual int init();
+	int init() override;
 };
 
 class Scene471: public CutScene {
 public:
 	Scene471(GnapEngine *vm);
-	virtual ~Scene471() {}
+	~Scene471() override {}
 
-	virtual int init();
+	int init() override;
 };
 
 class Scene472: public CutScene {
 public:
 	Scene472(GnapEngine *vm);
-	virtual ~Scene472() {}
+	~Scene472() override {}
 
-	virtual int init();
+	int init() override;
 };
 
 class Scene473: public CutScene {
 public:
 	Scene473(GnapEngine *vm);
-	virtual ~Scene473() {}
+	~Scene473() override {}
 
-	virtual int init();
+	int init() override;
 };
 
 class Scene474: public CutScene {
 public:
 	Scene474(GnapEngine *vm);
-	virtual ~Scene474() {}
+	~Scene474() override {}
 
-	virtual int init();
+	int init() override;
 };
 
 class Scene475: public CutScene {
 public:
 	Scene475(GnapEngine *vm);
-	virtual ~Scene475() {}
+	~Scene475() override {}
 
-	virtual int init();
+	int init() override;
 };
 
 class Scene476: public CutScene {
 public:
 	Scene476(GnapEngine *vm);
-	virtual ~Scene476() {}
+	~Scene476() override {}
 
-	virtual int init();
+	int init() override;
 };
 
 class Scene477: public CutScene {
 public:
 	Scene477(GnapEngine *vm);
-	virtual ~Scene477() {}
+	~Scene477() override {}
 
-	virtual int init();
+	int init() override;
 };
 
 class Scene48: public CutScene {
 public:
 	Scene48(GnapEngine *vm);
-	virtual ~Scene48() {}
+	~Scene48() override {}
 
-	virtual int init();
+	int init() override;
 };
 
 class Scene541: public CutScene {
 public:
 	Scene541(GnapEngine *vm);
-	virtual ~Scene541() {}
+	~Scene541() override {}
 
-	virtual int init();
+	int init() override;
 };
 
 class Scene542: public CutScene {
 public:
 	Scene542(GnapEngine *vm);
-	virtual ~Scene542() {}
+	~Scene542() override {}
 
-	virtual int init();
+	int init() override;
 };
 } // End of namespace Gnap
 

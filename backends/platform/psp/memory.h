@@ -5,10 +5,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -16,8 +16,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -72,7 +71,7 @@ public:
 	// This is the interface to the outside world
 	static void *fastCopy(void *dstv, const void *srcv, int32 bytes) {
 		byte *dst = (byte *)dstv;
-		byte *src = (byte *)srcv;
+		const byte *src = (const byte *)srcv;
 
 		if (bytes < MIN_AMOUNT_FOR_COMPLEX_COPY) {
 			copy8(dst, src, bytes);
@@ -103,20 +102,20 @@ private:
 	static void swap32Misaligned(uint32 *dst32, const uint16 *src16, uint32 bytes, PSPPixelFormat &format);
 	// For swapping, we know that we have multiples of 16 bits
 	static void swap16(uint16 *dst16, const uint16 *src16, uint32 bytes, PSPPixelFormat &format) {
-	PSP_DEBUG_PRINT("swap16 called with dst16[%p], src16[%p], bytes[%d]\n", dst16, src16, bytes);
-	uint32 shorts = bytes >> 1;
+		PSP_DEBUG_PRINT("swap16 called with dst16[%p], src16[%p], bytes[%d]\n", dst16, src16, bytes);
+		uint32 shorts = bytes >> 1;
 
-	while (shorts--) {
-		*dst16++ = format.swapRedBlue16(*src16++);
+		while (shorts--) {
+			*dst16++ = format.swapRedBlue16(*src16++);
+		}
 	}
-}
 
 public:
 	static void fastSwap(byte *dst, const byte *src, uint32 bytes, PSPPixelFormat &format) {
 		if (bytes < MIN_AMOUNT_FOR_COMPLEX_COPY * 2) {
-			swap16((uint16 *)dst, (uint16 *)src, bytes, format);
+			swap16((uint16 *)dst, (const uint16 *)src, bytes, format);
 		} else {	// go to more powerful copy
-			swap((uint16 *)dst, (uint16 *)src, bytes, format);
+			swap((uint16 *)dst, (const uint16 *)src, bytes, format);
 		}
 	}
 };

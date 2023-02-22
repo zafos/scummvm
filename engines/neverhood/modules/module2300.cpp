@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -108,6 +107,8 @@ void Module2300::createScene(int sceneNum, int which) {
 	case 9999:
 		createDemoScene();
 		break;
+	default:
+		break;
 	}
 	SetUpdateHandler(&Module2300::updateScene);
 	_childObject->handleUpdate();
@@ -125,7 +126,7 @@ void Module2300::updateScene() {
 		case 1:
 			if (_moduleResult == 1)
 				createScene(0, 0);
-			else if (_vm->isDemo())
+			else if (_vm->isDemo() && !(_vm->isBigDemo() && _moduleResult == 4))
 				createScene(9999, 0);
 			else if (_moduleResult == 2)
 				createScene(2, 1);
@@ -157,6 +158,8 @@ void Module2300::updateScene() {
 		case 9999:
 			createScene(1, -1);
 			break;
+		default:
+			break;
 		}
 	} else {
 		switch (_sceneNum) {
@@ -178,6 +181,8 @@ void Module2300::updateScene() {
 				_waterfallSoundVolume--;
 				_vm->_soundMan->setSoundVolume(0x90F0D1C3, _waterfallSoundVolume);
 			}
+			break;
+		default:
 			break;
 		}
 	}

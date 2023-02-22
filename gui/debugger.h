@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,7 +27,10 @@
 #include "common/hashmap.h"
 #include "common/hash-str.h"
 #include "common/array.h"
+#include "common/str.h"
 #include "common/str-array.h"
+
+#include "engines/engine.h"
 
 namespace GUI {
 
@@ -43,7 +45,7 @@ public:
 
 	int getCharsPerLine();
 
-	int debugPrintf(const char *format, ...) GCC_PRINTF(2, 3);
+	int debugPrintf(MSVC_PRINTF const char *format, ...) GCC_PRINTF(2, 3);
 
 	void debugPrintColumns(const Common::StringArray &list);
 
@@ -64,7 +66,7 @@ public:
 	 * 'Attach' the debugger. This ensures that the next time onFrame()
 	 * is invoked, the debugger will activate and accept user input.
 	 */
-	virtual void attach(const char *entry = 0);
+	virtual void attach(const char *entry = nullptr);
 
 	/**
 	 * Return true if the debugger is currently active (i.e. executing
@@ -73,6 +75,7 @@ public:
 	bool isActive() const { return _isActive; }
 
 protected:
+	typedef Common::Functor1<const char *, bool> defaultCommand;
 	typedef Common::Functor2<int, const char **, bool> Debuglet;
 
 	/**
@@ -86,9 +89,18 @@ protected:
 	#define WRAP_METHOD(cls, method) \
 		new Common::Functor2Mem<int, const char **, bool, cls>(this, &cls::method)
 
+	/**
+	 * Convenience macro that makes it easier to register a defaultCommandProcessor
+	 * Usage example:
+	 * 	registerDefaultCmd(WRAP_DEFAULTCOMMAND(MyDebugger, myCmd));
+	 */
+	#define WRAP_DEFAULTCOMMAND(cls, command) \
+		new Common::Functor1Mem<const char *, bool, cls>(this, &cls::command)
+
 	enum VarType {
 		DVAR_BYTE,
 		DVAR_INT,
+		DVAR_FLOAT,
 		DVAR_BOOL,
 		DVAR_INTARRAY,
 		DVAR_STRING
@@ -110,31 +122,54 @@ private:
 	 * @param type		the type of the variable (byte, int, bool, ...)
 	 * @param arraySize	for type DVAR_INTARRAY this specifies the size of the array
 	 */
-	void registerVar(const Common::String &varname, void *variable, VarType type, int arraySize);
+	void registerVarImpl(const Common::String &varname, void *variable, VarType type, int arraySize);
 
 protected:
 	void registerVar(const Common::String &varname, byte *variable) {
-		registerVar(varname, variable, DVAR_BYTE, 0);
+		registerVarImpl(varname, variable, DVAR_BYTE, 0);
 	}
 
 	void registerVar(const Common::String &varname, int *variable) {
-		registerVar(varname, variable, DVAR_INT, 0);
+		registerVarImpl(varname, variable, DVAR_INT, 0);
+	}
+
+	void registerVar(const Common::String &varname, float *variable) {
+		registerVarImpl(varname, variable, DVAR_FLOAT, 0);
 	}
 
 	void registerVar(const Common::String &varname, bool *variable) {
-		registerVar(varname, variable, DVAR_BOOL, 0);
+		registerVarImpl(varname, variable, DVAR_BOOL, 0);
 	}
 
 	void registerVar(const Common::String &varname, int32 **variable, int arraySize) {
-		registerVar(varname, variable, DVAR_INTARRAY, arraySize);
+		registerVarImpl(varname, variable, DVAR_INTARRAY, arraySize);
 	}
 
 	void registerVar(const Common::String &varname, Common::String *variable) {
-		registerVar(varname, variable, DVAR_STRING, 0);
+		registerVarImpl(varname, variable, DVAR_STRING, 0);
 	}
 
 	void registerCmd(const Common::String &cmdname, Debuglet *debuglet);
 
+	/**
+	 * Register a default command processor with the debugger. This
+	 * allows an engine to receive all user input in the debugger.
+	 *
+	 * A defaultCommandProcessor has the following signature:
+	 * 		bool func(const char **inputOrig)
+	 *
+	 * To deactivate call with a nullptr.
+	 */
+	void registerDefaultCmd(defaultCommand *defaultCommandProcessor) {
+		_defaultCommandProcessor = defaultCommandProcessor; }
+
+	/**
+	 * Remove all vars except default "debug_countdown"
+	 */
+	void clearVars();
+
+	void setPrompt(Common::String prompt);
+	void resetPrompt();
 
 private:
 	/**
@@ -161,7 +196,7 @@ private:
 	 */
 	bool _isActive;
 
-	char *_errStr;
+	Common::String _errStr;
 
 	/**
 	 * Initially true, set to false when Debugger::enter is called
@@ -170,6 +205,14 @@ private:
 	 * time.
 	 */
 	bool _firstTime;
+
+	/**
+	 * A nullptr till set by via registerDefaultCommand.
+	 */
+	defaultCommand *_defaultCommandProcessor;
+
+protected:
+	PauseToken _debugPauseToken;
 
 #ifndef USE_TEXT_CONSOLE_FOR_DEBUGGER
 	GUI::ConsoleDialog *_debuggerDialog;
@@ -193,6 +236,13 @@ protected:
 	virtual void postEnter();
 
 	/**
+	 * Process the given command line.
+	 * Returns true if and only if argv[0] is a known command and was
+	 * handled, false otherwise.
+	 */
+	virtual bool handleCommand(int argc, const char **argv, bool &keepRunning);
+
+	/**
 	 * Subclasses should invoke the detach() method in their cmdFOO methods
 	 * if that command will resume execution of the program (as opposed to
 	 * executing, say, a "single step through code" command).
@@ -208,17 +258,10 @@ private:
 	 * Splits up the input into individual parameters
 	 * @remarks		Adapted from code provided by torek on StackOverflow
 	 */
-	void splitCommand(char *input, int &argc, const char **argv);
+	void splitCommand(Common::String &input, int &argc, const char **argv);
 
 	bool parseCommand(const char *input);
 	bool tabComplete(const char *input, Common::String &completion) const;
-
-	/**
-	 * Process the given command line.
-	 * Returns true if and only if argv[0] is a known command and was
-	 * handled, false otherwise.
-	 */
-	virtual bool handleCommand(int argc, const char **argv, bool &keepRunning);
 
 protected:
 	bool cmdExit(int argc, const char **argv);
@@ -232,6 +275,7 @@ protected:
 	bool cmdDebugFlagsList(int argc, const char **argv);
 	bool cmdDebugFlagEnable(int argc, const char **argv);
 	bool cmdDebugFlagDisable(int argc, const char **argv);
+	bool cmdExecFile(int argc, const char **argv);
 
 #ifndef USE_TEXT_CONSOLE_FOR_DEBUGGER
 private:

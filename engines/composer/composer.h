@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef COMPOSER_COMPOSER_H
 #define COMPOSER_COMPOSER_H
 
-#include "common/ini-file.h"
+#include "common/formats/ini-file.h"
 #include "common/random.h"
 #include "common/system.h"
 #include "common/debug.h"
@@ -44,19 +43,13 @@
 
 #include "composer/resource.h"
 #include "composer/console.h"
+#include "composer/detection.h"
 
 namespace Audio {
 	class QueuingAudioStream;
 }
 
 namespace Composer {
-
-struct ComposerGameDescription;
-
-enum GameType {
-	GType_ComposerV1,
-	GType_ComposerV2
-};
 
 class Archive;
 struct Animation;
@@ -150,7 +143,7 @@ struct OldScript {
 
 class ComposerEngine : public Engine {
 protected:
-	Common::Error run();
+	Common::Error run() override;
 
 	template <typename T>
 	void syncArray(Common::Serializer &ser, Common::Array<T> &data, Common::Serializer::Version minVersion = 0, Common::Serializer::Version maxVersion = Common::Serializer::kLastVersion);
@@ -160,26 +153,25 @@ protected:
 	void syncListReverse(Common::Serializer &ser, Common::List<T> &data, Common::Serializer::Version minVersion = 0, Common::Serializer::Version maxVersion = Common::Serializer::kLastVersion);
 	template <typename T>
 	void sync(Common::Serializer &ser, T &data, Common::Serializer::Version minVersion, Common::Serializer::Version maxVersion);
-	bool canLoadGameStateCurrently() { return true; }
-	Common::Error loadGameState(int slot);
-	bool canSaveGameStateCurrently() { return true; }
-	Common::Error saveGameState(int slot, const Common::String &desc);
+	bool canLoadGameStateCurrently() override { return true; }
+	Common::Error loadGameState(int slot) override;
+	bool canSaveGameStateCurrently() override { return true; }
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
 
 public:
 	ComposerEngine(OSystem *syst, const ComposerGameDescription *gameDesc);
-	virtual ~ComposerEngine();
+	~ComposerEngine() override;
 
-	virtual bool hasFeature(EngineFeature f) const;
+	bool hasFeature(EngineFeature f) const override;
 
 	int getGameType() const;
 	const char *getGameId() const;
 	uint32 getFeatures() const;
 	Common::Language getLanguage() const;
+	Common::Platform getPlatform() const;
+	bool loadDetectedConfigFile(Common::INIFile &configFile) const;
 
 	const ComposerGameDescription *_gameDescription;
-
-	Console *_console;
-	GUI::Debugger *getDebugger() { return _console; }
 
 private:
 	Common::RandomSource *_rnd;
@@ -188,7 +180,7 @@ private:
 	Audio::QueuingAudioStream *_audioStream;
 	uint16 _currSoundPriority;
 
-	uint32 _currentTime, _lastTime, _timeDelta, _lastSaveTime;
+	uint32 _currentTime, _lastTime, _timeDelta;
 
 	bool _needsUpdate;
 	Common::Array<Common::Rect> _dirtyRects;
@@ -225,7 +217,7 @@ private:
 	uint16 _mouseSpriteId;
 	Common::Point _mouseOffset;
 
-	Common::String makeSaveGameName(int slot);
+	Common::String getSaveStateName(int slot) const override;
 	Common::String getStringFromConfig(const Common::String &section, const Common::String &key);
 	Common::String getFilename(const Common::String &section, uint id);
 	Common::String mangleFilename(Common::String filename);

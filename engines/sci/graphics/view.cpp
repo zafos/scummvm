@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,6 +26,9 @@
 #include "sci/graphics/remap.h"
 #include "sci/graphics/coordadjuster.h"
 #include "sci/graphics/view.h"
+
+
+#include "sci/graphics/scifx.h"
 
 namespace Sci {
 
@@ -140,6 +142,7 @@ void GfxView::initData(GuiResourceId resourceId) {
 	switch (curViewType) {
 	case kViewEga: // SCI0 (and Amiga 16 colors)
 		isEGA = true;
+		// fall through
 	case kViewAmiga: // Amiga ECS (32 colors)
 	case kViewAmiga64: // Amiga AGA (64 colors)
 	case kViewVga: // View-format SCI1
@@ -210,7 +213,7 @@ void GfxView::initData(GuiResourceId resourceId) {
 				// HACK: Fix Ego's odd displacement in the QFG3 demo, scene 740.
 				// For some reason, ego jumps above the rope, so we fix his rope
 				// hanging view by displacing it down by 40 pixels. Fixes bug
-				// #3035693.
+				// #5009.
 				// FIXME: Remove this once we figure out why Ego jumps so high.
 				// Likely culprits include kInitBresen, kDoBresen and kCantBeHere.
 				// The scripts have the y offset that hero reaches (11) hardcoded,
@@ -260,7 +263,6 @@ void GfxView::initData(GuiResourceId resourceId) {
 			_isScaleable = false;
 			break;
 		case 0x40:
-		case 0x4F:	// LSL6 Polish, seems to be garbage - bug #6718
 		case 0:
 			break; // don't do anything, we already have _isScaleable set
 		default:
@@ -285,10 +287,15 @@ void GfxView::initData(GuiResourceId resourceId) {
 
 			seekEntry = loopData[0];
 			if (seekEntry != 255) {
-				if (seekEntry >= loopCount)
-					error("Bad loop-pointer in sci 1.1 view");
 				_loop[loopNo].mirrorFlag = true;
-				loopData = _resource->subspan(headerSize + (seekEntry * loopSize));
+
+				// use the root loop for mirroring. this handles rare loops that
+				//  mirror loops that mirror loops. (FPFP view 844, bug #10953)
+				do {
+					if (seekEntry >= loopCount)
+						error("Bad loop-pointer in sci 1.1 view");
+					loopData = _resource->subspan(headerSize + (seekEntry * loopSize));
+				} while ((seekEntry = loopData[0]) != 255);
 			} else {
 				_loop[loopNo].mirrorFlag = false;
 			}
@@ -411,7 +418,7 @@ uint16 GfxView::getCelCount(int16 loopNo) const {
 }
 
 Palette *GfxView::getPalette() {
-	return _embeddedPal ? &_viewPalette : NULL;
+	return _embeddedPal ? &_viewPalette : nullptr;
 }
 
 bool GfxView::isScaleable() {
@@ -576,8 +583,9 @@ void unpackCelData(const SciSpan<const byte> &inBuffer, SciSpan<byte> &celBitmap
 			runLength = curByte & 0x3F;
 
 			switch (curByte & 0xC0) {
-			case 0x40: // copy bytes as is (In copy case, runLength can go up to 127 i.e. pixel & 0x40). Fixes bug #3135872.
+			case 0x40: // copy bytes as is (In copy case, runLength can go up to 127 i.e. pixel & 0x40). Fixes bug #5551.
 				runLength += 64;
+				// fall through
 			case 0x00: // copy bytes as-is
 				if (!literalPos) {
 					memcpy(outPtr + pixelNr,        rlePtr, MIN<uint16>(runLength, pixelCount - pixelNr));
@@ -594,6 +602,7 @@ void unpackCelData(const SciSpan<const byte> &inBuffer, SciSpan<byte> &celBitmap
 					memset(outPtr + pixelNr, *literalPtr++, MIN<uint16>(runLength, pixelCount - pixelNr));
 				break;
 			case 0xC0: // skip the next pixels (transparency)
+			default:
 				break;
 			}
 
@@ -773,8 +782,25 @@ void GfxView::unditherBitmap(SciSpan<byte> &bitmapPtr, int16 width, int16 height
 	}
 }
 
+byte GfxView::getMappedColor(byte color, uint16 scaleSignal, const Palette *palette, int x2, int y2) {
+	byte outputColor = palette->mapping[color];
+	// SCI16 remapping (QFG4 demo)
+	if (g_sci->_gfxRemap16 && g_sci->_gfxRemap16->isRemapped(outputColor))
+		outputColor = g_sci->_gfxRemap16->remapColor(outputColor, _screen->getVisual(x2, y2));
+	// SCI11+ remapping (Catdate)
+	if ((scaleSignal & 0xFF00) && g_sci->_gfxRemap16 && _resMan->testResource(ResourceId(kResourceTypeVocab, 184))) {
+		if ((scaleSignal >> 8) == 1) // all black
+			outputColor = 0;
+		else if ((scaleSignal >> 8) == 2) // darken
+			outputColor = g_sci->_gfxRemap16->remapColor(253, outputColor);
+		else if ((scaleSignal >> 8) == 3) // shadow
+			outputColor = g_sci->_gfxRemap16->remapColor(253, _screen->getVisual(x2, y2));
+	}
+	return outputColor;
+}
+
 void GfxView::draw(const Common::Rect &rect, const Common::Rect &clipRect, const Common::Rect &clipRectTranslated,
-			int16 loopNo, int16 celNo, byte priority, uint16 EGAmappingNr, bool upscaledHires) {
+			int16 loopNo, int16 celNo, byte priority, uint16 EGAmappingNr, bool upscaledHires, uint16 scaleSignal) {
 	const Palette *palette = _embeddedPal ? &_viewPalette : &_palette->_sysPalette;
 	const CelInfo *celInfo = getCelInfo(loopNo, celNo);
 	const SciSpan<const byte> &bitmap = getBitmap(loopNo, celNo);
@@ -795,6 +821,10 @@ void GfxView::draw(const Common::Rect &rect, const Common::Rect &clipRect, const
 	}
 
 	const byte *bitmapData = bitmap.getUnsafeDataAt((clipRect.top - rect.top) * celWidth + (clipRect.left - rect.left), celWidth * (height - 1) + width);
+
+	// Set up custom per-view palette mod
+	byte oldpalvalue = _screen->getCurPaletteMapValue();
+	doCustomViewPalette(_screen, _resourceId, loopNo, celNo);
 
 	if (_EGAmapping) {
 		const SciSpan<const byte> EGAmapping = _EGAmapping.subspan(EGAmappingNr * SCI_VIEW_EGAMAPPING_SIZE, SCI_VIEW_EGAMAPPING_SIZE);
@@ -826,25 +856,19 @@ void GfxView::draw(const Common::Rect &rect, const Common::Rect &clipRect, const
 					const int x2 = clipRectTranslated.left + x;
 					const int y2 = clipRectTranslated.top + y;
 					if (priority >= _screen->getPriority(x2, y2)) {
-						byte outputColor = palette->mapping[color];
-						// SCI16 remapping (QFG4 demo)
-						if (g_sci->_gfxRemap16 && g_sci->_gfxRemap16->isRemapped(outputColor))
-							outputColor = g_sci->_gfxRemap16->remapColor(outputColor, _screen->getVisual(x2, y2));
-						_screen->putPixel(x2, y2, drawMask, outputColor, priority, 0);
+						_screen->putPixel(x2, y2, drawMask, getMappedColor(color, scaleSignal, palette, x2, y2), priority, 0);
 					}
 				}
 			}
 		}
 	}
+
+	// Reset custom per-view palette mod
+	_screen->setCurPaletteMapValue(oldpalvalue);
 }
 
-/**
- * We don't fully follow sierra sci here, I did the scaling algo myself and it
- * is definitely not pixel-perfect with the one sierra is using. It shouldn't
- * matter because the scaled cel rect is definitely the same as in sierra sci.
- */
 void GfxView::drawScaled(const Common::Rect &rect, const Common::Rect &clipRect, const Common::Rect &clipRectTranslated,
-			int16 loopNo, int16 celNo, byte priority, int16 scaleX, int16 scaleY) {
+			int16 loopNo, int16 celNo, byte priority, int16 scaleX, int16 scaleY, uint16 scaleSignal) {
 	const Palette *palette = _embeddedPal ? &_viewPalette : &_palette->_sysPalette;
 	const CelInfo *celInfo = getCelInfo(loopNo, celNo);
 	const SciSpan<const byte> &bitmap = getBitmap(loopNo, celNo);
@@ -852,64 +876,21 @@ void GfxView::drawScaled(const Common::Rect &rect, const Common::Rect &clipRect,
 	const int16 celWidth = celInfo->width;
 	const byte clearKey = celInfo->clearKey;
 	const byte drawMask = priority > 15 ? GFX_SCREEN_MASK_VISUAL : GFX_SCREEN_MASK_VISUAL|GFX_SCREEN_MASK_PRIORITY;
-	uint16 scalingX[640];
-	uint16 scalingY[480];
-	int16 scaledWidth, scaledHeight;
-	int pixelNo, scaledPixel, scaledPixelNo, prevScaledPixelNo;
 
 	if (_embeddedPal)
 		// Merge view palette in...
 		_palette->set(&_viewPalette, false);
 
-	scaledWidth = (celInfo->width * scaleX) >> 7;
-	scaledHeight = (celInfo->height * scaleY) >> 7;
-	scaledWidth = CLIP<int16>(scaledWidth, 0, _screen->getWidth());
-	scaledHeight = CLIP<int16>(scaledHeight, 0, _screen->getHeight());
+	Common::Array<uint16> scalingX, scalingY;
+	createScalingTable(scalingX, celWidth, _screen->getWidth(), scaleX);
+	createScalingTable(scalingY, celHeight, _screen->getHeight(), scaleY);
 
-	// Do we really need to do this?!
-	//memset(scalingX, 0, sizeof(scalingX));
-	//memset(scalingY, 0, sizeof(scalingY));
-
-	// Create height scaling table
-	pixelNo = 0;
-	scaledPixel = scaledPixelNo = prevScaledPixelNo = 0;
-	while (pixelNo < celHeight) {
-		scaledPixelNo = scaledPixel >> 7;
-		assert(scaledPixelNo < ARRAYSIZE(scalingY));
-		for (; prevScaledPixelNo <= scaledPixelNo; prevScaledPixelNo++)
-			scalingY[prevScaledPixelNo] = pixelNo;
-		pixelNo++;
-		scaledPixel += scaleY;
-	}
-	pixelNo--;
-	scaledPixelNo++;
-	for (; scaledPixelNo < scaledHeight; scaledPixelNo++)
-		scalingY[scaledPixelNo] = pixelNo;
-
-	// Create width scaling table
-	pixelNo = 0;
-	scaledPixel = scaledPixelNo = prevScaledPixelNo = 0;
-	while (pixelNo < celWidth) {
-		scaledPixelNo = scaledPixel >> 7;
-		assert(scaledPixelNo < ARRAYSIZE(scalingX));
-		for (; prevScaledPixelNo <= scaledPixelNo; prevScaledPixelNo++)
-			scalingX[prevScaledPixelNo] = pixelNo;
-		pixelNo++;
-		scaledPixel += scaleX;
-	}
-	pixelNo--;
-	scaledPixelNo++;
-	for (; scaledPixelNo < scaledWidth; scaledPixelNo++)
-		scalingX[scaledPixelNo] = pixelNo;
-
-	scaledWidth = MIN(clipRect.width(), scaledWidth);
-	scaledHeight = MIN(clipRect.height(), scaledHeight);
+	int16 scaledWidth = MIN(clipRect.width(), (int16)scalingX.size());
+	int16 scaledHeight = MIN(clipRect.height(), (int16)scalingY.size());
 
 	const int16 offsetY = clipRect.top - rect.top;
 	const int16 offsetX = clipRect.left - rect.left;
 
-	assert(scaledHeight + offsetY <= ARRAYSIZE(scalingY));
-	assert(scaledWidth + offsetX <= ARRAYSIZE(scalingX));
 	const byte *bitmapData = bitmap.getUnsafeDataAt(0, celWidth * celHeight);
 	for (int y = 0; y < scaledHeight; y++) {
 		for (int x = 0; x < scaledWidth; x++) {
@@ -917,13 +898,34 @@ void GfxView::drawScaled(const Common::Rect &rect, const Common::Rect &clipRect,
 			const int x2 = clipRectTranslated.left + x;
 			const int y2 = clipRectTranslated.top + y;
 			if (color != clearKey && priority >= _screen->getPriority(x2, y2)) {
-				byte outputColor = palette->mapping[color];
-				// SCI16 remapping (QFG4 demo)
-				if (g_sci->_gfxRemap16 && g_sci->_gfxRemap16->isRemapped(outputColor))
-					outputColor = g_sci->_gfxRemap16->remapColor(outputColor, _screen->getVisual(x2, y2));
-				_screen->putPixel(x2, y2, drawMask, outputColor, priority, 0);
+				_screen->putPixel(x2, y2, drawMask, getMappedColor(color, scaleSignal, palette, x2, y2), priority, 0);
 			}
 		}
+	}
+}
+
+void GfxView::createScalingTable(Common::Array<uint16> &table, int16 celSize, uint16 maxSize, int16 scale) {
+	const int16 scaledSize = (celSize * scale) >> 7;
+	const int16 clippedScaledSize = CLIP<int16>(scaledSize, 0, maxSize);
+	const int16 stepCount = scaledSize - 1;
+
+	if (stepCount <= 0) {
+		table.clear();
+		return;
+	}
+
+	uint32 acc;
+	uint32 inc = ((celSize - 1) << 16) / stepCount;
+	if ((inc & 0xffff8000) == 0) {
+		acc = 0x8000;
+	} else {
+		acc = inc & 0xffff;
+	}
+
+	table.resize(clippedScaledSize);
+	for (uint16 i = 0; i < clippedScaledSize; ++i) {
+		table[i] = acc >> 16;
+		acc += inc;
 	}
 }
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -42,7 +41,7 @@
  * Status of this engine: ???
  *
  * Games using this engine:
- * - Touche: The Adventures of the Fifth Musketeer
+ * - Touché: The Adventures of the Fifth Musketeer
  */
 namespace Touche {
 
@@ -192,6 +191,20 @@ struct AnimationEntry {
 	int16 delayCounter;
 	int16 displayCounter;
 	Common::Rect displayRect;
+
+	void clear() {
+		num = 0;
+		x = 0;
+		y = 0;
+		dx = 0;
+		dy = 0;
+		posNum = 0;
+		delayCounter = 0;
+		displayRect.top = 0;
+		displayRect.left = 0;
+		displayRect.bottom = 0;
+		displayRect.right = 0;
+	}
 };
 
 struct SequenceEntry {
@@ -469,13 +482,12 @@ public:
 	typedef void (ToucheEngine::*OpcodeProc)();
 
 	ToucheEngine(OSystem *system, Common::Language language);
-	virtual ~ToucheEngine();
+	~ToucheEngine() override;
 
 	// Engine APIs
-	virtual Common::Error run();
-	virtual bool hasFeature(EngineFeature f) const;
-	virtual void syncSoundSettings();
-	GUI::Debugger *getDebugger() { return _console; }
+	Common::Error run() override;
+	bool hasFeature(EngineFeature f) const override;
+	void syncSoundSettings() override;
 
 protected:
 
@@ -605,12 +617,13 @@ protected:
 
 	void saveGameStateData(Common::WriteStream *stream);
 	void loadGameStateData(Common::ReadStream *stream);
-	virtual Common::Error saveGameState(int num, const Common::String &description);
-	virtual Common::Error loadGameState(int num);
-	virtual bool canLoadGameStateCurrently();
-	virtual bool canSaveGameStateCurrently();
-
-	ToucheConsole *_console;
+	Common::Error saveGameState(int num, const Common::String &description, bool isAutosave = false) override;
+	Common::Error loadGameState(int num) override;
+	bool canLoadGameStateCurrently() override;
+	bool canSaveGameStateCurrently() override;
+	Common::String getSaveStateName(int slot) const override {
+		return Common::String::format("%s.%d", _targetName.c_str(), slot);
+	}
 
 	void setupOpcodes();
 	void op_nop();

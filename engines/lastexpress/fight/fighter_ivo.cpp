@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -111,7 +110,7 @@ void FighterPlayerIvo::update() {
 		if (_opponent->getCountdown() <= 0) {
 			setSequenceAndDraw(9, kFightSequenceType1);
 			_opponent->setSequenceAndDraw(8, kFightSequenceType1);
-			getSoundQueue()->removeFromQueue(kEntityTables0);
+			getSoundQueue()->stop(kEntityTables0);
 
 			handleAction(kFightActionWin);
 			return;
@@ -145,7 +144,7 @@ FighterOpponentIvo::FighterOpponentIvo(LastExpressEngine *engine) : Opponent(eng
 	_sequences.push_back(loadSequence("csdr.seq"));
 	_sequences.push_back(loadSequence("2003l.seq"));
 
-	getSound()->playSound(kEntityTables0, "MUS032", kFlagDefault);
+	getSound()->playSound(kEntityTables0, "MUS032", kVolumeFull);
 
 	_countdown = 5;
 	_field_38 = 15;
@@ -228,7 +227,7 @@ void FighterOpponentIvo::update() {
 		if (_opponent->getCountdown() <= 0) {
 			setSequenceAndDraw(7, kFightSequenceType1);
 			_opponent->setSequenceAndDraw(8, kFightSequenceType1);
-			getSoundQueue()->removeFromQueue(kEntityTables0);
+			getSoundQueue()->stop(kEntityTables0);
 
 			_opponent->handleAction(kFightActionWin);
 

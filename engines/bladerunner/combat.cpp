@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -54,14 +53,14 @@ void Combat::reset() {
 	_ammoDamage[1] = 20;
 	_ammoDamage[2] = 30;
 
-	for (int i = 0; i < kSoundCount; i++) {
+	for (int i = 0; i < kSoundCount; ++i) {
 		_hitSoundId[i] = -1;
 		_missSoundId[i] = -1;
 	}
 }
 
 void Combat::activate() {
-	if(_enabled) {
+	if (_enabled) {
 		_vm->_playerActor->combatModeOn(-1, true, -1, -1, kAnimationModeCombatIdle, kAnimationModeCombatWalk, kAnimationModeCombatRun, -1, -1, -1, _vm->_combat->_ammoDamage[_vm->_settings->getAmmoType()], 0, false);
 		_active = true;
 	}
@@ -75,7 +74,7 @@ void Combat::deactivate() {
 }
 
 void Combat::change() {
-	if (!_vm->_playerActor->inWalkLoop() && _enabled) {
+	if (!_vm->_playerActor->mustReachWalkDestination() && _enabled) {
 		if (_active) {
 			deactivate();
 		} else {
@@ -97,19 +96,19 @@ void Combat::disable() {
 }
 
 void Combat::setHitSound(int ammoType, int column, int soundId) {
-	_hitSoundId[ammoType * 3 + column] = soundId;
+	_hitSoundId[(kSoundCount/_vm->_settings->getAmmoTypesCount()) * ammoType + column] = soundId;
 }
 
 void Combat::setMissSound(int ammoType, int column, int soundId) {
-	_missSoundId[ammoType * 3 + column] = soundId;
+	_missSoundId[(kSoundCount/_vm->_settings->getAmmoTypesCount()) * ammoType + column] = soundId;
 }
 
 int Combat::getHitSound() const {
-	return _hitSoundId[3 * _vm->_settings->getAmmoType() + _vm->_rnd.getRandomNumber(2)];
+	return _hitSoundId[(kSoundCount/_vm->_settings->getAmmoTypesCount()) * _vm->_settings->getAmmoType() + _vm->_rnd.getRandomNumber(2)];
 }
 
 int Combat::getMissSound() const {
-	return _hitSoundId[3 * _vm->_settings->getAmmoType() + _vm->_rnd.getRandomNumber(2)];
+	return _missSoundId[(kSoundCount/_vm->_settings->getAmmoTypesCount()) * _vm->_settings->getAmmoType() + _vm->_rnd.getRandomNumber(2)];
 }
 
 void Combat::shoot(int actorId, Vector3 &to, int screenX) {
@@ -158,12 +157,19 @@ void Combat::shoot(int actorId, Vector3 &to, int screenX) {
 		if (actor->inCombat()) {
 			actor->combatModeOff();
 		}
+#if BLADERUNNER_ORIGINAL_BUGS
+#else
+		// make sure the dead enemy won't pick a pending movement track and re-spawn
+		actor->_movementTrack->flush();
+#endif
 		actor->stopWalking(false);
-		actor->changeAnimationMode(48, false);
+		actor->changeAnimationMode(kAnimationModeDie, false);
+
 		actor->retire(true, 72, 36, kActorMcCoy);
 		actor->setAtXYZ(actor->getXYZ(), actor->getFacing(), true, false, true);
 		_vm->_sceneObjects->setRetired(actorId + kSceneObjectOffsetActors, true);
-		sentenceId = 9020;
+
+		sentenceId = 9020; // Bug or intended? This sentence id (death rattle) won't be used in this case since combat mode is set to off above. Probably intended, in order to use the rattle in a case by case (?)
 	}
 
 	if (sentenceId >= 0 && actor->inCombat()) {

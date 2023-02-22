@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,55 +23,37 @@
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
 #include <unistd.h>
-#include <pthread.h>
 #include <string.h>
 
 #include <sys/time.h>
 #include <QuartzCore/QuartzCore.h>
+#include <dlfcn.h>
 
 #include "common/scummsys.h"
 #include "common/util.h"
 #include "common/rect.h"
 #include "common/file.h"
 #include "common/fs.h"
+#include "common/config-manager.h"
+#include "common/translation.h"
 
 #include "base/main.h"
 
+#include "engines/engine.h"
+#include "engines/metaengine.h"
+
+#include "gui/gui-manager.h"
+
 #include "backends/saves/default/default-saves.h"
 #include "backends/timer/default/default-timer.h"
+#include "backends/mutex/pthread/pthread-mutex.h"
 #include "backends/fs/chroot/chroot-fs-factory.h"
 #include "backends/fs/posix/posix-fs.h"
 #include "audio/mixer.h"
 #include "audio/mixer_intern.h"
 
-#include "graphics/scaler.h"
-#include "graphics/scaler/aspect.h"
-
 #include "backends/platform/ios7/ios7_osys_main.h"
 
-
-const OSystem::GraphicsMode OSystem_iOS7::s_supportedGraphicsModes[] = {
-	{ "none", "Normal", kGraphicsModeNone },
-
-#ifdef ENABLE_IOS7_SCALERS
-#ifdef USE_SCALERS
-//	{"2x", "2x", GFX_DOUBLESIZE},
-//	{"3x", "3x", GFX_TRIPLESIZE},
-	{ "2xsai", "2xSAI", kGraphicsMode2xSaI},
-	{"super2xsai", "Super2xSAI", kGraphicsModeSuper2xSaI},
-	{"supereagle", "SuperEagle", kGraphicsModeSuperEagle},
-	{"advmame2x", "AdvMAME2x", kGraphicsModeAdvMame2x},
-	{"advmame3x", "AdvMAME3x", kGraphicsModeAdvMame3x},
-#ifdef USE_HQ_SCALERS
-	{"hq2x", "HQ2x", kGraphicsModeHQ2x},
-	{"hq3x", "HQ3x", kGraphicsModeHQ3x},
-#endif
-	{"tv2x", "TV2x", kGraphicsModeTV2x},
-	{"dotmatrix", "DotMatrix", kGraphicsModeDotMatrix},
-#endif
-#endif
-	{ 0, 0, 0 }
-};
 
 AQCallbackStruct OSystem_iOS7::s_AudioQueue;
 SoundProc OSystem_iOS7::s_soundCallback = NULL;
@@ -87,7 +68,7 @@ public:
 			: DefaultSaveFileManager(defaultSavepath), _sandboxRootPath(sandboxRootPath) {
 	}
 
-	virtual bool removeSavefile(const Common::String &filename) override {
+	bool removeSavefile(const Common::String &filename) override {
 		Common::String chrootedFile = getSavePath() + "/" + filename;
 		Common::String realFilePath = _sandboxRootPath + chrootedFile;
 
@@ -111,7 +92,7 @@ OSystem_iOS7::OSystem_iOS7() :
 	_screenOrientation(kScreenOrientationFlippedLandscape), _mouseClickAndDragEnabled(false),
 	_gestureStartX(-1), _gestureStartY(-1), _fullScreenIsDirty(false), _fullScreenOverlayIsDirty(false),
 	_mouseDirty(false), _timeSuspended(0), _lastDragPosX(-1), _lastDragPosY(-1), _screenChangeCount(0),
-	_lastErrorMessage(NULL), _mouseCursorPaletteEnabled(false), _gfxTransactionError(kTransactionSuccess) {
+	_mouseCursorPaletteEnabled(false), _gfxTransactionError(kTransactionSuccess) {
 	_queuedInputEvent.type = Common::EVENT_INVALID;
 	_touchpadModeEnabled = !iOS7_isBigDevice();
 #ifdef IPHONE_SANDBOXED
@@ -143,6 +124,12 @@ bool OSystem_iOS7::touchpadModeEnabled() const {
 	return _touchpadModeEnabled;
 }
 
+#if defined(USE_OPENGL) && defined(USE_GLAD)
+void *OSystem_iOS7::getOpenGLProcAddress(const char *name) const {
+	return dlsym(RTLD_SELF, name);
+}
+#endif
+
 int OSystem_iOS7::timerHandler(int t) {
 	DefaultTimerManager *tm = (DefaultTimerManager *)g_system->getTimerManager();
 	tm->handler();
@@ -158,7 +145,7 @@ void OSystem_iOS7::initBackend() {
 
 	_timerManager = new DefaultTimerManager();
 
-	gettimeofday(&_startTime, NULL);
+	_startTime = CACurrentMediaTime();
 
 	setupMixer();
 
@@ -171,6 +158,12 @@ bool OSystem_iOS7::hasFeature(Feature f) {
 	switch (f) {
 	case kFeatureCursorPalette:
 	case kFeatureFilteringMode:
+	case kFeatureVirtualKeyboard:
+#if TARGET_OS_IOS
+	case kFeatureClipboardSupport:
+#endif
+	case kFeatureOpenUrl:
+	case kFeatureNoQuit:
 		return true;
 
 	default:
@@ -193,6 +186,9 @@ void OSystem_iOS7::setFeatureState(Feature f, bool enable) {
 	case kFeatureAspectRatioCorrection:
 		_videoContext->asprectRatioCorrection = enable;
 		break;
+	case kFeatureVirtualKeyboard:
+		setShowKeyboard(enable);
+		break;
 
 	default:
 		break;
@@ -207,6 +203,8 @@ bool OSystem_iOS7::getFeatureState(Feature f) {
 		return _videoContext->filtering;
 	case kFeatureAspectRatioCorrection:
 		return _videoContext->asprectRatioCorrection;
+	case kFeatureVirtualKeyboard:
+		return isKeyboardShown();
 
 	default:
 		return false;
@@ -217,13 +215,22 @@ void OSystem_iOS7::suspendLoop() {
 	bool done = false;
 	uint32 startTime = getMillis();
 
+	PauseToken pt;
+	if (g_engine)
+		pt = g_engine->pauseEngine();
+
+	// We also need to stop the audio queue and restart it later in case there
+	// is an audio interruption that render it invalid.
 	stopSoundsystem();
 
 	InternalEvent event;
 	while (!done) {
-		if (iOS7_fetchEvent(&event))
+		if (iOS7_fetchEvent(&event)) {
 			if (event.type == kInputApplicationResumed)
 				done = true;
+			else if (event.type == kInputApplicationSaveState)
+				handleEvent_applicationSaveState();
+		}
 		usleep(100000);
 	}
 
@@ -232,49 +239,68 @@ void OSystem_iOS7::suspendLoop() {
 	_timeSuspended += getMillis() - startTime;
 }
 
+void OSystem_iOS7::saveState() {
+	// Clear any previous restore state to avoid having and obsolete one if we don't save it again below.
+	clearState();
+
+	// If there is an engine running and it accepts autosave, do an autosave and add the current
+	// running target to the config file.
+	if (g_engine && g_engine->hasFeature(Engine::kSupportsSavingDuringRuntime) && g_engine->canSaveAutosaveCurrently()) {
+		Common::String targetName(ConfMan.getActiveDomainName());
+		int saveSlot = g_engine->getAutosaveSlot();
+		// Make sure we do not overwrite a user save
+		SaveStateDescriptor desc = g_engine->getMetaEngine()->querySaveMetaInfos(targetName.c_str(), saveSlot);
+		if (desc.getSaveSlot() != -1 && !desc.isAutosave())
+			return;
+
+		// Do the auto-save, and if successful store this it in the config
+		if (g_engine->saveGameState(saveSlot, _("Autosave"), true).getCode() == Common::kNoError) {
+			ConfMan.set("restore_target", targetName, Common::ConfigManager::kApplicationDomain);
+			ConfMan.setInt("restore_slot", saveSlot, Common::ConfigManager::kApplicationDomain);
+			ConfMan.flushToDisk();
+		}
+	}
+}
+
+void OSystem_iOS7::restoreState() {
+	Common::String target;
+	int slot = -1;
+	if (ConfMan.hasKey("restore_target", Common::ConfigManager::kApplicationDomain) &&
+		ConfMan.hasKey("restore_slot", Common::ConfigManager::kApplicationDomain)) {
+		target = ConfMan.get("restore_target", Common::ConfigManager::kApplicationDomain);
+		slot = ConfMan.getInt("restore_slot", Common::ConfigManager::kApplicationDomain);
+		clearState();
+	}
+
+	// If the g_engine is still running (i.e. the application was not terminated) we don't need to do anything.
+	if (g_engine)
+		return;
+
+	if (!target.empty() && slot != -1) {
+		ConfMan.setInt("save_slot", slot, Common::ConfigManager::kTransientDomain);
+		ConfMan.setActiveDomain(target);
+		if (GUI::GuiManager::hasInstance())
+			g_gui.exitLoop();
+	}
+}
+
+void OSystem_iOS7::clearState() {
+	if (ConfMan.hasKey("restore_target", Common::ConfigManager::kApplicationDomain) &&
+	ConfMan.hasKey("restore_slot", Common::ConfigManager::kApplicationDomain)) {
+		ConfMan.removeKey("restore_target", Common::ConfigManager::kApplicationDomain);
+		ConfMan.removeKey("restore_slot", Common::ConfigManager::kApplicationDomain);
+		ConfMan.flushToDisk();
+	}
+}
+
 uint32 OSystem_iOS7::getMillis(bool skipRecord) {
 	CFTimeInterval timeInSeconds = CACurrentMediaTime();
-	return (uint32) (timeInSeconds * 1000.0);
+	return (uint32) ((timeInSeconds - _startTime) * 1000.0) - _timeSuspended;
 }
 
 void OSystem_iOS7::delayMillis(uint msecs) {
 	//printf("delayMillis(%d)\n", msecs);
 	usleep(msecs * 1000);
-}
-
-OSystem::MutexRef OSystem_iOS7::createMutex(void) {
-	pthread_mutexattr_t attr;
-	pthread_mutexattr_init(&attr);
-	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-
-	pthread_mutex_t *mutex = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t));
-	if (pthread_mutex_init(mutex, &attr) != 0) {
-		printf("pthread_mutex_init() failed!\n");
-		free(mutex);
-		return NULL;
-	}
-
-	return (MutexRef)mutex;
-}
-
-void OSystem_iOS7::lockMutex(MutexRef mutex) {
-	if (pthread_mutex_lock((pthread_mutex_t *) mutex) != 0) {
-		printf("pthread_mutex_lock() failed!\n");
-	}
-}
-
-void OSystem_iOS7::unlockMutex(MutexRef mutex) {
-	if (pthread_mutex_unlock((pthread_mutex_t *) mutex) != 0) {
-		printf("pthread_mutex_unlock() failed!\n");
-	}
-}
-
-void OSystem_iOS7::deleteMutex(MutexRef mutex) {
-	if (pthread_mutex_destroy((pthread_mutex_t *) mutex) != 0) {
-		printf("pthread_mutex_destroy() failed!\n");
-	} else {
-		free(mutex);
-	}
 }
 
 
@@ -289,10 +315,14 @@ void OSystem_iOS7::setTimerCallback(TimerProc callback, int interval) {
 		_timerCallback = NULL;
 }
 
+Common::MutexInternal *OSystem_iOS7::createMutex() {
+	return createPthreadMutexInternal();
+}
+
 void OSystem_iOS7::quit() {
 }
 
-void OSystem_iOS7::getTimeAndDate(TimeDate &td) const {
+void OSystem_iOS7::getTimeAndDate(TimeDate &td, bool skipRecord) const {
 	time_t curTime = time(0);
 	struct tm t = *localtime(&curTime);
 	td.tm_sec = t.tm_sec;
@@ -343,25 +373,8 @@ void OSystem_iOS7::addSysArchivesToSearchSet(Common::SearchSet &s, int priority)
 	}
 }
 
-void OSystem_iOS7::logMessage(LogMessageType::Type type, const char *message) {
-	FILE *output = 0;
-
-	if (type == LogMessageType::kInfo || type == LogMessageType::kDebug)
-		output = stdout;
-	else
-		output = stderr;
-
-	if (type == LogMessageType::kError) {
-		free(_lastErrorMessage);
-		_lastErrorMessage = strdup(message);
-	}
-
-	fputs(message, output);
-	fflush(output);
-}
-
 bool iOS7_touchpadModeEnabled() {
-	OSystem_iOS7 *sys = (OSystem_iOS7 *) g_system;
+	OSystem_iOS7 *sys = dynamic_cast<OSystem_iOS7 *>(g_system);
 	return sys && sys->touchpadModeEnabled();
 }
 
@@ -401,4 +414,10 @@ void iOS7_main(int argc, char **argv) {
 	// Invoke the actual ScummVM main entry point:
 	scummvm_main(argc, (const char *const *) argv);
 	g_system->quit();       // TODO: Consider removing / replacing this!
+
+	if (newfp != NULL) {
+		//*stdout = NULL;
+		//*stderr = NULL;
+		fclose(newfp);
+	}
 }

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,21 +30,24 @@
 namespace GUI {
 
 #if defined(USE_CLOUD) && defined(USE_LIBCURL)
-enum SaveLoadCloudSyncProgress {
-	kSavesSyncProgressCmd = 'SSPR',
-	kSavesSyncEndedCmd = 'SSEN'
-};
+class SaveLoadChooserDialog;
 
 class SaveLoadCloudSyncProgressDialog : public Dialog { //protected?
 	StaticTextWidget *_label, *_percentLabel;
 	SliderWidget *_progressBar;
+	SaveLoadChooserDialog *_parent;
 	bool _close;
-public:
-	SaveLoadCloudSyncProgressDialog(bool canRunInBackground);
-	virtual ~SaveLoadCloudSyncProgressDialog();
+	int _pollFrame;
 
-	virtual void handleCommand(CommandSender *sender, uint32 cmd, uint32 data);
-	virtual void handleTickle();
+public:
+	SaveLoadCloudSyncProgressDialog(bool canRunInBackground, SaveLoadChooserDialog *parent);
+	~SaveLoadCloudSyncProgressDialog() override;
+
+	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data) override;
+	void handleTickle() override;
+
+private:
+	void pollCloudMan();
 };
 #endif
 
@@ -65,34 +67,34 @@ enum SaveLoadChooserType {
 	kSaveLoadDialogGrid = 1
 };
 
-SaveLoadChooserType getRequestedSaveLoadDialog(const MetaEngine &metaEngine);
+SaveLoadChooserType getRequestedSaveLoadDialog(const MetaEngine *metaEngine);
 #endif // !DISABLE_SAVELOADCHOOSER_GRID
 
 class SaveLoadChooserDialog : protected Dialog {
 public:
 	SaveLoadChooserDialog(const Common::String &dialogName, const bool saveMode);
 	SaveLoadChooserDialog(int x, int y, int w, int h, const bool saveMode);
-	virtual ~SaveLoadChooserDialog();
+	~SaveLoadChooserDialog() override;
 
-	virtual void open();
-	virtual void close();
+	void open() override;
+	void close() override;
 
-	virtual void reflowLayout();
+	void reflowLayout() override;
 
-	virtual void handleCommand(CommandSender *sender, uint32 cmd, uint32 data);
+	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data) override;
 
 #if defined(USE_CLOUD) && defined(USE_LIBCURL)
 	virtual void runSaveSync(bool hasSavepathOverride);
 #endif
 
-	virtual void handleTickle();
+	void handleTickle() override;
 
 #ifndef DISABLE_SAVELOADCHOOSER_GRID
 	virtual SaveLoadChooserType getType() const = 0;
 #endif // !DISABLE_SAVELOADCHOOSER_GRID
 
 	int run(const Common::String &target, const MetaEngine *metaEngine);
-	virtual const Common::String &getResultString() const = 0;
+	virtual const Common::U32String getResultString() const = 0;
 
 protected:
 	virtual int runIntern() = 0;
@@ -110,48 +112,59 @@ protected:
 	*/
 	virtual void listSaves();
 
-	const bool				_saveMode;
-	const MetaEngine		*_metaEngine;
-	bool					_delSupport;
-	bool					_metaInfoSupport;
-	bool					_thumbnailSupport;
-	bool					_saveDateSupport;
-	bool					_playTimeSupport;
-	Common::String			_target;
+	void activate(int slot, const Common::U32String &description);
+
+	const bool					_saveMode;
+	const MetaEngine		    *_metaEngine;
+	bool						_delSupport;
+	bool						_metaInfoSupport;
+	bool						_thumbnailSupport;
+	bool						_saveDateSupport;
+	bool						_playTimeSupport;
+	Common::String				_target;
 	bool _dialogWasShown;
-	SaveStateList			_saveList;
+	SaveStateList				_saveList;
+	Common::U32String			_resultString;
 
 #ifndef DISABLE_SAVELOADCHOOSER_GRID
 	ButtonWidget *_listButton;
 	ButtonWidget *_gridButton;
 
 	void addChooserButtons();
-	ButtonWidget *createSwitchButton(const Common::String &name, const char *desc, const char *tooltip, const char *image, uint32 cmd = 0);
+	ButtonWidget *createSwitchButton(const Common::String &name, const Common::U32String &desc, const Common::U32String &tooltip, const char *image, uint32 cmd = 0);
 #endif // !DISABLE_SAVELOADCHOOSER_GRID
+
+#if defined(USE_CLOUD) && defined(USE_LIBCURL)
+	int _pollFrame;
+	bool _didUpdateAfterSync;
+
+	/** If CloudMan is syncing, this will refresh the list of saves. */
+	void pollCloudMan();
+
+	friend class SaveLoadCloudSyncProgressDialog;
+#endif
 };
 
 class SaveLoadChooserSimple : public SaveLoadChooserDialog {
-	typedef Common::String String;
-	typedef Common::Array<Common::String> StringArray;
 public:
-	SaveLoadChooserSimple(const String &title, const String &buttonLabel, bool saveMode);
+	SaveLoadChooserSimple(const Common::U32String &title, const Common::U32String &buttonLabel, bool saveMode);
 
-	virtual void handleCommand(CommandSender *sender, uint32 cmd, uint32 data);
+	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data) override;
 
-	virtual const Common::String &getResultString() const;
+	const Common::U32String getResultString() const override;
 
-	virtual void reflowLayout();
+	void reflowLayout() override;
 
 #ifndef DISABLE_SAVELOADCHOOSER_GRID
-	virtual SaveLoadChooserType getType() const { return kSaveLoadDialogList; }
+	SaveLoadChooserType getType() const override { return kSaveLoadDialogList; }
 #endif // !DISABLE_SAVELOADCHOOSER_GRID
 
-	virtual void open();
-	virtual void close();
+	void open() override;
+	void close() override;
 protected:
-	virtual void updateSaveList();
+	void updateSaveList() override;
 private:
-	virtual int runIntern();
+	int runIntern() override;
 
 	ListWidget		*_list;
 	ButtonWidget	*_chooseButton;
@@ -161,9 +174,9 @@ private:
 	StaticTextWidget	*_date;
 	StaticTextWidget	*_time;
 	StaticTextWidget	*_playtime;
+	StaticTextWidget	*_pageTitle;
 
-	String					_resultString;
-
+	void addThumbnailContainer();
 	void updateSelection(bool redraw);
 };
 
@@ -175,14 +188,14 @@ class SavenameDialog : public Dialog {
 public:
 	SavenameDialog();
 
-	void setDescription(const Common::String &desc);
-	const Common::String &getDescription();
+	void setDescription(const Common::U32String &desc);
+	const Common::U32String &getDescription();
 
 	void setTargetSlot(int slot) { _targetSlot = slot; }
 
-	virtual void open();
+	void open() override;
 protected:
-	virtual void handleCommand(CommandSender *sender, uint32 cmd, uint32 data);
+	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data) override;
 private:
 	int _targetSlot;
 	StaticTextWidget *_title;
@@ -191,24 +204,24 @@ private:
 
 class SaveLoadChooserGrid : public SaveLoadChooserDialog {
 public:
-	SaveLoadChooserGrid(const Common::String &title, bool saveMode);
-	~SaveLoadChooserGrid();
+	SaveLoadChooserGrid(const Common::U32String &title, bool saveMode);
+	~SaveLoadChooserGrid() override;
 
-	virtual const Common::String &getResultString() const;
+	const Common::U32String getResultString() const override;
 
-	virtual void open();
+	void open() override;
 
-	virtual void reflowLayout();
+	void reflowLayout() override;
 
-	virtual SaveLoadChooserType getType() const { return kSaveLoadDialogGrid; }
+	SaveLoadChooserType getType() const override { return kSaveLoadDialogGrid; }
 
-	virtual void close();
+	void close() override;
 protected:
-	virtual void handleCommand(CommandSender *sender, uint32 cmd, uint32 data);
-	virtual void handleMouseWheel(int x, int y, int direction);
-	virtual void updateSaveList();
+	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data) override;
+	void handleMouseWheel(int x, int y, int direction) override;
+	void updateSaveList() override;
 private:
-	virtual int runIntern();
+	int runIntern() override;
 
 	uint _columns, _lines;
 	uint _entriesPerPage;
@@ -217,17 +230,17 @@ private:
 	ButtonWidget *_nextButton;
 	ButtonWidget *_prevButton;
 
+	StaticTextWidget *_pageTitle;
 	StaticTextWidget *_pageDisplay;
 
 	ContainerWidget *_newSaveContainer;
 	int _nextFreeSaveSlot;
-	Common::String _resultString;
 
 	SavenameDialog _savenameDialog;
 	bool selectDescription();
 
 	struct SlotButton {
-		SlotButton() : container(0), button(0), description(0) {}
+		SlotButton() : container(nullptr), button(nullptr), description(nullptr) {}
 		SlotButton(ContainerWidget *c, PicButtonWidget *b, StaticTextWidget *d) : container(c), button(b), description(d) {}
 
 		ContainerWidget  *container;

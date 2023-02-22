@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,12 +15,12 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "gui/console.h"
+#include "common/savefile.h"
 #include "gui/widgets/scrollbar.h"
 #include "gui/ThemeEval.h"
 #include "gui/gui-manager.h"
@@ -33,8 +33,10 @@
 
 namespace GUI {
 
-#define kConsoleCharWidth	(_font->getMaxCharWidth())
-#define kConsoleLineHeight	(_font->getFontHeight() + 2)
+#define kConsoleCharWidth  (_font->getCharWidth('M'))
+#define kConsoleLineHeight (_font->getFontHeight())
+
+#define HISTORY_FILENAME "scummvm-history.txt"
 
 enum {
 	kConsoleSlideDownDuration = 200	// Time in milliseconds
@@ -76,8 +78,8 @@ ConsoleDialog::ConsoleDialog(float widthPercent, float heightPercent)
 	_promptStartPos = _promptEndPos = -1;
 
 	// Init callback
-	_callbackProc = 0;
-	_callbackRefCon = 0;
+	_callbackProc = nullptr;
+	_callbackRefCon = nullptr;
 
 	// Init History
 	_historyIndex = 0;
@@ -89,12 +91,15 @@ ConsoleDialog::ConsoleDialog(float widthPercent, float heightPercent)
 	print("\nConsole is ready\n");
 }
 
+ConsoleDialog::~ConsoleDialog() {
+	saveHistory();
+}
+
 void ConsoleDialog::init() {
 	const int screenW = g_system->getOverlayWidth();
 	const int screenH = g_system->getOverlayHeight();
 
-	_font = FontMan.getFontByUsage((Graphics::FontManager::FontUsage)
-		g_gui.xmlEval()->getVar("Console.Font", Graphics::FontManager::kConsoleFont));
+	_font = &g_gui.getFont(ThemeEngine::kFontStyleConsole);
 
 	_leftPadding = g_gui.xmlEval()->getVar("Globals.Console.Padding.Left", 0);
 	_rightPadding = g_gui.xmlEval()->getVar("Globals.Console.Padding.Right", 0);
@@ -111,11 +116,21 @@ void ConsoleDialog::init() {
 
 	// Set scrollbar dimensions
 	int scrollBarWidth = g_gui.xmlEval()->getVar("Globals.Scrollbar.Width", 0);
-	_scrollBar->resize(_w - scrollBarWidth - 1, 0, scrollBarWidth, _h);
+	_scrollBar->resize(_w - scrollBarWidth - 1, 0, scrollBarWidth, _h, false);
 
 	_pageWidth = (_w - scrollBarWidth - 2 - _leftPadding - _topPadding - scrollBarWidth) / kConsoleCharWidth;
 	_linesPerPage = (_h - 2 - _topPadding - _bottomPadding) / kConsoleLineHeight;
 	_linesInBuffer = kBufferSize / kCharsPerLine;
+
+	resetPrompt();
+}
+
+void ConsoleDialog::setPrompt(Common::String prompt) {
+	_prompt = prompt;
+}
+
+void ConsoleDialog::resetPrompt() {
+	_prompt = PROMPT;
 }
 
 void ConsoleDialog::slideUpAndClose() {
@@ -154,8 +169,12 @@ void ConsoleDialog::open() {
 	if ((_promptStartPos == -1) || (_currentPos > _promptEndPos)) {
 		// we print a prompt, if this is the first time we are called or if the
 		//  engine wrote onto us since the last call
-		print(PROMPT);
+		print(_prompt.c_str());
 		_promptStartPos = _promptEndPos = _currentPos;
+	}
+
+	if (_historySize == 0) {
+		loadHistory();
 	}
 }
 
@@ -167,21 +186,16 @@ void ConsoleDialog::drawDialog(DrawLayer layerToDraw) {
 	Dialog::drawDialog(layerToDraw);
 
 	for (int line = 0; line < _linesPerPage; line++)
-		drawLine(line, false);
+		drawLine(line);
 }
 
-void ConsoleDialog::drawLine(int line, bool restoreBg) {
+void ConsoleDialog::drawLine(int line) {
 	int x = _x + 1 + _leftPadding;
 	int start = _scrollLine - _linesPerPage + 1;
 	int y = _y + 2 + _topPadding;
 	int limit = MIN(_pageWidth, (int)kCharsPerLine);
 
 	y += line * kConsoleLineHeight;
-
-	if (restoreBg) {
-		Common::Rect r(_x, y - 2, _x + _pageWidth * kConsoleCharWidth, y+kConsoleLineHeight);
-		g_gui.theme()->restoreBackground(r);
-	}
 
 	for (int column = 0; column < limit; column++) {
 #if 0
@@ -279,7 +293,7 @@ void ConsoleDialog::handleKeyDown(Common::KeyState state) {
 				keepRunning = (*_callbackProc)(this, userInput.c_str(), _callbackRefCon);
 		}
 
-		print(PROMPT);
+		print(_prompt.c_str());
 		_promptStartPos = _promptEndPos = _currentPos;
 
 		g_gui.scheduleTopDialogRedraw();
@@ -495,11 +509,15 @@ void ConsoleDialog::insertIntoPrompt(const char* str) {
 void ConsoleDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data) {
 	switch (cmd) {
 	case kSetPositionCmd:
-		int newPos = (int)data + _linesPerPage - 1 + _firstLineInBuffer;
-		if (newPos != _scrollLine) {
-			_scrollLine = newPos;
-			g_gui.scheduleTopDialogRedraw();
+		{
+			int newPos = (int)data + _linesPerPage - 1 + _firstLineInBuffer;
+			if (newPos != _scrollLine) {
+				_scrollLine = newPos;
+				g_gui.scheduleTopDialogRedraw();
+			}
 		}
+		break;
+	default:
 		break;
 	}
 }
@@ -529,15 +547,15 @@ void ConsoleDialog::specialKeys(Common::KeyCode keycode) {
 		g_gui.scheduleTopDialogRedraw();
 		break;
 	case Common::KEYCODE_v:
-		if (g_system->hasFeature(OSystem::kFeatureClipboardSupport) && g_system->hasTextInClipboard()) {
-			Common::String text = g_system->getTextFromClipboard();
-			insertIntoPrompt(text.c_str());
+		if (g_system->hasTextInClipboard()) {
+			Common::U32String text = g_system->getTextFromClipboard();
+			insertIntoPrompt(text.encode().c_str());
 			scrollToCurrent();
 			drawLine(pos2line(_currentPos));
 		}
 		break;
 	case Common::KEYCODE_c:
-		if (g_system->hasFeature(OSystem::kFeatureClipboardSupport)) {
+		{
 			Common::String userInput = getUserInput();
 			if (!userInput.empty())
 				g_system->setTextInClipboard(userInput);
@@ -584,6 +602,57 @@ void ConsoleDialog::killLastWord() {
 	}
 }
 
+void ConsoleDialog::loadHistory() {
+	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
+	Common::InSaveFile *loadFile = saveFileMan->openRawFile(HISTORY_FILENAME);
+	if (!loadFile) {
+		return;
+	}
+	for (int i = 0; i < kHistorySize; ++i) {
+		const Common::String &line = loadFile->readLine();
+		if (line.empty()) {
+			break;
+		}
+		addToHistory(line);
+	}
+	delete loadFile;
+	debug("Read %i history entries", _historySize);
+}
+
+void ConsoleDialog::saveHistory() {
+	if (_historySize == 0) {
+		return;
+	}
+	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
+	Common::WriteStream *saveFile = saveFileMan->openForSaving(HISTORY_FILENAME, false);
+	if (!saveFile) {
+		warning("Failed to open " HISTORY_FILENAME " for writing");
+		return;
+	}
+
+	// Saving the history entries in the proper order;
+	// The most recent entry should be the last to be saved.
+	// NOTE When the _history table is full, we need to start saving
+	//      from one slot after (in a circular manner) the _historyIndex slot.
+	//      In this case the _historyIndex slot contains the temporary stored user input,
+	//      which we do not want to persist.
+	//      This means that when full, (kHistorySize - 1) entries will be saved.
+	//      When the table is not full, storing always begins from index 0.
+	int idx = (kHistorySize == _historySize) ? ((_historyIndex + 1) % kHistorySize) : 0;
+	int entriesWritten = 0;
+	while (idx != _historyIndex) {
+		if (!_history[idx].empty()) {
+			saveFile->writeString(_history[idx]);
+			saveFile->writeByte('\n');
+			++entriesWritten;
+		}
+		idx = (idx + 1) % kHistorySize;
+	}
+	saveFile->finalize();
+	delete saveFile;
+	debug("Wrote %i history entries", entriesWritten);
+}
+
 void ConsoleDialog::addToHistory(const Common::String &str) {
 	_history[_historyIndex] = str;
 	_historyIndex = (_historyIndex + 1) % kHistorySize;
@@ -596,15 +665,25 @@ void ConsoleDialog::historyScroll(int direction) {
 	if (_historySize == 0)
 		return;
 
-	if (_historyLine == 0 && direction > 0) {
-		int i;
-		for (i = 0; i < _promptEndPos - _promptStartPos; i++)
-			_history[_historyIndex].insertChar(buffer(_promptStartPos + i), i);
-	}
+	if (_historyLine == 0 && direction > 0)
+		// Save current line in history
+		_history[_historyIndex] = getUserInput();
 
 	// Advance to the next line in the history
+	// NOTE Due to temporarily storing the user input line in the
+	//      _history table, without executing an addToHistory() call,
+	//      that user input line is stored into the slot _historyIndex
+	//      where the next committed command will replace it.
+	//      However, since this slot is still a slot from the _history table,
+	//      when the table is full (kHistorySize entries) and while scrolling
+	//      the history upwards, the user can reach this slot (top most)
+	//      and get their user input again instead of a historic entry.
+	//      We prevent this by stopping upwards navigation one slot earlier,
+	//      when the table is full.
 	int line = _historyLine + direction;
-	if ((direction < 0 && line < 0) || (direction > 0 && line > _historySize))
+	if ((direction < 0 && line < 0)
+	    || (direction > 0 && (line > _historySize
+	                         || (_historySize == kHistorySize && line == _historySize))) )
 		return;
 	_historyLine = line;
 
@@ -677,10 +756,13 @@ int ConsoleDialog::printFormat(int dummy, const char *format, ...) {
 
 int ConsoleDialog::vprintFormat(int dummy, const char *format, va_list argptr) {
 	Common::String buf = Common::String::vformat(format, argptr);
+	const int size = buf.size();
 
 	print(buf.c_str());
+	buf.trim();
+	debug("%s", buf.c_str());
 
-	return buf.size();
+	return size;
 }
 
 void ConsoleDialog::printChar(int c) {
@@ -726,7 +808,7 @@ void ConsoleDialog::drawCaret(bool erase) {
 	}
 
 	int x = _x + 1 + _leftPadding + (_currentPos % kCharsPerLine) * kConsoleCharWidth;
-	int y = _y + _topPadding + displayLine * kConsoleLineHeight;
+	int y = _y + 2 + _topPadding + displayLine * kConsoleLineHeight;
 
 	_caretVisible = !erase;
 	g_gui.theme()->drawCaret(Common::Rect(x, y, x + 1, y + kConsoleLineHeight), erase);

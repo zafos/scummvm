@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -129,6 +128,8 @@ uint32 SsScene3009FireCannonButton::handleMessage(int messageNum, const MessageP
 		}
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -229,6 +230,8 @@ uint32 SsScene3009SymbolArrow::handleMessage(int messageNum, const MessageParam 
 		}
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -262,6 +265,8 @@ uint32 AsScene3009VerticalIndicator::handleMessage(int messageNum, const Message
 		}
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -292,6 +297,8 @@ uint32 AsScene3009HorizontalIndicator::handleMessage(int messageNum, const Messa
 		}
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -299,7 +306,7 @@ uint32 AsScene3009HorizontalIndicator::handleMessage(int messageNum, const Messa
 void AsScene3009HorizontalIndicator::suMoveLeft() {
 	_x -= 6;
 	if (_x < 92) {
-		SetSpriteUpdate(NULL);
+		SetSpriteUpdate(nullptr);
 		_x = 92;
 	}
 }
@@ -307,7 +314,7 @@ void AsScene3009HorizontalIndicator::suMoveLeft() {
 void AsScene3009HorizontalIndicator::suMoveRight() {
 	_x += 6;
 	if (_x > 533) {
-		SetSpriteUpdate(NULL);
+		SetSpriteUpdate(nullptr);
 		_x = 533;
 	}
 }
@@ -373,6 +380,8 @@ uint32 AsScene3009Symbol::handleMessage(int messageNum, const MessageParam &para
 			sendMessage(_parentScene, 0x2003, 0);
 		}
 		messageResult = 1;
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -472,6 +481,8 @@ uint32 SsScene3010DeadBoltButton::handleMessage(int messageNum, const MessagePar
 		}
 		messageResult = 1;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -531,6 +542,8 @@ uint32 AsScene3010DeadBolt::hmAnimation(int messageNum, const MessageParam &para
 	switch (messageNum) {
 	case NM_ANIMATION_STOP:
 		gotoNextState();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -661,6 +674,8 @@ uint32 SsScene3011Button::handleMessage(int messageNum, const MessageParam &para
 			playSound(0);
 		}
 		messageResult = 1;
+		break;
+	default:
 		break;
 	}
 	return messageResult;

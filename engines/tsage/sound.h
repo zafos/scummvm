@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -190,10 +189,10 @@ public:
 	bool _soTimeIndexFlag;
 public:
 	SoundManager();
-	~SoundManager();
+	~SoundManager() override;
 
 	void dispatch();
-	virtual void listenerSynchronize(Serializer &s);
+	void listenerSynchronize(Serializer &s) override;
 	virtual void postInit();
 	void syncSounds();
 
@@ -311,9 +310,9 @@ public:
 	byte *_remoteReceiver;
 public:
 	Sound();
-	~Sound();
+	~Sound() override;
 
-	void synchronize(Serializer &s);
+	void synchronize(Serializer &s) override;
 	void orientAfterRestore();
 
 	void play(int soundResID);
@@ -371,9 +370,9 @@ public:
 	int _cueValue;
 
 	ASound();
-	~ASound();
-	virtual void synchronize(Serializer &s);
-	virtual void dispatch();
+	~ASound() override;
+	void synchronize(Serializer &s) override;
+	void dispatch() override;
 
 	void play(int soundNum, EventHandler *endAction = NULL, int volume = 127);
 	void stop();
@@ -411,9 +410,9 @@ public:
 	void fadeOut2(EventHandler *endAction);
 	void changeSound(int soundNum);
 
-	virtual Common::String getClassName() { return "ASoundExt"; }
-	virtual void synchronize(Serializer &s);
-	virtual void signal();
+	Common::String getClassName() override { return "ASoundExt"; }
+	void synchronize(Serializer &s) override;
+	void signal() override;
 };
 
 class PlayStream: public EventHandler {
@@ -437,15 +436,15 @@ private:
 	static uint32 getFileOffset(const uint16 *data, int count, int voiceNum);
 public:
 	PlayStream();
-	virtual ~PlayStream();
+	~PlayStream() override;
 
 	bool setFile(const Common::String &filename);
 	bool play(int voiceNum, EventHandler *endAction);
 	void stop();
 	bool isPlaying() const;
 
-	virtual void remove();
-	virtual void dispatch();
+	void remove() override;
+	void dispatch() override;
 };
 
 #define ADLIB_CHANNEL_COUNT 9
@@ -481,18 +480,18 @@ private:
 	void setFrequency(int channel);
 public:
 	AdlibSoundDriver();
-	virtual ~AdlibSoundDriver();
+	~AdlibSoundDriver() override;
 
-	virtual bool open();
-	virtual void close();
-	virtual bool reset();
-	virtual const GroupData *getGroupData();
-	virtual void installPatch(const byte *data, int size);
-	virtual int setMasterVolume(int volume);
-	virtual void playSound(const byte *channelData, int dataOffset, int program, int channel, int v0, int v1);
-	virtual void updateVoice(int channel);
-	virtual void proc38(int channel, int cmd, int value);
-	virtual void setPitch(int channel, int pitchBlend);
+	bool open() override;
+	void close() override;
+	bool reset() override;
+	const GroupData *getGroupData() override;
+	void installPatch(const byte *data, int size) override;
+	int setMasterVolume(int volume) override;
+	void playSound(const byte *channelData, int dataOffset, int program, int channel, int v0, int v1) override;
+	void updateVoice(int channel) override;
+	void proc38(int channel, int cmd, int value) override;
+	void setPitch(int channel, int pitchBlend) override;
 
 private:
 	void onTimer();
@@ -511,17 +510,17 @@ private:
 	const byte *_channelData;
 public:
 	SoundBlasterDriver();
-	virtual ~SoundBlasterDriver();
+	~SoundBlasterDriver() override;
 
-	virtual bool open();
-	virtual void close();
-	virtual bool reset();
-	virtual const GroupData *getGroupData();
-	virtual int setMasterVolume(int volume);
-	virtual void playSound(const byte *channelData, int dataOffset, int program, int channel, int v0, int v1);
-	virtual void updateVoice(int channel);
-	virtual void proc38(int channel, int cmd, int value);
-	virtual void proc42(int channel, int cmd, int value, int *v1, int *v2);
+	bool open() override;
+	void close() override;
+	bool reset() override;
+	const GroupData *getGroupData() override;
+	int setMasterVolume(int volume) override;
+	void playSound(const byte *channelData, int dataOffset, int program, int channel, int v0, int v1) override;
+	void updateVoice(int channel) override;
+	void proc38(int channel, int cmd, int value) override;
+	void proc42(int channel, int cmd, int value, int *v1, int *v2) override;
 };
 
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -53,23 +52,23 @@ void SetEffects::read(Common::ReadStream *stream, int frameCount) {
 
 	_fogCount = stream->readUint32LE();
 	int i;
-	for (i = 0; i < _fogCount; i++) {
+	for (i = 0; i < _fogCount; ++i) {
 		int type = stream->readUint32LE();
 		Fog *fog = nullptr;
 		switch (type) {
 		case 0:
-			fog = new FogCone();
+			fog = new FogSphere();
 			break;
 		case 1:
-			fog = new FogSphere();
+			fog = new FogCone();
 			break;
 		case 2:
 			fog = new FogBox();
 			break;
+		default:
+			error("Unknown fog type %d", type);
 		}
-		if (!fog) {
-			//TODO exception, unknown fog type
-		} else {
+		if (fog != nullptr) {
 			fog->read(stream, frameCount);
 			fog->_next = _fogs;
 			_fogs = fog;
@@ -92,6 +91,9 @@ void SetEffects::reset() {
 }
 
 void SetEffects::setupFrame(int frame) {
+	for (Fog *fog = _fogs; fog != nullptr; fog = fog->_next) {
+		fog->setupFrame(frame);
+	}
 }
 
 void SetEffects::setFadeColor(float r, float g, float b) {
@@ -104,6 +106,10 @@ void SetEffects::setFadeDensity(float density) {
 	_fadeDensity = density;
 }
 
+/**
+* Set fog color for fog effect named fogName.
+* RGB arguments are percentages of red, green and blue
+*/
 void SetEffects::setFogColor(const Common::String &fogName, float r, float g, float b) {
 	Fog *fog = findFog(fogName);
 	if (fog == nullptr) {

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -37,18 +36,17 @@ class UIInputBox : public UIComponent {
 	bool                 _isVisible;
 	Common::Rect         _rect;
 
-	int                  _maxLength;
-	int                  _length;
+	uint                 _maxLength;
 	Common::String       _text;
 
 	bool                 _cursorIsVisible;
 
-	int                  _timeLast;
+	uint32               _timeLast;
 
 public:
 	UIInputBox(BladeRunnerEngine *vm, UIComponentCallback *valueChangedCallback, void *callbackData, Common::Rect rect, int maxLength, const Common::String &text);
 
-	void draw(Graphics::Surface &surface);
+	void draw(Graphics::Surface &surface) override;
 
 	void setText(const Common::String &text);
 	const Common::String &getText();
@@ -56,10 +54,12 @@ public:
 	void show();
 	void hide();
 
-	void handleKeyUp(const Common::KeyState &kbd);
+	void handleKeyDown(const Common::KeyState &kbd) override;
+	void handleCustomEventStart(const Common::Event &evt) override;
 
 private:
-	bool charIsValid(const Common::KeyState &kbd);
+	bool getValidChar(const uint16 &kc16bit, uint8 &kc8bit);
+	bool charIsValid(const uint8 &kc16bit);
 };
 
 } // End of namespace BladeRunner

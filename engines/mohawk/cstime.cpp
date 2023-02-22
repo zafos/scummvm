@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -52,7 +51,6 @@ MohawkEngine_CSTime::MohawkEngine_CSTime(OSystem *syst, const MohawkGameDescript
 
 	reset();
 
-	_console = 0;
 	_gfx = 0;
 	_video = 0;
 	_sound = 0;
@@ -67,7 +65,6 @@ MohawkEngine_CSTime::MohawkEngine_CSTime(OSystem *syst, const MohawkGameDescript
 MohawkEngine_CSTime::~MohawkEngine_CSTime() {
 	delete _interface;
 	delete _view;
-	delete _console;
 	delete _sound;
 	delete _video;
 	delete _gfx;
@@ -77,7 +74,11 @@ MohawkEngine_CSTime::~MohawkEngine_CSTime() {
 Common::Error MohawkEngine_CSTime::run() {
 	MohawkEngine::run();
 
-	_console = new CSTimeConsole(this);
+	if (!_mixer->isReady()) {
+		return Common::kAudioDeviceInitFailed;
+	}
+
+	setDebugger(new CSTimeConsole(this));
 	_gfx = new CSTimeGraphics(this);
 	_video = new VideoManager(this);
 	_sound = new Sound(this);
@@ -108,6 +109,9 @@ Common::Error MohawkEngine_CSTime::run() {
 
 		case kCSTStateNormal:
 			update();
+			break;
+
+		default:
 			break;
 		}
 	}
@@ -149,13 +153,6 @@ void MohawkEngine_CSTime::update() {
 
 		case Common::EVENT_KEYDOWN:
 			switch (event.kbd.keycode) {
-			case Common::KEYCODE_d:
-				if (event.kbd.flags & Common::KBD_CTRL) {
-					_console->attach();
-					_console->onFrame();
-				}
-				break;
-
 			case Common::KEYCODE_SPACE:
 				pauseGame();
 				break;

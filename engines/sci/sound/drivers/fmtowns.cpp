@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,7 +27,7 @@
 
 #include "audio/softsynth/fmtowns_pc98/towns_audio.h"
 
-#include "sci/resource.h"
+#include "sci/resource/resource.h"
 #include "sci/sound/drivers/mididriver.h"
 
 namespace Sci {
@@ -98,27 +97,25 @@ friend class TownsChannel;
 friend class TownsMidiPart;
 public:
 	MidiDriver_FMTowns(Audio::Mixer *mixer, SciVersion version);
-	~MidiDriver_FMTowns();
+	~MidiDriver_FMTowns() override;
 
-	int open();
+	int open() override;
 	void loadInstruments(const SciSpan<const uint8> &data);
-	bool isOpen() const { return _isOpen; }
-	void close();
+	bool isOpen() const override { return _isOpen; }
+	void close() override;
 
-	void send(uint32 b);
+	void send(uint32 b) override;
 
-	uint32 property(int prop, uint32 param);
-	void setTimerCallback(void *timer_param, Common::TimerManager::TimerProc timer_proc);
+	uint32 property(int prop, uint32 param) override;
+	void setTimerCallback(void *timer_param, Common::TimerManager::TimerProc timer_proc) override;
 
 	void setSoundOn(bool toggle);
 
-	uint32 getBaseTempo();
-	MidiChannel *allocateChannel() { return 0; }
-	MidiChannel *getPercussionChannel() { return 0; }
+	uint32 getBaseTempo() override;
+	MidiChannel *allocateChannel() override { return nullptr; }
+	MidiChannel *getPercussionChannel() override { return nullptr; }
 
-	uint8 currentProgram();
-
-	void timerCallback(int timerId);
+	void timerCallback(int timerId) override;
 
 private:
 	int getChannelVolume(uint8 midiPart);
@@ -149,14 +146,14 @@ private:
 class MidiPlayer_FMTowns : public MidiPlayer {
 public:
 	MidiPlayer_FMTowns(SciVersion version);
-	~MidiPlayer_FMTowns();
+	~MidiPlayer_FMTowns() override;
 
-	int open(ResourceManager *resMan);
+	int open(ResourceManager *resMan) override;
 
-	bool hasRhythmChannel() const;
-	byte getPlayId() const;
-	int getPolyphony() const;
-	void playSwitch(bool play);
+	bool hasRhythmChannel() const override;
+	byte getPlayId() const override;
+	int getPolyphony() const override;
+	void playSwitch(bool play) override;
 
 private:
 	MidiDriver_FMTowns *_townsDriver;
@@ -329,6 +326,8 @@ void TownsMidiPart::addChannels(int num) {
 
 	_chanMissing += num;
 	programChange(_program);
+	pitchBend(_pitchBend);
+	controlChangeVolume(_volume << 1);
 }
 
 void TownsMidiPart::dropChannels(int num) {
@@ -404,7 +403,7 @@ int TownsMidiPart::allocateChannel() {
 	return chan;
 }
 
-MidiDriver_FMTowns::MidiDriver_FMTowns(Audio::Mixer *mixer, SciVersion version) : _version(version), _timerProc(0), _timerProcPara(0), _baseTempo(10080), _ready(false), _isOpen(false), _masterVolume(0x0f), _soundOn(true) {
+MidiDriver_FMTowns::MidiDriver_FMTowns(Audio::Mixer *mixer, SciVersion version) : _version(version), _timerProc(nullptr), _timerProcPara(nullptr), _baseTempo(10080), _ready(false), _isOpen(false), _masterVolume(0x0f), _soundOn(true) {
 	_intf = new TownsAudioInterface(mixer, this, true);
 	_out = new TownsChannel*[6];
 	for (int i = 0; i < 6; i++)
@@ -420,19 +419,19 @@ MidiDriver_FMTowns::~MidiDriver_FMTowns() {
 	if (_parts) {
 		for (int i = 0; i < 16; i++) {
 			delete _parts[i];
-			_parts[i] = 0;
+			_parts[i] = nullptr;
 		}
 		delete[] _parts;
-		_parts = 0;
+		_parts = nullptr;
 	}
 
 	if (_out) {
 		for (int i = 0; i < 6; i++) {
 			delete _out[i];
-			_out[i] = 0;
+			_out[i] = nullptr;
 		}
 		delete[] _out;
-		_out = 0;
+		_out = nullptr;
 	}
 }
 
@@ -640,7 +639,12 @@ byte MidiPlayer_FMTowns::getPlayId() const {
 }
 
 int MidiPlayer_FMTowns::getPolyphony() const {
-	return (_version == SCI_VERSION_1_EARLY) ? 1 : 6;
+	// WORKAROUND:
+	// I set the return value to 16 for SCI_VERSION_1_EARLY here, which fixes music playback in Mixed Up Mothergoose.
+	// This has been broken since the introduction of SciMusic::remapChannels() and the corresponding code.
+	// The original code of Mixed Up Mothergoose code doesn't have the remapping and doesn't seem to check the polyphony
+	// setting ever. So the value of 1 was probably incorrect.
+	return (_version == SCI_VERSION_1_EARLY) ? 16 : 6;
 }
 
 void MidiPlayer_FMTowns::playSwitch(bool play) {

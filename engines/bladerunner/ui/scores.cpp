@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,6 +26,7 @@
 #include "bladerunner/savefile.h"
 #include "bladerunner/scene.h"
 #include "bladerunner/text_resource.h"
+#include "bladerunner/time.h"
 #include "bladerunner/vqa_player.h"
 
 #include "common/keyboard.h"
@@ -50,22 +50,20 @@ void Scores::open() {
 		return;
 	}
 
-	_vqaPlayer = new VQAPlayer(_vm, &_vm->_surfaceBack);
+	_vqaPlayer = new VQAPlayer(_vm, &_vm->_surfaceBack, "SCORE.VQA");
 
-	if (!_vqaPlayer->open("SCORE.VQA")) {
+	if (!_vqaPlayer->open()) {
 		return;
 	}
 
 	_vqaPlayer->setLoop(1, -1, 0, nullptr, nullptr);
 
-	// TODO: Freeze game time
+	_vm->_time->pause();
 
 	_txtScorers = new TextResource(_vm);
 	_txtScorers->open("SCORERS");
 
-	_font = new Font(_vm);
-	_font->open("TAHOMA24.FON", 640, 480, -1, 0, 0);
-	_font->setSpacing(1, 0);
+	_font = Font::load(_vm, "TAHOMA24.FON", 1, true);
 
 	fill();
 
@@ -94,7 +92,7 @@ void Scores::close() {
 
 	_vm->closeArchive("MODE.MIX");
 
-	// TODO: Unfreeze game time
+	_vm->_time->resume();
 	_vm->_scene->resume();
 }
 
@@ -105,6 +103,10 @@ void Scores::set(int index, int value) {
 
 	_lastScoreId = index;
 	_lastScoreValue = value;
+}
+
+void Scores::handleCustomEventStart(const Common::Event &evt) {
+	close();
 }
 
 void Scores::handleKeyDown(const Common::KeyState &kbd) {
@@ -128,7 +130,7 @@ int Scores::handleMouseDown(int x, int y) {
 }
 
 void Scores::tick() {
-	if (!_vm->_gameIsRunning) {
+	if (!_vm->_windowIsActive) {
 		return;
 	}
 
@@ -138,29 +140,29 @@ void Scores::tick() {
 	// vqaPlayer renders to _surfaceBack
 	blit(_vm->_surfaceBack, _vm->_surfaceFront);
 
-	_vm->_surfaceFront.hLine(200, 139, 400, 0x3e0);
-	_vm->_surfaceFront.hLine(200, 347, 400, 0x1f);
+	_vm->_surfaceFront.hLine(200, 139, 400, _vm->_surfaceFront.format.RGBToColor(0, 248, 0));
+	_vm->_surfaceFront.hLine(200, 347, 400, _vm->_surfaceFront.format.RGBToColor(0, 0, 248));
 
-	_font->draw(_txtScorers->getText(7), _vm->_surfaceFront, 200, 114);
+	_font->drawString(&_vm->_surfaceFront, _txtScorers->getText(7), 200, 114, _vm->_surfaceFront.w, 0);
 
 	int y = 140;
 
-	for (int i = 0; i < 7; i++) {
-		_font->draw(_txtScorers->getText(_scorers[i]), _vm->_surfaceFront, 220, y);
-		_font->drawNumber(_scores[_scorers[i]], _vm->_surfaceFront, 360, y);
+	for (int i = 0; i < 7; ++i) {
+		_font->drawString(&_vm->_surfaceFront, _txtScorers->getText(_scorers[i]), 220, y, _vm->_surfaceFront.w, 0);
+		_font->drawString(&_vm->_surfaceFront, Common::String::format("%d", _scores[_scorers[i]]), 360, y, _vm->_surfaceFront.w, 0);
 
 		y += 26;
 	}
 
-	_font->draw(_txtScorers->getText(8), _vm->_surfaceFront, 200, 322);
-	_font->draw(_txtScorers->getText(_lastScoreId), _vm->_surfaceFront, 220, 348);
-	_font->drawNumber(_lastScoreValue, _vm->_surfaceFront, 360, 348);
+	_font->drawString(&_vm->_surfaceFront, _txtScorers->getText(8), 200, 322, _vm->_surfaceFront.w, 0);
+	_font->drawString(&_vm->_surfaceFront, _txtScorers->getText(_lastScoreId), 220, 348, _vm->_surfaceFront.w, 0);
+	_font->drawString(&_vm->_surfaceFront, Common::String::format("%d", _lastScoreValue), 360, 348, _vm->_surfaceFront.w, 0);
 
 	_vm->blitToScreen(_vm->_surfaceFront);
 }
 
 void Scores::fill() {
-	for (int i = 0; i < 7; i++) {
+	for (int i = 0; i < 7; ++i) {
 		_scorers[i] = i;
 	}
 
@@ -188,7 +190,7 @@ void Scores::reset() {
 	_isLoaded = false;
 	_vqaPlayer = nullptr;
 
-	for (int i = 0; i < 7; i++) {
+	for (int i = 0; i < 7; ++i) {
 		_scores[i] = -80;
 		_scorers[i] = 0;
 	}
@@ -198,7 +200,7 @@ void Scores::reset() {
 }
 
 void Scores::save(SaveFileWriteStream &f) {
-	for (int i = 0; i < 7; i++) {
+	for (int i = 0; i < 7; ++i) {
 		f.writeInt(_scores[i]);
 	}
 
@@ -207,7 +209,7 @@ void Scores::save(SaveFileWriteStream &f) {
 }
 
 void Scores::load(SaveFileReadStream &f) {
-	for (int i = 0; i < 7; i++) {
+	for (int i = 0; i < 7; ++i) {
 		_scores[i] = f.readInt();
 	}
 

@@ -8,6 +8,14 @@ MODULE_OBJS := \
 	events/default/default-events.o \
 	fs/abstract-fs.o \
 	fs/stdiostream.o \
+	keymapper/action.o \
+	keymapper/hardware-input.o \
+	keymapper/input-watcher.o \
+	keymapper/keymap.o \
+	keymapper/keymapper.o \
+	keymapper/remap-widget.o \
+	keymapper/standard-actions.o \
+	keymapper/virtual-mouse.o \
 	log/log.o \
 	midi/alsa.o \
 	midi/dmedia.o \
@@ -23,6 +31,7 @@ ifdef USE_CLOUD
 
 ifdef USE_LIBCURL
 MODULE_OBJS += \
+	cloud/basestorage.o \
 	cloud/cloudicon.o \
 	cloud/cloudmanager.o \
 	cloud/iso8601.o \
@@ -39,6 +48,7 @@ MODULE_OBJS += \
 	cloud/dropbox/dropboxcreatedirectoryrequest.o \
 	cloud/dropbox/dropboxinforequest.o \
 	cloud/dropbox/dropboxlistdirectoryrequest.o \
+	cloud/dropbox/dropboxtokenrefresher.o \
 	cloud/dropbox/dropboxuploadrequest.o \
 	cloud/googledrive/googledrivelistdirectorybyidrequest.o \
 	cloud/googledrive/googledrivestorage.o \
@@ -64,7 +74,10 @@ MODULE_OBJS += \
 	networking/curl/networkreadstream.o \
 	networking/curl/curlrequest.o \
 	networking/curl/curljsonrequest.o \
-	networking/curl/request.o
+	networking/curl/postrequest.o \
+	networking/curl/request.o \
+	networking/curl/session.o \
+	networking/curl/sessionrequest.o
 endif
 
 ifdef USE_SDL_NET
@@ -98,15 +111,6 @@ MODULE_OBJS += \
 	plugins/elf/version.o
 endif
 
-ifdef ENABLE_KEYMAPPER
-MODULE_OBJS += \
-	keymapper/action.o \
-	keymapper/hardware-input.o \
-	keymapper/keymap.o \
-	keymapper/keymapper.o \
-	keymapper/remap-dialog.o
-endif
-
 ifdef ENABLE_VKEYBD
 MODULE_OBJS += \
 	vkeybd/image-map.o \
@@ -119,8 +123,6 @@ endif
 # OpenGL specific source files.
 ifdef USE_OPENGL
 MODULE_OBJS += \
-	graphics/opengl/context.o \
-	graphics/opengl/debug.o \
 	graphics/opengl/framebuffer.o \
 	graphics/opengl/opengl-graphics.o \
 	graphics/opengl/shader.o \
@@ -128,6 +130,8 @@ MODULE_OBJS += \
 	graphics/opengl/pipelines/clut8.o \
 	graphics/opengl/pipelines/fixed.o \
 	graphics/opengl/pipelines/pipeline.o \
+	graphics/opengl/pipelines/libretro.o \
+	graphics/opengl/pipelines/libretro/parser.o \
 	graphics/opengl/pipelines/shader.o
 endif
 
@@ -136,13 +140,19 @@ endif
 # derive from the SDL backend, and they all need the following files.
 ifdef SDL_BACKEND
 MODULE_OBJS += \
+	events/sdl/legacy-sdl-events.o \
 	events/sdl/sdl-events.o \
 	graphics/sdl/sdl-graphics.o \
 	graphics/surfacesdl/surfacesdl-graphics.o \
 	mixer/sdl/sdl-mixer.o \
 	mutex/sdl/sdl-mutex.o \
-	plugins/sdl/sdl-provider.o \
 	timer/sdl/sdl-timer.o
+
+ifndef RISCOS
+ifndef KOLIBRIOS
+MODULE_OBJS += plugins/sdl/sdl-provider.o
+endif
+endif
 
 # SDL 2 removed audio CD support
 ifndef USE_SDL2
@@ -152,42 +162,80 @@ endif
 
 ifdef USE_OPENGL
 MODULE_OBJS += \
-	graphics/openglsdl/openglsdl-graphics.o
+	graphics3d/opengl/framebuffer.o \
+	graphics3d/opengl/surfacerenderer.o \
+	graphics3d/opengl/texture.o \
+	graphics3d/opengl/tiledsurface.o
+ifdef SDL_BACKEND
+MODULE_OBJS += \
+	graphics/openglsdl/openglsdl-graphics.o \
+	graphics3d/openglsdl/openglsdl-graphics3d.o
 endif
 endif
 
-# Connection::isLimited
-ifeq ($(BACKEND),android)
+ifdef USE_DISCORD
 MODULE_OBJS += \
-	networking/connection/islimited-android.o
-else
+	presence/discord/discord.o
+endif
+endif
+
+ifdef KOLIBRIOS
 MODULE_OBJS += \
-	networking/connection/islimited-default.o
+	fs/kolibrios/kolibrios-fs.o \
+	fs/kolibrios/kolibrios-fs-factory.o \
+	fs/posix/posix-iostream.o \
+	plugins/kolibrios/kolibrios-provider.o \
+	saves/kolibrios/kolibrios-saves.o
 endif
 
 ifdef POSIX
 MODULE_OBJS += \
 	fs/posix/posix-fs.o \
 	fs/posix/posix-fs-factory.o \
+	fs/posix/posix-iostream.o \
+	fs/posix-drives/posix-drives-fs.o \
+	fs/posix-drives/posix-drives-fs-factory.o \
 	fs/chroot/chroot-fs-factory.o \
 	fs/chroot/chroot-fs.o \
 	plugins/posix/posix-provider.o \
 	saves/posix/posix-saves.o \
-	taskbar/unity/unity-taskbar.o
+	taskbar/unity/unity-taskbar.o \
+	dialogs/gtk/gtk-dialogs.o
+
+ifdef USE_SPEECH_DISPATCHER
+ifdef USE_TTS
+MODULE_OBJS += \
+	text-to-speech/linux/linux-text-to-speech.o
+endif
+endif
+
 endif
 
 ifdef MACOSX
 MODULE_OBJS += \
 	audiocd/macosx/macosx-audiocd.o \
+	dialogs/macosx/macosx-dialogs.o \
 	midi/coreaudio.o \
 	midi/coremidi.o \
 	updates/macosx/macosx-updates.o \
 	taskbar/macosx/macosx-taskbar.o
+
+ifdef USE_TTS
+MODULE_OBJS += \
+	text-to-speech/macosx/macosx-text-to-speech.o
+endif
+
+ifdef SDL_BACKEND
+MODULE_OBJS += \
+	plugins/sdl/macosx/macosx-provider.o
+endif
+
 endif
 
 ifdef WIN32
 MODULE_OBJS += \
 	audiocd/win32/win32-audiocd.o \
+	dialogs/win32/win32-dialogs.o \
 	fs/windows/windows-fs.o \
 	fs/windows/windows-fs-factory.o \
 	midi/windows.o \
@@ -195,31 +243,70 @@ MODULE_OBJS += \
 	saves/windows/windows-saves.o \
 	updates/win32/win32-updates.o \
 	taskbar/win32/win32-taskbar.o
+
+ifdef USE_TTS
+MODULE_OBJS += \
+	text-to-speech/windows/windows-text-to-speech.o
 endif
 
-ifeq ($(BACKEND),androidsdl)
+endif
+
+ifeq ($(BACKEND),3ds)
 MODULE_OBJS += \
-	events/androidsdl/androidsdl-events.o \
-	graphics/androidsdl/androidsdl-graphics.o
+	mutex/3ds/3ds-mutex.o
+endif
+
+ifeq ($(BACKEND),android)
+MODULE_OBJS += \
+	fs/android/android-fs-factory.o \
+	fs/android/android-posix-fs.o \
+	fs/android/android-saf-fs.o \
+	graphics/android/android-graphics.o \
+	graphics3d/android/android-graphics3d.o \
+	graphics3d/android/texture.o \
+	graphics3d/opengl/framebuffer.o \
+	graphics3d/opengl/surfacerenderer.o \
+	graphics3d/opengl/texture.o \
+	graphics3d/opengl/tiledsurface.o \
+	mutex/pthread/pthread-mutex.o
 endif
 
 ifdef AMIGAOS
 MODULE_OBJS += \
-	fs/amigaos4/amigaos4-fs.o \
-	fs/amigaos4/amigaos4-fs-factory.o \
+	dialogs/amigaos/amigaos-dialogs.o \
+	fs/amigaos/amigaos-fs.o \
+	fs/amigaos/amigaos-fs-factory.o \
+	midi/camd.o
+endif
+
+ifdef MORPHOS
+MODULE_OBJS += \
+	fs/morphos/morphos-fs.o \
+	fs/morphos/morphos-fs-factory.o \
+	dialogs/morphos/morphos-dialogs.o \
 	midi/camd.o
 endif
 
 ifdef RISCOS
 MODULE_OBJS += \
+	events/riscossdl/riscossdl-events.o \
+	graphics/riscossdl/riscossdl-graphics.o \
 	fs/riscos/riscos-fs.o \
-	fs/riscos/riscos-fs-factory.o
+	fs/riscos/riscos-fs-factory.o \
+	midi/riscos.o \
+	plugins/riscos/riscos-provider.o
+ifndef SDL_BACKEND
+# This is needed for null backend but already included in SDL backend
+MODULE_OBJS += \
+	platform/sdl/riscos/riscos-utils.o
+endif
 endif
 
 ifdef PLAYSTATION3
 MODULE_OBJS += \
 	fs/posix/posix-fs.o \
 	fs/posix/posix-fs-factory.o \
+	fs/posix/posix-iostream.o \
 	fs/ps3/ps3-fs-factory.o \
 	events/ps3sdl/ps3sdl-events.o
 endif
@@ -229,22 +316,27 @@ MODULE_OBJS += \
 	audiocd/linux/linux-audiocd.o
 endif
 
-ifeq ($(BACKEND),tizen)
+ifeq ($(BACKEND),3ds)
 MODULE_OBJS += \
-	timer/tizen/timer.o
+	plugins/3ds/3ds-provider.o
 endif
 
 ifeq ($(BACKEND),ds)
 MODULE_OBJS += \
-	fs/ds/ds-fs.o \
-	fs/ds/ds-fs-factory.o \
+	events/ds/ds-events.o \
+	fs/posix/posix-fs.o \
+	fs/posix/posix-fs-factory.o \
+	fs/posix/posix-iostream.o \
+	fs/posix-drives/posix-drives-fs.o \
+	fs/posix-drives/posix-drives-fs-factory.o \
+	fs/devoptab/devoptab-fs-factory.o \
+	mixer/maxmod/maxmod-mixer.o \
 	plugins/ds/ds-provider.o
 endif
 
 ifeq ($(BACKEND),dingux)
 MODULE_OBJS += \
-	events/dinguxsdl/dinguxsdl-events.o \
-	graphics/dinguxsdl/dinguxsdl-graphics.o
+	events/dinguxsdl/dinguxsdl-events.o
 endif
 
 ifeq ($(BACKEND),gph)
@@ -253,10 +345,9 @@ MODULE_OBJS += \
 	graphics/gph/gph-graphics.o
 endif
 
-ifeq ($(BACKEND),linuxmoto)
+ifdef IPHONE
 MODULE_OBJS += \
-	events/linuxmotosdl/linuxmotosdl-events.o \
-	graphics/linuxmotosdl/linuxmotosdl-graphics.o
+	mutex/pthread/pthread-mutex.o
 endif
 
 ifeq ($(BACKEND),maemo)
@@ -272,17 +363,27 @@ MODULE_OBJS += \
 	fs/n64/romfsstream.o
 endif
 
+ifeq ($(BACKEND),null)
+MODULE_OBJS += \
+	mixer/null/null-mixer.o
+endif
+
+ifdef MIYOO
+ifeq ($(MIYOO_TARGET), miyoomini)
+MODULE_OBJS += \
+	graphics/miyoo/miyoomini-graphics.o
+endif
+endif
+
+ifdef OPENDINGUX
+MODULE_OBJS += \
+	graphics/opendingux/opendingux-graphics.o
+endif
+
 ifeq ($(BACKEND),openpandora)
 MODULE_OBJS += \
 	events/openpandora/op-events.o \
 	graphics/openpandora/op-graphics.o
-endif
-
-ifeq ($(BACKEND),ps2)
-MODULE_OBJS += \
-	fs/ps2/ps2-fs.o \
-	fs/ps2/ps2-fs-factory.o \
-	plugins/ps2/ps2-provider.o
 endif
 
 ifeq ($(BACKEND),psp)
@@ -291,50 +392,40 @@ MODULE_OBJS += \
 	fs/psp/psp-fs-factory.o \
 	fs/psp/psp-stream.o \
 	plugins/psp/psp-provider.o \
-	saves/psp/psp-saves.o \
 	timer/psp/timer.o
 endif
 
 ifeq ($(BACKEND),psp2)
 MODULE_OBJS += \
 	fs/posix/posix-fs.o \
-	fs/psp2/psp2-fs-factory.o \
-	fs/psp2/psp2-dirent.o \
-	events/psp2sdl/psp2sdl-events.o \
-	graphics/psp2sdl/psp2sdl-graphics.o
+	fs/posix/posix-iostream.o \
+	fs/posix-drives/posix-drives-fs.o \
+	fs/posix-drives/posix-drives-fs-factory.o \
+	plugins/psp2/psp2-provider.o \
+	events/psp2sdl/psp2sdl-events.o
 endif
 
 ifeq ($(BACKEND),samsungtv)
 MODULE_OBJS += \
-	events/samsungtvsdl/samsungtvsdl-events.o \
-	graphics/samsungtvsdl/samsungtvsdl-graphics.o
-endif
-
-ifeq ($(BACKEND),webos)
-MODULE_OBJS += \
-	events/webossdl/webossdl-events.o
-endif
-
-ifeq ($(BACKEND),wince)
-MODULE_OBJS += \
-	events/wincesdl/wincesdl-events.o \
-	fs/windows/windows-fs.o \
-	fs/windows/windows-fs-factory.o \
-	graphics/wincesdl/wincesdl-graphics.o \
-	mixer/wincesdl/wincesdl-mixer.o \
-	plugins/win32/win32-provider.o
+	events/samsungtvsdl/samsungtvsdl-events.o
 endif
 
 ifeq ($(BACKEND),wii)
 MODULE_OBJS += \
 	fs/wii/wii-fs.o \
 	fs/wii/wii-fs-factory.o \
+	mutex/wii/wii-mutex.o \
 	plugins/wii/wii-provider.o
+endif
+
+ifeq ($(BACKEND),switch)
+MODULE_OBJS += \
+	events/switchsdl/switchsdl-events.o
 endif
 
 ifdef ENABLE_EVENTRECORDER
 MODULE_OBJS += \
-	mixer/nullmixer/nullsdl-mixer.o \
+	mixer/null/null-mixer.o \
 	saves/recorder/recorder-saves.o
 endif
 

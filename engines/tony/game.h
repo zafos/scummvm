@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -184,10 +183,10 @@ public:
 public:
 	RMOptionButton(uint32 dwRes, RMPoint pt, bool bDoubleState = false);
 	RMOptionButton(const RMRect &pt);
-	virtual ~RMOptionButton();
+	~RMOptionButton() override;
 
 	bool doFrame(const RMPoint &mousePos, bool bLeftClick, bool bRightClick);
-	virtual void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim);
+	void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim) override;
 	void addToList(RMGfxTargetBuffer &bigBuf);
 	bool isActive();
 	void setActiveState(bool bState);
@@ -209,10 +208,10 @@ private:
 
 public:
 	RMOptionSlide(const RMPoint &pt, int m_nRange = 100, int m_nStartValue = 0, int slideSize = 300);
-	virtual ~RMOptionSlide();
+	~RMOptionSlide() override;
 
 	bool doFrame(const RMPoint &mousePos, bool bLeftClick, bool bRightClick);
-	virtual void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim);
+	void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim) override;
 	void addToList(RMGfxTargetBuffer &bigBuf);
 
 	int getValue();
@@ -298,7 +297,7 @@ private:
 
 public:
 	RMOptionScreen();
-	virtual ~RMOptionScreen();
+	~RMOptionScreen() override;
 
 	using RMGfxWoodyBuffer::init;
 	void init(CORO_PARAM, RMGfxTargetBuffer &bigBuf, bool &result);
@@ -310,9 +309,9 @@ public:
 	bool isClosing();
 
 	// Overloaded methods
-	virtual int priority();
-	virtual void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim);
-	virtual void removeThis(CORO_PARAM, bool &result);
+	int priority() override;
+	void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim) override;
+	void removeThis(CORO_PARAM, bool &result) override;
 
 	/**
 	 * Polling for the option screen

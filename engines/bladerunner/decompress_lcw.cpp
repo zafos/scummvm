@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,7 +27,7 @@ namespace BladeRunner {
 
 uint32 decompress_lcw(uint8 *inBuf, uint32 inLen, uint8 *outBuf, uint32 outLen) {
 	int version = 1;
-	int count, i, color, pos, relpos, out_remain;
+	int count, i, color, pos, relpos;
 
 	uint8 *src = inBuf;
 	uint8 *dst = outBuf;
@@ -40,7 +39,7 @@ uint32 decompress_lcw(uint8 *inBuf, uint32 inLen, uint8 *outBuf, uint32 outLen) 
 	}
 
 	while (src < inBuf + inLen && dst < outEnd && src[0] != 0x80) {
-		out_remain = (int)(outEnd - dst);
+		int out_remain = (int)(outEnd - dst);
 
 		if (src[0] == 0xff) {     // 0b11111111
 			count = src[1] | (src[2] << 8);
@@ -49,10 +48,10 @@ uint32 decompress_lcw(uint8 *inBuf, uint32 inLen, uint8 *outBuf, uint32 outLen) 
 			count = MIN(count, out_remain);
 
 			if (version == 1) {
-				for (i = 0; i < count; i++)
+				for (i = 0; i < count; ++i)
 					dst[i] = outBuf[i + pos];
 			} else {
-				for (i = 0; i < count; i++)
+				for (i = 0; i < count; ++i)
 					dst[i] = *(dst + i - pos);
 			}
 		} else if (src[0] == 0xfe) { // 0b11111110
@@ -69,10 +68,10 @@ uint32 decompress_lcw(uint8 *inBuf, uint32 inLen, uint8 *outBuf, uint32 outLen) 
 			count = MIN(count, out_remain);
 
 			if (version == 1) {
-				for (i = 0; i < count; i++)
+				for (i = 0; i < count; ++i)
 					dst[i] = outBuf[i + pos];
 			} else {
-				for (i = 0; i < count; i++)
+				for (i = 0; i < count; ++i)
 					dst[i] = *(dst + i - pos);
 			}
 		} else if (src[0] >= 0x80) { // 0b10??????
@@ -88,7 +87,7 @@ uint32 decompress_lcw(uint8 *inBuf, uint32 inLen, uint8 *outBuf, uint32 outLen) 
 			src += 2;
 			count = MIN(count, out_remain);
 
-			for (i = 0; i < count; i++) {
+			for (i = 0; i < count; ++i) {
 				dst[i] = *(dst + i - relpos);
 			}
 		}

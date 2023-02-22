@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -30,10 +29,10 @@
  */
 
 /*
-    BS_Vertex
-    ---------
+	BS_Vertex
+	---------
 
-    Autor: Malte Thiesen
+	Autor: Malte Thiesen
 */
 
 #ifndef SWORD25_VERTEX_H
@@ -44,10 +43,6 @@
 #include "sword25/kernel/common.h"
 
 struct lua_State;
-
-#if defined(MACOSX) || defined(SOLARIS) || defined(__MINGW32__)
-#define sqrtf(x)	((float)sqrt(x))
-#endif
 
 namespace Sword25 {
 
@@ -67,7 +62,7 @@ public:
 	 * @remark              If only distances should be compared, sqrDist() should be used, since it is faster.
 	 */
 	inline int distance(const Vertex &vertex) const {
-		return (int)(sqrtf(static_cast<float>(sqrDist(vertex))) + 0.5);
+		return (int)(sqrt(static_cast<float>(sqrDist(vertex))) + 0.5);
 	}
 
 	static Vertex &luaVertexToVertex(lua_State *L, int StackIndex, Vertex &vertex);

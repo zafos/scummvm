@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -117,9 +116,9 @@ void VramAllocator::deallocate(void *address) {
 	// Find the Allocator to deallocate
 	for (i = _allocList.begin(); i != _allocList.end(); ++i) {
 		if ((*i).address == address) {
+			PSP_DEBUG_PRINT("Deallocated address[%p], size[%u]\n", (*i).address, (*i).size);
 			_bytesAllocated -= (*i).size;
 			_allocList.erase(i);
-			PSP_DEBUG_PRINT("Deallocated address[%p], size[%u]\n", (*i).address, (*i).size);
 			return;
 		}
 	}
@@ -326,22 +325,6 @@ void DisplayManager::setSizeAndPixelFormat(uint width, uint height, const Graphi
 	calculateScaleParams();
 }
 
-bool DisplayManager::setGraphicsMode(const char *name) {
-	DEBUG_ENTER_FUNC();
-
-	int i = 0;
-
-	while (_supportedModes[i].name) {
-		if (!scumm_stricmp(_supportedModes[i].name, name)) {
-			setGraphicsMode(_supportedModes[i].id);
-			return true;
-		}
-		i++;
-	}
-
-	return false;
-}
-
 bool DisplayManager::setGraphicsMode(int mode) {
 	DEBUG_ENTER_FUNC();
 
@@ -380,7 +363,7 @@ void DisplayManager::calculateScaleParams() {
 			_displayParams.screenOutput.width = (uint32)(PSP_SCREEN_HEIGHT * aspectRatio);
 
 			if (_displayParams.screenOutput.width > PSP_SCREEN_WIDTH) { // shrink if wider than screen
-				_displayParams.screenOutput.height = (uint32)(((float)PSP_SCREEN_HEIGHT * (float)PSP_SCREEN_WIDTH) / (float)_displayParams.screenOutput.width); 
+				_displayParams.screenOutput.height = (uint32)(((float)PSP_SCREEN_HEIGHT * (float)PSP_SCREEN_WIDTH) / (float)_displayParams.screenOutput.width);
 				_displayParams.screenOutput.width = PSP_SCREEN_WIDTH;
 			}
 		}
@@ -435,7 +418,7 @@ bool DisplayManager::renderAll() {
 	                _overlay->isDirty() ? "true" : "false",
 	                _cursor->isDirty() ? "true" : "false",
 	                _keyboard->isDirty() ? "true" : "false",
-					_imageViewer->isDirty() ? "true" : "false",
+					_imageViewer->isDirty() ? "true" : "false"
 	               );
 
 	_masterGuRenderer.guPreRender();	// Set up rendering

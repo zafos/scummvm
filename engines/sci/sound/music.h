@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -29,7 +28,7 @@
 #include "audio/mixer.h"
 
 #include "sci/sci.h"
-#include "sci/resource.h"
+#include "sci/resource/resource.h"
 #include "sci/sound/drivers/mididriver.h"
 #ifdef ENABLE_SCI32
 #include "sci/sound/audio32.h"
@@ -66,7 +65,7 @@ struct MusicEntryChannel {
 	int8 _voices;
 	bool _dontRemap;
 	bool _dontMap;
-	bool _mute;
+	uint8 _mute;
 };
 
 
@@ -83,8 +82,6 @@ public:
 	uint16 resourceId;
 
 	int time; // "tim"estamp to indicate in which order songs have been added
-
-	bool isQueued; // for SCI0 only!
 
 	uint16 dataInc;
 	uint16 ticker;
@@ -130,13 +127,13 @@ public:
 
 public:
 	MusicEntry();
-	~MusicEntry();
+	~MusicEntry() override;
 
 	void doFade();
 	void onTimer();
 	void setSignal(int signal);
 
-	virtual void saveLoadWithSerializer(Common::Serializer &ser);
+	void saveLoadWithSerializer(Common::Serializer &ser) override;
 };
 
 struct DeviceChannelUsage {
@@ -160,20 +157,35 @@ struct ChannelRemapping {
 	int lowestPrio() const;
 };
 
+struct MidiCommand {
+	enum CmdType {
+		kTypeMidiMessage = 0,
+		kTypeTrackInit
+	};
+	// Keeping this very simple, due to the very limited purpose of it.
+	MidiCommand(CmdType type, uint32 val) : _type(type), _dataPtr(0), _dataVal(val) {}
+	MidiCommand(CmdType type, void *ptr) : _type(type), _dataPtr(ptr), _dataVal(0) {}
+	CmdType _type;
+	void *_dataPtr;
+	uint32 _dataVal;
+};
+
 typedef Common::Array<MusicEntry *> MusicList;
-typedef Common::Array<uint32> MidiCommandQueue;
+typedef Common::Array<MidiCommand> MidiCommandQueue;
 
 class SciMusic : public Common::Serializable {
 
 public:
 	SciMusic(SciVersion soundVersion, bool useDigitalSFX);
-	~SciMusic();
+	~SciMusic() override;
 
 	void init();
 
 	void onTimer();
 	void putMidiCommandInQueue(byte status, byte firstOp, byte secondOp);
 	void putMidiCommandInQueue(uint32 midi);
+	void putTrackInitCommandInQueue(MusicEntry *psnd);
+	void removeTrackInitCommandsFromQueue(MusicEntry *psnd);
 private:
 	static void miditimerCallback(void *p);
 	void sendMidiCommandsFromQueue();
@@ -181,11 +193,14 @@ private:
 public:
 	void clearPlayList();
 	void pauseAll(bool pause);
+	bool isAllPaused() const { return (_globalPause > 0); }
+	void resetGlobalPauseCounter();
 	void stopAll();
+	void stopAllSamples();
 
 	// sound and midi functions
 	void soundInitSnd(MusicEntry *pSnd);
-	void soundPlay(MusicEntry *pSnd);
+	void soundPlay(MusicEntry *pSnd, bool restoring = false);
 	void soundStop(MusicEntry *pSnd);
 	void soundKill(MusicEntry *pSnd);
 	void soundPause(MusicEntry *pSnd);
@@ -213,11 +228,13 @@ public:
 	}
 
 	MusicEntry *getSlot(reg_t obj);
-	MusicEntry *getActiveSci0MusicSlot();
+	MusicEntry *getFirstSlotWithStatus(SoundStatus status);
 
 	void pushBackSlot(MusicEntry *slotEntry) {
 		Common::StackLock lock(_mutex);
 		_playList.push_back(slotEntry);
+		if (_soundVersion <= SCI_VERSION_0_LATE) // I limit this to SCI0, since it always inserts the nodes at the correct position, but no idea about >=SCI1
+			sortPlayList();
 	}
 
 	void printPlayList(Console *con);
@@ -238,13 +255,13 @@ public:
 
 	void needsRemap() { _needsRemap = true; }
 
-	virtual void saveLoadWithSerializer(Common::Serializer &ser);
+	void saveLoadWithSerializer(Common::Serializer &ser) override;
 
 	// Mutex for music code. Used to guard access to the song playlist, to the
-	// MIDI parser and to the MIDI driver/player. Note that guarded code must NOT
-	// include references to the mixer, otherwise there will probably be situations
-	// where a deadlock can occur
-	Common::Mutex _mutex;
+	// MIDI parser and to the MIDI driver/player. We use a reference to
+	// the mixer's internal mutex to avoid deadlocks which sometimes occur when
+	// different threads lock each other up in different mutexes.
+	Common::Mutex &_mutex;
 
 protected:
 	void sortPlayList();
@@ -263,6 +280,10 @@ protected:
 	ChannelRemapping *determineChannelMap();
 	void resetDeviceChannel(int devChannel, bool mainThread);
 
+public:
+	// The parsers need to know this for the dontMap channels...
+	bool isDeviceChannelMapped(int devChannel) const;
+
 private:
 	MusicList _playList;
 	bool _soundOn;
@@ -271,6 +292,8 @@ private:
 	int8 _channelRemap[16];
 	int8 _globalReverb;
 	bool _needsRemap;
+	int _globalPause;
+	bool _needsResume;
 
 	DeviceChannelUsage _channelMap[16];
 

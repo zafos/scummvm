@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,7 +30,7 @@ namespace Mohawk {
 namespace MystStacks {
 
 Demo::Demo(MohawkEngine_Myst *vm) :
-		Intro(vm),
+		Intro(vm, kDemoStack),
 		_returnToMenuRunning(false),
 		_returnToMenuStep(0),
 		_returnToMenuNextTime(0) {
@@ -81,12 +80,12 @@ void Demo::o_fadeToBlack(uint16 var, const ArgumentsArray &args) {
 }
 
 void Demo::returnToMenu_run() {
-	uint32 time = _vm->_system->getMillis();
+	uint32 time = _vm->getTotalPlayTime();
 
 	if (time < _returnToMenuNextTime)
 		return;
 
-	switch (_returnToMenuStep){
+	switch (_returnToMenuStep) {
 	case 0:
 		_vm->_gfx->fadeToBlack();
 		_vm->changeToCard(2003, kNoTransition);
@@ -109,7 +108,7 @@ void Demo::returnToMenu_run() {
 
 void Demo::o_returnToMenu_init(uint16 var, const ArgumentsArray &args) {
 	// Used on Card 2001, 2002 and 2003
-	_returnToMenuNextTime = _vm->_system->getMillis() + 5000;
+	_returnToMenuNextTime = _vm->getTotalPlayTime() + 5000;
 	_returnToMenuRunning = true;
 }
 

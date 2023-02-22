@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,7 +23,17 @@
 #define GRAPHICS_PALETTE_H
 
 #include "common/scummsys.h"
+#include "common/hashmap.h"
 #include "common/noncopyable.h"
+
+/**
+ * @defgroup graphics_palette PaletteManager
+ * @ingroup graphics
+ *
+ * @brief The PaletteManager class.
+ *
+ * @{
+ */
 
 /**
  * The PaletteManager is part of the OSystem backend API and responsible
@@ -98,5 +107,47 @@ public:
 	 */
 	virtual void grabPalette(byte *colors, uint start, uint num) const = 0;
 };
+ /** @} */
 
+namespace Graphics {
+
+class PaletteLookup {
+public:
+	PaletteLookup();
+	/**
+	 * @brief Construct a new Palette Lookup object
+	 *
+	 * @param palette   the palette data, in interleaved RGB format
+	 * @param len       the number of palette entries to be read
+	 */
+	PaletteLookup(const byte *palette, uint len);
+
+	/**
+	 * @brief Pass palette to the look up. It also compares given palette
+	 * with the current one and resets cache only when their contents is different.
+	 *
+	 * @param palette   the palette data, in interleaved RGB format
+	 * @param len       the number of palette entries to be read
+	 *
+	 * @return true if palette was changed and false if it was the same
+	 */
+	bool setPalette(const byte *palette, uint len);
+
+	/**
+	 * @brief This method returns closest color from the palette
+	 *        and it uses cache for faster lookups
+	 *
+	 * @param useNaiveAlg            if true, use a simpler algorithm (non-floating point calculations)
+	 *
+	 * @return the palette index
+	 */
+	byte findBestColor(byte r, byte g, byte b, bool useNaiveAlg = false);
+
+private:
+	byte _palette[256 * 3];
+	uint _paletteSize;
+	Common::HashMap<int, byte> _colorHash;
+};
+
+} //  // end of namespace Graphics
 #endif

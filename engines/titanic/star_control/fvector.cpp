@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "titanic/star_control/fvector.h"
 #include "titanic/star_control/fpose.h"
-//#include "common/textconsole.h"
+
+#include "common/math.h"
 
 namespace Titanic {
 
@@ -44,8 +44,8 @@ FVector FVector::crossProduct(const FVector &src) const {
 }
 
 void FVector::rotVectAxisY(float angleDeg) {
-	float sinVal = sin(angleDeg * Deg2Rad);
-	float cosVal = cos(angleDeg * Deg2Rad);
+	float sinVal = sin(Common::deg2rad<double>(angleDeg));
+	float cosVal = cos(Common::deg2rad<double>(angleDeg));
 	float x = cosVal * _x - sinVal * _z;
 	float z = cosVal * _z + sinVal * _x;
 
@@ -65,20 +65,13 @@ bool FVector::normalize(float & hyp) {
 	return true;
 }
 
-FVector FVector::addAndNormalize(const FVector &v) const {
-	FVector tempV(_x + v._x, _y + v._y, _z + v._z);
-
-	float unusedScale = 0.0;
-	if (!tempV.normalize(unusedScale)) {
-		// Do the normalization, put the scale amount in unusedScale,
-		// but if it is unsuccessful, crash
-		assert(unusedScale);
-	}
-
+FVector FVector::half(const FVector &v) const {
+	FVector tempV = *this + v;
+	tempV.normalize();
 	return tempV;
 }
 
-FVector FVector::getAnglesAsVect() const {
+FVector FVector::getPolarCoord() const {
 	FVector vector = *this;
 	FVector dest;
 
@@ -114,15 +107,15 @@ FVector FVector::matProdRowVect(const FPose &pose) const {
 FPose FVector::getFrameTransform(const FVector &v) {
 	FPose matrix1, matrix2, matrix3, matrix4;
 
-	FVector vector1 = getAnglesAsVect();
-	matrix1.setRotationMatrix(X_AXIS, vector1._y * Rad2Deg);
-	matrix2.setRotationMatrix(Y_AXIS, vector1._z * Rad2Deg);
+	FVector vector1 = getPolarCoord();
+	matrix1.setRotationMatrix(X_AXIS, Common::rad2deg<double>(vector1._y));
+	matrix2.setRotationMatrix(Y_AXIS, Common::rad2deg<double>(vector1._z));
 	fposeProd(matrix1, matrix2, matrix3);
 	matrix4 = matrix3.inverseTransform();
 
-	vector1 = v.getAnglesAsVect();
-	matrix1.setRotationMatrix(X_AXIS, vector1._y * Rad2Deg);
-	matrix2.setRotationMatrix(Y_AXIS, vector1._z * Rad2Deg);
+	vector1 = v.getPolarCoord();
+	matrix1.setRotationMatrix(X_AXIS, Common::rad2deg<double>(vector1._y));
+	matrix2.setRotationMatrix(Y_AXIS, Common::rad2deg<double>(vector1._z));
 	fposeProd(matrix1, matrix2, matrix3);
 	fposeProd(matrix4, matrix3, matrix1);
 
@@ -130,10 +123,10 @@ FPose FVector::getFrameTransform(const FVector &v) {
 }
 
 FPose FVector::formRotXY() const {
-	FVector v1 = getAnglesAsVect();
+	FVector v1 = getPolarCoord();
 	FPose m1, m2;
-	m1.setRotationMatrix(X_AXIS, v1._y * Rad2Deg);
-	m2.setRotationMatrix(Y_AXIS, v1._z * Rad2Deg);
+	m1.setRotationMatrix(X_AXIS, Common::rad2deg<double>(v1._y));
+	m2.setRotationMatrix(Y_AXIS, Common::rad2deg<double>(v1._z));
 	FPose m3;
 	fposeProd(m1, m2, m3);
 	return m3;

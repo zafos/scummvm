@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -147,18 +146,12 @@ void EventsManager::pollEvents() {
 		// Handle keypress
 		switch (event.type) {
 		case Common::EVENT_QUIT:
-		case Common::EVENT_RTL:
+		case Common::EVENT_RETURN_TO_LAUNCHER:
 			return;
 
 		case Common::EVENT_KEYDOWN:
 			// Check for debugger
-			if (event.kbd.keycode == Common::KEYCODE_d && (event.kbd.flags & Common::KBD_CTRL)) {
-				// Attach to the debugger
-				_vm->_debugger->attach();
-				_vm->_debugger->onFrame();
-			} else {
-				_pendingKeys.push(event.kbd);
-			}
+			_pendingKeys.push(event.kbd);
 			return;
 		case Common::EVENT_KEYUP:
 			return;
@@ -213,14 +206,8 @@ bool EventsManager::checkForNextFrameCounter() {
 		// Do any palette cycling
 		_vm->_game->_scene.animatePalette();
 
-		// Give time to the debugger
-		_vm->_debugger->onFrame();
-
 		// Display the frame
 		_vm->_screen->update();
-
-		// Signal the ScummVM debugger
-		_vm->_debugger->onFrame();
 
 		return true;
 	}

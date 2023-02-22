@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,11 +24,23 @@
 
 #include "common/array.h"
 #include "common/str.h"
+#include "common/ustr.h"
 #include "common/ptr.h"
+
+class MetaEngine;
 
 namespace Graphics {
 struct Surface;
 }
+
+/**
+ * @defgroup engines_savestate Save states
+ * @ingroup engines
+ *
+ * @brief API for managing save states.
+ *
+ * @{
+ */
 
 /**
  * Object describing a save state.
@@ -43,9 +54,18 @@ struct Surface;
  * Saves are writable and deletable by default.
  */
 class SaveStateDescriptor {
+private:
+	enum SaveType {
+		kSaveTypeUndetermined,
+		kSaveTypeRegular,
+		kSaveTypeAutosave
+	};
+
+	void initSaveType(const MetaEngine *metaEngine);
 public:
 	SaveStateDescriptor();
-	SaveStateDescriptor(int s, const Common::String &d);
+	SaveStateDescriptor(const MetaEngine *metaEngine, int slot, const Common::U32String &d);
+	SaveStateDescriptor(const MetaEngine *metaEngine, int slot, const Common::String &d);
 
 	/**
 	 * @param slot The saveslot id, as it would be passed to the "-x" command line switch.
@@ -60,12 +80,13 @@ public:
 	/**
 	 * @param desc A human readable description of the save state.
 	 */
-	void setDescription(const Common::String &desc) { _description = desc; }
+	void setDescription(const Common::String &desc) { _description = desc.decode(); }
+	void setDescription(const Common::U32String &desc) { _description = desc; }
 
 	/**
 	 * @return A human readable description of the save state.
 	 */
-	const Common::String &getDescription() const { return _description; }
+	const Common::U32String &getDescription() const { return _description; }
 
 	/** Optional entries only included when querying via MetaEngine::querySaveMetaInfo */
 
@@ -177,6 +198,33 @@ public:
 	 */
 	const Common::String &getPlayTime() const { return _playTime; }
 
+	/**
+	 * Returns the time the game was played before the save state was created
+	 * in milliseconds.
+	 *
+	 * It defaults to 0.
+	 */
+	uint32 getPlayTimeMSecs() const { return _playTimeMSecs; }
+
+	/**
+	 * Sets whether the save is an autosave
+	 */
+	void setAutosave(bool autosave);
+
+	/**
+	 * Returns true whether the save is an autosave
+	 */
+	bool isAutosave() const;
+
+	/**
+	 * Returns true if the save has an autosave name
+	 */
+	bool hasAutosaveName() const;
+
+	/**
+	 * Returns true if this entry is valid
+	 */
+	bool isValid() const;
 private:
 	/**
 	 * The saveslot id, as it would be passed to the "-x" command line switch.
@@ -186,7 +234,7 @@ private:
 	/**
 	 * A human readable description of the save state.
 	 */
-	Common::String _description;
+	Common::U32String _description;
 
 	/**
 	 * Whether the save state can be deleted.
@@ -220,9 +268,20 @@ private:
 	Common::String _playTime;
 
 	/**
+	 * The time the game was played before the save state was created
+	 * in milliseconds.
+	 */
+	uint32 _playTimeMSecs;
+
+	/**
 	 * The thumbnail of the save state.
 	 */
 	Common::SharedPtr<Graphics::Surface> _thumbnail;
+
+	/**
+	 * Save file type
+	 */
+	SaveType _saveType;
 };
 
 /** List of savestates. */
@@ -236,5 +295,5 @@ struct SaveStateDescriptorSlotComparator {
 		return x.getSaveSlot() < y.getSaveSlot();
 	}
 };
-
+/** @} */
 #endif

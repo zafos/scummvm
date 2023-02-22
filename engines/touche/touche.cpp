@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -103,14 +102,7 @@ ToucheEngine::ToucheEngine(OSystem *system, Common::Language language)
 
 	SearchMan.addSubDirectoryMatching(gameDataDir, "database");
 
-	DebugMan.addDebugChannel(kDebugEngine,   "Engine",   "Engine debug level");
-	DebugMan.addDebugChannel(kDebugGraphics, "Graphics", "Graphics debug level");
-	DebugMan.addDebugChannel(kDebugResource, "Resource", "Resource debug level");
-	DebugMan.addDebugChannel(kDebugOpcodes,  "Opcodes",  "Opcodes debug level");
-	DebugMan.addDebugChannel(kDebugMenu,     "Menu",     "Menu debug level");
-	DebugMan.addDebugChannel(kDebugCharset,  "Charset",   "Charset debug level");
-
-	_console = new ToucheConsole(this);
+	setDebugger(new ToucheConsole(this));
 
 	_newEpisodeNum = 0;
 	_currentEpisodeNum = 0;
@@ -191,9 +183,6 @@ ToucheEngine::ToucheEngine(OSystem *system, Common::Language language)
 }
 
 ToucheEngine::~ToucheEngine() {
-	DebugMan.clearAllDebugChannels();
-	delete _console;
-
 	stopMusic();
 	delete _midiPlayer;
 }
@@ -338,6 +327,8 @@ void ToucheEngine::writeConfigurationSettings() {
 		ConfMan.setBool("speech_mute", false);
 		ConfMan.setBool("subtitles", true);
 		break;
+	default:
+		break;
 	}
 	ConfMan.setInt("music_volume", getMusicVolume());
 	ConfMan.flushToDisk();
@@ -432,9 +423,6 @@ void ToucheEngine::processEvents(bool handleKeyEvents) {
 			if (event.kbd.hasFlags(Common::KBD_CTRL)) {
 				if (event.kbd.keycode == Common::KEYCODE_f) {
 					_fastMode = !_fastMode;
-				} else if (event.kbd.keycode == Common::KEYCODE_d) {
-					this->getDebugger()->attach();
-					this->getDebugger()->onFrame();
 				}
 			} else {
 				if (event.kbd.keycode == Common::KEYCODE_t) {
@@ -850,6 +838,8 @@ void ToucheEngine::setKeyCharFrame(int keyChar, int16 type, int16 value1, int16 
 	case 4:
 		key->anim3Start = value1;
 		key->anim3Count = value2;
+		break;
+	default:
 		break;
 	}
 }
@@ -1612,6 +1602,8 @@ void ToucheEngine::handleLeftMouseButtonClickOnInventory() {
 						drawInventory(_objectDescriptionNum, 1);
 					}
 					break;
+				default:
+					break;
 				}
 			}
 			break;
@@ -1698,6 +1690,8 @@ void ToucheEngine::handleMouseClickOnRoom(int flag) {
 						hitPosY = mousePos.y;
 					}
 				}
+				break;
+			default:
 				break;
 			}
 			if (_giveItemToCounter == 0 && !_hideInventoryTexts) {
@@ -2035,7 +2029,7 @@ void ToucheEngine::updateRoomAreas(int num, int flags) {
 		if (_programAreaTable[i].id == num) {
 			Area area = _programAreaTable[i].area;
 			if (i == 14 && _currentRoomNum == 8 && area.r.left == 715) {
-				// Workaround for bug #1751170. area[14].r.left (update rect) should
+				// Workaround for bug #3306. area[14].r.left (update rect) should
 				// be equal to area[7].r.left (redraw rect) but it's one off, which
 				// leads to a glitch when that room area needs to be redrawn.
 				area.r.left = 714;
@@ -2097,6 +2091,8 @@ void ToucheEngine::updateRoomRegions() {
 					_programAreaTable[i].animNext = 0;
 				}
 				i += _programAreaTable[i].animCount + 1;
+				break;
+			default:
 				break;
 			}
 		}
@@ -2194,16 +2190,15 @@ void ToucheEngine::drawInventory(int index, int flag) {
 
 void ToucheEngine::drawAmountOfMoneyInInventory() {
 	if (_flagsTable[606] == 0 && !_hideInventoryTexts) {
-		char text[10];
-		sprintf(text, "%d", _keyCharsTable[0].money);
+		Common::String textStr = Common::String::format("%d", _keyCharsTable[0].money);
 		Graphics::fillRect(_offscreenBuffer, kScreenWidth, 74, 354, 40, 16, 0xD2);
-		drawGameString(217, 94, 355, text);
+		drawGameString(217, 94, 355, textStr.c_str());
 		updateScreenArea(74, 354, 40, 16);
 		Graphics::fillRect(_offscreenBuffer, kScreenWidth, 150, 353, 40, 41, 0xD2);
 		if (_currentAmountOfMoney != 0) {
 			drawIcon(141, 348, 1);
-			sprintf(text, "%d", _currentAmountOfMoney);
-			drawGameString(217, 170, 378, text);
+			textStr = Common::String::format("%d", _currentAmountOfMoney);
+			drawGameString(217, 170, 378, textStr.c_str());
 		}
 		updateScreenArea(150, 353, 40, 41);
 	}
@@ -2779,6 +2774,8 @@ void ToucheEngine::adjustKeyCharPosToWalkBox(KeyChar *key, int moveType) {
 			key->yPos = dy * kz / dz + y1;
 		}
 		break;
+	default:
+		break;
 	}
 }
 
@@ -3058,6 +3055,8 @@ void ToucheEngine::updateKeyCharWalkPath(KeyChar *key, int16 dx, int16 dy, int16
 			}
 		}
 		break;
+	default:
+		break;
 	}
 }
 
@@ -3311,7 +3310,9 @@ void ToucheEngine::processAnimationTable() {
 }
 
 void ToucheEngine::clearAnimationTable() {
-	memset(_animationTable, 0, sizeof(_animationTable));
+	for (uint i = 0; i < ARRAYSIZE(_animationTable); i++) {
+		_animationTable[i].clear();
+	}
 }
 
 void ToucheEngine::addToDirtyRect(const Common::Rect &r) {

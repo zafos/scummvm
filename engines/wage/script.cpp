@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * MIT License:
  *
@@ -216,7 +215,7 @@ bool Script::execute(World *world, int loopCount, Common::String *inputText, Des
 			processIf();
 			break;
 		case 0x87: // EXIT
-			debug(6, "exit at offset %d", _data->pos() - 1);
+			debug(6, "exit at offset %d", (int)_data->pos() - 1);
 
 			return true;
 		case 0x89: // MOVE
@@ -267,7 +266,7 @@ bool Script::execute(World *world, int loopCount, Common::String *inputText, Des
 		case 0x88: // END
 			break;
 		default:
-			debug(0, "Unknown opcode: %d", _data->pos());
+			debug(0, "Unknown opcode: %d", (int)_data->pos());
 		}
 	}
 
@@ -335,7 +334,7 @@ bool Script::execute(World *world, int loopCount, Common::String *inputText, Des
 Script::Operand *Script::readOperand() {
 	byte operandType = _data->readByte();
 
-	debug(7, "%x: readOperand: 0x%x", _data->pos(), operandType);
+	debug(7, "%x: readOperand: 0x%x", (int)_data->pos(), operandType);
 
 	Context *cont = &_world->_player->_context;
 	switch (operandType) {
@@ -352,11 +351,11 @@ Script::Operand *Script::readOperand() {
 	case 0xC3: // MONSTER@
 		return new Operand(_engine->getMonster(), CHR);
 	case 0xC4: // RANDOMSCN@
-		return new Operand(_world->_orderedScenes[_engine->_rnd->getRandomNumber(_world->_orderedScenes.size())], SCENE);
+		return new Operand(_world->_orderedScenes[_engine->_rnd->getRandomNumber(_world->_orderedScenes.size() - 1)], SCENE);
 	case 0xC5: // RANDOMCHR@
-		return new Operand(_world->_orderedChrs[_engine->_rnd->getRandomNumber(_world->_orderedChrs.size())], CHR);
+		return new Operand(_world->_orderedChrs[_engine->_rnd->getRandomNumber(_world->_orderedChrs.size() - 1)], CHR);
 	case 0xC6: // RANDOMOBJ@
-		return new Operand(_world->_orderedObjs[_engine->_rnd->getRandomNumber(_world->_orderedObjs.size())], OBJ);
+		return new Operand(_world->_orderedObjs[_engine->_rnd->getRandomNumber(_world->_orderedObjs.size() - 1)], OBJ);
 	case 0xB0: // VISITS#
 		return new Operand(cont->_visits, NUMBER);
 	case 0xB1: // RANDOM# for Star Trek, but VISITS# for some other games?
@@ -418,7 +417,7 @@ Script::Operand *Script::readOperand() {
 			_data->seek(-1, SEEK_CUR);
 			return readStringOperand();
 		} else {
-			debug("Dunno what %x is (index=%d)!\n", operandType, _data->pos()-1);
+			debug("Dunno what %x is (index=%d)!\n", operandType, (int)_data->pos() - 1);
 		}
 		return NULL;
 	}
@@ -486,7 +485,7 @@ void Script::assign(byte operandType, int uservar, uint16 value) {
 		cont->_statVariables[PHYS_SPE_CUR] = value;
 		break;
 	default:
-		debug("No idea what I'm supposed to assign! (%x at %d)!\n", operandType, _data->pos()-1);
+		debug("No idea what I'm supposed to assign! (%x at %d)!\n", operandType, (int)_data->pos() - 1);
 	}
 }
 
@@ -621,8 +620,10 @@ void Script::skipBlock() {
 			case 0x8C: // SOUND
 			case 0x8E: // LET
 			case 0x95: // MENU
-				while (_data->readByte() != 0xFD)
-					;
+				while (_data->readByte() != 0xFD);
+				break;
+			default:
+				break;
 		}
 	}
 }
@@ -800,6 +801,8 @@ bool Script::compare(Operand *o1, Operand *o2, int comparator) {
 	case kMoveChrScene:
 		_world->move(o1->_value.chr, o2->_value.scene);
 		_handled = true;  // TODO: Is this correct?
+		break;
+	default:
 		break;
 	}
 
@@ -1203,7 +1206,7 @@ void Script::convertToText() {
 
 		if (c < 0x80) {
 			if (c < 0x20) {
-				warning("convertToText: Unknown code 0x%02x at %d", c, _data->pos());
+				warning("convertToText: Unknown code 0x%02x at %d", c, (int)_data->pos());
 				c = ' ';
 			}
 
@@ -1212,7 +1215,7 @@ void Script::convertToText() {
 				c = _data->readByte();
 
 				if (c < 0x20) {
-					warning("convertToText: Unknown code 0x%02x at %d", c, _data->pos());
+					warning("convertToText: Unknown code 0x%02x at %d", c, (int)_data->pos());
 					c = ' ';
 				}
 			} while (c < 0x80);

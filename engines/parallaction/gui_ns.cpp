@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,7 +46,7 @@ public:
 			_timeOut(0), _startTime(0) {
 	}
 
-	virtual MenuInputState* run() {
+	MenuInputState* run() override {
 		uint32 curTime = _vm->_system->getMillis();
 		if (curTime - _startTime > _timeOut) {
 			return _helper->getState(_nextState);
@@ -55,7 +54,7 @@ public:
 		return this;
 	}
 
-	virtual void enter() {
+	void enter() override {
 		_vm->_input->setMouseState(MOUSE_DISABLED);
 		_vm->showSlide(_slideName.c_str());
 		_startTime = _vm->_system->getMillis();
@@ -117,8 +116,8 @@ public:
 	ChooseLanguageInputState_NS(Parallaction *vm, MenuInputHelper *helper) : MenuInputState("chooselanguage", helper), _vm(vm) {
 		_allowChoice = false;
 		_nextState = "selectgame";
-		_label = 0;
-		_blocks = 0;
+		_label = nullptr;
+		_blocks = nullptr;
 
 		_dosLanguageSelectBlocks[0] = Common::Rect(  80, 110, 128, 180 );	// Italian
 		_dosLanguageSelectBlocks[1] = Common::Rect( 129,  85, 177, 155 );	// French
@@ -152,17 +151,17 @@ public:
 		_allowChoice = true;
 	}
 
-	~ChooseLanguageInputState_NS() {
+	~ChooseLanguageInputState_NS() override {
 		destroyLabels();
 	}
 
 	void destroyLabels() {
 		_vm->_gfx->unregisterLabel(_label);
 		delete _label;
-		_label = 0;
+		_label = nullptr;
 	}
 
-	virtual MenuInputState* run() {
+	MenuInputState* run() override {
 		if (!_allowChoice) {
 			_vm->setInternLanguage(_language);
 			return _helper->getState(_nextState);
@@ -188,7 +187,7 @@ public:
 		return this;
 	}
 
-	virtual void enter() {
+	void enter() override {
 		if (!_allowChoice) {
 			return;
 		}
@@ -225,11 +224,11 @@ public:
 		_nextState[0] = "newgame";
 		_nextState[1] = "loadgame";
 
-		_labels[0] = 0;
-		_labels[1] = 0;
+		_labels[0] = nullptr;
+		_labels[1] = nullptr;
 	}
 
-	~SelectGameInputState_NS() {
+	~SelectGameInputState_NS() override {
 		destroyLabels();
 	}
 
@@ -238,12 +237,12 @@ public:
 		_vm->_gfx->unregisterLabel(_labels[1]);
 		delete _labels[0];
 		delete _labels[1];
-		_labels[0] = 0;
-		_labels[1] = 0;
+		_labels[0] = nullptr;
+		_labels[1] = nullptr;
 	}
 
 
-	virtual MenuInputState *run() {
+	MenuInputState *run() override {
 		int event = _vm->_input->getLastButtonEvent();
 
 		if (event == kMouseLeftUp) {
@@ -268,7 +267,7 @@ public:
 		return this;
 	}
 
-	virtual void enter() {
+	void enter() override {
 		_vm->showSlide("restore");
 		_vm->_input->setMouseState(MOUSE_ENABLED_SHOW);
 
@@ -301,14 +300,14 @@ class LoadGameInputState_NS : public MenuInputState {
 public:
 	LoadGameInputState_NS(Parallaction *vm, MenuInputHelper *helper) : MenuInputState("loadgame", helper), _vm(vm), _result(false) { }
 
-	virtual MenuInputState* run() {
+	MenuInputState* run() override {
 		if (!_result) {
 			_vm->scheduleLocationSwitch("fogne.dough");
 		}
-		return 0;
+		return nullptr;
 	}
 
-	virtual void enter() {
+	void enter() override {
 		_result = _vm->_saveLoad->loadGame();
 	}
 };
@@ -323,17 +322,17 @@ class NewGameInputState_NS : public MenuInputState {
 
 public:
 	NewGameInputState_NS(Parallaction_ns *vm, MenuInputHelper *helper) : MenuInputState("newgame", helper), _vm(vm) {
-		_labels[0] = 0;
-		_labels[1] = 0;
-		_labels[2] = 0;
-		_labels[3] = 0;
+		_labels[0] = nullptr;
+		_labels[1] = nullptr;
+		_labels[2] = nullptr;
+		_labels[3] = nullptr;
 	}
 
-	~NewGameInputState_NS() {
+	~NewGameInputState_NS() override {
 		destroyLabels();
 	}
 
-	virtual MenuInputState* run() {
+	MenuInputState* run() override {
 		int event = _vm->_input->getLastButtonEvent();
 
 		if (event == kMouseLeftUp || event == kMouseRightUp) {
@@ -342,7 +341,7 @@ public:
 
 			if (event == kMouseLeftUp) {
 				_vm->scheduleLocationSwitch("fogne.dough");
-				return 0;
+				return nullptr;
 			}
 
 			return _helper->getState("selectcharacter");
@@ -360,13 +359,13 @@ public:
 		delete _labels[1];
 		delete _labels[2];
 		delete _labels[3];
-		_labels[0] = 0;
-		_labels[1] = 0;
-		_labels[2] = 0;
-		_labels[3] = 0;
+		_labels[0] = nullptr;
+		_labels[1] = nullptr;
+		_labels[2] = nullptr;
+		_labels[3] = nullptr;
 	}
 
-	virtual void enter() {
+	void enter() override {
 		_vm->changeBackground("test");
 		_vm->_input->setMouseState(MOUSE_ENABLED_HIDE);
 
@@ -397,13 +396,13 @@ public:
 	StartDemoInputState_NS(Parallaction *vm, MenuInputHelper *helper) : MenuInputState("startdemo", helper), _vm(vm) {
 	}
 
-	virtual MenuInputState* run() {
+	MenuInputState* run() override {
 		_vm->scheduleLocationSwitch("fognedemo.dough");
 		_vm->_input->setMouseState(MOUSE_ENABLED_SHOW);
-		return 0;
+		return nullptr;
 	}
 
-	virtual void enter() {
+	void enter() override {
 		_vm->_input->setMouseState(MOUSE_DISABLED);
 	}
 };
@@ -475,8 +474,8 @@ public:
 	SelectCharacterInputState_NS(Parallaction_ns *vm, MenuInputHelper *helper) : MenuInputState("selectcharacter", helper), _vm(vm) {
 		_keys = (_vm->getPlatform() == Common::kPlatformAmiga && (_vm->getFeatures() & GF_LANG_MULT)) ? _amigaKeys : _pcKeys;
 		_block.create(BLOCK_WIDTH, BLOCK_HEIGHT, Graphics::PixelFormat::createFormatCLUT8());
-		_labels[0] = 0;
-		_labels[1] = 0;
+		_labels[0] = nullptr;
+		_labels[1] = nullptr;
 
 		_fail = false;
 		_len = 0;
@@ -504,7 +503,7 @@ public:
 		_codeTrueBlocks[8] = Common::Rect( 248, 58, 264, 82 );
 	}
 
-	~SelectCharacterInputState_NS() {
+	~SelectCharacterInputState_NS() override {
 		_block.free();
 		_emptySlots.free();
 
@@ -516,8 +515,8 @@ public:
 		_vm->_gfx->unregisterLabel(_labels[1]);
 		delete _labels[0];
 		delete _labels[1];
-		_labels[0] = 0;
-		_labels[1] = 0;
+		_labels[0] = nullptr;
+		_labels[1] = nullptr;
 	}
 
 	void cleanup() {
@@ -598,7 +597,7 @@ public:
 		_vm->scheduleLocationSwitch(_charStartLocation[character]);
 	}
 
-	virtual MenuInputState* run() {
+	MenuInputState* run() override {
 		MenuInputState* nextState = this;
 
 		switch (_state) {
@@ -616,7 +615,7 @@ public:
 
 		case SUCCESS:
 			success();
-			nextState = 0;
+			nextState = nullptr;
 			break;
 
 		default:
@@ -626,7 +625,7 @@ public:
 		return nextState;
 	}
 
-	virtual void enter() {
+	void enter() override {
 		_vm->_soundManI->stopMusic();
 		_vm->showSlide("password");
 
@@ -693,14 +692,14 @@ class ShowCreditsInputState_NS : public MenuInputState {
 
 public:
 	ShowCreditsInputState_NS(Parallaction *vm, MenuInputHelper *helper) : MenuInputState("showcredits", helper), _vm(vm) {
-		_labels[0] = 0;
-		_labels[1] = 0;
+		_labels[0] = nullptr;
+		_labels[1] = nullptr;
 
 		_current = 0;
 		_startTime = 0;
 	}
 
-	~ShowCreditsInputState_NS() {
+	~ShowCreditsInputState_NS() override {
 		destroyLabels();
 	}
 
@@ -709,8 +708,8 @@ public:
 		_vm->_gfx->unregisterLabel(_labels[1]);
 		delete _labels[0];
 		delete _labels[1];
-		_labels[0] = 0;
-		_labels[1] = 0;
+		_labels[0] = nullptr;
+		_labels[1] = nullptr;
 	}
 
 	void drawCurrentLabel() {
@@ -723,7 +722,7 @@ public:
 	}
 
 
-	virtual MenuInputState* run() {
+	MenuInputState* run() override {
 		if (_current == -1) {
 			_startTime = _vm->_system->getMillis();
 			_current = 0;
@@ -748,7 +747,7 @@ public:
 		return this;
 	}
 
-	virtual void enter() {
+	void enter() override {
 		_current = -1;
 		_vm->_input->setMouseState(MOUSE_DISABLED);
 	}
@@ -771,20 +770,20 @@ class EndIntroInputState_NS : public MenuInputState {
 public:
 	EndIntroInputState_NS(Parallaction_ns *vm, MenuInputHelper *helper) : MenuInputState("endintro", helper), _vm(vm) {
 		_isDemo = (_vm->getFeatures() & GF_DEMO) != 0;
-		_label = 0;
+		_label = nullptr;
 	}
 
-	~EndIntroInputState_NS() {
+	~EndIntroInputState_NS() override {
 		destroyLabels();
 	}
 
 	void destroyLabels() {
 		_vm->_gfx->unregisterLabel(_label);
 		delete _label;
-		_label = 0;
+		_label = nullptr;
 	}
 
-	virtual MenuInputState* run() {
+	MenuInputState* run() override {
 
 		int event = _vm->_input->getLastButtonEvent();
 		if (event != kMouseLeftUp) {
@@ -793,7 +792,7 @@ public:
 
 		if (_isDemo) {
 			_vm->quitGame();
-			return 0;
+			return nullptr;
 		}
 
 		destroyLabels();
@@ -801,7 +800,7 @@ public:
 		return _helper->getState("selectcharacter");
 	}
 
-	virtual void enter() {
+	void enter() override {
 		_vm->_input->setMouseState(MOUSE_DISABLED);
 
 		if (!_isDemo) {
@@ -832,10 +831,10 @@ class EndPartInputState_NS : public MenuInputState {
 
 public:
 	EndPartInputState_NS(Parallaction *vm, MenuInputHelper *helper) : MenuInputState("endpart", helper), _vm(vm) {
-		_labels[0] = 0;
-		_labels[1] = 0;
-		_labels[2] = 0;
-		_labels[3] = 0;
+		_labels[0] = nullptr;
+		_labels[1] = nullptr;
+		_labels[2] = nullptr;
+		_labels[3] = nullptr;
 
 		_allPartsComplete = false;
 	}
@@ -851,13 +850,13 @@ public:
 		delete _labels[2];
 		delete _labels[3];
 
-		_labels[0] = 0;
-		_labels[1] = 0;
-		_labels[2] = 0;
-		_labels[3] = 0;
+		_labels[0] = nullptr;
+		_labels[1] = nullptr;
+		_labels[2] = nullptr;
+		_labels[3] = nullptr;
 	}
 
-	virtual MenuInputState* run() {
+	MenuInputState* run() override {
 		int event = _vm->_input->getLastButtonEvent();
 		if (event != kMouseLeftUp) {
 			return this;
@@ -867,13 +866,13 @@ public:
 
 		if (_allPartsComplete) {
 			_vm->scheduleLocationSwitch("estgrotta.drki");
-			return 0;
+			return nullptr;
 		}
 
 		return _helper->getState("selectcharacter");
 	}
 
-	virtual void enter() {
+	void enter() override {
 		bool completed[3];
 		_vm->_saveLoad->getGamePartProgress(completed, 3);
 		_allPartsComplete = (completed[0] && completed[1] && completed[2]);

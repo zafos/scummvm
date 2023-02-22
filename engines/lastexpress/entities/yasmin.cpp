@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,6 +27,7 @@
 #include "lastexpress/game/savepoint.h"
 #include "lastexpress/game/state.h"
 
+#include "lastexpress/sound/queue.h"
 
 #include "lastexpress/lastexpress.h"
 
@@ -35,10 +35,10 @@ namespace LastExpress {
 
 Yasmin::Yasmin(LastExpressEngine *engine) : Entity(engine, kEntityYasmin) {
 	ADD_CALLBACK_FUNCTION(Yasmin, reset);
-	ADD_CALLBACK_FUNCTION(Yasmin, enterExitCompartment);
-	ADD_CALLBACK_FUNCTION(Yasmin, playSound);
-	ADD_CALLBACK_FUNCTION(Yasmin, updateFromTime);
-	ADD_CALLBACK_FUNCTION(Yasmin, updateEntity);
+	ADD_CALLBACK_FUNCTION_SI(Yasmin, enterExitCompartment);
+	ADD_CALLBACK_FUNCTION_S(Yasmin, playSound);
+	ADD_CALLBACK_FUNCTION_I(Yasmin, updateFromTime);
+	ADD_CALLBACK_FUNCTION_II(Yasmin, updateEntity);
 	ADD_CALLBACK_FUNCTION(Yasmin, goEtoG);
 	ADD_CALLBACK_FUNCTION(Yasmin, goGtoE);
 	ADD_CALLBACK_FUNCTION(Yasmin, chapter1);
@@ -492,19 +492,46 @@ IMPLEMENT_FUNCTION(21, Yasmin, hiding)
 		break;
 
 	case kActionNone:
+		if (!getSoundQueue()->isBuffered(kEntityYasmin)) {
+			if (Entity::updateParameter(params->param1, getState()->timeTicks, 450)) {
+				getSound()->playSound(kEntityYasmin, "Har5001");
+				params->param1 = 0;
+			}
+		}
+		break;
+
 	case kActionDefault:
-		if (getEntities()->updateEntity(kEntityYasmin, (CarIndex)params->param1, (EntityPosition)params->param2))
-			callbackAction();
+		setCallback(1);
+		setup_updateEntity(kCarGreenSleeping, kPosition_4840);
 		break;
 
-	case kActionExcuseMeCath:
-		getSound()->excuseMeCath();
+	case kActionCallback:
+		switch (getCallback()) {
+		default:
+			break;
+
+		case 1:
+			setCallback(2);
+			setup_enterExitCompartment("615BE", kObjectCompartment5);
+			break;
+
+		case 2:
+			getEntities()->clearSequences(kEntityYasmin);
+			getData()->location = kLocationInsideCompartment;
+			getData()->entityPosition = kPosition_3050;
+			getObjects()->update(kObjectCompartment7, kEntityPlayer, kObjectLocation1, kCursorHandKnock, kCursorHand);
+			getSound()->playSound(kEntityYasmin, "Har5001");
+			break;
+		}
 		break;
 
-	case kActionExcuseMe:
-		getSound()->excuseMe(kEntityYasmin);
+	case kAction135800432:
+		setup_nullfunction();
 		break;
 	}
 IMPLEMENT_FUNCTION_END
+
+//////////////////////////////////////////////////////////////////////////
+IMPLEMENT_NULL_FUNCTION(22, Yasmin)
 
 } // End of namespace LastExpress

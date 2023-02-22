@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,18 +15,16 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "common/debug.h"
 #include "common/file.h"
 
-#include "sludge/allfiles.h"
-#include "sludge/backdrop.h"
-#include "sludge/moreio.h"
+#include "sludge/graphics.h"
 #include "sludge/newfatal.h"
+#include "sludge/variable.h"
 
 namespace Sludge {
 
@@ -108,7 +106,7 @@ static int *s_matrixEffectData = NULL;
 static int s_matrixEffectBase = 0;
 #endif
 
-void blur_saveSettings(Common::WriteStream *stream) {
+void GraphicsManager::blur_saveSettings(Common::WriteStream *stream) {
 	if (s_matrixEffectData) {
 		stream->writeUint32LE(s_matrixEffectDivide);
 		stream->writeUint32LE(s_matrixEffectWidth);
@@ -134,7 +132,7 @@ static int *blur_allocateMemoryForEffect() {
 	return s_matrixEffectData;
 }
 
-void blur_loadSettings(Common::SeekableReadStream *stream) {
+void GraphicsManager::blur_loadSettings(Common::SeekableReadStream *stream) {
 	s_matrixEffectDivide = stream->readUint32LE();
 	s_matrixEffectWidth = stream->readUint32LE();
 	s_matrixEffectHeight = stream->readUint32LE();
@@ -150,7 +148,7 @@ void blur_loadSettings(Common::SeekableReadStream *stream) {
 	}
 }
 
-bool blur_createSettings(int numParams, VariableStack *&stack) {
+bool GraphicsManager::blur_createSettings(int numParams, VariableStack *&stack) {
 	bool createNullThing = true;
 	Common::String error = "";
 
@@ -166,7 +164,7 @@ bool blur_createSettings(int numParams, VariableStack *&stack) {
 				error = "Third and subsequent parameters in setBackgroundEffect should be arrays";
 				break;
 			} else {
-				int w = stackSize(justToCheckSizes->thisVar.varData.theStack);
+				int w = justToCheckSizes->thisVar.varData.theStack->getStackSize();
 				if (a) {
 					if (w != width) {
 						error = "Arrays in setBackgroundEffect must be the same size";
@@ -196,7 +194,7 @@ bool blur_createSettings(int numParams, VariableStack *&stack) {
 						for (int x = 0; x < width; x++) {
 							int arraySlot = x + (y * width);
 //							s_matrixEffectData[arraySlot] = (rand() % 4);
-							if (!getValueType(s_matrixEffectData[arraySlot], SVT_INT, eachNumber->thisVar)) {
+							if (!eachNumber->thisVar.getValueType(s_matrixEffectData[arraySlot], SVT_INT)) {
 								error = "";
 								break;
 							}
@@ -205,10 +203,10 @@ bool blur_createSettings(int numParams, VariableStack *&stack) {
 						trimStack(stack);
 					}
 				}
-				if (error.empty() && !getValueType(s_matrixEffectDivide, SVT_INT, stack->thisVar))
+				if (error.empty() && !stack->thisVar.getValueType(s_matrixEffectDivide, SVT_INT))
 					error = "";
 				trimStack(stack);
-				if (error.empty() && !getValueType(s_matrixEffectBase, SVT_INT, stack->thisVar))
+				if (error.empty() && !stack->thisVar.getValueType(s_matrixEffectBase, SVT_INT))
 					error = "";
 				trimStack(stack);
 				if (error.empty()) {
@@ -244,10 +242,6 @@ bool blur_createSettings(int numParams, VariableStack *&stack) {
 	return !createNullThing;
 }
 
-static inline int clampi(int i, int min, int max) {
-	return (i >= max) ? max : ((i <= min) ? min : i);
-}
-
 static inline void blur_createSourceLine(byte *createLine, byte *fromLine, int overlapOnLeft, int width) {
 	int miniX;
 	memcpy(createLine + overlapOnLeft * 4, fromLine, width * 4);
@@ -265,8 +259,7 @@ static inline void blur_createSourceLine(byte *createLine, byte *fromLine, int o
 	}
 }
 
-bool blurScreen() {
-#if 0
+bool GraphicsManager::blurScreen() {
 	if (s_matrixEffectWidth && s_matrixEffectHeight && s_matrixEffectDivide && s_matrixEffectData) {
 		byte *thisLine;
 		int y, x;
@@ -278,31 +271,20 @@ bool blurScreen() {
 		if (!checkNew(sourceLine))
 			return false;
 
-		int picWidth = sceneWidth;
-		int picHeight = sceneHeight;
-
-		if (!NPOT_textures) {
-			picWidth = getNextPOT(sceneWidth);
-			picHeight = getNextPOT(sceneHeight);
-		}
-
-		// Retrieve the texture
-		saveTexture(backdropTextureName, backdropTexture);
-
 		for (y = 0; y < s_matrixEffectHeight; y++) {
-			sourceLine[y] = new byte[(s_matrixEffectWidth - 1 + picWidth) * 4];
+			sourceLine[y] = new byte[(s_matrixEffectWidth - 1 + _sceneWidth) * 4];
 			ok &= (sourceLine[y] != NULL);
 		}
 
 		if (ok) {
 			for (y = 0; y < s_matrixEffectHeight; y++) {
-				int miniY = clampi(y - overlapAbove - 1, 0, sceneHeight - 1);
+				int miniY = CLIP<int>(y - overlapAbove - 1, 0, _sceneHeight - 1);
 
-				blur_createSourceLine(sourceLine[y], backdropTexture + miniY * picWidth * 4, overlapOnLeft, picWidth);
+				blur_createSourceLine(sourceLine[y], (byte *)_origBackdropSurface.getBasePtr(0, miniY), overlapOnLeft, _sceneWidth);
 			}
 
-			for (y = 0; y < sceneHeight; y++) {
-				thisLine = backdropTexture + y * picWidth * 4;
+			for (y = 0; y < (int)_sceneHeight; y++) {
+				thisLine = (byte *)_origBackdropSurface.getBasePtr(0, y);
 
 				//-------------------------
 				// Scroll source lines
@@ -314,11 +296,11 @@ bool blurScreen() {
 				sourceLine[s_matrixEffectHeight - 1] = tempLine;
 				{
 					int h = s_matrixEffectHeight - 1;
-					int miniY = clampi(y + (s_matrixEffectHeight - overlapAbove - 1), 0, sceneHeight - 1);
+					int miniY = CLIP<int>(y + (s_matrixEffectHeight - overlapAbove - 1), 0, _sceneHeight - 1);
 
-					blur_createSourceLine(sourceLine[h], backdropTexture + miniY * picWidth * 4, overlapOnLeft, picWidth);
+					blur_createSourceLine(sourceLine[h], (byte *)_origBackdropSurface.getBasePtr(0, miniY), overlapOnLeft, _sceneWidth);
 				}
-				for (x = 0; x < sceneWidth; x++) {
+				for (x = 0; x < (int)_sceneWidth; x++) {
 					int totalRed = 0;
 					int totalGreen = 0;
 					int totalBlue = 0;
@@ -358,13 +340,11 @@ bool blurScreen() {
 		for (y = 0; y < s_matrixEffectHeight; y++) {
 			delete sourceLine[y];
 		}
-		delete sourceLine;
+		delete[] sourceLine;
 		sourceLine = NULL;
 
-		texImage2D(GL_TEXTURE_2D, 0, GL_RGBA, picWidth, picHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, backdropTexture, backdropTextureName);
 		return true;
 	}
-#endif
 	return false;
 }
 

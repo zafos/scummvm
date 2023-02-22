@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995-1997 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,17 +18,20 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
+#include "common/file.h"
+
+#include "pegasus/compass.h"
 #include "pegasus/cursor.h"
 #include "pegasus/energymonitor.h"
 #include "pegasus/gamestate.h"
 #include "pegasus/pegasus.h"
 #include "pegasus/ai/ai_area.h"
 #include "pegasus/items/biochips/aichip.h"
+#include "pegasus/items/biochips/arthurchip.h"
 #include "pegasus/items/biochips/opticalchip.h"
 #include "pegasus/neighborhood/caldoria/caldoria.h"
 #include "pegasus/neighborhood/norad/constants.h"
@@ -492,7 +495,7 @@ enum {
 	kRedirectionCCDoorLeft = kNavAreaLeft + 174,
 	kRedirectionCCDoorTop = kNavAreaTop + 36,
 
-	kRedirectionRRDoorLeft = kNavAreaLeft + 418,
+	kRedirectionRRDoorLeft = kNavAreaLeft + 428,
 	kRedirectionRRDoorTop = kNavAreaTop + 32,
 
 	kRedirectionFDDoorLeft = kNavAreaLeft + 298,
@@ -535,6 +538,10 @@ enum {
 	kPegasusCantExit = false,
 	kPegasusCanExit = true
 };
+
+static const ExtraID kEasterEggJimenez = 1000;
+static const ExtraID kEasterEggCastillo = 1001;
+static const ExtraID kEasterEggSinclair = 1002;
 
 // Monitor modes
 enum {
@@ -612,7 +619,7 @@ enum {
 void RipTimer::initImage() {
 	_middle = -1;
 
-	_timerImage.getImageFromPICTResource(((PegasusEngine *)g_engine)->_resFork, kLeftRipPICTID);
+	_timerImage.getImageFromPICTResource(g_vm->_resFork, kLeftRipPICTID);
 
 	Common::Rect r;
 	_timerImage.getSurfaceBounds(r);
@@ -657,11 +664,12 @@ void RipTimer::timeChanged(const TimeValue newTime) {
 	}
 
 	if (newTime == getStop())
-		((PegasusEngine *)g_engine)->die(kDeathUncreatedInTSA);
+		g_vm->die(kDeathUncreatedInTSA);
 }
 
 FullTSA::FullTSA(InputHandler *nextHandler, PegasusEngine *owner) : Neighborhood(nextHandler, owner, "Full TSA", kFullTSAID),
-		_ripTimer(kNoDisplayElement), _sprite1(kNoDisplayElement), _sprite2(kNoDisplayElement), _sprite3(kNoDisplayElement) {
+		_extraMovie(kNoDisplayElement), _blankMovie(kNoDisplayElement), _playedSolvedMusicCue(false), _ripTimer(kNoDisplayElement),
+		_sprite1(kNoDisplayElement), _sprite2(kNoDisplayElement), _sprite3(kNoDisplayElement) {
 	setIsItemTaken(kJourneymanKey);
 	setIsItemTaken(kPegasusBiochip);
 	setIsItemTaken(kMapBiochip);
@@ -669,6 +677,12 @@ FullTSA::FullTSA(InputHandler *nextHandler, PegasusEngine *owner) : Neighborhood
 
 void FullTSA::init() {
 	Neighborhood::init();
+	_extraMovieCallBack.setNotification(&_neighborhoodNotification);
+	if (Common::File::exists("Images/TSA/Blank TSA.movie"))
+		_blankMovie.initFromMovieFile("Images/TSA/Blank TSA.movie");
+	_blankMovie.setVolume(_vm->getSoundFXLevel());
+	_blankMovie.setDisplayOrder(kNavMovieOrder + 1);
+	_blankMovie.startDisplaying();
 	_ripTimer.setDisplayOrder(kRipTimerOrder);
 	_ripTimer.startDisplaying();
 
@@ -694,6 +708,11 @@ void FullTSA::dieUncreatedInTSA() {
 void FullTSA::start() {
 	g_energyMonitor->stopEnergyDraining();
 
+	if (_vm->isDVD()) {
+		_entranceMusic.attachFader(&_entranceFader);
+		_entranceMusic.initFromAIFFFile("Sounds/TSA/TSA Entrance.32K.AIFF");
+		_entranceFader.setMasterVolume(_vm->getAmbienceLevel() / 2);
+	}
 	if (!GameState.getScoringEnterTSA()) {
 		_utilityFuse.primeFuse(GameState.getTSAFuseTimeLimit());
 		_utilityFuse.setFunctor(new Common::Functor0Mem<void, FullTSA>(this, &FullTSA::dieUncreatedInTSA));
@@ -832,6 +851,8 @@ uint FullTSA::getNumHints() {
 			if (GameState.getCurrentRoom() == kTSA0B && GameState.getTSA0BZoomedIn())
 				numHints = 3;
 			break;
+		default:
+			break;
 		}
 	}
 
@@ -853,24 +874,38 @@ void FullTSA::loadAmbientLoops() {
 	switch (GameState.getTSAState()) {
 	case kTSAPlayerDetectedRip:
 	case kTSAPlayerNeedsHistoricalLog:
-		if ((room >= kTSA16 && room <= kTSA0B) || (room >= kTSA21Cyan && room <= kTSA24Cyan) || (room >= kTSA21Red && room <= kTSA24Red))
-			loadLoopSound1("Sounds/TSA/TSA CLAXON.22K.AIFF", 0x100 / 4, 0, 0);
-		else if (room == kTSA25Cyan || room == kTSA25Red)
-			loadLoopSound1("Sounds/TSA/TSA CLAXON.22K.AIFF", 0x100 / 6, 0, 0);
-		else
-			loadLoopSound1("Sounds/TSA/TSA EchoClaxon.22K.AIFF", 0x100 / 4, 0, 0);
+		if (_vm->isDVD()) {
+			if ((room >= kTSA16 && room <= kTSA0B) || (room >= kTSA21Cyan && room <= kTSA24Cyan) || (room >= kTSA21Red && room <= kTSA24Red))
+				loadLoopSound1("Sounds/TSA/TSA CLAXON.44K.AIFF", 0x100 * 3 / 16, 0, 0);
+			else if (room == kTSA25Cyan || room == kTSA25Red)
+				loadLoopSound1("Sounds/TSA/TSA CLAXON.44K.AIFF", 0x100 / 8, 0, 0);
+			else
+				loadLoopSound1("Sounds/TSA/TSA EchoClaxon.22K.AIFF", 0x100 * 3 / 16, 0, 0);
+		} else {
+			if ((room >= kTSA16 && room <= kTSA0B) || (room >= kTSA21Cyan && room <= kTSA24Cyan) || (room >= kTSA21Red && room <= kTSA24Red))
+				loadLoopSound1("Sounds/TSA/TSA CLAXON.22K.AIFF", 0x100 / 4, 0, 0);
+			else if (room == kTSA25Cyan || room == kTSA25Red)
+				loadLoopSound1("Sounds/TSA/TSA CLAXON.22K.AIFF", 0x100 / 6, 0, 0);
+			else
+				loadLoopSound1("Sounds/TSA/TSA EchoClaxon.22K.AIFF", 0x100 / 4, 0, 0);
+		}
 		break;
 	default:
-		if (room >= kTSA00 && room <= kTSA02)
-			loadLoopSound1("Sounds/TSA/T01NAE.NEW.22K.AIFF");
-		else if (room >= kTSA03 && room <= kTSA15)
-			loadLoopSound1("Sounds/TSA/T01NAE.NEW.22K.AIFF");
-		else if (room >= kTSA16 && room <= kTSA0B)
-			loadLoopSound1("Sounds/TSA/T14SAEO1.22K.AIFF");
-		else if (room >= kTSA21Cyan && room <= kTSA25Red)
-			loadLoopSound1("Sounds/TSA/T15SAE01.22K.AIFF");
-		else if (room >= kTSA26 && room <= kTSA37)
-			loadLoopSound1("Sounds/TSA/T01NAE.NEW.22K.AIFF");
+		if (_vm->isDVD()) {
+			if ((room >= kTSA00 && room <= kTSA02) || (room >= kTSA03 && room <= kTSA15) || (room >= kTSA26 && room <= kTSA37))
+				loadLoopSound1("Sounds/TSA/T01NAE.NEW.32K.AIFF", 0x100 * 3 / 4, 0, 0);
+			else if (room >= kTSA16 && room <= kTSA0B)
+				loadLoopSound1("Sounds/TSA/T14SAEO1.32K.AIFF", 0x100 * 3 / 4, 0, 0);
+			else if (room >= kTSA21Cyan && room <= kTSA25Red)
+				loadLoopSound1("Sounds/TSA/T15SAE01.32K.AIFF", 0x100 * 3 / 4, 0, 0);
+		} else {
+			if ((room >= kTSA00 && room <= kTSA02) || (room >= kTSA03 && room <= kTSA15) || (room >= kTSA26 && room <= kTSA37))
+				loadLoopSound1("Sounds/TSA/T01NAE.NEW.22K.AIFF");
+			else if (room >= kTSA16 && room <= kTSA0B)
+				loadLoopSound1("Sounds/TSA/T14SAEO1.22K.AIFF");
+			else if (room >= kTSA21Cyan && room <= kTSA25Red)
+				loadLoopSound1("Sounds/TSA/T15SAE01.22K.AIFF");
+		}
 		break;
 	}
 }
@@ -947,6 +982,8 @@ short FullTSA::getStaticCompassAngle(const RoomID room, const DirectionConstant 
 	case kTSA37:
 		result -= kCompassShift * 2;
 		break;
+	default:
+		break;
 	}
 
 	return result;
@@ -983,6 +1020,8 @@ void FullTSA::getExitCompassMove(const ExitTable::Entry &exitEntry, FaderMoveSpe
 				getStaticCompassAngle(exitEntry.room, exitEntry.direction) + kCompassShift * 3 / 2);
 		compassMove.insertFaderKnot(exitEntry.movieStart + kFullTSAFrameDuration * 105,
 				getStaticCompassAngle(exitEntry.exitRoom, exitEntry.exitDirection));
+		break;
+	default:
 		break;
 	}
 }
@@ -1092,6 +1131,8 @@ TimeValue FullTSA::getViewTime(const RoomID room, const DirectionConstant direct
 			break;
 		}
 		break;
+	default:
+		break;
 	}
 
 	if (extraID != 0xffffffff) {
@@ -1124,6 +1165,50 @@ void FullTSA::getExtraEntry(const uint32 id, ExtraTable::Entry &extraEntry) {
 		extraEntry.movieStart += kFullTSAFrameDuration * 3;
 }
 
+void FullTSA::showViewFrame(TimeValue viewTime) {
+	if ((int32)viewTime >= 0) {
+		_turnPush.hide();
+		_navMovie.stop();
+		_navMovie.setFlags(0);
+		if (_blankMovie.isMovieValid() &&
+			(GameState.getTSAState() == kRobotsAtCommandCenter ||
+			GameState.getTSAState() == kRobotsAtFrontDoor ||
+			GameState.getTSAState() == kRobotsAtReadyRoom) &&
+			(GameState.getCurrentRoom() == kTSA0A ||
+			GameState.getCurrentRoom() == kTSA06) &&
+			(GameState.getCurrentDirection() == kEast ||
+			GameState.getCurrentDirection() == kWest)) {
+			viewTime = 0;
+			if (GameState.getCurrentRoom() == kTSA06)
+				viewTime = 2 * _blankMovie.getScale();
+			if (GameState.getCurrentDirection() == kWest)
+				viewTime += _blankMovie.getScale();
+
+			_navMovie.hide();
+			_blankMovie.setSegment(0, _blankMovie.getDuration());
+			_blankMovie.setTime(viewTime);
+
+			Common::Rect pushBounds;
+			_turnPush.getBounds(pushBounds);
+
+			_blankMovie.moveElementTo(pushBounds.left, pushBounds.top);
+			_blankMovie.show();
+			_blankMovie.redrawMovieWorld();
+		} else {
+			_blankMovie.hide();
+			_navMovie.setSegment(0, _navMovie.getDuration());
+			_navMovie.setTime(viewTime);
+
+			Common::Rect pushBounds;
+			_turnPush.getBounds(pushBounds);
+
+			_navMovie.moveElementTo(pushBounds.left, pushBounds.top);
+			_navMovie.show();
+			_navMovie.redrawMovieWorld();
+		}
+	}
+}
+
 void FullTSA::pickedUpItem(Item *item) {
 	BiochipItem *biochip;
 
@@ -1135,6 +1220,8 @@ void FullTSA::pickedUpItem(Item *item) {
 		biochip = (BiochipItem *)_vm->getAllItems().findItemByID(kMapBiochip);
 		_vm->addItemToBiochips(biochip);
 		GameState.setScoringGotPegasusBiochip(true);
+		break;
+	default:
 		break;
 	}
 }
@@ -1203,9 +1290,124 @@ void FullTSA::startDoorOpenMovie(const TimeValue startTime, const TimeValue stop
 			return;
 		}
 		break;
+	default:
+		break;
 	}
 
 	Neighborhood::startDoorOpenMovie(startTime, stopTime);
+}
+
+void FullTSA::startTurnPush(const TurnDirection turnDirection, const TimeValue newView, const DirectionConstant nextDir) {
+	if (g_AIArea)
+		g_AIArea->lockAIOut();
+
+	_vm->_cursor->hide();
+
+	GameState.setNextDirection(nextDir);
+
+	_interruptionFilter = kFilterNoInput;
+	_turnPush.stopFader();
+
+	// Set up callback.
+	_turnPushCallBack.setCallBackFlag(kTurnCompletedFlag);
+	_turnPushCallBack.scheduleCallBack(kTriggerAtStop, 0, 0);
+
+	// Stop nav movie.
+	_navMovie.stop();
+	_navMovie.setFlags(0);
+
+	if (_blankMovie.isMovieValid() &&
+		(GameState.getTSAState() == kRobotsAtCommandCenter ||
+		GameState.getTSAState() == kRobotsAtFrontDoor ||
+		GameState.getTSAState() == kRobotsAtReadyRoom) &&
+		(GameState.getCurrentRoom() == kTSA0A || GameState.getCurrentRoom() == kTSA06) &&
+		(nextDir == kEast || nextDir == kWest)) {
+		TimeValue newRobotView = 0;
+		if (GameState.getCurrentRoom() == kTSA06)
+			newRobotView = 2 * _blankMovie.getScale();
+		if (nextDir == kWest)
+			newRobotView += _blankMovie.getScale();
+
+		_blankMovie.setSegment(0, _blankMovie.getDuration());
+
+		_pushIn.initFromMovieFrame(_blankMovie.getMovie(), newRobotView);
+		_turnPush.setInAndOutElements(&_pushIn, &_navMovie);
+	} else {
+		// Set segment of nav movie to whole movie, so that subsequent initFromMovieFrame
+		// will work.
+		_navMovie.setSegment(0, _navMovie.getDuration());
+
+		_pushIn.initFromMovieFrame(_navMovie.getMovie(), newView);
+		if (_blankMovie.isMovieValid() &&
+			(GameState.getTSAState() == kRobotsAtCommandCenter ||
+			GameState.getTSAState() == kRobotsAtFrontDoor ||
+			GameState.getTSAState() == kRobotsAtReadyRoom) &&
+			(GameState.getCurrentRoom() == kTSA0A ||
+			GameState.getCurrentRoom() == kTSA06))
+			_turnPush.setInAndOutElements(&_pushIn, &_blankMovie);
+		else
+			_turnPush.setInAndOutElements(&_pushIn, &_navMovie);
+	}
+
+	_blankMovie.hide();
+	_navMovie.hide();
+
+	switch (turnDirection) {
+	case kTurnLeft:
+		_turnPush.setSlideDirection(kSlideRightMask);
+		break;
+	case kTurnRight:
+		_turnPush.setSlideDirection(kSlideLeftMask);
+		break;
+	case kTurnUp:
+		_turnPush.setSlideDirection(kSlideDownMask);
+		break;
+	case kTurnDown:
+		_turnPush.setSlideDirection(kSlideUpMask);
+		break;
+	}
+
+	_turnPush.show();
+
+	FaderMoveSpec moveSpec;
+	moveSpec.makeTwoKnotFaderSpec(60, 0, 0, 15, 1000);
+	_turnPush.startFader(moveSpec);
+
+	if (g_compass) {
+		_turnPush.pauseFader();
+
+		int32 startAngle = getStaticCompassAngle(GameState.getCurrentRoom(), GameState.getCurrentDirection());
+		int32 stopAngle = getStaticCompassAngle(GameState.getCurrentRoom(), nextDir);
+
+		if (turnDirection == kTurnLeft) {
+			if (startAngle < stopAngle)
+				startAngle += 360;
+		} else {
+			if (stopAngle < startAngle)
+				stopAngle += 360;
+		}
+
+		FaderMoveSpec turnSpec;
+		_turnPush.getCurrentFaderMove(turnSpec);
+
+		FaderMoveSpec compassMove;
+		compassMove.makeTwoKnotFaderSpec(turnSpec.getFaderScale(), turnSpec.getNthKnotTime(0), startAngle, turnSpec.getNthKnotTime(1), stopAngle);
+		g_compass->startFader(compassMove);
+	}
+
+	_turnPushCallBack.cancelCallBack();
+	_turnPush.continueFader();
+
+	do {
+		InputDevice.pumpEvents();
+
+		_vm->checkCallBacks();
+		_vm->refreshDisplay();
+		_vm->_system->delayMillis(10);
+	} while (_turnPush.isFading());
+
+	_turnPush.stopFader();
+	_neighborhoodNotification.setNotificationFlags(kTurnCompletedFlag, kTurnCompletedFlag);
 }
 
 InputBits FullTSA::getInputFilter() {
@@ -1220,6 +1422,8 @@ InputBits FullTSA::getInputFilter() {
 	case kTSA37:
 		// Can't move forward in Pegasus. Only press the exit button.
 		result &= ~(kFilterUpButton | kFilterUpAuto);
+		break;
+	default:
 		break;
 	}
 
@@ -1240,6 +1444,8 @@ void FullTSA::turnLeft() {
 	case MakeRoomView(kTSA0B, kEast):
 		shutDownComparisonMonitor();
 		break;
+	default:
+		break;
 	}
 
 	Neighborhood::turnLeft();
@@ -1259,20 +1465,56 @@ void FullTSA::turnRight() {
 	case MakeRoomView(kTSA0B, kEast):
 		shutDownComparisonMonitor();
 		break;
+	default:
+		break;
 	}
 
 	Neighborhood::turnRight();
 }
 
 void FullTSA::openDoor() {
+	FaderMoveSpec spec;
+
 	switch (GameState.getCurrentRoomAndView()) {
+	case MakeRoomView(kTSA14, kSouth):
+		if (_vm->isDVD()) {
+			spec.makeTwoKnotFaderSpec(10, 0, 255, 5, 0);
+			_entranceFader.startFader(spec);
+		}
+		break;
 	case MakeRoomView(kTSA15, kSouth):
+		if (_vm->isDVD()) {
+			spec.makeTwoKnotFaderSpec(10, 0, 255, 5, 0);
+			_entranceFader.startFader(spec);
+		}
 		if (GameState.getTSAState() == kTSAPlayerNeedsHistoricalLog || GameState.getTSAState() == kRobotsAtFrontDoor)
 			setCurrentAlternate(kAltTSARedAlert);
+		break;
+	default:
 		break;
 	}
 
 	Neighborhood::openDoor();
+}
+
+void FullTSA::doorOpened() {
+	if (_vm->isDVD()) {
+		switch (GameState.getCurrentRoomAndView()) {
+		case MakeRoomView(kTSA02, kNorth):
+			if (_lastExtra == kTSA02NorthDoorWithAgent3 && g_arthurChip) {
+				if (_vm->getRandomBit())
+					g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBB36", kArthurTSASawAgent3);
+				else
+					g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBB37", kArthurTSASawAgent3);
+			}
+			break;
+		case MakeRoomView(kTSA16, kSouth):
+		case MakeRoomView(kTSA21Cyan, kSouth):
+			_entranceMusic.stopSound();
+			break;
+		}
+	}
+	Neighborhood::doorOpened();
 }
 
 CanMoveForwardReason FullTSA::canMoveForward(ExitTable::Entry &entry) {
@@ -1280,6 +1522,27 @@ CanMoveForwardReason FullTSA::canMoveForward(ExitTable::Entry &entry) {
 		return kCantMoveBlocked;
 
 	return Neighborhood::canMoveForward(entry);
+}
+
+void FullTSA::moveForward() {
+	ExitTable::Entry exitEntry;
+	CanMoveForwardReason moveReason = kCanMoveForward;
+	FaderMoveSpec spec;
+
+	if (_vm->isDVD()) {
+		moveReason = canMoveForward(exitEntry);
+		if (moveReason == kCanMoveForward &&
+			GameState.getCurrentRoomAndView() == MakeRoomView(kTSA02, kNorth) &&
+			!GameState.allTimeZonesFinished()) {
+			_entranceMusic.playSound();
+			spec.makeOneKnotFaderSpec(255);
+			_entranceFader.startFader(spec);
+		}
+	}
+	Neighborhood::moveForward();
+	if (moveReason == kCanMoveForward && GameState.getCurrentRoomAndView() == MakeRoomView(kTSA01, kSouth) &&
+		GameState.allTimeZonesFinished() && g_arthurChip)
+		g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA51", kArthurTSALeaving);
 }
 
 CanOpenDoorReason FullTSA::canOpenDoor(DoorTable::Entry &entry) {
@@ -1295,6 +1558,8 @@ CanOpenDoorReason FullTSA::canOpenDoor(DoorTable::Entry &entry) {
 	case MakeRoomView(kTSA16, kNorth):
 		if (GameState.getTSACommandCenterLocked())
 			return kCantOpenLocked;
+		break;
+	default:
 		break;
 	}
 
@@ -1322,6 +1587,7 @@ void FullTSA::downButton(const Input &input) {
 		break;
 	default:
 		Neighborhood::downButton(input);
+		break;
 	}
 }
 
@@ -1355,6 +1621,18 @@ void FullTSA::activateHotspots() {
 		if (!GameState.getTSAFrontDoorUnlockedOutside())
 			_vm->getAllHotspots().activateOneHotspot(kTSA02DoorSpotID);
 		break;
+	case MakeRoomView(kTSA0A, kEast):
+		if (GameState.getTSAState() == kRobotsAtCommandCenter ||
+			GameState.getTSAState() == kRobotsAtFrontDoor ||
+			GameState.getTSAState() == kRobotsAtReadyRoom)
+			_vm->getAllHotspots().deactivateOneHotspot(kTSA0AEastSpotID);
+		break;
+	case MakeRoomView(kTSA0A, kWest):
+		if (GameState.getTSAState() == kRobotsAtCommandCenter ||
+			GameState.getTSAState() == kRobotsAtFrontDoor ||
+			GameState.getTSAState() == kRobotsAtReadyRoom)
+			_vm->getAllHotspots().deactivateOneHotspot(kTSA0AWastSpotID);
+		break;
 	case MakeRoomView(kTSA0B, kEast):
 		if (GameState.getTSA0BZoomedIn())
 			switch (GameState.getTSAState()) {
@@ -1370,6 +1648,8 @@ void FullTSA::activateHotspots() {
 					_vm->getAllHotspots().activateOneHotspot(kTSA0BEastCompareWSCSpotID);
 				}
 				break;
+			default:
+				break;
 			}
 		break;
 	case MakeRoomView(kTSA0B, kNorth):
@@ -1382,7 +1662,11 @@ void FullTSA::activateHotspots() {
 				_vm->getAllHotspots().activateOneHotspot(kTSA0BNorthRobotsToReadyRoomSpotID);
 				_vm->getAllHotspots().activateOneHotspot(kTSA0BNorthRobotsToFrontDoorSpotID);
 				break;
+			default:
+				break;
 			}
+		break;
+	default:
 		break;
 	}
 }
@@ -1399,7 +1683,10 @@ void FullTSA::clickInHotspot(const Input &input, const Hotspot *clickedSpot) {
 		Neighborhood::clickInHotspot(input, clickedSpot);
 		break;
 	case kTSA03EastJimenezSpotID:
-		startExtraLongSequence(kTSA03JimenezZoomIn, kTSA03JimenezZoomOut, kExtraCompletedFlag, kFilterNoInput);
+		if (_vm->isDVD() && JMPPPInput::isEasterEggModifierInput(input))
+			startExtraSequence(kEasterEggJimenez, kExtraCompletedFlag, kFilterNoInput);
+		else
+			startExtraLongSequence(kTSA03JimenezZoomIn, kTSA03JimenezZoomOut, kExtraCompletedFlag, kFilterNoInput);
 		break;
 	case kTSA03WestCrenshawSpotID:
 		startExtraLongSequence(kTSA03CrenshawZoomIn, kTSA03CrenshawZoomOut, kExtraCompletedFlag, kFilterNoInput);
@@ -1408,10 +1695,16 @@ void FullTSA::clickInHotspot(const Input &input, const Hotspot *clickedSpot) {
 		startExtraLongSequence(kTSA04MatsumotoZoomIn, kTSA04MatsumotoZoomOut, kExtraCompletedFlag, kFilterNoInput);
 		break;
 	case kTSA04WestCastilleSpotID:
-		startExtraLongSequence(kTSA04CastilleZoomIn, kTSA04CastilleZoomOut, kExtraCompletedFlag, kFilterNoInput);
+		if (_vm->isDVD() && JMPPPInput::isEasterEggModifierInput(input))
+			startExtraSequence(kEasterEggCastillo, kExtraCompletedFlag, kFilterNoInput);
+		else
+			startExtraLongSequence(kTSA04CastilleZoomIn, kTSA04CastilleZoomOut, kExtraCompletedFlag, kFilterNoInput);
 		break;
 	case kTSA05EastSinclairSpotID:
-		startExtraLongSequence(kTSA05SinclairZoomIn, kTSA05SinclairZoomOut, kExtraCompletedFlag, kFilterNoInput);
+		if (_vm->isDVD() && JMPPPInput::isEasterEggModifierInput(input))
+			startExtraSequence(kEasterEggSinclair, kExtraCompletedFlag, kFilterNoInput);
+		else
+			startExtraLongSequence(kTSA05SinclairZoomIn, kTSA05SinclairZoomOut, kExtraCompletedFlag, kFilterNoInput);
 		break;
 	case kTSA05WestWhiteSpotID:
 		startExtraLongSequence(kTSA05WhiteZoomIn, kTSA05WhiteZoomOut, kExtraCompletedFlag, kFilterNoInput);
@@ -1518,6 +1811,8 @@ void FullTSA::clickInHotspot(const Input &input, const Hotspot *clickedSpot) {
 			_sprite2.setCurrentFrameIndex(kRedirectionNewTargetSprite);
 			startExtraSequence(kTSA0BRobotsFromReadyRoomToCommandCenter, kExtraCompletedFlag, kFilterNoInput);
 			break;
+		default:
+			break;
 		}
 		break;
 	case kTSA0BNorthRobotsToReadyRoomSpotID:
@@ -1539,6 +1834,8 @@ void FullTSA::clickInHotspot(const Input &input, const Hotspot *clickedSpot) {
 			break;
 		case kRobotsAtReadyRoom:
 			// Nothing
+			break;
+		default:
 			break;
 		}
 		break;
@@ -1562,12 +1859,20 @@ void FullTSA::clickInHotspot(const Input &input, const Hotspot *clickedSpot) {
 			_sprite2.setCurrentFrameIndex(kRedirectionNewTargetSprite);
 			startExtraSequence(kTSA0BRobotsFromReadyRoomToFrontDoor, kExtraCompletedFlag, kFilterNoInput);
 			break;
+		default:
+			break;
 		}
 		break;
 
 	// Pegasus
 	case kTSA37NorthJumpToPrehistoricSpotID:
 		startExtraSequence(kTSA37PegasusDepart, kExtraCompletedFlag, kFilterNoInput);
+		if (g_arthurChip) {
+			if (_vm->getRandomBit())
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA30", kArthurTSAUsedPegasus);
+			else
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA35", kArthurTSAUsedPegasus);
+		}
 		break;
 	case kTSA37NorthExitSpotID:
 		_sprite2.setCurrentFrameIndex(1);
@@ -1794,7 +2099,9 @@ void FullTSA::initializeComparisonMonitor(const int newMode, const ExtraID compa
 		}
 	}
 
-	_interruptionFilter = kFilterAllInput;
+	// Only allow input if we're not in the middle of series of queue requests.
+	if (actionQueueEmpty())
+		_interruptionFilter = kFilterAllInput;
 }
 
 void FullTSA::playLeftComparison() {
@@ -1905,7 +2212,7 @@ void FullTSA::playRightComparison() {
 // TSA state is kTSABossSawHistoricalLog.
 void FullTSA::startRobotGame() {
 	requestExtraSequence(kTSA0BNorthCantChangeHistory, 0, kFilterNoInput);
-	requestExtraSequence(kTSA0BAIInterruption, 0, kFilterNoInput);
+	requestExtraSequence(kTSA0BAIInterruption, kExtraCompletedFlag, kFilterNoInput);
 	requestExtraSequence(kTSA0BShowGuardRobots, 0, kFilterNoInput);
 	requestExtraSequence(kTSA0BRobotsToCommandCenter, kExtraCompletedFlag, kFilterNoInput);
 }
@@ -1919,7 +2226,7 @@ void FullTSA::startUpRobotMonitor() {
 	_sprite1.addPICTResourceFrame(kRedirectionRRRolloverPICTID, true,
 			kRedirectionRRRolloverLeft - kRedirectionSprite1Left,
 			kRedirectionRRRolloverTop - kRedirectionSprite1Top);
-	_sprite1.addPICTResourceFrame(kRedirectionFDRolloverPICTID, false,
+	_sprite1.addPICTResourceFrame(kRedirectionFDRolloverPICTID, true,
 			kRedirectionFDRolloverLeft - kRedirectionSprite1Left,
 			kRedirectionFDRolloverTop - kRedirectionSprite1Top);
 	_sprite1.addPICTResourceFrame(kRedirectionCCDoorPICTID, true,
@@ -1928,7 +2235,7 @@ void FullTSA::startUpRobotMonitor() {
 	_sprite1.addPICTResourceFrame(kRedirectionRRDoorPICTID, true,
 			kRedirectionRRDoorLeft - kRedirectionSprite1Left,
 			kRedirectionRRDoorTop - kRedirectionSprite1Top);
-	_sprite1.addPICTResourceFrame(kRedirectionFDDoorPICTID, false,
+	_sprite1.addPICTResourceFrame(kRedirectionFDDoorPICTID, true,
 			kRedirectionFDDoorLeft - kRedirectionSprite1Left,
 			kRedirectionFDDoorTop - kRedirectionSprite1Top);
 	_sprite1.addPICTResourceFrame(kRedirectionClosePICTID, false,
@@ -1953,6 +2260,8 @@ void FullTSA::startUpRobotMonitor() {
 		break;
 	case kRobotsAtReadyRoom:
 		showExtraView(kTSA0BNorthRobotsAtRRView);
+		break;
+	default:
 		break;
 	}
 }
@@ -1990,6 +2299,8 @@ void FullTSA::checkContinuePoint(const RoomID room, const DirectionConstant dire
 	case MakeRoomView(kTSA26, kNorth):
 		makeContinuePoint();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -2013,11 +2324,14 @@ void FullTSA::arriveAt(const RoomID room, const DirectionConstant direction) {
 			loopExtraSequence(kTSATransporterArrowLoop, 0);
 		}
 		break;
+	case MakeRoomView(kTSA01, kNorth):
+		if (g_arthurChip)
+			g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA22", kArthurTSAEnteredCave);
+		break;
 	case MakeRoomView(kTSA03, kNorth):
 	case MakeRoomView(kTSA05, kNorth):
 	case MakeRoomView(kTSA0A, kNorth):
 	case MakeRoomView(kTSA06, kNorth):
-	case MakeRoomView(kTSA07, kNorth):
 		if (_utilityFuse.isFuseLit())
 			_utilityFuse.stopFuse();
 		GameState.setScoringEnterTSA(true);
@@ -2027,6 +2341,13 @@ void FullTSA::arriveAt(const RoomID room, const DirectionConstant direction) {
 			_utilityFuse.stopFuse();
 		if (!GameState.getTSASeenRobotGreeting())
 			startExtraSequence(kTSA04NorthRobotGreeting, kExtraCompletedFlag, kFilterNoInput);
+		break;
+	case MakeRoomView(kTSA07, kNorth):
+		if (_utilityFuse.isFuseLit())
+			_utilityFuse.stopFuse();
+		GameState.setScoringEnterTSA(true);
+		if (g_arthurChip)
+			g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA23", kArthurTSAReachedJunction);
 		break;
 	case MakeRoomView(kTSA03, kSouth):
 		GameState.setTSAFrontDoorUnlockedInside(GameState.getTSAState() == kRobotsAtFrontDoor || GameState.allTimeZonesFinished());
@@ -2049,6 +2370,8 @@ void FullTSA::arriveAt(const RoomID room, const DirectionConstant direction) {
 			case kRobotsAtReadyRoom:
 				startUpRobotMonitor();
 				break;
+			default:
+				break;
 			}
 		} else {
 			setCurrentActivation(kActivateTSA0BZoomedOut);
@@ -2063,6 +2386,8 @@ void FullTSA::arriveAt(const RoomID room, const DirectionConstant direction) {
 				break;
 			case kTSAPlayerGotHistoricalLog:
 				startExtraSequence(kTSA0BNorthHistLogOpen, kExtraCompletedFlag, kFilterNoInput);
+				break;
+			default:
 				break;
 			}
 		}
@@ -2091,6 +2416,8 @@ void FullTSA::arriveAt(const RoomID room, const DirectionConstant direction) {
 			case kRobotsAtReadyRoom:
 				initializeComparisonMonitor(kMonitorNeutral, 0);
 				break;
+			default:
+				break;
 			}
 		} else {
 			setCurrentActivation(kActivateTSA0BZoomedOut);
@@ -2112,11 +2439,20 @@ void FullTSA::arriveAt(const RoomID room, const DirectionConstant direction) {
 		arriveAtTSA25Red();
 		break;
 	case MakeRoomView(kTSA34, kSouth):
-		if (GameState.getLastRoom() == kTSA37)
+		if (GameState.getLastRoom() == kTSA37) {
 			closeDoorOffScreen(kTSA37, kNorth);
+			if (_vm->isDVD() && GameState.allTimeZonesFinished() && !_playedSolvedMusicCue) {
+				_solvedMusicCue.initFromAIFFFile("Sounds/TSA/TSA NORM.32K.AIFF");
+				_solvedMusicCue.setVolume(_vm->getAmbienceLevel());
+				_solvedMusicCue.playSound();
+				_playedSolvedMusicCue = true;
+			}
+		}
 		break;
 	case MakeRoomView(kTSA37, kNorth):
 		arriveAtTSA37();
+		break;
+	default:
 		break;
 	}
 }
@@ -2144,6 +2480,8 @@ void FullTSA::checkRobotLocations(const RoomID room, const DirectionConstant dir
 		case kRobotsAtReadyRoom:
 			setCurrentAlternate(kAltTSARobotsAtReadyRoom);
 			break;
+		default:
+			break;
 		}
 		break;
 	case kTSA16:
@@ -2151,7 +2489,8 @@ void FullTSA::checkRobotLocations(const RoomID room, const DirectionConstant dir
 			switch (GameState.getTSAState()) {
 			case kRobotsAtCommandCenter:
 				if (!_privateFlags.getFlag(kTSAPrivateSeenRobotWarningFlag)) {
-					g_AIArea->playAIMovie(kRightAreaSignature, "Images/AI/TSA/XT11WB", false, kWarningInterruption);
+					if (_vm->isChattyAI())
+						g_AIArea->playAIMovie(kRightAreaSignature, "Images/AI/TSA/XT11WB", false, kWarningInterruption);
 					_privateFlags.setFlag(kTSAPrivateSeenRobotWarningFlag, true);
 				}
 				break;
@@ -2161,8 +2500,12 @@ void FullTSA::checkRobotLocations(const RoomID room, const DirectionConstant dir
 			case kRobotsAtReadyRoom:
 				setCurrentAlternate(kAltTSARobotsAtReadyRoom);
 				break;
+			default:
+				break;
 			}
 		}
+		break;
+	default:
 		break;
 	}
 }
@@ -2208,6 +2551,8 @@ void FullTSA::arriveAtTSA37() {
 	case kPlayerFinishedWithTSA:
 		initializePegasusButtons(true);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -2245,6 +2590,8 @@ void FullTSA::turnTo(const DirectionConstant newDirection) {
 			if (GameState.getTSA0BZoomedIn())
 				startUpComparisonMonitor();
 			break;
+		default:
+			break;
 		}
 		break;
 	case MakeRoomView(kTSA0B, kNorth):
@@ -2281,6 +2628,8 @@ void FullTSA::turnTo(const DirectionConstant newDirection) {
 			if (GameState.getTSA0BZoomedIn())
 				startExtraSequence(kTSA0BShowGuardRobots, kExtraCompletedFlag, kFilterNoInput);
 			break;
+		default:
+			break;
 		}
 		break;
 	case MakeRoomView(kTSA0B, kWest):
@@ -2305,7 +2654,8 @@ void FullTSA::turnTo(const DirectionConstant newDirection) {
 		switch (GameState.getTSAState()) {
 		case kRobotsAtCommandCenter:
 			if (!_privateFlags.getFlag(kTSAPrivateSeenRobotWarningFlag)) {
-				g_AIArea->playAIMovie(kRightAreaSignature, "Images/AI/TSA/XT11WB", false, kWarningInterruption);
+				if (_vm->isChattyAI())
+					g_AIArea->playAIMovie(kRightAreaSignature, "Images/AI/TSA/XT11WB", false, kWarningInterruption);
 				_privateFlags.setFlag(kTSAPrivateSeenRobotWarningFlag, true);
 			}
 			break;
@@ -2314,6 +2664,8 @@ void FullTSA::turnTo(const DirectionConstant newDirection) {
 			break;
 		case kRobotsAtReadyRoom:
 			setCurrentAlternate(kAltTSARobotsAtReadyRoom);
+			break;
+		default:
 			break;
 		}
 		break;
@@ -2343,6 +2695,8 @@ void FullTSA::turnTo(const DirectionConstant newDirection) {
 
 		setCurrentActivation(kActivateHotSpotAlways);
 		break;
+	default:
+		break;
 	}
 
 	// Make sure the TBP monitor is forced neutral.
@@ -2371,6 +2725,67 @@ void FullTSA::closeDoorOffScreen(const RoomID room, const DirectionConstant) {
 	case kTSA37:
 		playSpotSoundSync(kTSAPegasusDoorCloseIn, kTSAPegasusDoorCloseOut);
 		break;
+	default:
+		break;
+	}
+}
+
+void FullTSA::startExtraSequence(const ExtraID extraID, const NotificationFlags flags, const InputBits interruptionFilter) {
+	static const TimeValue times[3][2] = {
+		{ 0, 11720 },
+		{ 11720, 19840 },
+		{ 19840, 29960 }
+	};
+	TimeValue segmentStart = 0, segmentStop = 0;
+	bool loopSequence = false;
+	Common::Rect pushBounds;
+	NotificationFlags extraFlags;
+
+	switch (extraID) {
+	case kEasterEggJimenez:
+	case kEasterEggCastillo:
+	case kEasterEggSinclair:
+		_turnPush.getBounds(pushBounds);
+		_extraMovie.initFromMovieFile("Images/TSA/Wacky TSA.movie");
+		segmentStart = times[extraID - 1000][0];
+		segmentStop = times[extraID - 1000][1];
+		loopSequence = false;
+
+		_lastExtra = extraID;
+		_turnPush.hide();
+
+		if (!loopSequence && g_AIArea)
+			g_AIArea->lockAIOut();
+
+		extraFlags = flags;
+		_interruptionFilter = interruptionFilter;
+		// Stop the nav movie before doing anything else
+		_navMovie.stop();
+		_navMovie.stopDisplaying();
+
+		_extraMovie.setVolume(_vm->getSoundFXLevel());
+		_extraMovie.moveElementTo(pushBounds.left, pushBounds.top);
+		_extraMovie.setDisplayOrder(kNavMovieOrder + 1);
+		_extraMovie.startDisplaying();
+		_extraMovie.show();
+		_extraMovie.setFlags(0);
+		_extraMovie.setSegment(segmentStart, segmentStop);
+		_extraMovie.setTime(segmentStart);
+		if (loopSequence)
+			_extraMovie.setFlags(kLoopTimeBase);
+		else
+			extraFlags |= kNeighborhoodMovieCompletedFlag;
+		_extraMovieCallBack.cancelCallBack();
+		_extraMovieCallBack.initCallBack(&_extraMovie, kCallBackAtExtremes);
+		if (extraFlags != 0) {
+			_extraMovieCallBack.setCallBackFlag(extraFlags);
+			_extraMovieCallBack.scheduleCallBack(kTriggerAtStop, 0, 0);
+		}
+		_extraMovie.start();
+		break;
+	default:
+		Neighborhood::startExtraSequence(extraID, flags, interruptionFilter);
+		break;
 	}
 }
 
@@ -2385,18 +2800,23 @@ void FullTSA::receiveNotification(Notification *notification, const Notification
 			// which may end up starting another sequence...
 			turnTo(kNorth);
 			break;
+		default:
+			break;
 		}
 	}
 
 	Neighborhood::receiveNotification(notification, flags);
 
 	InventoryItem *item;
+	bool doArthurSawBustMovie, doArthurRedirectedRobotsMovie;
 
 	if ((flags & kExtraCompletedFlag) != 0) {
 		// Only allow input if we're not in the middle of series of queue requests.
 		if (actionQueueEmpty())
 			_interruptionFilter = kFilterAllInput;
 
+		doArthurSawBustMovie = false;
+		doArthurRedirectedRobotsMovie = false;
 		switch (lastExtra) {
 		case kTSAGTCardSwipe:
 			item = (InventoryItem *)_vm->getAllItems().findItemByID(kKeyCard);
@@ -2427,21 +2847,43 @@ void FullTSA::receiveNotification(Notification *notification, const Notification
 			break;
 		case kTSA03JimenezZoomIn:
 			GameState.setScoringSawBust1(true);
+			doArthurSawBustMovie = true;
 			break;
 		case kTSA03CrenshawZoomIn:
 			GameState.setScoringSawBust2(true);
+			doArthurSawBustMovie = true;
 			break;
 		case kTSA04MatsumotoZoomIn:
 			GameState.setScoringSawBust3(true);
+			doArthurSawBustMovie = true;
 			break;
 		case kTSA04CastilleZoomIn:
 			GameState.setScoringSawBust4(true);
+			doArthurSawBustMovie = true;
 			break;
 		case kTSA05SinclairZoomIn:
 			GameState.setScoringSawBust5(true);
+			doArthurSawBustMovie = true;
 			break;
 		case kTSA05WhiteZoomIn:
 			GameState.setScoringSawBust6(true);
+			doArthurSawBustMovie = true;
+			break;
+		case kEasterEggJimenez:
+		case kEasterEggCastillo:
+		case kEasterEggSinclair:
+			_extraMovie.stopDisplaying();
+			_extraMovie.releaseMovie();
+			_navMovie.startDisplaying();
+			doArthurSawBustMovie = true;
+			break;
+		case kTSA0AEastRobot:
+			if (g_arthurChip)
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA48", kArthurTSAClickedRobot1);
+			break;
+		case kTSA0AWestRobot:
+			if (g_arthurChip)
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA53", kArthurTSAClickedRobot2);
 			break;
 
 		// Command center
@@ -2458,6 +2900,8 @@ void FullTSA::receiveNotification(Notification *notification, const Notification
 			case kRobotsAtFrontDoor:
 			case kRobotsAtReadyRoom:
 				startUpComparisonMonitor();
+				break;
+			default:
 				break;
 			}
 			break;
@@ -2520,6 +2964,8 @@ void FullTSA::receiveNotification(Notification *notification, const Notification
 			case kRobotsAtReadyRoom:
 				startExtraSequence(kTSA0BShowGuardRobots, kExtraCompletedFlag, kFilterNoInput);
 				break;
+			default:
+				break;
 			}
 			break;
 		case kTSA0BNorthZoomOut:
@@ -2545,14 +2991,20 @@ void FullTSA::receiveNotification(Notification *notification, const Notification
 		case kTSA0BShowGuardRobots:
 			startUpRobotMonitor();
 			// Fall through
+		case kTSA0BRobotsFromCommandCenterToFrontDoor:
+		case kTSA0BRobotsFromReadyRoomToFrontDoor:
+			doArthurRedirectedRobotsMovie = true;
+			// falls through
 		case kTSA0BRobotsFromCommandCenterToReadyRoom:
 		case kTSA0BRobotsFromReadyRoomToCommandCenter:
-		case kTSA0BRobotsFromCommandCenterToFrontDoor:
 		case kTSA0BRobotsFromFrontDoorToCommandCenter:
 		case kTSA0BRobotsFromFrontDoorToReadyRoom:
-		case kTSA0BRobotsFromReadyRoomToFrontDoor:
 			_sprite2.setCurrentFrameIndex(kRedirectionSecuredSprite);
 			_sprite2.show();
+			break;
+		case kTSA0BAIInterruption:
+			if (g_arthurChip)
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA52", kArthurTSAConfinedByBaldwin);
 			break;
 
 		// TBP monitor.
@@ -2567,6 +3019,8 @@ void FullTSA::receiveNotification(Notification *notification, const Notification
 			}
 
 			initializeTBPMonitor(kMonitorNeutral, 0);
+			if (GameState.getTSAState() == kTSAPlayerForcedReview && g_arthurChip)
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA55", kArthurTSAOpenTBPMonitor);
 			break;
 		case kTSA0BWestZoomOut:
 			GameState.setTSA0BZoomedIn(false);
@@ -2593,18 +3047,26 @@ void FullTSA::receiveNotification(Notification *notification, const Notification
 		case kTSA22RedEastZoomInSequence:
 			_privateFlags.setFlag(kTSAPrivateKeyVaultOpenFlag, true);
 			setCurrentActivation(kActivationKeyVaultOpen);
+			if (g_arthurChip)
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA50", kArthurTSASawJourneymanKey);
 			break;
 		case kTSA23RedWestVaultZoomInSequence:
 			_privateFlags.setFlag(kTSAPrivateChipVaultOpenFlag, true);
 			setCurrentActivation(kActivationChipVaultOpen);
+			if (g_arthurChip)
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA54", kArthurTSASawBiochips);
 			break;
 		case kTSA25NorthPutOnSuit:
 			GameState.setTSABiosuitOn(true);
 			GameState.setScoringGotBiosuit(true);
 			// Fall through...
 		case kTSA25NorthAlreadyHaveSuit:
-			requestExtraSequence(kTSA25NorthDescending1, 0, kFilterNoInput);
+			requestExtraSequence(kTSA25NorthDescending1, kExtraCompletedFlag, kFilterNoInput);
+			break;
+		case kTSA25NorthDescending1:
 			requestExtraSequence(kTSA25NorthDescending2, kExtraCompletedFlag, kFilterNoInput);
+			if (GameState.getTSAState() != kTSAPlayerNeedsHistoricalLog && g_arthurChip)
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA04", kArthurTSAUsedTurbolift);
 			break;
 		case kTSA25NorthDescending2:
 			arriveAt(kTSA26, kNorth);
@@ -2687,6 +3149,8 @@ void FullTSA::receiveNotification(Notification *notification, const Notification
 				GameState.setWSCRobotDead(false);
 				GameState.setWSCRobotGone(false);
 				break;
+			default:
+				break;
 			};
 			break;
 		case kTSA37TimeJumpToPegasus:
@@ -2721,6 +3185,8 @@ void FullTSA::receiveNotification(Notification *notification, const Notification
 					break;
 				case kPlayerOnWayToWSC:
 					g_opticalChip->playOpMemMovie(kMercurySpotID);
+					break;
+				default:
 					break;
 				}
 			}
@@ -2765,11 +3231,39 @@ void FullTSA::receiveNotification(Notification *notification, const Notification
 		case kTSA37CongratulationsToExit:
 			GameState.setTSAState(kPlayerFinishedWithTSA);
 			initializePegasusButtons(true);
+			if (g_arthurChip) {
+				if (_vm->getRandomBit())
+					g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA49", kArthurTSASawBaldwinSayGo);
+				else
+					g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBB22", kArthurTSASawBaldwinSayGo);
+			}
 			break;
+		default:
+			break;
+		}
+		if (g_arthurChip) {
+			if (doArthurSawBustMovie)
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA21", kArthurTSASawBust);
+			else if (doArthurRedirectedRobotsMovie && GameState.getTSAState() == kRobotsAtFrontDoor)
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA02", kArthurTSARedirectedRobots);
 		}
 	}
 
 	g_AIArea->checkMiddleArea();
+}
+
+void FullTSA::setSoundFXLevel(const uint16 level) {
+	Neighborhood::setSoundFXLevel(level);
+	if (_extraMovie.isMovieValid())
+		_extraMovie.setVolume(level);
+}
+
+void FullTSA::setAmbienceLevel(const uint16 level) {
+	Neighborhood::setAmbienceLevel(level);
+	if (_entranceMusic.isSoundLoaded())
+		_entranceFader.setMasterVolume(level);
+	if (_solvedMusicCue.isSoundLoaded())
+		_solvedMusicCue.setVolume(level);
 }
 
 void FullTSA::arriveFromPrehistoric() {
@@ -2847,6 +3341,8 @@ Hotspot *FullTSA::getItemScreenSpot(Item *item, DisplayElement *element) {
 	case kPegasusBiochip:
 		return _vm->getAllHotspots().findHotspotByID(kTSA23WestChipsSpotID);
 		break;
+	default:
+		break;
 	}
 
 	return Neighborhood::getItemScreenSpot(item, element);
@@ -2868,6 +3364,8 @@ void FullTSA::dropItemIntoRoom(Item *item, Hotspot *dropSpot) {
 			requestExtraSequence(kTSA0BComparisonStartup, kExtraCompletedFlag, kFilterNoInput);
 			GameState.setScoringPutLogInReader(true);
 		}
+		break;
+	default:
 		break;
 	}
 }
@@ -2938,6 +3436,8 @@ void FullTSA::handleInput(const Input &input, const Hotspot *cursorSpot) {
 					_sprite2.hide();
 				}
 				break;
+			default:
+				break;
 			}
 		}
 		break;
@@ -2969,8 +3469,12 @@ void FullTSA::handleInput(const Input &input, const Hotspot *cursorSpot) {
 					_sprite1.hide();
 				}
 				break;
+			default:
+				break;
 			}
 		}
+		break;
+	default:
 		break;
 	}
 
@@ -3016,6 +3520,8 @@ void FullTSA::doSolve() {
 		_sprite2.setCurrentFrameIndex(kRedirectionNewTargetSprite);
 		startExtraSequence(kTSA0BRobotsFromReadyRoomToFrontDoor, kExtraCompletedFlag, kFilterNoInput);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -3034,6 +3540,8 @@ void FullTSA::updateCursor(const Common::Point where, const Hotspot *cursorSpot)
 		case kTSA0BWestMonitorOutSpotID:
 			_vm->_cursor->setCurrentFrameIndex(2);
 			return;
+		default:
+			break;
 		}
 	}
 

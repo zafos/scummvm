@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -138,9 +137,16 @@ reg_t reg_t::operator%(const reg_t right) const {
 			warning("Modulo of a negative number has been requested for SCI0. This *could* lead to issues");
 		int16 value = toSint16();
 		int16 modulo = ABS(right.toSint16());
-		int16 result = value % modulo;
-		if (result < 0)
-			result += modulo;
+		int16 result;
+		if (getSciVersion() <= SCI_VERSION_2_1_MIDDLE) {
+			result = value % modulo;
+			if (result < 0)
+				result += modulo;
+		} else {
+			// SCI2.1 Late and SCI3 treat the dividend as unsigned.
+			// LSL7 ocean motion depends on this. Bug #10270
+			result = (uint16)value % modulo;
+		}
 		return make_reg(0, result);
 	} else
 		return lookForWorkaround(right, "modulo");
@@ -247,7 +253,7 @@ int reg_t::sci32Comparison(const reg_t right) const {
 	// engine compares these as a tiebreaker for graphics objects that are at
 	// the same priority, and it is necessary to at least minimally handle
 	// this situation.
-	// This is obviously a bogus comparision, but then, this entire thing is
+	// This is obviously a bogus comparison, but then, this entire thing is
 	// bogus. For the moment, it just needs to be deterministic.
 	if (isNumber() && !right.isNumber()) {
 		return 1;

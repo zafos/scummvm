@@ -1,1 +1,6 @@
-Filer_Opendir <Obey$Dir>.docs
+Run <Obey$Dir>.!Boot
+
+If "<ScummVM$Dir>"="" Then Error ScummVM has not been seen by the filer.
+
+Filer_Opendir <ScummVM$Dir>.docs
+IfThere <ScummVM$Dir>.FindHelp Then Run <ScummVM$Dir>.FindHelp

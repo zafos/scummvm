@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,48 +15,56 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef GRAPHICS_SPRITE_3DS_H
 #define GRAPHICS_SPRITE_3DS_H
 
-#include <citro3d.h>
-#include "graphics/surface.h"
+#define FORBIDDEN_SYMBOL_EXCEPTION_time_h
 
-#define TEXTURE_TRANSFER_FLAGS \
-	(GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(1) | GX_TRANSFER_RAW_COPY(0) | \
-	GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) | \
-	GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
+#include "graphics/surface.h"
+#include <3ds.h>
+#include <citro3d.h>
+
+namespace N3DS {
 
 typedef struct {
 	float position[3];
 	float texcoord[2];
 } vertex;
 
+struct GfxMode3DS;
+
 class Sprite : public Graphics::Surface {
 public:
 	Sprite();
 	~Sprite();
-	void create(uint16 width, uint16 height, const Graphics::PixelFormat &format);
+	void create(uint16 width, uint16 height, const GfxMode3DS *mode);
 	void free();
 	void convertToInPlace(const Graphics::PixelFormat &dstFormat, const byte *palette = 0);
+	void transfer();
 	void render();
 	void clear(uint32 color = 0);
 	void markDirty(){ dirtyPixels = true; }
 
 	void setPosition(int x, int y);
+	void setOffset(uint16 x, uint16 y);
 	void setScale(float x, float y);
-	float getScaleX(){ return scaleX; }
-	float getScaleY(){ return scaleY; }
+	float getScaleX() const { return scaleX; }
+	float getScaleY() const { return scaleY; }
+	int getPosX() const { return posX; }
+	int getPosY() const { return posY; }
 	C3D_Mtx* getMatrix();
+
+	void setFilteringMode(bool enableLinearFiltering);
 
 	uint16 actualWidth;
 	uint16 actualHeight;
 
 private:
+	uint32 textureTransferFlags;
 	bool dirtyPixels;
 	bool dirtyMatrix;
 	C3D_Mtx modelview;
@@ -64,8 +72,12 @@ private:
 	vertex* vertices;
 	int posX;
 	int posY;
+	uint16 offsetX;
+	uint16 offsetY;
 	float scaleX;
 	float scaleY;
 };
+
+} // namespace N3DS
 
 #endif

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -113,6 +112,8 @@ void Module1600::createScene(int sceneNum, int which) {
 		else
 			incGlobalVar(V_TALK_COUNTING_INDEX, +1);
 		break;
+	default:
+		break;
 	}
 	SetUpdateHandler(&Module1600::updateScene);
 	_childObject->handleUpdate();
@@ -181,12 +182,14 @@ void Module1600::updateScene() {
 		case 1001:
 			createScene(1, 0);
 			break;
+		default:
+			break;
 		}
 	}
 }
 
 Scene1608::Scene1608(NeverhoodEngine *vm, Module *parentModule, int which)
-	: Scene(vm, parentModule), _asCar(NULL), _countdown1(0) {
+	: Scene(vm, parentModule), _asCar(nullptr), _countdown1(0) {
 
 	setGlobalVar(V_CAR_DELTA_X, 1);
 
@@ -219,6 +222,7 @@ Scene1608::Scene1608(NeverhoodEngine *vm, Module *parentModule, int which)
 		}
 	} else if (which == 0) {
 		// Klaymen entering from the left
+		playSound(0, calcHash("fxDoorOpen23"));
 		_vm->gameState().which = 0;
 		setRectList(0x004B47D0);
 		insertKlaymen<KmScene1608>(0, 438);
@@ -351,7 +355,7 @@ void Scene1608::upUpperFloor() {
 		_asCar->setVisible(true);
 		sendMessage(_asCar, NM_CAR_ENTER, 0);
 		_asCar->handleUpdate();
-		_klaymen = NULL;
+		_klaymen = nullptr;
 		_carStatus = 0;
 	}
 	updateKlaymenCliprect();
@@ -423,7 +427,7 @@ uint32 Scene1608::hmLowerFloor(int messageNum, const MessageParam &param, Entity
 			_klaymen->setVisible(false);
 			showMouse(false);
 			_sprite1->setVisible(false);
-			//sendMessage(_asDoor, NM_KLAYMEN_CLOSE_DOOR, 0); // Play sound?
+			playSound(0, calcHash("fxDoorClose23"));
 			_countdown1 = 28;
 		}
 		break;
@@ -436,6 +440,8 @@ uint32 Scene1608::hmLowerFloor(int messageNum, const MessageParam &param, Entity
 			setMessageList(0x004B4770);
 		} else if (sender == _asKey)
 			setMessageList(0x004B46C8);
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -457,6 +463,8 @@ uint32 Scene1608::hmUpperFloor(int messageNum, const MessageParam &param, Entity
 			setMessageList(0x004B4760);
 		}
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -475,6 +483,8 @@ uint32 Scene1608::hmRidingCar(int messageNum, const MessageParam &param, Entity 
 	case 0x200D:
 		sendMessage(_parentModule, 0x200D, 0);
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -487,6 +497,8 @@ uint32 Scene1608::hmCarAtHome(int messageNum, const MessageParam &param, Entity 
 		break;
 	case 0x200D:
 		sendMessage(_parentModule, 0x200D, 0);
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -568,6 +580,8 @@ uint32 Scene1609::handleMessage(int messageNum, const MessageParam &param, Entit
 			_changeCurrentSymbol = true;
 			_countdown1 = 1;
 		}
+		break;
+	default:
 		break;
 	}
 	return 0;

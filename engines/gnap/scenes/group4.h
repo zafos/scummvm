@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -183,25 +182,25 @@ class CutScene;
 class Scene40: public Scene {
 public:
 	Scene40(GnapEngine *vm);
-	virtual ~Scene40() {}
+	~Scene40() override {}
 
-	virtual int init();
-	virtual void updateHotspots();
-	virtual void run();
-	virtual void updateAnimations();
-	virtual void updateAnimationsCb() {};
+	int init() override;
+	void updateHotspots() override;
+	void run() override;
+	void updateAnimations() override;
+	void updateAnimationsCb() override {};
 };
 
 class Scene41: public Scene {
 public:
 	Scene41(GnapEngine *vm);
-	virtual ~Scene41() {}
+	~Scene41() override {}
 
-	virtual int init();
-	virtual void updateHotspots();
-	virtual void run();
-	virtual void updateAnimations();
-	virtual void updateAnimationsCb() {};
+	int init() override;
+	void updateHotspots() override;
+	void run() override;
+	void updateAnimations() override;
+	void updateAnimationsCb() override {};
 
 private:
 	int _currKidSequenceId;
@@ -213,13 +212,13 @@ private:
 class Scene42: public Scene {
 public:
 	Scene42(GnapEngine *vm);
-	virtual ~Scene42() {}
+	~Scene42() override {}
 
-	virtual int init();
-	virtual void updateHotspots();
-	virtual void run();
-	virtual void updateAnimations();
-	virtual void updateAnimationsCb() {};
+	int init() override;
+	void updateHotspots() override;
+	void run() override;
+	void updateAnimations() override;
+	void updateAnimationsCb() override {};
 
 private:
 	int _currBBQVendorSequenceId;
@@ -229,13 +228,13 @@ private:
 class Scene43: public Scene {
 public:
 	Scene43(GnapEngine *vm);
-	virtual ~Scene43() {}
+	~Scene43() override {}
 
-	virtual int init();
-	virtual void updateHotspots();
-	virtual void run();
-	virtual void updateAnimations();
-	virtual void updateAnimationsCb() {};
+	int init() override;
+	void updateHotspots() override;
+	void run() override;
+	void updateAnimations() override;
+	void updateAnimationsCb() override {};
 
 private:
 	int _currTwoHeadedGuySequenceId;
@@ -245,13 +244,13 @@ private:
 class Scene44: public Scene {
 public:
 	Scene44(GnapEngine *vm);
-	virtual ~Scene44() {}
+	~Scene44() override {}
 
-	virtual int init();
-	virtual void updateHotspots();
-	virtual void run();
-	virtual void updateAnimations();
-	virtual void updateAnimationsCb() {};
+	int init() override;
+	void updateHotspots() override;
+	void run() override;
+	void updateAnimations() override;
+	void updateAnimationsCb() override {};
 
 private:
 	int _nextSpringGuySequenceId;
@@ -263,13 +262,13 @@ private:
 class Scene45: public Scene {
 public:
 	Scene45(GnapEngine *vm);
-	virtual ~Scene45() {}
+	~Scene45() override {}
 
-	virtual int init();
-	virtual void updateHotspots();
-	virtual void run();
-	virtual void updateAnimations();
-	virtual void updateAnimationsCb() {};
+	int init() override;
+	void updateHotspots() override;
+	void run() override;
+	void updateAnimations() override;
+	void updateAnimationsCb() override {};
 
 private:
 	int _currDancerSequenceId;
@@ -278,13 +277,13 @@ private:
 class Scene46: public Scene {
 public:
 	Scene46(GnapEngine *vm);
-	virtual ~Scene46() {}
+	~Scene46() override {}
 
-	virtual int init();
-	virtual void updateHotspots();
-	virtual void run();
-	virtual void updateAnimations();
-	virtual void updateAnimationsCb() {};
+	int init() override;
+	void updateHotspots() override;
+	void run() override;
+	void updateAnimations() override;
+	void updateAnimationsCb() override {};
 
 private:
 	int _currSackGuySequenceId;

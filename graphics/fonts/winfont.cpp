@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,8 +23,8 @@
 #include "common/str.h"
 #include "common/stream.h"
 #include "common/textconsole.h"
-#include "common/winexe_ne.h"
-#include "common/winexe_pe.h"
+#include "common/formats/winexe_ne.h"
+#include "common/formats/winexe_pe.h"
 #include "graphics/surface.h"
 #include "graphics/fonts/winfont.h"
 
@@ -70,69 +69,37 @@ static WinFontDirEntry readDirEntry(Common::SeekableReadStream &stream) {
 	stream.skip(68); // Useless
 	entry.points = stream.readUint16LE();
 	stream.skip(43); // Useless (for now, maybe not in the future)
-	readString(stream);
+	readString(stream); // Skip Device Name
 	entry.faceName = readString(stream);
 
 	return entry;
 }
 
 bool WinFont::loadFromFON(const Common::String &fileName, const WinFontDirEntry &dirEntry) {
-	// First try loading via the NE code
-	if (loadFromNE(fileName, dirEntry))
-		return true;
-
-	// Then try loading via the PE code
-	return loadFromPE(fileName, dirEntry);
-}
-
-bool WinFont::loadFromNE(const Common::String &fileName, const WinFontDirEntry &dirEntry) {
-	Common::NEResources exe;
-
-	if (!exe.loadFromEXE(fileName))
+	Common::WinResources *exe = Common::WinResources::createFromEXE(fileName);
+	if (!exe)
 		return false;
 
-	// Let's pull out the font directory
-	Common::SeekableReadStream *fontDirectory = exe.getResource(Common::kNEFontDir, Common::String("FONTDIR"));
-	if (!fontDirectory) {
-		warning("No font directory in '%s'", fileName.c_str());
-		return false;
-	}
-
-	uint32 fontId = getFontIndex(*fontDirectory, dirEntry);
-
-	delete fontDirectory;
-
-	// Couldn't match the face name
-	if (fontId == 0xffffffff) {
-		warning("Could not find face '%s' in '%s'", dirEntry.faceName.c_str(), fileName.c_str());
-		return false;
-	}
-
-	// Actually go get our font now...
-	Common::SeekableReadStream *fontStream = exe.getResource(Common::kNEFont, fontId);
-	if (!fontStream) {
-		warning("Could not find font %d in %s", fontId, fileName.c_str());
-		return false;
-	}
-
-	bool ok = loadFromFNT(*fontStream);
-	delete fontStream;
+	bool ok = loadFromEXE(exe, fileName, dirEntry);
+	delete exe;
 	return ok;
 }
 
-bool WinFont::loadFromPE(const Common::String &fileName, const WinFontDirEntry &dirEntry) {
-	Common::PEResources *exe = new Common::PEResources();
-
-	if (!exe->loadFromEXE(fileName)) {
-		delete exe;
+bool WinFont::loadFromFON(Common::SeekableReadStream &stream, const WinFontDirEntry &dirEntry) {
+	Common::WinResources *exe = Common::WinResources::createFromEXE(&stream);
+	if (!exe)
 		return false;
-	}
 
+	bool ok = loadFromEXE(exe, Common::String("stream"), dirEntry);
+	delete exe;
+	return ok;
+}
+
+bool WinFont::loadFromEXE(Common::WinResources *exe, const Common::String &fileName, const WinFontDirEntry &dirEntry) {
 	// Let's pull out the font directory
-	Common::SeekableReadStream *fontDirectory = exe->getResource(Common::kPEFontDir, Common::String("FONTDIR"));
+	Common::SeekableReadStream *fontDirectory = exe->getResource(Common::kWinFontDir, Common::String("FONTDIR"));
 	if (!fontDirectory) {
 		warning("No font directory in '%s'", fileName.c_str());
-		delete exe;
 		return false;
 	}
 
@@ -143,21 +110,18 @@ bool WinFont::loadFromPE(const Common::String &fileName, const WinFontDirEntry &
 	// Couldn't match the face name
 	if (fontId == 0xffffffff) {
 		warning("Could not find face '%s' in '%s'", dirEntry.faceName.c_str(), fileName.c_str());
-		delete exe;
 		return false;
 	}
 
 	// Actually go get our font now...
-	Common::SeekableReadStream *fontStream = exe->getResource(Common::kPEFont, fontId);
+	Common::SeekableReadStream *fontStream = exe->getResource(Common::kWinFont, fontId);
 	if (!fontStream) {
 		warning("Could not find font %d in %s", fontId, fileName.c_str());
-		delete exe;
 		return false;
 	}
 
 	bool ok = loadFromFNT(*fontStream);
 	delete fontStream;
-	delete exe;
 	return ok;
 }
 
@@ -175,8 +139,10 @@ uint32 WinFont::getFontIndex(Common::SeekableReadStream &stream, const WinFontDi
 		uint16 id = stream.readUint16LE();
 
 		// Use the first name when empty
-		if (dirEntry.faceName.empty())
+		if (dirEntry.faceName.empty()) {
+			_name = getFONFontName(stream);
 			return id;
+		}
 
 		WinFontDirEntry entry = readDirEntry(stream);
 
@@ -185,6 +151,15 @@ uint32 WinFont::getFontIndex(Common::SeekableReadStream &stream, const WinFontDi
 	}
 
 	return 0xffffffff;
+}
+
+Common::String WinFont::getFONFontName(Common::SeekableReadStream& stream) {
+	// Currently only works when dirEntry.faceName in getFontIndex is empty
+	// But this can be used for each FONTDIR entry
+	stream.seek(117);
+	/* Device Name = */ stream.readString();
+	Common::String fontName = stream.readString();
+	return fontName;
 }
 
 bool WinFont::loadFromFNT(const Common::String &fileName) {
@@ -228,13 +203,13 @@ bool WinFont::loadFromFNT(Common::SeekableReadStream &stream) {
 	/* uint16 points = */ stream.readUint16LE();
 	/* uint16 vertRes = */ stream.readUint16LE();
 	/* uint16 horizRes = */ stream.readUint16LE();
-	/* uint16 ascent = */ stream.readUint16LE();
+	_ascent = stream.readUint16LE();
 	/* uint16 internalLeading = */ stream.readUint16LE();
 	/* uint16 externalLeading = */ stream.readUint16LE();
-	/* byte italic = */ stream.readByte();
-	/* byte underline = */ stream.readByte();
-	/* byte strikeOut = */ stream.readByte();
-	/* uint16 weight = */ stream.readUint16LE();
+	_italic = stream.readByte();
+	_underline = stream.readByte();
+	_strikethrough = stream.readByte();
+	_weight = stream.readUint16LE();
 	/* byte charSet = */ stream.readByte();
 	uint16 pixWidth = stream.readUint16LE();
 	_pixHeight = stream.readUint16LE();
@@ -344,6 +319,22 @@ void WinFont::drawChar(Surface *dst, uint32 chr, int x, int y, uint32 color) con
 			}
 		}
 	}
+}
+
+int WinFont::getStyle() {
+	int style = kFontStyleRegular;
+
+	// This has been taken from Wine Source
+	// https://github.com/wine-mirror/wine/blob/b9a61cde89e5dc6264b4c152f4dc24ecf064f8f6/include/wingdi.h#L728
+
+	if (_weight >= 700)
+		style |= kFontStyleBold;
+	if (_italic)
+		style |= kFontStyleItalic;
+	if (_underline)
+		style |= kFontStyleUnderline;
+
+	return style;
 }
 
 } // End of namespace Graphics

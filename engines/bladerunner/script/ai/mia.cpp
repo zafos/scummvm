@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,7 +24,7 @@
 namespace BladeRunner {
 
 AIScriptMia::AIScriptMia(BladeRunnerEngine *vm) : AIScriptBase(vm) {
-	_flag1 = false;
+	_resumeIdleAfterFramesetCompletesFlag = false;
 }
 
 void AIScriptMia::Initialize() {
@@ -34,15 +33,18 @@ void AIScriptMia::Initialize() {
 	_animationStateNext = 0;
 	_animationNext = 0;
 
-	_flag1 = false;
+	_resumeIdleAfterFramesetCompletesFlag = false;
 	Actor_Put_In_Set(kActorMia, kSetHF01);
 	Actor_Set_At_XYZ(kActorMia, 606.77f, -0.01f, -214.3f, 511);
 	Actor_Set_Goal_Number(kActorMia, 0);
 }
 
 bool AIScriptMia::Update() {
-	if (Global_Variable_Query(kVariableChapter) == 4 && Actor_Query_Goal_Number(kActorMia) != 300)
+	if (Global_Variable_Query(kVariableChapter) == 4
+	 && Actor_Query_Goal_Number(kActorMia) != 300
+	) {
 		Actor_Set_Goal_Number(kActorMia, 300);
+	}
 
 	return false;
 }
@@ -63,15 +65,15 @@ void AIScriptMia::ClickedByPlayer() {
 	//return false;
 }
 
-void AIScriptMia::EnteredScene(int sceneId) {
+void AIScriptMia::EnteredSet(int setId) {
 	// return false;
 }
 
-void AIScriptMia::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptMia::OtherAgentEnteredThisSet(int otherActorId) {
 	// return false;
 }
 
-void AIScriptMia::OtherAgentExitedThisScene(int otherActorId) {
+void AIScriptMia::OtherAgentExitedThisSet(int otherActorId) {
 	// return false;
 }
 
@@ -107,34 +109,34 @@ bool AIScriptMia::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 bool AIScriptMia::UpdateAnimation(int *animation, int *frame) {
 	switch (_animationState) {
 	case 0:
-		*animation = 566;
-		_animationFrame++;
+		*animation = kModelAnimationMiaIdle;
+		++_animationFrame;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(566))
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMiaIdle))
 			_animationFrame = 0;
 
 		break;
 
 	case 1:
-		*animation = 567;
-		_animationFrame++;
+		*animation = kModelAnimationMiaGestureGive;
+		++_animationFrame;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(567)) {
-			*animation = 566;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMiaGestureGive)) {
+			*animation = kModelAnimationMiaIdle;
 			_animationFrame = 0;
 			_animationState = 0;
 		}
 		break;
 
 	case 2:
-		*animation = 568;
+		*animation = kModelAnimationMiaHeadNodTalk;
 
-		if (!_animationFrame && _flag1) {
-			*animation = 566;
+		if (_animationFrame == 0 && _resumeIdleAfterFramesetCompletesFlag) {
+			*animation = kModelAnimationMiaIdle;
 			_animationFrame = 0;
 			_animationState = 0;
 		} else {
-			_animationFrame++;
+			++_animationFrame;
 
 			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 				_animationFrame = 0;
@@ -143,28 +145,25 @@ bool AIScriptMia::UpdateAnimation(int *animation, int *frame) {
 		break;
 
 	case 3:
-		*animation = 569;
-		_animationFrame++;
+		*animation = kModelAnimationMiaMoreCalmTalk;
+		++_animationFrame;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(569)) {
-			*animation = 568;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMiaMoreCalmTalk)) {
+			*animation = kModelAnimationMiaHeadNodTalk;
 			_animationFrame = 0;
 			_animationState = 2;
 		}
 		break;
 
 	case 4:
-		*animation = 570;
-		_animationFrame++;
+		*animation = kModelAnimationMiaHandsOnWaistTalk;
+		++_animationFrame;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(570)) {
-			*animation = 568;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMiaHandsOnWaistTalk)) {
+			*animation = kModelAnimationMiaHeadNodTalk;
 			_animationFrame = 0;
 			_animationState = 2;
 		}
-		break;
-
-	default:
 		break;
 	}
 
@@ -176,28 +175,34 @@ bool AIScriptMia::UpdateAnimation(int *animation, int *frame) {
 bool AIScriptMia::ChangeAnimationMode(int mode) {
 	switch (mode) {
 	case kAnimationModeIdle:
-		if (_animationState >= 2 && _animationState <= 4) {
-			_flag1 = false;
+		if (_animationState >= 2
+		 && _animationState <= 4
+		) {
+			_resumeIdleAfterFramesetCompletesFlag = false;
 		} else {
 			_animationFrame = 0;
 			_animationState = 0;
 		}
 		break;
+
 	case kAnimationModeTalk:
 		_animationFrame = 0;
-		_flag1 = false;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		_animationState = 2;
 		break;
+
 	case 12:
 		_animationFrame = 0;
-		_flag1 = false;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		_animationState = 3;
 		break;
+
 	case 13:
 		_animationFrame = 0;
-		_flag1 = false;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		_animationState = 4;
 		break;
+
 	case 23:
 		_animationFrame = 0;
 		_animationState = 1;

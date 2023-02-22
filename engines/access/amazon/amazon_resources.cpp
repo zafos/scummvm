@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,6 +25,11 @@
 namespace Access {
 
 namespace Amazon {
+
+AmazonResources::~AmazonResources() {
+	delete _font3x5;
+	delete _font6x6;
+}
 
 void AmazonResources::load(Common::SeekableReadStream &s) {
 	Resources::load(s);
@@ -60,24 +64,29 @@ void AmazonResources::load(Common::SeekableReadStream &s) {
 
 	// Load font data
 	count = s.readUint16LE();
-	FONT2_INDEX.resize(count);
+	Common::Array<int> index;
+	Common::Array<byte> data;
+
+	index.resize(count);
 	for (uint idx = 0; idx < count; ++idx)
-		FONT2_INDEX[idx] = s.readSint16LE();
+		index[idx] = s.readSint16LE();
 
 	count = s.readUint16LE();
-	FONT2_DATA.resize(count);
+	data.resize(count);
 	for (uint idx = 0; idx < count; ++idx)
-		FONT2_DATA[idx] = s.readByte();
+		data[idx] = s.readByte();
+	_font3x5 = new AmazonFont(&index[0], &data[0]);
 
 	count = s.readUint16LE();
-	FONT6x6_INDEX.resize(count);
+	index.resize(count);
 	for (uint idx = 0; idx < count; ++idx)
-		FONT6x6_INDEX[idx] = s.readSint16LE();
+		index[idx] = s.readSint16LE();
 
 	count = s.readUint16LE();
-	FONT6x6_DATA.resize(count);
+	data.resize(count);
 	for (uint idx = 0; idx < count; ++idx)
-		FONT6x6_DATA[idx] = s.readByte();
+		data[idx] = s.readByte();
+	_font6x6 = new AmazonFont(&index[0], &data[0]);
 }
 
 /*------------------------------------------------------------------------*/

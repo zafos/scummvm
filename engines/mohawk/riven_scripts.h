@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -75,7 +74,7 @@ enum RivenCommandType {
 	kRivenCommandDisableMovie        = 28,
 	kRivenCommandDisableAllMovies    = 29,
 	kRivenCommandEnableMovie         = 31,
-	kRivenCommandlayMovieBlocking    = 32,
+	kRivenCommandPlayMovieBlocking   = 32,
 	kRivenCommandPlayMovie           = 33,
 	kRivenCommandStopMovie           = 34,
 	kRivenCommandUnk36               = 36,
@@ -285,12 +284,12 @@ public:
 	typedef Common::Array<uint16> ArgumentArray;
 
 	RivenSimpleCommand(MohawkEngine_Riven *vm, RivenCommandType type, const ArgumentArray &arguments);
-	virtual ~RivenSimpleCommand();
+	~RivenSimpleCommand() override;
 
 	// RivenCommand API
-	virtual void dump(byte tabs) override;
-	virtual void execute() override;
-	virtual RivenCommandType getType() const override;
+	void dump(byte tabs) override;
+	void execute() override;
+	RivenCommandType getType() const override;
 
 private:
 	typedef void (RivenSimpleCommand::*OpcodeProcRiven)(uint16 op, const ArgumentArray &args);
@@ -358,13 +357,13 @@ private:
 class RivenSwitchCommand : public RivenCommand {
 public:
 	static RivenSwitchCommand *createFromStream(MohawkEngine_Riven *vm, Common::ReadStream *stream);
-	virtual ~RivenSwitchCommand();
+	~RivenSwitchCommand() override;
 
 	// RivenCommand API
-	virtual void dump(byte tabs) override;
-	virtual void execute() override;
-	virtual RivenCommandType getType() const override;
-	virtual void applyCardPatches(uint32 globalId, int scriptType, uint16 hotspotId) override;
+	void dump(byte tabs) override;
+	void execute() override;
+	RivenCommandType getType() const override;
+	void applyCardPatches(uint32 globalId, int scriptType, uint16 hotspotId) override;
 
 private:
 	RivenSwitchCommand(MohawkEngine_Riven *vm);
@@ -387,20 +386,22 @@ private:
  */
 class RivenStackChangeCommand : public RivenCommand {
 public:
-	RivenStackChangeCommand(MohawkEngine_Riven *vm, uint16 stackId, uint32 globalCardId, bool byStackId);
+	RivenStackChangeCommand(MohawkEngine_Riven *vm, uint16 stackId, uint32 globalCardId,
+		                        bool byStackId, bool byStackCardId);
 
 	static RivenStackChangeCommand *createFromStream(MohawkEngine_Riven *vm, Common::ReadStream *stream);
-	virtual ~RivenStackChangeCommand();
+	~RivenStackChangeCommand() override;
 
 	// RivenCommand API
-	virtual void dump(byte tabs) override;
-	virtual void execute() override;
-	virtual RivenCommandType getType() const override;
+	void dump(byte tabs) override;
+	void execute() override;
+	RivenCommandType getType() const override;
 
 private:
 	uint16 _stackId;
 	uint32 _cardId;
 	bool _byStackId; // Otherwise by stack name id
+	bool _byStackCardId; // Otherwise by global card id
 };
 
 /**
@@ -414,9 +415,9 @@ public:
 	RivenTimerCommand(MohawkEngine_Riven *vm, const Common::SharedPtr<RivenStack::TimerProc> &timerProc);
 
 	// RivenCommand API
-	virtual void dump(byte tabs) override;
-	virtual void execute() override;
-	virtual RivenCommandType getType() const override;
+	void dump(byte tabs) override;
+	void execute() override;
+	RivenCommandType getType() const override;
 
 private:
 	Common::SharedPtr<RivenStack::TimerProc> _timerProc;

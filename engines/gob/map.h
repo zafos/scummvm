@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -77,7 +76,7 @@ public:
 	int16 _destX;
 	int16 _destY;
 
-	bool _mapUnknownBool;
+	bool _usesObliqueCoordinates;
 
 	ItemPos _itemPoses[40];
 	char _sourceFile[15];
@@ -159,13 +158,13 @@ private:
 
 class Map_v1 : public Map {
 public:
-	virtual void loadMapObjects(const char *avjFile);
-	virtual void findNearestToGob(Mult::Mult_Object *obj);
-	virtual void findNearestToDest(Mult::Mult_Object *obj);
-	virtual void optimizePoints(Mult::Mult_Object *obj, int16 x, int16 y);
+	void loadMapObjects(const char *avjFile) override;
+	void findNearestToGob(Mult::Mult_Object *obj) override;
+	void findNearestToDest(Mult::Mult_Object *obj) override;
+	void optimizePoints(Mult::Mult_Object *obj, int16 x, int16 y) override;
 
 	Map_v1(GobEngine *vm);
-	virtual ~Map_v1();
+	~Map_v1() override;
 
 protected:
 	void init();
@@ -177,13 +176,13 @@ protected:
 
 class Map_v2 : public Map_v1 {
 public:
-	virtual void loadMapObjects(const char *avjFile);
-	virtual void findNearestToGob(Mult::Mult_Object *obj);
-	virtual void findNearestToDest(Mult::Mult_Object *obj);
-	virtual void optimizePoints(Mult::Mult_Object *obj, int16 x, int16 y);
+	void loadMapObjects(const char *avjFile) override;
+	void findNearestToGob(Mult::Mult_Object *obj) override;
+	void findNearestToDest(Mult::Mult_Object *obj) override;
+	void optimizePoints(Mult::Mult_Object *obj, int16 x, int16 y) override;
 
 	Map_v2(GobEngine *vm);
-	virtual ~Map_v2();
+	~Map_v2() override;
 
 protected:
 	void loadGoblinStates(Common::SeekableReadStream &data, int index);

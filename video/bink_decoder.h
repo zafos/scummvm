@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -46,8 +45,11 @@ class QueuingAudioStream;
 
 namespace Common {
 class SeekableReadStream;
+template <class BITSTREAM>
 class Huffman;
+}
 
+namespace Math {
 class RDFT;
 class DCT;
 }
@@ -72,10 +74,14 @@ public:
 	bool loadStream(Common::SeekableReadStream *stream);
 	void close();
 
+	Common::Rational getFrameRate();
+
 protected:
 	void readNextPacket();
 	bool supportsAudioTrackSwitching() const { return true; }
 	AudioTrack *getAudioTrack(int index);
+	bool seekIntern(const Audio::Timestamp &time);
+	uint32 findKeyFrame(uint32 frame) const;
 
 private:
 	static const int kAudioChannelsMax  = 2;
@@ -119,8 +125,8 @@ private:
 
 		float *coeffsPtr[kAudioChannelsMax];
 
-		Common::RDFT *rdft;
-		Common::DCT  *dct;
+		Math::RDFT *rdft;
+		Math::DCT  *dct;
 
 		AudioInfo();
 		~AudioInfo();
@@ -144,18 +150,21 @@ private:
 		BinkVideoTrack(uint32 width, uint32 height, const Graphics::PixelFormat &format, uint32 frameCount, const Common::Rational &frameRate, bool swapPlanes, bool hasAlpha, uint32 id);
 		~BinkVideoTrack();
 
-		uint16 getWidth() const { return _surface.w; }
-		uint16 getHeight() const { return _surface.h; }
-		Graphics::PixelFormat getPixelFormat() const { return _surface.format; }
-		int getCurFrame() const { return _curFrame; }
-		int getFrameCount() const { return _frameCount; }
-		const Graphics::Surface *decodeNextFrame() { return &_surface; }
+		uint16 getWidth() const override { return _surface.w; }
+		uint16 getHeight() const  override{ return _surface.h; }
+		Graphics::PixelFormat getPixelFormat() const override { return _surface.format; }
+		int getCurFrame() const override { return _curFrame; }
+		int getFrameCount() const override { return _frameCount; }
+		const Graphics::Surface *decodeNextFrame() override { return &_surface; }
+		bool isSeekable() const  override{ return true; }
+		bool seek(const Audio::Timestamp &time) override { return true; }
+		bool rewind() override;
+		void setCurFrame(uint32 frame) { _curFrame = frame; }
 
 		/** Decode a video packet. */
 		void decodePacket(VideoFrame &frame);
 
-	protected:
-		Common::Rational getFrameRate() const { return _frameRate; }
+		Common::Rational getFrameRate() const override { return _frameRate; }
 
 	private:
 		/** A decoder state. */
@@ -247,7 +256,7 @@ private:
 
 		Bundle _bundles[kSourceMAX]; ///< Bundles for decoding all data types.
 
-		Common::Huffman *_huffman[16]; ///< The 16 Huffman codebooks used in Bink decoding.
+		Common::Huffman<Common::BitStream32LELSB> *_huffman[16]; ///< The 16 Huffman codebooks used in Bink decoding.
 
 		/** Huffman codebooks to use for decoding high nibbles in color data types. */
 		Huffman _colHighHuffman[16];
@@ -313,14 +322,15 @@ private:
 		void readBlockTypes  (VideoFrame &video, Bundle &bundle);
 		void readPatterns    (VideoFrame &video, Bundle &bundle);
 		void readColors      (VideoFrame &video, Bundle &bundle);
-		void readDCS         (VideoFrame &video, Bundle &bundle, int startBits, bool hasSign);
-		void readDCTCoeffs   (VideoFrame &video, int16 *block, bool isIntra);
+		template<int startBits, bool hasSign>
+		void readDCS         (VideoFrame &video, Bundle &bundle);
+		void readDCTCoeffs   (VideoFrame &video, int32 *block, bool isIntra);
 		void readResidue     (VideoFrame &video, int16 *block, int masksCount);
 
 		// Bink video IDCT
-		void IDCT(int16 *block);
-		void IDCTPut(DecodeContext &ctx, int16 *block);
-		void IDCTAdd(DecodeContext &ctx, int16 *block);
+		void IDCT(int32 *block);
+		void IDCTPut(DecodeContext &ctx, int32 *block);
+		void IDCTAdd(DecodeContext &ctx, int32 *block);
 	};
 
 	class BinkAudioTrack : public AudioTrack {
@@ -330,6 +340,11 @@ private:
 
 		/** Decode an audio packet. */
 		void decodePacket();
+
+		bool seek(const Audio::Timestamp &time);
+		bool isSeekable() const { return true; }
+		void skipSamples(const Audio::Timestamp &length);
+		int getRate();
 
 	protected:
 		Audio::AudioStream *getAudioStream() const;

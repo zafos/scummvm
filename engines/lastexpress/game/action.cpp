@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -336,8 +335,8 @@ public:
 
 	Functor1MemConst(T *t, const FuncType &func) : _t(t), _func(func) {}
 
-	bool isValid() const { return _func != 0 && _t != 0; }
-	Res operator()(Arg v1) const {
+	bool isValid() const override { return _func != nullptr && _t != nullptr; }
+	Res operator()(Arg v1) const override {
 		return (_t->*_func)(v1);
 	}
 private:
@@ -400,7 +399,7 @@ Action::~Action() {
 	_actions.clear();
 
 	// Zero-out passed pointers
-	_engine = NULL;
+	_engine = nullptr;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -479,7 +478,7 @@ IMPLEMENT_ACTION(playMusic)
 	Common::String filename = Common::String::format("MUS%03d", hotspot.param1);
 
 	if (!getSoundQueue()->isBuffered(filename) && (hotspot.param1 != 50 || getProgress().chapter == kChapter5))
-		getSound()->playSound(kEntityPlayer, filename, kFlagDefault, hotspot.param2);
+		getSound()->playSound(kEntityPlayer, filename, kVolumeFull, hotspot.param2);
 
 	return kSceneInvalid;
 }
@@ -819,7 +818,7 @@ IMPLEMENT_ACTION(enterCompartment)
 		getSound()->playSoundEvent(kEntityPlayer, 15, 22);
 
 		if (getProgress().field_78 && !getSoundQueue()->isBuffered("MUS003")) {
-			getSound()->playSound(kEntityPlayer, "MUS003", kFlagDefault);
+			getSound()->playSound(kEntityPlayer, "MUS003", kVolumeFull);
 			getProgress().field_78 = 0;
 		}
 
@@ -1097,7 +1096,7 @@ IMPLEMENT_ACTION(enterBaggage)
 
 	case 2:
 		if (!getSoundQueue()->isBuffered("MUS021"))
-			getSound()->playSound(kEntityPlayer, "MUS021", kFlagDefault);
+			getSound()->playSound(kEntityPlayer, "MUS021", kVolumeFull);
 		break;
 
 	case 3:
@@ -1196,7 +1195,7 @@ IMPLEMENT_ACTION(29)
 
 	Common::String filename = Common::String::format("MUS%03d", hotspot.param3);
 	if (!getSoundQueue()->isBuffered(filename))
-		getSound()->playSound(kEntityPlayer, filename, kFlagDefault);
+		getSound()->playSound(kEntityPlayer, filename, kVolumeFull);
 
 	return kSceneInvalid;
 }
@@ -1358,7 +1357,7 @@ IMPLEMENT_ACTION(openBed)
 //////////////////////////////////////////////////////////////////////////
 // Action 37
 IMPLEMENT_ACTION(dialog)
-	getSound()->playDialog(kEntityTables4, (EntityIndex)hotspot.param1, kFlagDefault, 0);
+	getSound()->playDialog(kEntityTables4, (EntityIndex)hotspot.param1, kVolumeFull, 0);
 
 	return kSceneInvalid;
 }
@@ -1368,7 +1367,7 @@ IMPLEMENT_ACTION(dialog)
 IMPLEMENT_ACTION(eggBox)
 	getSound()->playSoundEvent(kEntityPlayer, 43);
 	if (getProgress().field_7C && !getSoundQueue()->isBuffered("MUS003")) {
-		getSound()->playSound(kEntityPlayer, "MUS003", kFlagDefault);
+		getSound()->playSound(kEntityPlayer, "MUS003", kVolumeFull);
 		getProgress().field_7C = 0;
 	}
 
@@ -1380,7 +1379,7 @@ IMPLEMENT_ACTION(eggBox)
 IMPLEMENT_ACTION(39)
 	getSound()->playSoundEvent(kEntityPlayer, 24);
 	if (getProgress().field_80 && !getSoundQueue()->isBuffered("MUS003")) {
-		getSound()->playSound(kEntityPlayer, "MUS003", kFlagDefault);
+		getSound()->playSound(kEntityPlayer, "MUS003", kVolumeFull);
 		getProgress().field_80 = 0;
 	}
 
@@ -1422,7 +1421,7 @@ IMPLEMENT_ACTION(playMusicChapter)
 		Common::String filename = Common::String::format("MUS%03d", id);
 
 		if (!getSoundQueue()->isBuffered(filename))
-			getSound()->playSound(kEntityPlayer, filename, kFlagDefault);
+			getSound()->playSound(kEntityPlayer, filename, kVolumeFull);
 	}
 
 	return kSceneInvalid;
@@ -1454,7 +1453,7 @@ IMPLEMENT_ACTION(playMusicChapterSetupTrain)
 	Common::String filename = Common::String::format("MUS%03d", hotspot.param1);
 
 	if (!getSoundQueue()->isBuffered(filename) && hotspot.param3 & id) {
-		getSound()->playSound(kEntityPlayer, filename, kFlagDefault);
+		getSound()->playSound(kEntityPlayer, filename, kVolumeFull);
 
 		getSavePoints()->call(kEntityPlayer, kEntityTrain, kAction203863200, filename);
 		getSavePoints()->push(kEntityPlayer, kEntityTrain, kAction222746496, hotspot.param2);
@@ -1852,7 +1851,7 @@ CursorStyle Action::getCursor(const SceneHotspot &hotspot) const {
 
 		return kCursorHand;
 
-	case SceneHotspot::kActionCatchBeetle:
+	case SceneHotspot::kActionCatchBeetleHS:
 		if (!getBeetle()->isLoaded())
 			return kCursorNormal;
 
@@ -1897,7 +1896,7 @@ CursorStyle Action::getCursor(const SceneHotspot &hotspot) const {
 LABEL_KEY:
 	// Handle compartment action
 	case SceneHotspot::kActionCompartment:
-	case SceneHotspot::kActionExitCompartment:
+	case SceneHotspot::kActionExitCompartmentHS:
 		debugC(2, kLastExpressDebugScenes, "================================= DOOR %03d =================================", object);
 		if (object >= kObjectMax)
 			return kCursorNormal;
@@ -1926,7 +1925,7 @@ void Action::playAnimation(EventIndex index, bool debugMode) const {
 	// In debug mode, just show the animation
 	if (debugMode) {
 		Animation animation;
-		if (animation.load(getArchive(Common::String(_animationList[index].filename) + ".nis")))
+		if (animation.load(getArchiveMember(Common::String(_animationList[index].filename) + ".nis")))
 			animation.play();
 		return;
 	}
@@ -1944,7 +1943,7 @@ void Action::playAnimation(EventIndex index, bool debugMode) const {
 
 		if (getGlobalTimer()) {
 			if (getSoundQueue()->isBuffered("TIMER")) {
-				getSoundQueue()->processEntry("TIMER");
+				getSoundQueue()->fade("TIMER");
 				setGlobalTimer(105);
 			}
 		}
@@ -1958,11 +1957,11 @@ void Action::playAnimation(EventIndex index, bool debugMode) const {
 			processSound = true;
 
 		Animation animation;
-		if (animation.load(getArchive(Common::String(_animationList[index].filename) + ".nis") , processSound ? Animation::kFlagDefault : Animation::kFlagProcess))
+		if (animation.load(getArchiveMember(Common::String(_animationList[index].filename) + ".nis") , processSound ? Animation::kFlagDefault : Animation::kFlagProcess))
 			animation.play();
 
 		if (getSoundQueue()->isBuffered("TIMER"))
-			getSoundQueue()->removeFromQueue("TIMER");
+			getSoundQueue()->stop("TIMER");
 	}
 
 	// Show cursor

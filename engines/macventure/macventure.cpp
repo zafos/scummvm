@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -64,24 +63,21 @@ MacVentureEngine::MacVentureEngine(OSystem *syst, const ADGameDescription *gameD
 	_gameDescription = gameDesc;
 	_rnd = new Common::RandomSource("macventure");
 
-	initDebugChannels();
+	_resourceManager = nullptr;
+	_globalSettings = nullptr;
+	_gui = nullptr;
+	_world = nullptr;
+	_scriptEngine = nullptr;
+	_filenames = nullptr;
 
-	_debugger = NULL;
-	_resourceManager = NULL;
-	_globalSettings = NULL;
-	_gui = NULL;
-	_world = NULL;
-	_scriptEngine = NULL;
-	_filenames = NULL;
+	_decodingDirectArticles = nullptr;
+	_decodingNamingArticles = nullptr;
+	_decodingIndirectArticles = nullptr;
+	_textHuffman = nullptr;
 
-	_decodingDirectArticles = NULL;
-	_decodingNamingArticles = NULL;
-	_decodingIndirectArticles = NULL;
-	_textHuffman = NULL;
+	_soundManager = nullptr;
 
-	_soundManager = NULL;
-
-	_dataBundle = NULL;
+	_dataBundle = nullptr;
 
 	debug("MacVenture::MacVentureEngine()");
 }
@@ -89,13 +85,8 @@ MacVentureEngine::MacVentureEngine(OSystem *syst, const ADGameDescription *gameD
 MacVentureEngine::~MacVentureEngine() {
 	debug("MacVenture::~MacVentureEngine()");
 
-	DebugMan.clearAllDebugChannels();
-
 	if (_rnd)
 		delete _rnd;
-
-	if (_debugger)
-		delete _debugger;
 
 	if (_resourceManager)
 		delete _resourceManager;
@@ -134,21 +125,13 @@ MacVentureEngine::~MacVentureEngine() {
 		delete _dataBundle;
 }
 
-void MacVentureEngine::initDebugChannels() {
-	DebugMan.addDebugChannel(kMVDebugMain, "main", "Engine state");
-	DebugMan.addDebugChannel(kMVDebugGUI, "gui", "Gui");
-	DebugMan.addDebugChannel(kMVDebugText, "text", "Text decoders and printers");
-	DebugMan.addDebugChannel(kMVDebugImage, "image", "Image decoders and renderers");
-	DebugMan.addDebugChannel(kMVDebugScript, "script", "Script engine");
-	DebugMan.addDebugChannel(kMVDebugSound, "sound", "Sound decoders");
-	DebugMan.addDebugChannel(kMVDebugContainer, "container", "Containers");
-}
-
 Common::Error MacVentureEngine::run() {
 	debug("MacVenture::MacVentureEngine::init()");
 	initGraphics(kScreenWidth, kScreenHeight);
 
-	_debugger = new Console(this);
+	setInitialFlags();
+
+	setDebugger(new Console(this));
 
 	// Additional setup.
 	debug("MacVentureEngine::init");
@@ -176,8 +159,6 @@ Common::Error MacVentureEngine::run() {
 	_scriptEngine = new ScriptEngine(this, _world);
 
 	_soundManager = new SoundManager(this, _mixer);
-
-	setInitialFlags();
 
 	int directSaveSlotLoading = ConfMan.getInt("save_slot");
 	if (directSaveSlotLoading >= 0) {
@@ -313,8 +294,10 @@ void MacVentureEngine::refreshReady() {
 		_cmdReady = _currentSelection.size() != 0;
 		break;
 	case 2:
-		if (_destObject > 0) // We have a destination seleted
+		if (_destObject > 0) // We have a destination selected
 			_cmdReady = true;
+		break;
+	default:
 		break;
 	}
 }
@@ -463,7 +446,7 @@ bool MacVentureEngine::showTextEntry(ObjID text, ObjID srcObj, ObjID destObj) {
 	return true;
 }
 
-void MacVentureEngine::setTextInput(Common::String content) {
+void MacVentureEngine::setTextInput(const Common::String &content) {
 	_prepared = true;
 	_userInput = content;
 	_clickToContinue = false;
@@ -508,6 +491,7 @@ void MacVentureEngine::processEvents() {
 
 		switch (event.type) {
 		case Common::EVENT_QUIT:
+		case Common::EVENT_RETURN_TO_LAUNCHER:
 			_gameState = kGameStateQuitting;
 			break;
 		default:
@@ -614,6 +598,8 @@ void MacVentureEngine::runObjQueue() {
 		case 0xe:
 			zoomObject(obj.object);
 			break;
+		default:
+			break;
 		}
 	}
 }
@@ -635,6 +621,8 @@ void MacVentureEngine::printTexts() {
 			_gui->printText(_world->getText(text.asset, text.source, text.destination));
 			gameChanged();
 			break;
+		default:
+			break;
 		}
 	}
 }
@@ -653,6 +641,8 @@ void MacVentureEngine::playSounds(bool pause) {
 			break;
 		case kSoundWait:
 			// Empty in the original.
+			break;
+		default:
 			break;
 		}
 	}
@@ -728,7 +718,7 @@ int MacVentureEngine::findObjectInArray(ObjID objID, const Common::Array<ObjID> 
 		}
 	}
 	// HACK, should use iterator
-	return found ? i : -1;
+	return found ? (int)i : -1;
 }
 
 uint MacVentureEngine::getPrefixNdx(ObjID obj) {
@@ -795,7 +785,12 @@ void MacVentureEngine::openObject(ObjID objID) {
 	} else { // Open inventory window
 		Common::Point p(_world->getObjAttr(objID, kAttrPosX), _world->getObjAttr(objID, kAttrPosY));
 		WindowReference invID = _gui->createInventoryWindow(objID);
-		_gui->setWindowTitle(invID, _world->getText(objID, objID, objID));
+		Common::String title = _world->getText(objID, objID, objID);
+		// HACK, trim titletext to fit initial inventory size
+		while (title.size() > 6) {
+			title.deleteLastChar();
+		}
+		_gui->setWindowTitle(invID, title);
 		_gui->updateWindowInfo(invID, objID, _world->getChildren(objID, true));
 		_gui->updateWindow(invID, _world->getObjAttr(objID, kAttrContainerOpen));
 	}
@@ -804,7 +799,6 @@ void MacVentureEngine::openObject(ObjID objID) {
 void MacVentureEngine::closeObject(ObjID objID) {
 	warning("closeObject: not fully implemented");
 	_gui->tryCloseWindow(getObjWindow(objID));
-	return;
 }
 
 void MacVentureEngine::checkObject(QueuedObject old) {
@@ -819,8 +813,8 @@ void MacVentureEngine::checkObject(QueuedObject old) {
 		if (old.parent != _world->getObjAttr(id, kAttrParentObject)) {
 			enqueueObject(kSetToPlayerParent, id);
 		}
-		if (old.offscreen != _world->getObjAttr(id, kAttrInvisible) ||
-			old.invisible != _world->getObjAttr(id, kAttrUnclickable)) {
+		if (old.offscreen != !!_world->getObjAttr(id, kAttrInvisible) ||
+			old.invisible != !!_world->getObjAttr(id, kAttrUnclickable)) {
 			updateWindow(findParentWindow(id));
 		}
 	} else if (old.parent != _world->getObjAttr(id, kAttrParentObject) ||
@@ -837,14 +831,14 @@ void MacVentureEngine::checkObject(QueuedObject old) {
 			_gui->addChild(newWin, id);
 			hasChanged = true;
 		}
-	} else if (old.offscreen != _world->getObjAttr(id, kAttrInvisible) ||
-				old.invisible != _world->getObjAttr(id, kAttrUnclickable)) {
+	} else if (old.offscreen != !!_world->getObjAttr(id, kAttrInvisible) ||
+				old.invisible != !!_world->getObjAttr(id, kAttrUnclickable)) {
 		updateWindow(findParentWindow(id));
 	}
 
 	if (_world->getObjAttr(id, kAttrIsExit)) {
 		if (hasChanged ||
-			old.hidden != _world->getObjAttr(id, kAttrHiddenExit) ||
+			old.hidden != !!_world->getObjAttr(id, kAttrHiddenExit) ||
 			old.exitx != _world->getObjAttr(id, kAttrExitX) ||
 			old.exity != _world->getObjAttr(id, kAttrExitY))
 			_gui->updateExit(id);
@@ -1026,12 +1020,6 @@ ObjID MacVentureEngine::getParent(ObjID objID) {
 Common::Rect MacVentureEngine::getObjBounds(ObjID objID) {
 	Common::Point pos = getObjPosition(objID);
 
-	WindowReference win = findParentWindow(objID);
-	if (win != kNoWindow) { // If it's not in a window YET, we don't really care about the border
-		BorderBounds bounds = borderBounds(_gui->getWindowData(win).type); // HACK
-		pos.x += bounds.leftOffset;
-		pos.y += bounds.topOffset;
-	}
 	Common::Point measures = _gui->getObjMeasures(objID);
 	uint w = measures.x;
 	uint h = measures.y;
@@ -1158,8 +1146,8 @@ void GlobalSettings::loadSettings(Common::SeekableReadStream *dataStream) {
 	dataStream->readUint16BE(); // unknown
 	_invTop = dataStream->readUint16BE();
 	_invLeft = dataStream->readUint16BE();
-	_invWidth = dataStream->readUint16BE();
 	_invHeight = dataStream->readUint16BE();
+	_invWidth = dataStream->readUint16BE();
 	_invOffsetY = dataStream->readUint16BE();
 	_invOffsetX = dataStream->readSint16BE();
 	_defaultFont = dataStream->readUint16BE();

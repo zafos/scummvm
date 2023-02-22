@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -72,39 +71,39 @@ protected:
 
 class ObjectV2 : public Object {
 public:
-	int load(Common::SeekableReadStream &source);
-	int load(byte *source);
-	int save(Common::WriteStream &dest);
-	uint16 getFlags();
-	uint16 getClass();
-	uint16 getSize();
-	byte getCount1();
-	byte getCount2();
-	byte *getData();
+	int load(Common::SeekableReadStream &source) override;
+	int load(byte *source) override;
+	int save(Common::WriteStream &dest) override;
+	uint16 getFlags() override;
+	uint16 getClass() override;
+	uint16 getSize() override;
+	byte getCount1() override;
+	byte getCount2() override;
+	byte *getData() override;
 
-	bool isConstant() {
+	bool isConstant() override {
 		return false;
 	}
 };
 
 class ObjectV1 : public ObjectV2 {
 public:
-	int load(Common::SeekableReadStream &source);
+	int load(Common::SeekableReadStream &source) override;
 };
 
 class ObjectV3 : public Object {
 public:
-	int load(Common::SeekableReadStream &source);
-	int load(byte *source);
-	int save(Common::WriteStream &dest);
-	uint16 getFlags();
-	uint16 getClass();
-	uint16 getSize();
-	byte getCount1();
-	byte getCount2();
-	byte *getData();
+	int load(Common::SeekableReadStream &source) override;
+	int load(byte *source) override;
+	int save(Common::WriteStream &dest) override;
+	uint16 getFlags() override;
+	uint16 getClass() override;
+	uint16 getSize() override;
+	byte getCount1() override;
+	byte getCount2() override;
+	byte *getData() override;
 
-	bool isConstant() {
+	bool isConstant() override {
 		return !(getFlags() & 1);
 	}
 
@@ -167,31 +166,31 @@ protected:
 class GameDatabaseV2 : public GameDatabase {
 public:
 	GameDatabaseV2(MadeEngine *vm);
-	~GameDatabaseV2();
-	int16 *findObjectProperty(int16 objectIndex, int16 propertyId, int16 &propertyFlag);
-	const char *getString(uint16 offset);
-	bool getSavegameDescription(const char *filename, Common::String &description, int16 version);
-	int16 savegame(const char *filename, const char *description, int16 version);
-	int16 loadgame(const char *filename, int16 version);
+	~GameDatabaseV2() override;
+	int16 *findObjectProperty(int16 objectIndex, int16 propertyId, int16 &propertyFlag) override;
+	const char *getString(uint16 offset) override;
+	bool getSavegameDescription(const char *filename, Common::String &description, int16 version) override;
+	int16 savegame(const char *filename, const char *description, int16 version) override;
+	int16 loadgame(const char *filename, int16 version) override;
 protected:
 	char *_gameText;
-	void load(Common::SeekableReadStream &sourceS);
-	void reloadFromStream(Common::SeekableReadStream &sourceS);
+	void load(Common::SeekableReadStream &sourceS) override;
+	void reloadFromStream(Common::SeekableReadStream &sourceS) override;
 };
 
 class GameDatabaseV3 : public GameDatabase {
 public:
 	GameDatabaseV3(MadeEngine *vm);
-	int16 *findObjectProperty(int16 objectIndex, int16 propertyId, int16 &propertyFlag);
-	const char *getString(uint16 offset);
-	bool getSavegameDescription(const char *filename, Common::String &description, int16 version);
-	int16 savegame(const char *filename, const char *description, int16 version);
-	int16 loadgame(const char *filename, int16 version);
+	int16 *findObjectProperty(int16 objectIndex, int16 propertyId, int16 &propertyFlag) override;
+	const char *getString(uint16 offset) override;
+	bool getSavegameDescription(const char *filename, Common::String &description, int16 version) override;
+	int16 savegame(const char *filename, const char *description, int16 version) override;
+	int16 loadgame(const char *filename, int16 version) override;
 protected:
 	char *_gameText;
 	uint32 _gameStateOffs;
-	void load(Common::SeekableReadStream &sourceS);
-	void reloadFromStream(Common::SeekableReadStream &sourceS);
+	void load(Common::SeekableReadStream &sourceS) override;
+	void reloadFromStream(Common::SeekableReadStream &sourceS) override;
 };
 
 } // End of namespace Made

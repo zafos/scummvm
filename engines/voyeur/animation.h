@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -91,15 +90,15 @@ private:
 		const RL2FileHeader &_header;
 		Audio::QueuingAudioStream *_audStream;
 	protected:
-		Audio::AudioStream *getAudioStream() const;
+		Audio::AudioStream *getAudioStream() const override;
 	public:
 		RL2AudioTrack(const RL2FileHeader &header, Common::SeekableReadStream *stream,
 			Audio::Mixer::SoundType soundType);
-		~RL2AudioTrack();
+		~RL2AudioTrack() override;
 
 		int numQueuedStreams() const { return _audStream->numQueuedStreams(); }
-		virtual bool isSeekable() const { return true; }
-		virtual bool seek(const Audio::Timestamp &time) { return true; }
+		bool isSeekable() const override { return true; }
+		bool seek(const Audio::Timestamp &time) override { return true; }
 
 		void queueSound(Common::SeekableReadStream *stream, int size);
 	};
@@ -108,26 +107,26 @@ private:
 	public:
 		RL2VideoTrack(const RL2FileHeader &header, RL2AudioTrack *audioTrack,
 			Common::SeekableReadStream *stream);
-		~RL2VideoTrack();
+		~RL2VideoTrack() override;
 
-		uint16 getWidth() const;
-		uint16 getHeight() const;
+		uint16 getWidth() const override;
+		uint16 getHeight() const override;
 		Graphics::Surface *getSurface() { return _surface; }
 		Graphics::Surface *getBackSurface();
-		Graphics::PixelFormat getPixelFormat() const;
-		int getCurFrame() const { return _curFrame; }
-		int getFrameCount() const { return _header._numFrames; }
-		const Graphics::Surface *decodeNextFrame();
-		const byte *getPalette() const { _dirtyPalette = false; return _header._palette; }
+		Graphics::PixelFormat getPixelFormat() const override;
+		int getCurFrame() const override { return _curFrame; }
+		int getFrameCount() const override { return _header._numFrames; }
+		const Graphics::Surface *decodeNextFrame() override;
+		const byte *getPalette() const override { _dirtyPalette = false; return _header._palette; }
 		int getPaletteCount() const { return _header._colorCount; }
-		bool hasDirtyPalette() const { return _dirtyPalette; }
+		bool hasDirtyPalette() const override { return _dirtyPalette; }
 		const Common::List<Common::Rect> *getDirtyRects() const { return &_dirtyRects; }
 		void clearDirtyRects() { _dirtyRects.clear(); }
 		void copyDirtyRectsToBuffer(uint8 *dst, uint pitch);
 
-		virtual Common::Rational getFrameRate() const { return _header.getFrameRate(); }
-		virtual bool isSeekable() const { return true; }
-		virtual bool seek(const Audio::Timestamp &time);
+		Common::Rational getFrameRate() const override { return _header.getFrameRate(); }
+		bool isSeekable() const override { return true; }
+		bool seek(const Audio::Timestamp &time) override;
 	private:
 		Common::SeekableReadStream *_fileStream;
 		const RL2FileHeader &_header;
@@ -164,16 +163,16 @@ private:
 	void copyDirtyRectsToBuffer(uint8 *dst, uint pitch);
 	int getPaletteStart() const { return _paletteStart; }
 	const RL2FileHeader &getHeader() { return _header; }
-	virtual void readNextPacket();
-	virtual bool seekIntern(const Audio::Timestamp &time);
+	void readNextPacket() override;
+	bool seekIntern(const Audio::Timestamp &time) override;
 
 public:
 	RL2Decoder();
-	virtual ~RL2Decoder();
+	~RL2Decoder() override;
 
-	virtual void close();
+	void close() override;
 
-	bool loadStream(Common::SeekableReadStream *stream);
+	bool loadStream(Common::SeekableReadStream *stream) override;
 	bool loadRL2File(const Common::String &file, bool palFlag);
 	bool loadVideo(int videoId);
 	int getPaletteCount() const { return _header._colorCount; }

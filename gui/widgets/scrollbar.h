@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -60,17 +59,19 @@ public:
 	int		_numEntries;
 	int		_entriesPerPage;
 	int		_currentPos;
+	int		_singleStep;
 
 public:
 	ScrollBarWidget(GuiObject *boss, int x, int y, int w, int h);
 
-	void handleMouseDown(int x, int y, int button, int clickCount);
-	void handleMouseUp(int x, int y, int button, int clickCount);
-	void handleMouseWheel(int x, int y, int direction);
-	void handleMouseMoved(int x, int y, int button);
-	void handleMouseEntered(int button)	{ setFlags(WIDGET_HILITED); }
-	void handleMouseLeft(int button)	{ clearFlags(WIDGET_HILITED); _part = kNoPart; markAsDirty(); }
-	void handleTickle();
+	void handleMouseDown(int x, int y, int button, int clickCount) override;
+	void handleMouseUp(int x, int y, int button, int clickCount) override;
+	void handleMouseWheel(int x, int y, int direction) override;
+	void handleMouseMoved(int x, int y, int button) override;
+	void handleMouseEntered(int button) override	{ setFlags(WIDGET_HILITED); }
+	void handleMouseLeft(int button) override	{ clearFlags(WIDGET_HILITED); _part = kNoPart; markAsDirty(); }
+	void handleTickle() override;
+	bool wantsFocus() override { return true; }
 
 	// FIXME - this should be private, but then we also have to add accessors
 	// for _numEntries, _entriesPerPage and _currentPos. This again leads to the question:
@@ -80,7 +81,7 @@ public:
 	void checkBounds(int old_pos);
 
 protected:
-	void drawWidget();
+	void drawWidget() override;
 };
 
 } // End of namespace GUI

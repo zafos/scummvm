@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -80,8 +79,8 @@ private:
 	 */
 	void drawViewContents(CScreenManager *screenManager);
 
-	void leftButtonDoubleClick(const Point &mousePos);
-	void middleButtonDoubleClick(const Point &mousePos);
+	void leftButtonDoubleClick(const Point &mousePos) override;
+	void middleButtonDoubleClick(const Point &mousePos) override;
 
 	/**
 	 * Returns true if the player can control the mouse
@@ -96,25 +95,25 @@ public:
 	void *_cursor;
 public:
 	CMainGameWindow(TitanicEngine *vm);
-	virtual ~CMainGameWindow();
+	~CMainGameWindow() override;
 
 	/**
 	* Called to handle any regular updates the game requires
 	*/
-	void onIdle();
+	void onIdle() override;
 
-	virtual void mouseMove(const Point &mousePos);
-	virtual void leftButtonDown(const Point &mousePos);
-	virtual void leftButtonUp(const Point &mousePos);
-	virtual void middleButtonDown(const Point &mousePos);
-	virtual void middleButtonUp(const Point &mousePos);
-	virtual void mouseWheel(const Point &mousePos, bool wheelUp);
-	virtual void keyDown(Common::KeyState keyState);
+	void mouseMove(const Point &mousePos) override;
+	void leftButtonDown(const Point &mousePos) override;
+	void leftButtonUp(const Point &mousePos) override;
+	void middleButtonDown(const Point &mousePos) override;
+	void middleButtonUp(const Point &mousePos) override;
+	void mouseWheel(const Point &mousePos, bool wheelUp) override;
+	void keyDown(Common::KeyState keyState) override;
 
 	/**
 	 * Called when the application starts
 	 */
-	void applicationStarting();
+	bool applicationStarting();
 
 	/**
 	 * Sets the view to be shown

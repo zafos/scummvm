@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,34 +25,34 @@
 #include "backends/platform/ios7/ios7_osys_main.h"
 #include "backends/platform/ios7/ios7_video.h"
 
-#include "graphics/conversion.h"
+#include "graphics/blit.h"
 #include "backends/platform/ios7/ios7_app_delegate.h"
 
-@interface iOS7AlertHandler : NSObject<UIAlertViewDelegate>
-@end
-
-@implementation iOS7AlertHandler
-
-- (void)alertView:(UIAlertView *)alertView willDismissWithButtonIndex:(NSInteger)buttonIndex {
-	OSystem_iOS7::sharedInstance()->quit();
-	exit(1);
-}
-
-@end
+#define UIViewParentController(__view) ({ \
+	UIResponder *__responder = __view; \
+	while ([__responder isKindOfClass:[UIView class]]) \
+		__responder = [__responder nextResponder]; \
+	(UIViewController *)__responder; \
+})
 
 static void displayAlert(void *ctx) {
-	UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"Fatal Error"
-	                                                message:[NSString stringWithCString:(const char *)ctx encoding:NSUTF8StringEncoding]
-	                                               delegate:[[iOS7AlertHandler alloc] init]
-	                                      cancelButtonTitle:@"OK"
-	                                      otherButtonTitles:nil];
-	[alert show];
-	[alert autorelease];
+	UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Fatal Error"
+								message:[NSString stringWithCString:(const char *)ctx 	encoding:NSUTF8StringEncoding]
+								preferredStyle:UIAlertControllerStyleAlert];
+
+	UIAlertAction* defaultAction = [UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault
+	   handler:^(UIAlertAction * action) {
+		OSystem_iOS7::sharedInstance()->quit();
+		abort();
+	}];
+
+	[alert addAction:defaultAction];
+	[UIViewParentController([iOS7AppDelegate iPhoneView]) presentViewController:alert animated:YES completion:nil];
 }
 
 void OSystem_iOS7::fatalError() {
-	if (_lastErrorMessage) {
-		dispatch_async_f(dispatch_get_main_queue(), _lastErrorMessage, displayAlert);
+	if (_lastErrorMessage.size()) {
+		dispatch_async_f(dispatch_get_main_queue(), (void *)_lastErrorMessage.c_str(), displayAlert);
 		for(;;);
 	}
 	else {
@@ -61,59 +60,55 @@ void OSystem_iOS7::fatalError() {
 	}
 }
 
+void OSystem_iOS7::logMessage(LogMessageType::Type type, const char *message) {
+	FILE *output = 0;
+
+	if (type == LogMessageType::kInfo || type == LogMessageType::kDebug)
+		output = stdout;
+	else
+		output = stderr;
+
+	if (type == LogMessageType::kError) {
+		_lastErrorMessage = message;
+		NSString *messageString = [NSString stringWithUTF8String:message];
+		NSLog(@"%@", messageString);
+	}
+
+	fputs(message, output);
+	fflush(output);
+}
+
 void OSystem_iOS7::engineInit() {
 	EventsBaseBackend::engineInit();
 	// Prevent the device going to sleep during game play (and in particular cut scenes)
-	[[UIApplication sharedApplication] setIdleTimerDisabled:YES];
+	dispatch_async(dispatch_get_main_queue(), ^{
+		[[UIApplication sharedApplication] setIdleTimerDisabled:YES];
+	});
+	[[iOS7AppDelegate iPhoneView] setIsInGame:YES];
 }
 
 void OSystem_iOS7::engineDone() {
 	EventsBaseBackend::engineDone();
 	// Allow the device going to sleep if idle while in the Launcher
-	[[UIApplication sharedApplication] setIdleTimerDisabled:NO];
+	dispatch_async(dispatch_get_main_queue(), ^{
+		[[UIApplication sharedApplication] setIdleTimerDisabled:NO];
+	});
+	[[iOS7AppDelegate iPhoneView] setIsInGame:NO];
 }
 
 void OSystem_iOS7::initVideoContext() {
 	_videoContext = [[iOS7AppDelegate iPhoneView] getVideoContext];
 }
 
-const OSystem::GraphicsMode *OSystem_iOS7::getSupportedGraphicsModes() const {
-	return s_supportedGraphicsModes;
-}
-
-int OSystem_iOS7::getDefaultGraphicsMode() const {
-	return kGraphicsModeNone;
-}
-
-bool OSystem_iOS7::setGraphicsMode(int mode) {
-	switch (mode) {
-	case kGraphicsModeNone:
-	case kGraphicsMode2xSaI:
-	case kGraphicsModeSuper2xSaI:
-	case kGraphicsModeSuperEagle:
-	case kGraphicsModeAdvMame2x:
-	case kGraphicsModeAdvMame3x:
-	case kGraphicsModeHQ2x:
-	case kGraphicsModeHQ3x:
-	case kGraphicsModeTV2x:
-	case kGraphicsModeDotMatrix:
-		_videoContext->graphicsMode = (GraphicsModes)mode;
-		return true;
-
-	default:
-		return false;
-	}
-}
-
-int OSystem_iOS7::getGraphicsMode() const {
-	return _videoContext->graphicsMode;
-}
-
 #ifdef USE_RGB_COLOR
 Common::List<Graphics::PixelFormat> OSystem_iOS7::getSupportedFormats() const {
 	Common::List<Graphics::PixelFormat> list;
+	// ABGR8888 (big endian)
+	list.push_back(Graphics::PixelFormat(4, 8, 8, 8, 8, 0, 8, 16, 24));
+	// RGBA8888 (big endian)
+	list.push_back(Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0));
 	// RGB565
-	list.push_back(Graphics::createPixelFormat<565>());
+	list.push_back(Graphics::PixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0));
 	// CLUT8
 	list.push_back(Graphics::PixelFormat::createFormatCLUT8());
 	return list;
@@ -129,12 +124,17 @@ static inline void execute_on_main_thread(void (^block)(void)) {
 	}
 }
 
+float OSystem_iOS7::getHiDPIScreenFactor() const {
+	return [UIScreen mainScreen].scale;
+}
+
 void OSystem_iOS7::initSize(uint width, uint height, const Graphics::PixelFormat *format) {
 	//printf("initSize(%u, %u, %p)\n", width, height, (const void *)format);
 
 	_videoContext->screenWidth = width;
 	_videoContext->screenHeight = height;
-	_videoContext->shakeOffsetY = 0;
+	_videoContext->shakeXOffset = 0;
+	_videoContext->shakeYOffset = 0;
 
 	// In case we use the screen texture as frame buffer we reset the pixels
 	// pointer here to avoid freeing the screen texture.
@@ -144,9 +144,19 @@ void OSystem_iOS7::initSize(uint width, uint height, const Graphics::PixelFormat
 	// Create the screen texture right here. We need to do this here, since
 	// when a game requests hi-color mode, we actually set the framebuffer
 	// to the texture buffer to avoid an additional copy step.
-	execute_on_main_thread(^ {
-		[[iOS7AppDelegate iPhoneView] createScreenTexture];
-	});
+	// Free any previous screen texture and create new to handle format changes
+	_videoContext->screenTexture.free();
+
+	if (format && *format == Graphics::PixelFormat(4, 8, 8, 8, 8, 0, 8, 16, 24)) {
+		// ABGR8888 (big endian)
+		_videoContext->screenTexture.create((uint16) getSizeNextPOT(_videoContext->screenWidth), (uint16) getSizeNextPOT(_videoContext->screenHeight), Graphics::PixelFormat(4, 8, 8, 8, 8, 0, 8, 16, 24));
+	} else if (format && *format == Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0)) {
+		// RGBA8888 (big endian)
+		_videoContext->screenTexture.create((uint16) getSizeNextPOT(_videoContext->screenWidth), (uint16) getSizeNextPOT(_videoContext->screenHeight), Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0));
+	} else {
+		// Assume RGB565
+		_videoContext->screenTexture.create((uint16) getSizeNextPOT(_videoContext->screenWidth), (uint16) getSizeNextPOT(_videoContext->screenHeight), Graphics::PixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0));
+	}
 
 	// In case the client code tries to set up a non supported mode, we will
 	// fall back to CLUT8 and set the transaction error accordingly.
@@ -154,6 +164,10 @@ void OSystem_iOS7::initSize(uint width, uint height, const Graphics::PixelFormat
 		format = 0;
 		_gfxTransactionError = kTransactionFormatNotSupported;
 	}
+
+	execute_on_main_thread(^{
+		[[iOS7AppDelegate iPhoneView] setGameScreenCoords];
+	});
 
 	if (!format || format->bytesPerPixel == 1) {
 		_framebuffer.create(width, height, Graphics::PixelFormat::createFormatCLUT8());
@@ -210,8 +224,8 @@ void OSystem_iOS7::setPalette(const byte *colors, uint start, uint num) {
 	const byte *b = colors;
 
 	for (uint i = start; i < start + num; ++i) {
-		_gamePalette[i] = Graphics::RGBToColor<Graphics::ColorMasks<565> >(b[0], b[1], b[2]);
-		_gamePaletteRGBA5551[i] = Graphics::RGBToColor<Graphics::ColorMasks<5551> >(b[0], b[1], b[2]);
+		_gamePalette[i] = _videoContext->screenTexture.format.RGBToColor(b[0], b[1], b[2]);
+		_gamePaletteRGBA5551[i] = _videoContext->mouseTexture.format.RGBToColor(b[0], b[1], b[2]);
 		b += 3;
 	}
 
@@ -229,7 +243,7 @@ void OSystem_iOS7::grabPalette(byte *colors, uint start, uint num) const {
 	byte *b = colors;
 
 	for (uint i = start; i < start + num; ++i) {
-		Graphics::colorToRGB<Graphics::ColorMasks<565> >(_gamePalette[i], b[0], b[1], b[2]);
+		_videoContext->screenTexture.format.colorToRGB(_gamePalette[i], b[0], b[1], b[2]);
 		b += 3;
 	}
 }
@@ -350,9 +364,10 @@ void OSystem_iOS7::unlockScreen() {
 	dirtyFullScreen();
 }
 
-void OSystem_iOS7::setShakePos(int shakeOffset) {
-	//printf("setShakePos(%i)\n", shakeOffset);
-	_videoContext->shakeOffsetY = shakeOffset;
+void OSystem_iOS7::setShakePos(int shakeXOffset, int shakeYOffset) {
+	//printf("setShakePos(%i, %i)\n", shakeXOffset, shakeYOffset);
+	_videoContext->shakeXOffset = shakeXOffset;
+	_videoContext->shakeYOffset = shakeYOffset;
 	execute_on_main_thread(^ {
 		[[iOS7AppDelegate iPhoneView] setViewTransformation];
 	});
@@ -360,9 +375,10 @@ void OSystem_iOS7::setShakePos(int shakeOffset) {
 	_mouseDirty = true;
 }
 
-void OSystem_iOS7::showOverlay() {
+void OSystem_iOS7::showOverlay(bool inGUI) {
 	//printf("showOverlay()\n");
 	_videoContext->overlayVisible = true;
+	_videoContext->overlayInGUI = inGUI;
 	dirtyFullOverlayScreen();
 	updateScreen();
 	execute_on_main_thread(^ {
@@ -374,6 +390,7 @@ void OSystem_iOS7::showOverlay() {
 void OSystem_iOS7::hideOverlay() {
 	//printf("hideOverlay()\n");
 	_videoContext->overlayVisible = false;
+	_videoContext->overlayInGUI = false;
 	_dirtyOverlayRects.clear();
 	dirtyFullScreen();
 	execute_on_main_thread(^ {
@@ -384,21 +401,20 @@ void OSystem_iOS7::hideOverlay() {
 
 void OSystem_iOS7::clearOverlay() {
 	//printf("clearOverlay()\n");
-	bzero(_videoContext->overlayTexture.getPixels(), _videoContext->overlayTexture.h * _videoContext->overlayTexture.pitch);
+	memset(_videoContext->overlayTexture.getPixels(), 0, _videoContext->overlayTexture.h * _videoContext->overlayTexture.pitch);
 	dirtyFullOverlayScreen();
 }
 
-void OSystem_iOS7::grabOverlay(void *buf, int pitch) {
+void OSystem_iOS7::grabOverlay(Graphics::Surface &surface) {
 	//printf("grabOverlay()\n");
-	int h = _videoContext->overlayHeight;
+	assert(surface.w >= (int16)_videoContext->overlayWidth);
+	assert(surface.h >= (int16)_videoContext->overlayHeight);
+	assert(surface.format.bytesPerPixel == sizeof(uint16));
 
-	byte *dst = (byte *)buf;
 	const byte *src = (const byte *)_videoContext->overlayTexture.getPixels();
-	do {
-		memcpy(dst, src, _videoContext->overlayWidth * sizeof(uint16));
-		src += _videoContext->overlayTexture.pitch;
-		dst += pitch;
-	} while (--h);
+	byte *dst = (byte *)surface.getPixels();
+	Graphics::copyBlit(dst, src, surface.pitch,  _videoContext->overlayTexture.pitch,
+		_videoContext->overlayWidth, _videoContext->overlayHeight, sizeof(uint16));
 }
 
 void OSystem_iOS7::copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) {
@@ -447,6 +463,10 @@ int16 OSystem_iOS7::getOverlayWidth() {
 	return _videoContext->overlayWidth;
 }
 
+Graphics::PixelFormat OSystem_iOS7::getOverlayFormat() const {
+	return _videoContext->overlayTexture.format;
+}
+
 bool OSystem_iOS7::showMouse(bool visible) {
 	//printf("showMouse(%d)\n", visible);
 	bool last = _videoContext->mouseIsVisible;
@@ -482,8 +502,11 @@ void OSystem_iOS7::dirtyFullOverlayScreen() {
 	}
 }
 
-void OSystem_iOS7::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
+void OSystem_iOS7::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask) {
 	//printf("setMouseCursor(%p, %u, %u, %i, %i, %u, %d, %p)\n", (const void *)buf, w, h, hotspotX, hotspotY, keycolor, dontScale, (const void *)format);
+
+	if (mask)
+		printf("OSystem_iOS7::setMouseCursor: Masks are not supported");
 
 	const Graphics::PixelFormat pixelFormat = format ? *format : Graphics::PixelFormat::createFormatCLUT8();
 #if 0
@@ -491,9 +514,9 @@ void OSystem_iOS7::setMouseCursor(const void *buf, uint w, uint h, int hotspotX,
 	       pixelFormat.rLoss, pixelFormat.gLoss, pixelFormat.bLoss, pixelFormat.aLoss,
 	       pixelFormat.rShift, pixelFormat.gShift, pixelFormat.bShift, pixelFormat.aShift);
 #endif
-	assert(pixelFormat.bytesPerPixel == 1 || pixelFormat.bytesPerPixel == 2);
+	assert(pixelFormat.bytesPerPixel == 1 || pixelFormat.bytesPerPixel == 2 || pixelFormat.bytesPerPixel == 4);
 
-	if (_mouseBuffer.w != w || _mouseBuffer.h != h || _mouseBuffer.format != pixelFormat || !_mouseBuffer.getPixels())
+	if (_mouseBuffer.w != (int16)w || _mouseBuffer.h != (int16)h || _mouseBuffer.format != pixelFormat || !_mouseBuffer.getPixels())
 		_mouseBuffer.create(w, h, pixelFormat);
 
 	_videoContext->mouseWidth = w;
@@ -515,7 +538,7 @@ void OSystem_iOS7::setCursorPalette(const byte *colors, uint start, uint num) {
 	assert(start + num <= 256);
 
 	for (uint i = start; i < start + num; ++i, colors += 3)
-		_mouseCursorPalette[i] = Graphics::RGBToColor<Graphics::ColorMasks<5551> >(colors[0], colors[1], colors[2]);
+		_mouseCursorPalette[i] = _videoContext->mouseTexture.format.RGBToColor(colors[0], colors[1], colors[2]);
 
 	// FIXME: This is just stupid, our client code seems to assume that this
 	// automatically enables the cursor palette.
@@ -526,12 +549,12 @@ void OSystem_iOS7::setCursorPalette(const byte *colors, uint start, uint num) {
 }
 
 void OSystem_iOS7::updateMouseTexture() {
-	uint texWidth = getSizeNextPOT(_videoContext->mouseWidth);
-	uint texHeight = getSizeNextPOT(_videoContext->mouseHeight);
+	int texWidth = getSizeNextPOT(_videoContext->mouseWidth);
+	int texHeight = getSizeNextPOT(_videoContext->mouseHeight);
 
 	Graphics::Surface &mouseTexture = _videoContext->mouseTexture;
 	if (mouseTexture.w != texWidth || mouseTexture.h != texHeight)
-		mouseTexture.create(texWidth, texHeight, Graphics::createPixelFormat<5551>());
+		mouseTexture.create(texWidth, texHeight, Graphics::PixelFormat(2, 5, 5, 5, 1, 11, 6, 1, 0));
 
 	if (_mouseBuffer.format.bytesPerPixel == 1) {
 		const uint16 *palette;
@@ -553,19 +576,20 @@ void OSystem_iOS7::updateMouseTexture() {
 	} else {
 		if (crossBlit((byte *)mouseTexture.getPixels(), (const byte *)_mouseBuffer.getPixels(), mouseTexture.pitch,
 			          _mouseBuffer.pitch, _mouseBuffer.w, _mouseBuffer.h, mouseTexture.format, _mouseBuffer.format)) {
-			if (!_mouseBuffer.format.aBits()) {
-				// Apply color keying since the original cursor had no alpha channel.
-				const uint16 *src = (const uint16 *)_mouseBuffer.getPixels();
-				uint8 *dstRaw = (uint8 *)mouseTexture.getPixels();
+			// Apply color keying
+			const uint8 * src = (const uint8 *)_mouseBuffer.getPixels();
+			int srcBpp = _mouseBuffer.format.bytesPerPixel;
 
-				for (uint y = 0; y < _mouseBuffer.h; ++y, dstRaw += mouseTexture.pitch) {
-					uint16 *dst = (uint16 *)dstRaw;
-					for (uint x = 0; x < _mouseBuffer.w; ++x, ++dst) {
-						if (*src++ == _mouseKeyColor)
-							*dst &= ~1;
-						else
-							*dst |= 1;
-					}
+			uint8 *dstRaw = (uint8 *)mouseTexture.getPixels();
+
+			for (int y = 0; y < _mouseBuffer.h; ++y, dstRaw += mouseTexture.pitch) {
+				uint16 *dst = (uint16 *)dstRaw;
+				for (int x = 0; x < _mouseBuffer.w; ++x, ++dst, src += srcBpp) {
+					if (
+						(srcBpp == 2 && *((const uint16*)src) == _mouseKeyColor) ||
+						(srcBpp == 4 && *((const uint32*)src) == _mouseKeyColor)
+					)
+						*dst &= ~1;
 				}
 			}
 		} else {
@@ -578,4 +602,37 @@ void OSystem_iOS7::updateMouseTexture() {
 	execute_on_main_thread(^ {
 		[[iOS7AppDelegate iPhoneView] updateMouseCursor];
 	});
+}
+
+void OSystem_iOS7::setShowKeyboard(bool show) {
+	if (show) {
+#if TARGET_OS_IOS
+		execute_on_main_thread(^ {
+			[[iOS7AppDelegate iPhoneView] showKeyboard];
+		});
+#elif TARGET_OS_TV
+		// Delay the showing of keyboard 1 second so the user
+		// is able to see the message
+		dispatch_time_t delay = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC));
+		dispatch_after(delay, dispatch_get_main_queue(), ^(void){
+			[[iOS7AppDelegate iPhoneView] showKeyboard];
+		});
+#endif
+	} else {
+		// Do not hide the keyboard in portrait mode as it is shown automatically and not
+		// just when asked with the kFeatureVirtualKeyboard.
+		if (_screenOrientation == kScreenOrientationLandscape || _screenOrientation == kScreenOrientationFlippedLandscape) {
+			execute_on_main_thread(^ {
+				[[iOS7AppDelegate iPhoneView] hideKeyboard];
+			});
+		}
+	}
+}
+
+bool OSystem_iOS7::isKeyboardShown() const {
+	__block bool isShown = false;
+	execute_on_main_thread(^{
+		isShown = [[iOS7AppDelegate iPhoneView] isKeyboardShown];
+	});
+	return isShown;
 }

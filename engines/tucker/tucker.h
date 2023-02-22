@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -38,6 +37,7 @@
 #include "engines/engine.h"
 
 #include "tucker/console.h"
+#include "tucker/detection.h"
 
 namespace Audio {
 class RewindableAudioStream;
@@ -361,13 +361,6 @@ enum InputKey {
 	kInputKeyCount
 };
 
-enum GameFlag {
-	kGameFlagDemo = 1 << 0,
-	kGameFlagEncodedData = 1 << 1,
-	kGameFlagNoSubtitles = 1 << 2,
-	kGameFlagIntroOnly = 1 << 3
-};
-
 enum CompressedSoundType {
 	kSoundTypeFx,
 	kSoundTypeMusic,
@@ -387,7 +380,7 @@ public:
 private:
 
 	int _compressedSoundType;
-	int _compressedSoundFlags;
+	uint16 _compressedSoundFlags;
 	Common::File _fCompressedSound;
 };
 
@@ -446,15 +439,15 @@ public:
 	};
 
 	TuckerEngine(OSystem *system, Common::Language language, uint32 flags);
-	virtual ~TuckerEngine();
+	~TuckerEngine() override;
 
-	virtual Common::Error run();
-	virtual bool hasFeature(EngineFeature f) const;
-	GUI::Debugger *getDebugger() { return _console; }
+	Common::Error run() override;
+	bool hasFeature(EngineFeature f) const override;
 
 	WARN_UNUSED_RESULT static SavegameError readSavegameHeader(Common::InSaveFile *file, SavegameHeader &header, bool skipThumbnail = true);
 	WARN_UNUSED_RESULT static SavegameError readSavegameHeader(const char *target, int slot, SavegameHeader &header);
-	bool isAutosaveAllowed();
+	bool canSaveAutosaveCurrently() override;
+
 	static bool isAutosaveAllowed(const char *target);
 protected:
 
@@ -466,7 +459,7 @@ protected:
 	void waitForTimer(int ticksCount);
 	void parseEvents();
 	void updateCursorPos(int x, int y);
-	void setCursorStyle(CursorStyle num);
+	void setCursorStyle(CursorStyle style);
 	void setCursorState(CursorState state);
 	void showCursor(bool visible);
 	void setupNewLocation();
@@ -743,17 +736,18 @@ protected:
 	void updateSprite_locationNum82(int i);
 
 	template<class S> SavegameError saveOrLoadGameStateData(S &s);
-	virtual Common::Error loadGameState(int slot);
-	virtual Common::Error saveGameState(int slot, const Common::String &description);
-	Common::Error writeSavegame(int slot, const Common::String &description, bool autosave = false);
+	Common::Error loadGameState(int slot) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
 	SavegameError writeSavegameHeader(Common::OutSaveFile *file, SavegameHeader &header);
-	void writeAutosave();
-	bool canLoadOrSave() const;
-	virtual bool canLoadGameStateCurrently();
-	virtual bool canSaveGameStateCurrently();
-	virtual bool existsSavegame();
+	int getAutosaveSlot() const override { return kAutoSaveSlot; }
+	Common::String getSaveStateName(int slot) const override {
+		return Common::String::format("%s.%d", _targetName.c_str(), slot);
+	}
 
-	TuckerConsole *_console;
+	bool canLoadOrSave() const;
+	bool canLoadGameStateCurrently() override;
+	bool canSaveGameStateCurrently() override;
+	virtual bool existsSavegame();
 
 	void handleIntroSequence();
 	void handleCreditsSequence();
@@ -798,7 +792,6 @@ protected:
 	Common::Language _gameLang;
 	uint32 _gameFlags;
 	int _startSlot;
-	uint32 _lastSaveTime;
 
 	bool _quitGame;
 	bool _fastMode;
@@ -1165,7 +1158,7 @@ private:
 	const SoundSequenceData *_soundSeqData;
 	uint8 *_offscreenBuffer;
 	int _updateScreenWidth;
-	int _updateScreenPicture;
+	bool _updateScreenPicture;
 	int _updateScreenCounter;
 	int _updateScreenIndex;
 	int _frameCounter;

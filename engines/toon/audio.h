@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -35,7 +34,7 @@ class AudioStreamInstance : public Audio::AudioStream {
 
 public:
 	AudioStreamInstance(AudioManager *man, Audio::Mixer *mixer, Common::SeekableReadStream *stream, bool looping = false, bool deleteFileStreamAtEnd = false);
-	~AudioStreamInstance();
+	~AudioStreamInstance() override;
 	void play(bool fade = false, Audio::Mixer::SoundType soundType = Audio::Mixer::kMusicSoundType);
 	void stop(bool fade = false);
 
@@ -55,14 +54,14 @@ public:
 
 	void setVolume(int32 volume);
 protected:
-	int readBuffer(int16 *buffer, const int numSamples);
-	bool isStereo() const {
+	int readBuffer(int16 *buffer, const int numSamples) override;
+	bool isStereo() const override {
 		return false;
 	}
-	int getRate() const {
+	int getRate() const override {
 		return 22100;
 	}
-	bool endOfData() const {
+	bool endOfData() const override {
 		return _stopped;
 	}
 	void handleFade(int32 numSamples);
@@ -131,19 +130,20 @@ public:
 
 	bool voiceStillPlaying();
 
-	void playMusic(const Common::String &dir, const Common::String &music);
+	int playMusic(const Common::String &dir, const Common::String &music);
 	void playVoice(int32 id, bool genericVoice);
 	int32 playSFX(int32 id, int volume, bool genericSFX);
 	void stopCurrentVoice();
 	void stopAllSfxs();
-	void setMusicVolume(int32 volume);
-	void stopMusic();
+	void setMusicVolume(uint8 volume);
+	void stopMusicChannel(int channelId, bool fade);
+	void stopMusic(bool fade = true);
 	void muteVoice(bool mute);
 	void muteMusic(bool mute);
 	void muteSfx(bool mute);
-	bool isVoiceMuted() { return _voiceMuted; }
-	bool isMusicMuted() { return _musicMuted; }
-	bool isSfxMuted() { return _sfxMuted; }
+	bool isVoiceMuted() const { return _voiceMuted; }
+	bool isMusicMuted() const { return _musicMuted; }
+	bool isSfxMuted() const { return _sfxMuted; }
 
 	void startAmbientSFX(int32 id, int32 delay, int32 mode, int32 volume);
 	void killAmbientSFX(int32 id);
@@ -155,14 +155,15 @@ public:
 	bool loadAudioPack(int32 id, const Common::String &indexFile, const Common::String &packFile);
 
 	AudioStreamInstance *_channels[16];  // 0-1 : music
-	// 2 : voice
-	// 3-16 : SFX
+	                                     // 2 : voice
+	                                     // 3-15 : SFX
 
 	AudioStreamPackage *_audioPacks[4];  // 0 : generic streams
-	// 1 : local streams
-	// 2 : generic SFX
-	// 3 : local SFX
-	uint32 _currentMusicChannel;
+	                                     // 1 : local streams
+	                                     // 2 : generic SFX
+	                                     // 3 : local SFX
+
+	int _currentMusicChannel;
 	Common::String _currentMusicName;
 	ToonEngine *_vm;
 	Audio::Mixer *_mixer;

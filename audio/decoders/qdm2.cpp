@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -35,11 +34,12 @@
 #include "common/array.h"
 #include "common/debug.h"
 #include "common/math.h"
-#include "common/rdft.h"
 #include "common/stream.h"
 #include "common/memstream.h"
 #include "common/bitstream.h"
 #include "common/textconsole.h"
+
+#include "math/rdft.h"
 
 namespace Audio {
 
@@ -144,7 +144,7 @@ private:
 	int _fftCoefsMinIndex[5];
 	int _fftCoefsMaxIndex[5];
 	int _fftLevelExp[6];
-	Common::RDFT *_rdft;
+	Math::RDFT *_rdft;
 	QDM2FFT _fft;
 
 	// I/O data
@@ -253,9 +253,9 @@ private:
 
 // half mpeg encoding window (full precision)
 const int32 ff_mpa_enwindow[257] = {
-     0,    -1,    -1,    -1,    -1,    -1,    -1,    -2,
-    -2,    -2,    -2,    -3,    -3,    -4,    -4,    -5,
-    -5,    -6,    -7,    -7,    -8,    -9,   -10,   -11,
+	 0,    -1,    -1,    -1,    -1,    -1,    -1,    -2,
+	-2,    -2,    -2,    -3,    -3,    -4,    -4,    -5,
+	-5,    -6,    -7,    -7,    -8,    -9,   -10,   -11,
    -13,   -14,   -16,   -17,   -19,   -21,   -24,   -26,
    -29,   -31,   -35,   -38,   -41,   -45,   -49,   -53,
    -58,   -63,   -68,   -73,   -79,   -85,   -91,   -97,
@@ -278,7 +278,7 @@ const int32 ff_mpa_enwindow[257] = {
  -9727, -9838, -9916, -9959, -9966, -9935, -9863, -9750,
  -9592, -9389, -9139, -8840, -8492, -8092, -7640, -7134,
   6574,  5959,  5288,  4561,  3776,  2935,  2037,  1082,
-    70,  -998, -2122, -3300, -4533, -5818, -7154, -8540,
+	70,  -998, -2122, -3300, -4533, -5818, -7154, -8540,
  -9975,-11455,-12980,-14548,-16155,-17799,-19478,-21189,
 -22929,-24694,-26482,-28289,-30112,-31947,-33791,-35640,
 -37489,-39336,-41176,-43006,-44821,-46617,-48390,-50137,
@@ -595,9 +595,9 @@ static void dct32(int32 *out, int32 *tab) {
 // 32 samples.
 // XXX: optimize by avoiding ring buffer usage
 void ff_mpa_synth_filter(int16 *synth_buf_ptr, int *synth_buf_offset,
-                         int16 *window, int *dither_state,
-                         int16 *samples, int incr,
-                         int32 sb_samples[32])
+						 int16 *window, int *dither_state,
+						 int16 *samples, int incr,
+						 int32 sb_samples[32])
 {
 	int16 *synth_buf;
 	const int16 *w, *w2, *p;
@@ -733,11 +733,11 @@ static int allocTable(VLC *vlc, int size, int use_static) {
 }
 
 static int build_table(VLC *vlc, int table_nb_bits,
-                       int nb_codes,
-                       const void *bits, int bits_wrap, int bits_size,
-                       const void *codes, int codes_wrap, int codes_size,
-                       const void *symbols, int symbols_wrap, int symbols_size,
-                       int code_prefix, int n_prefix, int flags)
+					   int nb_codes,
+					   const void *bits, int bits_wrap, int bits_size,
+					   const void *codes, int codes_wrap, int codes_size,
+					   const void *symbols, int symbols_wrap, int symbols_size,
+					   int code_prefix, int n_prefix, int flags)
 {
 	int i, j, k, n, table_size, table_index, nb, n1, index, code_prefix2, symbol;
 	uint32 code;
@@ -1202,7 +1202,7 @@ QDM2Stream::QDM2Stream(Common::SeekableReadStream *extraData, DisposeAfterUse::F
 	if (_fftOrder < 7 || _fftOrder > 9)
 		error("QDM2Stream::QDM2Stream() Unsupported fft_order: %d", _fftOrder);
 
-	_rdft = new Common::RDFT(_fftOrder, Common::RDFT::IDFT_C2R);
+	_rdft = new Math::RDFT(_fftOrder, Math::RDFT::IDFT_C2R);
 
 	initVlc();
 	ff_mpa_synth_init(ff_mpa_synth_window);
@@ -1226,7 +1226,7 @@ static int qdm2_get_vlc(Common::BitStreamMemory32LELSB *gb, VLC *vlc, int flag, 
 
 	// stage-2, 3 bits exponent escape sequence
 	if (value-- == 0)
-		value = gb->getBits(gb->getBits(3) + 1);
+		value = gb->getBits(gb->getBits<3>() + 1);
 
 	// stage-3, optional
 	if (flag) {
@@ -1479,8 +1479,8 @@ void QDM2Stream::fill_tone_level_array(int flag) {
  * @param cm_table_select      q->cm_table_select
  */
 void QDM2Stream::fill_coding_method_array(sb_int8_array tone_level_idx, sb_int8_array tone_level_idx_temp,
-                sb_int8_array coding_method, int nb_channels,
-                int c, int superblocktype_2_3, int cm_table_select) {
+				sb_int8_array coding_method, int nb_channels,
+				int c, int superblocktype_2_3, int cm_table_select) {
 	int ch, sb, j;
 	int tmp, acc, esp_40, comp;
 	int add1, add2, add3, add4;
@@ -1552,6 +1552,9 @@ void QDM2Stream::fill_coding_method_array(sb_int8_array tone_level_idx, sb_int8_
 						case 4:
 							if (comp < 16)
 								comp = 16;
+							break;
+						default:
+							break;
 					}
 					if (comp <= 5)
 						tmp = 0;
@@ -1662,7 +1665,7 @@ void QDM2Stream::synthfilt_build_sb_samples(Common::BitStreamMemory32LELSB *gb, 
 									samples[2 * k] = gb->getBit() ? dequant_1bit[joined_stereo][2 * gb->getBit()] : 0;
 								}
 							} else {
-								n = gb->getBits(8);
+								n = gb->getBits<8>();
 								for (k = 0; k < 5; k++)
 									samples[2 * k] = dequant_1bit[joined_stereo][_randomDequantIndex[n][k]];
 							}
@@ -1698,7 +1701,7 @@ void QDM2Stream::synthfilt_build_sb_samples(Common::BitStreamMemory32LELSB *gb, 
 									samples[k] = (gb->getBit() == 0) ? 0 : dequant_1bit[joined_stereo][2 * gb->getBit()];
 								}
 							} else {
-								n = gb->getBits(8);
+								n = gb->getBits<8>();
 								for (k = 0; k < 5; k++)
 									samples[k] = dequant_1bit[joined_stereo][_randomDequantIndex[n][k]];
 							}
@@ -1711,7 +1714,7 @@ void QDM2Stream::synthfilt_build_sb_samples(Common::BitStreamMemory32LELSB *gb, 
 
 					case 24:
 						if ((length - gb->pos()) >= 7) {
-							n = gb->getBits(7);
+							n = gb->getBits<7>();
 							for (k = 0; k < 3; k++)
 								samples[k] = (_randomDequantType24[n][k] - 2.0) * 0.5;
 						} else {
@@ -1733,8 +1736,8 @@ void QDM2Stream::synthfilt_build_sb_samples(Common::BitStreamMemory32LELSB *gb, 
 					case 34:
 						if ((length - gb->pos()) >= 7) {
 							if (type34_first) {
-								type34_div = (float)(1 << gb->getBits(2));
-								samples[0] = ((float)gb->getBits(5) - 16.0) / 15.0;
+								type34_div = (float)(1 << gb->getBits<2>());
+								samples[0] = ((float)gb->getBits<5>() - 16.0) / 15.0;
 								type34_predictor = samples[0];
 								type34_first = 0;
 							} else {
@@ -1941,7 +1944,7 @@ void QDM2Stream::process_subpacket_11(QDM2SubPNode *node, int length) {
 	Common::BitStreamMemory32LELSB gb(&d);
 
 	if (length >= 32) {
-		int c = gb.getBits(13);
+		int c = gb.getBits<13>();
 
 		if (c > 3)
 			fill_coding_method_array(_toneLevelIdx, _toneLevelIdxTemp, _codingMethod,
@@ -2016,22 +2019,22 @@ void QDM2Stream::qdm2_decode_super_block(void) {
 	Common::BitStreamMemoryStream packetStream(_compressedData, _packetSize + FF_INPUT_BUFFER_PADDING_SIZE);
 	Common::BitStreamMemory32LELSB packetBitStream(packetStream);
 	//qdm2_decode_sub_packet_header
-	header.type = packetBitStream.getBits(8);
+	header.type = packetBitStream.getBits<8>();
 
 	if (header.type == 0) {
 		header.size = 0;
 		header.data = NULL;
 	} else {
-		header.size = packetBitStream.getBits(8);
+		header.size = packetBitStream.getBits<8>();
 
 		if (header.type & 0x80) {
 			header.size <<= 8;
-			header.size |= packetBitStream.getBits(8);
+			header.size |= packetBitStream.getBits<8>();
 			header.type &= 0x7f;
 		}
 
 		if (header.type == 0x7f)
-			header.type |= (packetBitStream.getBits(8) << 8);
+			header.type |= (packetBitStream.getBits<8>() << 8);
 
 		header.data = &_compressedData[packetBitStream.pos() / 8];
 	}
@@ -2049,7 +2052,7 @@ void QDM2Stream::qdm2_decode_super_block(void) {
 	Common::BitStreamMemory32LELSB headerBitStream(headerStream);
 
 	if (header.type == 2 || header.type == 4 || header.type == 5) {
-		int csum = 257 * headerBitStream.getBits(8) + 2 * headerBitStream.getBits(8);
+		int csum = 257 * headerBitStream.getBits<8>() + 2 * headerBitStream.getBits<8>();
 
 		csum = qdm2_packet_checksum(_compressedData, _packetSize, csum);
 
@@ -2085,22 +2088,22 @@ void QDM2Stream::qdm2_decode_super_block(void) {
 		// decode subpacket
 		packet = &_subPackets[i];
 		//qdm2_decode_sub_packet_header
-		packet->type = headerBitStream.getBits(8);
+		packet->type = headerBitStream.getBits<8>();
 
 		if (packet->type == 0) {
 			packet->size = 0;
 			packet->data = NULL;
 		} else {
-			packet->size = headerBitStream.getBits(8);
+			packet->size = headerBitStream.getBits<8>();
 
 			if (packet->type & 0x80) {
 				packet->size <<= 8;
-				packet->size |= headerBitStream.getBits(8);
+				packet->size |= headerBitStream.getBits<8>();
 				packet->type &= 0x7f;
 			}
 
 			if (packet->type == 0x7f)
-				packet->type |= (headerBitStream.getBits(8) << 8);
+				packet->type |= (headerBitStream.getBits<8>() << 8);
 
 			packet->data = &header.data[headerBitStream.pos() / 8];
 		}
@@ -2131,7 +2134,7 @@ void QDM2Stream::qdm2_decode_super_block(void) {
 			QDM2_LIST_ADD(_subPacketListD, subPacketsD, packet);
 		} else if (packet->type == 13) {
 			for (j = 0; j < 6; j++)
-				_fftLevelExp[j] = headerBitStream.getBits(6);
+				_fftLevelExp[j] = headerBitStream.getBits<6>();
 		} else if (packet->type == 14) {
 			for (j = 0; j < 6; j++)
 				_fftLevelExp[j] = qdm2_get_vlc(&headerBitStream, &_fftLevelExpVlc, 0, 2);
@@ -2157,7 +2160,7 @@ void QDM2Stream::qdm2_decode_super_block(void) {
 }
 
 void QDM2Stream::qdm2_fft_init_coefficient(int sub_packet, int offset, int duration,
-                                           int channel, int exp, int phase) {
+										   int channel, int exp, int phase) {
 	if (_fftCoefsMinIndex[duration] < 0)
 	    _fftCoefsMinIndex[duration] = _fftCoefsIndex;
 
@@ -2221,7 +2224,7 @@ void QDM2Stream::qdm2_fft_decode_tones(int duration, Common::BitStreamMemory32LE
 		exp += _fftLevelExp[fft_level_index_table[local_int_14]];
 		exp = (exp < 0) ? 0 : exp;
 
-		phase = gb->getBits(3);
+		phase = gb->getBits<3>();
 		stereo_exp = 0;
 		stereo_phase = 0;
 
@@ -2300,7 +2303,7 @@ void QDM2Stream::qdm2_decode_fft_packets(void) {
 			}
 		} else if (type == 46) {
 			for (j=0; j < 6; j++)
-				_fftLevelExp[j] = gb.getBits(6);
+				_fftLevelExp[j] = gb.getBits<6>();
 			for (j=0; j < 4; j++) {
 				qdm2_fft_decode_tones(j, &gb, unknown_flag);
 			}
@@ -2479,7 +2482,7 @@ void QDM2Stream::qdm2_synthesis_filter(uint8 index)
 }
 
 bool QDM2Stream::qdm2_decodeFrame(Common::SeekableReadStream &in, QueuingAudioStream *audioStream) {
-	debug(1, "QDM2Stream::qdm2_decodeFrame in.pos(): %d in.size(): %d", in.pos(), in.size());
+	debug(1, "QDM2Stream::qdm2_decodeFrame in.pos(): %ld in.size(): %ld", long(in.pos()), long(in.size()));
 	int ch, i;
 	const int frame_size = (_sFrameSize * _channels);
 
@@ -2496,7 +2499,7 @@ bool QDM2Stream::qdm2_decodeFrame(Common::SeekableReadStream &in, QueuingAudioSt
 	}
 
 	if ((in.size() - in.pos()) < _packetSize) {
-		debug(1, "QDM2Stream::qdm2_decodeFrame Insufficient Packet Data in Input Stream Found: %d Need: %d", in.size() - in.pos(), _packetSize);
+		debug(1, "QDM2Stream::qdm2_decodeFrame Insufficient Packet Data in Input Stream Found: %ld Need: %d", in.size() - in.pos(), _packetSize);
 		return false;
 	}
 

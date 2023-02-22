@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,6 +27,7 @@
 #include "avalanche/avalanche.h"
 #include "avalanche/graphics.h"
 
+#include "common/math.h"
 #include "common/system.h"
 #include "engines/util.h"
 #include "graphics/palette.h"
@@ -199,7 +199,6 @@ void GraphicManager::drawToolbar() {
 
 Common::Point GraphicManager::drawArc(Graphics::Surface &surface, int16 x, int16 y, int16 stAngle, int16 endAngle, uint16 radius, Color color) {
 	Common::Point endPoint;
-	const float convfac = (float)M_PI / 180.0f;
 
 	int32 xRadius = radius;
 	int32 yRadius = radius * kScreenWidth / (8 * kScreenHeight); // Just don't ask why...
@@ -243,7 +242,7 @@ Common::Point GraphicManager::drawArc(Graphics::Surface &surface, int16 x, int16
 	uint16 deltaEnd = 91;
 
 	// Set the end point.
-	float tempTerm = endAngle * convfac;
+	float tempTerm = Common::deg2rad<float>(endAngle);
 	endPoint.x = (int16)floor(xRadius * cos(tempTerm) + 0.5) + x;
 	endPoint.y = (int16)floor(yRadius * sin(tempTerm + M_PI) + 0.5) + y;
 
@@ -254,7 +253,7 @@ Common::Point GraphicManager::drawArc(Graphics::Surface &surface, int16 x, int16
 		int16 xTemp = xNext;
 		int16 yTemp = yNext;
 		// This is used by both sin and cos.
-		tempTerm = (j + delta) * convfac;
+		tempTerm = Common::deg2rad<float>(j + delta);
 
 		xNext = (int16)floor(xRadius * cos(tempTerm) + 0.5);
 		yNext = (int16)floor(yRadius * sin(tempTerm + M_PI) + 0.5);

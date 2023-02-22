@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -379,6 +378,8 @@ void Journal::loadJournalFile(bool alreadyLoaded) {
 		journalString += '\n';
 	}
 
+	const int inspectorId = (IS_SERRATED_SCALPEL) ? 2 : 18;
+
 	// If Holmes has something to say first, then take care of it
 	if (!replyOnly) {
 		// Handle the grammar
@@ -391,13 +392,13 @@ void Journal::loadJournalFile(bool alreadyLoaded) {
 			if (asked)
 				journalString += fixedText.getJournalText(kFixedJournalText_HolmesAskedMe);
 			else
-				journalString += fixedText.getJournalText(kFixedJournalText_HolmesSaidToTheInspector);
+				journalString += fixedText.getJournalText(kFixedJournalText_HolmesSaidToMe);
 
-		} else if ((talk._talkTo == 2 && IS_SERRATED_SCALPEL) || (talk._talkTo == 18 && IS_ROSE_TATTOO)) {
+		} else if (talk._talkTo == inspectorId) {
 			if (asked)
 				journalString += fixedText.getJournalText(kFixedJournalText_HolmesAskedTheInspector);
 			else
-				journalString += fixedText.getJournalText(kFixedJournalText_HolmesSaidToMe);
+				journalString += fixedText.getJournalText(kFixedJournalText_HolmesSaidToTheInspector);
 
 		} else {
 			const char *text = nullptr;
@@ -421,7 +422,6 @@ void Journal::loadJournalFile(bool alreadyLoaded) {
 	bool commentFlag = false;
 	bool commentJustPrinted = false;
 	const byte *replyP = (const byte *)statement._reply.c_str();
-	const int inspectorId = (IS_SERRATED_SCALPEL) ? 2 : 18;
 	int beforeLastSpeakerChange = journalString.size();
 	bool justChangedSpeaker = true;
 

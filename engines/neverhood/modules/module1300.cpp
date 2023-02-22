@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -214,6 +213,8 @@ void Module1300::createScene(int sceneNum, int which) {
 		_vm->_soundMan->stopMusic(0x00203197, 0, 2);
 		_childObject = new CreditsScene(_vm, this, false);
 		break;
+	default:
+		break;
 	}
 	SetUpdateHandler(&Module1300::updateScene);
 	_childObject->handleUpdate();
@@ -306,6 +307,8 @@ void Module1300::updateScene() {
 			break;
 		case 17:
 			leaveModule(1);
+			break;
+		default:
 			break;
 		}
 	}
@@ -470,12 +473,14 @@ uint32 Scene1302::handleMessage(int messageNum, const MessageParam &param, Entit
 	case 0x8001:
 		setSpriteSurfacePriority(_class595, 1015);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
 
 Scene1303::Scene1303(NeverhoodEngine *vm, Module *parentModule)
-	: Scene(vm, parentModule), _asBalloon(NULL) {
+	: Scene(vm, parentModule), _asBalloon(nullptr) {
 
 	SetMessageHandler(&Scene1303::handleMessage);
 
@@ -509,12 +514,14 @@ uint32 Scene1303::handleMessage(int messageNum, const MessageParam &param, Entit
 		if (sender == _asBalloon && getGlobalVar(V_HAS_NEEDLE))
 			setMessageList(0x004AF9B8);
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
 
 Scene1304::Scene1304(NeverhoodEngine *vm, Module *parentModule, int which)
-	: Scene(vm, parentModule), _asNeedle(NULL) {
+	: Scene(vm, parentModule), _asNeedle(nullptr) {
 
 	SetMessageHandler(&Scene1304::handleMessage);
 
@@ -572,6 +579,8 @@ uint32 Scene1304::handleMessage(int messageNum, const MessageParam &param, Entit
 			sendEntityMessage(_klaymen, 0x1014, _asKey);
 			setMessageList(0x004B9140);
 		}
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -745,6 +754,8 @@ uint32 Scene1306::handleMessage(int messageNum, const MessageParam &param, Entit
 		sendMessage(this, 0x2000, 0);
 		addCollisionSprite(_asTape);
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -771,12 +782,14 @@ uint32 Scene1306::handleMessage416EB0(int messageNum, const MessageParam &param,
 		sendMessage(this, 0x2000, 0);
 		addCollisionSprite(_asTape);
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
 
 Scene1307::Scene1307(NeverhoodEngine *vm, Module *parentModule)
-	: Scene(vm, parentModule), _countdown(0), _asCurrKey(NULL),
+	: Scene(vm, parentModule), _countdown(0), _asCurrKey(nullptr),
 	_isInsertingKey(false), _doLeaveScene(false), _isPuzzleSolved(false) {
 
 	Sprite *tempSprite;
@@ -816,12 +829,11 @@ Scene1307::Scene1307(NeverhoodEngine *vm, Module *parentModule)
 			_asKeys[keyIndex] = insertSprite<AsScene1307Key>(this, keyIndex, _clipRects);
 			addCollisionSprite(_asKeys[keyIndex]);
 		} else {
-			_asKeys[keyIndex] = NULL;
+			_asKeys[keyIndex] = nullptr;
 		}
 	}
 
 	loadSound(0, 0x68E25540);
-
 }
 
 void Scene1307::update() {
@@ -892,7 +904,7 @@ uint32 Scene1307::handleMessage(int messageNum, const MessageParam &param, Entit
 					sendMessage(_asKeys[keyIndex], 0x2000, 1);
 			sendMessage(_asCurrKey, 0x2004, 1);
 		}
-		_asCurrKey = NULL;
+		_asCurrKey = nullptr;
 		_isInsertingKey = false;
 		break;
 	case 0x4826:
@@ -900,6 +912,8 @@ uint32 Scene1307::handleMessage(int messageNum, const MessageParam &param, Entit
 		for (uint keyIndex = 0; keyIndex < 3; keyIndex++)
 			if (getSubVar(VA_IS_KEY_INSERTED, keyIndex) && _asKeys[keyIndex])
 				sendMessage(_asKeys[keyIndex], 0x2000, 0);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -915,7 +929,7 @@ static const uint32 kScene1308NumberFileHashes[] = {
 };
 
 Scene1308::Scene1308(NeverhoodEngine *vm, Module *parentModule, int which)
-	: Scene(vm, parentModule), _isProjecting(false), _asProjector(NULL) {
+	: Scene(vm, parentModule), _isProjecting(false), _asProjector(nullptr) {
 
 	_vm->gameModule()->initKeySlotsPuzzle();
 
@@ -941,7 +955,7 @@ Scene1308::Scene1308(NeverhoodEngine *vm, Module *parentModule, int which)
 	_ssNumber3 = insertSprite<SsScene1308Number>(kScene1308NumberFileHashes[getSubVar(VA_GOOD_KEY_SLOT_NUMBERS, 2)], 2);
 	_sprite2 = insertStaticSprite(0x40043120, 995);
 	_sprite3 = insertStaticSprite(0x43003100, 995);
-	_sprite4 = NULL;
+	_sprite4 = nullptr;
 	_sprite5 = nullptr;
 
 	if (which < 0) {
@@ -999,7 +1013,7 @@ Scene1308::Scene1308(NeverhoodEngine *vm, Module *parentModule, int which)
 		_klaymen->setClipRect(_sprite1->getDrawRect().x, 0, 640, 480);
 
 	if (getGlobalVar(V_PROJECTOR_LOCATION) == 4) {
-		_asProjector = insertSprite<AsCommonProjector>(this, _klaymen, (Sprite*)NULL);
+		_asProjector = insertSprite<AsCommonProjector>(this, _klaymen, (Sprite*)nullptr);
 		addCollisionSprite(_asProjector);
 		_asProjector->setClipRect(0, 0, 640, _sprite2->getDrawRect().y2());
 		_asProjector->setRepl(64, 0);
@@ -1089,6 +1103,8 @@ uint32 Scene1308::handleMessage(int messageNum, const MessageParam &param, Entit
 			}
 		}
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -1145,6 +1161,8 @@ uint32 Scene1317::handleMessage(int messageNum, const MessageParam &param, Entit
 	case NM_ANIMATION_STOP:
 		stChooseKing();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1164,6 +1182,8 @@ uint32 Scene1317::hmChooseKing(int messageNum, const MessageParam &param, Entity
 			stKlaymenAsKing();
 		}
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1174,6 +1194,8 @@ uint32 Scene1317::hmHoborgAsKing(int messageNum, const MessageParam &param, Enti
 	case NM_ANIMATION_STOP:
 		stEndMovie();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1183,6 +1205,8 @@ uint32 Scene1317::hmEndMovie(int messageNum, const MessageParam &param, Entity *
 	switch (messageNum) {
 	case NM_ANIMATION_STOP:
 		leaveScene(0);
+		break;
+	default:
 		break;
 	}
 	return messageResult;

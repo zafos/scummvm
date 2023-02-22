@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -36,6 +35,7 @@ class SetEffects;
 
 class Fog {
 	friend class SetEffects;
+	friend class Debugger;
 
 protected:
 	Common::String _name;
@@ -60,10 +60,6 @@ protected:
 	float     *_m33ptr;
 	float     *_m34ptr;
 
-	float      _parameter1;
-	float      _parameter2;
-	float      _parameter3;
-
 	Fog       *_next;
 
 public:
@@ -82,19 +78,38 @@ protected:
 
 };
 
-class FogCone : public Fog {
-	void read(Common::ReadStream *stream, int frameCount);
-	void calculateCoeficient(Vector3 position, Vector3 viewPosition, float *coeficient);
+class FogSphere : public Fog {
+private:
+	float _radius_sq;
+
+public:
+	FogSphere():_radius_sq(0.0f) {};
+
+	void read(Common::ReadStream *stream, int frameCount) override;
+	void calculateCoeficient(Vector3 position, Vector3 viewPosition, float *coeficient) override;
 };
 
-class FogSphere : public Fog {
-	void read(Common::ReadStream *stream, int frameCount);
-	void calculateCoeficient(Vector3 position, Vector3 viewPosition, float *coeficient);
+class FogCone : public Fog {
+private:
+	float _tan_coneAngle_sq;
+	float _cos_coneAngle;
+
+public:
+	FogCone():_tan_coneAngle_sq(0.0f), _cos_coneAngle(1.0f) {};
+
+	void read(Common::ReadStream *stream, int frameCount) override;
+	void calculateCoeficient(Vector3 position, Vector3 viewPosition, float *coeficient) override;
 };
 
 class FogBox : public Fog {
-	void read(Common::ReadStream *stream, int frameCount);
-	void calculateCoeficient(Vector3 position, Vector3 viewPosition, float *coeficient);
+private:
+	Vector3 _size;
+
+public:
+	FogBox():_size() {};
+
+	void read(Common::ReadStream *stream, int frameCount) override;
+	void calculateCoeficient(Vector3 position, Vector3 viewPosition, float *coeficient) override;
 };
 
 } // End of namespace BladeRunner

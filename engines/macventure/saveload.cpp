@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -52,7 +51,7 @@ SaveStateDescriptor loadMetaData(Common::SeekableReadStream *s, int slot, bool s
 	uint32 sig = s->readUint32BE();
 	byte version = s->readByte();
 
-	SaveStateDescriptor desc(-1, "");	// init to an invalid save slot
+	SaveStateDescriptor desc;	// init to an invalid save slot
 
 	if (sig != MACVENTURE_SAVE_HEADER || version > MACVENTURE_SAVE_VERSION)
 		return desc;
@@ -62,7 +61,7 @@ SaveStateDescriptor loadMetaData(Common::SeekableReadStream *s, int slot, bool s
 
 	// Depends on MACVENTURE_DESC_LENGTH
 	uint32 metaSize = s->readUint32BE();
-	s->seek(-(5 + MACVENTURE_DESC_LENGTH + metaSize), SEEK_END);
+	s->seek(-((int32)(5 + MACVENTURE_DESC_LENGTH + metaSize)), SEEK_END);
 
 	// Load the thumbnail
 	Graphics::Surface *thumbnail;
@@ -139,7 +138,7 @@ void writeMetaData(Common::OutSaveFile *file, Common::String desc) {
 }
 
 Common::Error MacVentureEngine::loadGameState(int slot) {
-	Common::String saveFileName = Common::String::format("%s.%03d", _targetName.c_str(), slot);
+	Common::String saveFileName = getSaveStateName(slot);
 	Common::InSaveFile *file;
 	if(!(file = getSaveFileManager()->openForLoading(saveFileName))) {
 		error("ENGINE: Missing savegame file %s", saveFileName.c_str());
@@ -149,8 +148,8 @@ Common::Error MacVentureEngine::loadGameState(int slot) {
 	return Common::kNoError;
 }
 
-Common::Error MacVentureEngine::saveGameState(int slot, const Common::String &desc) {
-	Common::String saveFileName = Common::String::format("%s.%03d", _targetName.c_str(), slot);
+Common::Error MacVentureEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
+	Common::String saveFileName = getSaveStateName(slot);
 	Common::SaveFileManager *manager = getSaveFileManager();
 	// HACK Get a real name!
 	Common::OutSaveFile *file = manager->openForSaving(saveFileName);

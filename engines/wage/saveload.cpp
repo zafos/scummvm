@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * MIT License:
  *
@@ -377,7 +376,7 @@ int WageEngine::saveGame(const Common::String &fileName, const Common::String &d
 
 int WageEngine::loadGame(int slotId) {
 	Common::InSaveFile *data;
-	Common::String fileName = getSavegameFilename(slotId);
+	Common::String fileName = getSaveStateName(slotId);
 
 	debug(9, "WageEngine::loadGame(%d)", slotId);
 	if (!(data = _saveFileMan->openForLoading(fileName))) {
@@ -721,12 +720,6 @@ int WageEngine::loadGame(int slotId) {
 	return 0;
 }
 
-Common::String WageEngine::getSavegameFilename(int16 slotId) const {
-	Common::String saveLoadSlot = _targetName;
-	saveLoadSlot += Common::String::format(".%.3d", slotId);
-	return saveLoadSlot;
-}
-
 Common::Error WageEngine::loadGameState(int slot) {
 	if (loadGame(slot) == 0)
 		return Common::kNoError;
@@ -734,8 +727,8 @@ Common::Error WageEngine::loadGameState(int slot) {
 		return Common::kUnknownError;
 }
 
-Common::Error WageEngine::saveGameState(int slot, const Common::String &description) {
-	Common::String saveLoadSlot = getSavegameFilename(slot);
+Common::Error WageEngine::saveGameState(int slot, const Common::String &description, bool isAutosave) {
+	Common::String saveLoadSlot = getSaveStateName(slot);
 	if (saveGame(saveLoadSlot, description) == 0)
 		return Common::kNoError;
 	else

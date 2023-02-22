@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -50,6 +49,8 @@ uint32 AsScene2101Door::handleMessage(int messageNum, const MessageParam &param,
 		break;
 	case NM_KLAYMEN_CLOSE_DOOR:
 		stCloseDoor();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -97,6 +98,8 @@ uint32 AsScene2101HitByDoorEffect::handleMessage(int messageNum, const MessagePa
 		stopAnimation();
 		setVisible(false);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -136,6 +139,8 @@ uint32 SsCommonFloorButton::handleMessage(int messageNum, const MessageParam &pa
 		loadSprite(_fileHash2, kSLFDefDrawOffset | kSLFDefPosition);
 		_countdown = 16;
 		playSound(0, _soundFileHash);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -220,6 +225,8 @@ uint32 KmScene2101::xHandleMessage(int messageNum, const MessageParam &param) {
 	case 0x483E:
 		teleporterDisappear(0x9A28CA1C);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -242,6 +249,8 @@ uint32 KmScene2101::hmHitByDoor(int messageNum, const MessageParam &param, Entit
 		} else if (param.asInteger() == 0x60428026) {
 			playSound(0, 0x40608A59);
 		}
+		break;
+	default:
 		break;
 	}
 	return messageResult;

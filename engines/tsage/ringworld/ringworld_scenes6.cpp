@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -83,6 +82,8 @@ void Scene5000::Action1::signal() {
 		break;
 	case 9:
 		scene->setAction(&scene->_action2);
+		break;
+	default:
 		break;
 	}
 }
@@ -184,6 +185,8 @@ void Scene5000::Action2::signal() {
 		g_globals->_player.enableControl();
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -258,6 +261,8 @@ void Scene5000::Action3::signal() {
 		scene->_hotspot7.setStrip(2);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -314,6 +319,8 @@ void Scene5000::Action4::signal() {
 			g_globals->_sceneManager.changeScene(2320);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -342,6 +349,9 @@ void Scene5000::Action5::signal() {
 
 		g_globals->_player.enableControl();
 		remove();
+		break;
+	default:
+		break;
 	}
 }
 
@@ -372,6 +382,8 @@ void Scene5000::Action6::signal() {
 		break;
 	case 5:
 		g_globals->_sceneManager.changeScene(2100);
+		break;
+	default:
 		break;
 	}
 }
@@ -576,6 +588,8 @@ void Scene5000::signal() {
 	case 5005:
 		g_globals->_sceneManager.changeScene(5100);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -662,6 +676,8 @@ void Scene5100::Action1::signal() {
 		g_globals->_player.enableControl();
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -711,6 +727,8 @@ void Scene5100::Action2::signal() {
 		break;
 	case 5:
 		g_globals->_sceneManager.changeScene(2100);
+		break;
+	default:
 		break;
 	}
 }
@@ -779,6 +797,8 @@ void Scene5100::Action3::signal() {
 		g_globals->_player.animate(ANIM_MODE_1, NULL);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -808,6 +828,8 @@ void Scene5100::Action4::signal() {
 	case 3:
 		g_globals->_sceneManager.changeScene(5200);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -829,6 +851,8 @@ void Scene5100::Action5::signal() {
 	case 3:
 		scene->_sceneMode = 5106;
 		scene->setAction(&scene->_sequenceManager, scene, 5106, &g_globals->_player, &scene->_hotspot14, NULL);
+		break;
+	default:
 		break;
 	}
 }
@@ -1259,6 +1283,8 @@ void Scene5100::postInit(SceneObjectList *OwnerList) {
 			g_globals->_player.setPosition(Common::Point(512, 190));
 			setAction(&_action2);
 			break;
+		default:
+			break;
 		}
 
 		if (g_globals->getFlag(108)) {
@@ -1378,6 +1404,8 @@ void Scene5100::signal() {
 		g_globals->clearFlag(60);
 		g_globals->_sceneManager.changeScene(5300);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1454,6 +1482,8 @@ void Scene5200::Action1::signal() {
 		scene->_hotspot3.animate(ANIM_MODE_8, 1, this);
 		_actionIndex = 0;
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1498,6 +1528,8 @@ void Scene5200::Action2::signal() {
 		g_globals->_player.enableControl();
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1513,6 +1545,8 @@ void Scene5200::Action3::signal() {
 	case 2:
 		g_globals->_player.enableControl();
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -1542,6 +1576,8 @@ void Scene5200::Action4::signal() {
 		break;
 	case 6:
 		g_globals->_sceneManager.changeScene(5100);
+		break;
+	default:
 		break;
 	}
 }
@@ -1592,6 +1628,8 @@ void Scene5200::Hotspot14::doAction(int action) {
 		break;
 	case CURSOR_USE:
 		scene->setAction(&scene->_action2);
+		break;
+	default:
 		break;
 	}
 }
@@ -1731,6 +1769,8 @@ void Scene5200::stripCallback(int v) {
 	case 2:
 		_hotspot7.animate(ANIM_MODE_NONE, NULL);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1795,6 +1835,8 @@ void Scene5300::Action1::signal() {
 			}
 		}
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1823,6 +1865,8 @@ void Scene5300::Action2::signal() {
 		g_globals->_sceneManager.changeScene(5100);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1840,6 +1884,8 @@ void Scene5300::Action3::signal() {
 	case 2:
 		g_globals->_player.enableControl();
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -2199,6 +2245,8 @@ void Scene5300::signal() {
 	case 5315:
 		g_globals->_stripNum = 5302;
 		g_globals->_sceneManager.changeScene(5100);
+		break;
+	default:
 		break;
 	}
 }

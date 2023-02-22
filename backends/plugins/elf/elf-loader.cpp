@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -50,8 +49,7 @@ DLObject::DLObject() :
 
 DLObject::~DLObject() {
 	discardSymtab();
-	ELFMemMan.pluginDeallocate(_segment);
-	_segment = 0;
+	discardSegment();
 }
 
 // Expel the symbol table from memory
@@ -65,16 +63,23 @@ void DLObject::discardSymtab() {
 	_symbol_cnt = 0;
 }
 
-// Unload all objects from memory
-void DLObject::unload() {
-	discardSymtab();
-
-	ELFMemMan.pluginDeallocate(_segment);
+void DLObject::discardSegment() {
+	if (_segment) {
+		// Restore default protection before returning memory
+		protectMemory(_segment, _segmentSize, PF_R | PF_W);
+		deallocateMemory(_segment, _segmentSize);
+	}
 
 	_segment = 0;
 	_segmentSize = 0;
 	_segmentOffset = 0;
 	_segmentVMA = 0;
+}
+
+// Unload all objects from memory
+void DLObject::unload() {
+	discardSymtab();
+	discardSegment();
 }
 
 bool DLObject::readElfHeader(Elf32_Ehdr *ehdr) {
@@ -152,7 +157,7 @@ bool DLObject::readProgramHeaders(Elf32_Ehdr *ehdr, Elf32_Phdr *phdr, Elf32_Half
 
 	// Check program header values
 	if (phdr->p_type != PT_LOAD  || phdr->p_filesz > phdr->p_memsz) {
-		warning("elfloader: Invalid program header.");
+		warning("elfloader: Invalid program header %x", phdr->p_type);
 		return false;
 	}
 
@@ -163,10 +168,10 @@ bool DLObject::readProgramHeaders(Elf32_Ehdr *ehdr, Elf32_Phdr *phdr, Elf32_Half
 }
 
 bool DLObject::loadSegment(Elf32_Phdr *phdr) {
-	_segment = (byte *)ELFMemMan.pluginAllocate(phdr->p_align, phdr->p_memsz);
+	_segment = (byte *)allocateMemory(phdr->p_align, phdr->p_memsz);
 
 	if (!_segment) {
-		warning("elfloader: Out of memory.");
+		warning("elfloader: Could not allocate %d bytes for the segment", phdr->p_memsz);
 		return false;
 	}
 
@@ -204,7 +209,7 @@ Elf32_Shdr * DLObject::loadSectionHeaders(Elf32_Ehdr *ehdr) {
 
 	// Allocate memory for section headers
 	if (!(shdr = (Elf32_Shdr *)malloc(ehdr->e_shnum * sizeof(*shdr)))) {
-		warning("elfloader: Out of memory.");
+		warning("elfloader: Could not allocate %ld bytes for the section headers", ehdr->e_shnum * sizeof(*shdr));
 		return 0;
 	}
 
@@ -253,7 +258,7 @@ int DLObject::loadSymbolTable(Elf32_Ehdr *ehdr, Elf32_Shdr *shdr) {
 
 	// Allocate memory for symbol table
 	if (!(_symtab = (Elf32_Sym *)malloc(shdr[_symtab_sect].sh_size))) {
-		warning("elfloader: Out of memory.");
+		warning("elfloader: Could not allocate %d bytes for the symbol table", shdr[_symtab_sect].sh_size);
 		return -1;
 	}
 
@@ -281,7 +286,7 @@ bool DLObject::loadStringTable(Elf32_Shdr *shdr) {
 
 	// Allocate memory for string table
 	if (!(_strtab = (char *)malloc(shdr[string_sect].sh_size))) {
-		warning("elfloader: Out of memory.");
+		warning("elfloader: Could not allocate %d bytes for the string table", shdr[string_sect].sh_size);
 		return false;
 	}
 
@@ -305,6 +310,9 @@ void DLObject::relocateSymbols(ptrdiff_t offset) {
 	for (uint32 c = _symbol_cnt; c--; s++) {
 		// Make sure we don't relocate special valued symbols
 		if (s->st_shndx < SHN_LOPROC) {
+			if (s->st_value < _segmentVMA)
+				s->st_value = _segmentVMA;	// deal with symbols referring to sections, which start before the VMA
+
 			s->st_value += offset;
 
 			if (s->st_value < Elf32_Addr(_segment) ||
@@ -402,6 +410,8 @@ bool DLObject::load() {
 		return false;
 	}
 
+	protectMemory(_segment, _segmentSize, phdr.p_flags);
+
 	return true;
 }
 
@@ -486,6 +496,14 @@ void *DLObject::symbol(const char *name) {
 	// We didn't find the symbol
 	warning("elfloader: Symbol \"%s\" not found.", name);
 	return 0;
+}
+
+void *DLObject::allocateMemory(uint32 align, uint32 size) {
+	return ELFMemMan.pluginAllocate(align, size);
+}
+
+void DLObject::deallocateMemory(void *ptr, uint32 size) {
+	ELFMemMan.pluginDeallocate(ptr);
 }
 
 #endif /* defined(DYNAMIC_MODULES) && defined(USE_ELF_LOADER) */

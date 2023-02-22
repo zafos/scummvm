@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,12 +39,12 @@ public:
 	/**
 	 * Save the data for the class to file
 	 */
-	virtual void save(SimpleFile *file, int indent);
+	void save(SimpleFile *file, int indent) override;
 
 	/**
 	 * Load the data for the class from file
 	 */
-	virtual void load(SimpleFile *file);
+	void load(SimpleFile *file) override;
 };
 
 /**
@@ -65,18 +64,18 @@ public:
 public:
 	PtrListItem() : _item(nullptr) {}
 	PtrListItem(T *item) : _item(item) {}
-	virtual ~PtrListItem() { delete _item; }
+	~PtrListItem() override { delete _item; }
 };
 
 template<typename T>
 class List : public CSaveableObject, public Common::List<T *> {
 public:
-	virtual ~List() { destroyContents(); }
+	~List() override { destroyContents(); }
 
 	/**
 	 * Save the data for the class to file
 	 */
-	virtual void save(SimpleFile *file, int indent) {
+	void save(SimpleFile *file, int indent) override {
 		file->writeNumberLine(0, indent);
 
 		// Write out number of items
@@ -97,7 +96,7 @@ public:
 	/**
 	 * Load the data for the class from file
 	 */
-	virtual void load(SimpleFile *file) {
+	void load(SimpleFile *file) override {
 		file->readNumber();
 		file->readBuffer();
 

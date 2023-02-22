@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -120,7 +119,7 @@ bool SXMath::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 	//////////////////////////////////////////////////////////////////////////
 	else if (strcmp(name, "Cos") == 0) {
 		stack->correctParams(1);
-		stack->pushFloat(cos(degreeToRadian(stack->pop()->getFloat())));
+		stack->pushFloat(cos(Common::deg2rad<double>(stack->pop()->getFloat())));
 		return STATUS_OK;
 	}
 
@@ -129,7 +128,7 @@ bool SXMath::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 	//////////////////////////////////////////////////////////////////////////
 	else if (strcmp(name, "Cosh") == 0) {
 		stack->correctParams(1);
-		stack->pushFloat(cosh(degreeToRadian(stack->pop()->getFloat())));
+		stack->pushFloat(cosh(Common::deg2rad<double>(stack->pop()->getFloat())));
 		return STATUS_OK;
 	}
 
@@ -186,7 +185,7 @@ bool SXMath::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 	//////////////////////////////////////////////////////////////////////////
 	else if (strcmp(name, "Sin") == 0) {
 		stack->correctParams(1);
-		stack->pushFloat(sin(degreeToRadian(stack->pop()->getFloat())));
+		stack->pushFloat(sin(Common::deg2rad<double>(stack->pop()->getFloat())));
 		return STATUS_OK;
 	}
 
@@ -195,7 +194,7 @@ bool SXMath::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 	//////////////////////////////////////////////////////////////////////////
 	else if (strcmp(name, "Sinh") == 0) {
 		stack->correctParams(1);
-		stack->pushFloat(sinh(degreeToRadian(stack->pop()->getFloat())));
+		stack->pushFloat(sinh(Common::deg2rad<double>(stack->pop()->getFloat())));
 		return STATUS_OK;
 	}
 
@@ -204,7 +203,7 @@ bool SXMath::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 	//////////////////////////////////////////////////////////////////////////
 	else if (strcmp(name, "Tan") == 0) {
 		stack->correctParams(1);
-		stack->pushFloat(tan(degreeToRadian(stack->pop()->getFloat())));
+		stack->pushFloat(tan(Common::deg2rad<double>(stack->pop()->getFloat())));
 		return STATUS_OK;
 	}
 
@@ -213,7 +212,7 @@ bool SXMath::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 	//////////////////////////////////////////////////////////////////////////
 	else if (strcmp(name, "Tanh") == 0) {
 		stack->correctParams(1);
-		stack->pushFloat(tanh(degreeToRadian(stack->pop()->getFloat())));
+		stack->pushFloat(tanh(Common::deg2rad<double>(stack->pop()->getFloat())));
 		return STATUS_OK;
 	}
 
@@ -231,7 +230,7 @@ bool SXMath::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 	//////////////////////////////////////////////////////////////////////////
 	else if (strcmp(name, "DegToRad") == 0) {
 		stack->correctParams(1);
-		stack->pushFloat(degreeToRadian(stack->pop()->getFloat()));
+		stack->pushFloat(Common::deg2rad<double>(stack->pop()->getFloat()));
 		return STATUS_OK;
 	}
 
@@ -240,7 +239,7 @@ bool SXMath::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 	//////////////////////////////////////////////////////////////////////////
 	else if (strcmp(name, "RadToDeg") == 0) {
 		stack->correctParams(1);
-		stack->pushFloat(radianToDegree(stack->pop()->getFloat()));
+		stack->pushFloat(Common::rad2deg<double>(stack->pop()->getFloat()));
 		return STATUS_OK;
 	} else {
 		return STATUS_FAILED;
@@ -269,18 +268,6 @@ ScValue *SXMath::scGetProperty(const Common::String &name) {
 	} else {
 		return _scValue;
 	}
-}
-
-
-//////////////////////////////////////////////////////////////////////////
-double SXMath::degreeToRadian(double value) {
-	return value * (M_PI / 180.0f);
-}
-
-
-//////////////////////////////////////////////////////////////////////////
-double SXMath::radianToDegree(double value) {
-	return value * (180.0f / M_PI);
 }
 
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,6 +46,7 @@ ScrollBarWidget::ScrollBarWidget(GuiObject *boss, int x, int y, int w, int h)
 	_numEntries = 0;
 	_entriesPerPage = 0;
 	_currentPos = 0;
+	_singleStep = 1;
 
 	_repeatTimer = 0;
 }
@@ -60,12 +60,12 @@ void ScrollBarWidget::handleMouseDown(int x, int y, int button, int clickCount) 
 
 	if (y <= UP_DOWN_BOX_HEIGHT) {
 		// Up arrow
-		_currentPos--;
+		_currentPos -= _singleStep;
 		_repeatTimer = g_system->getMillis() + kRepeatInitialDelay;
 		_draggingPart = kUpArrowPart;
 	} else if (y >= _h - UP_DOWN_BOX_HEIGHT) {
 		// Down arrow
-		_currentPos++;
+		_currentPos += _singleStep;
 		_repeatTimer = g_system->getMillis() + kRepeatInitialDelay;
 		_draggingPart = kDownArrowPart;
 	} else if (y < _sliderPos) {
@@ -93,9 +93,9 @@ void ScrollBarWidget::handleMouseWheel(int x, int y, int direction) {
 		return;
 
 	if (direction < 0) {
-		_currentPos--;
+		_currentPos -= _singleStep;
 	} else {
-		_currentPos++;
+		_currentPos += _singleStep;
 	}
 
 	// Make sure that _currentPos is still inside the bounds
@@ -146,9 +146,9 @@ void ScrollBarWidget::handleTickle() {
 			const int old_pos = _currentPos;
 
 			if (_part == kUpArrowPart)
-				_currentPos -= 3;
+				_currentPos -= 3 * _singleStep;
 			else if (_part == kDownArrowPart)
-				_currentPos += 3;
+				_currentPos += 3 * _singleStep;
 
 			checkBounds(old_pos);
 

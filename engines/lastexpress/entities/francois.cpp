@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -38,19 +37,19 @@ namespace LastExpress {
 
 Francois::Francois(LastExpressEngine *engine) : Entity(engine, kEntityFrancois) {
 	ADD_CALLBACK_FUNCTION(Francois, reset);
-	ADD_CALLBACK_FUNCTION(Francois, updateFromTime);
-	ADD_CALLBACK_FUNCTION(Francois, draw);
-	ADD_CALLBACK_FUNCTION(Francois, enterExitCompartment);
-	ADD_CALLBACK_FUNCTION(Francois, enterExitCompartment2);
-	ADD_CALLBACK_FUNCTION(Francois, playSound);
-	ADD_CALLBACK_FUNCTION(Francois, savegame);
-	ADD_CALLBACK_FUNCTION(Francois, doWalk);
+	ADD_CALLBACK_FUNCTION_I(Francois, updateFromTime);
+	ADD_CALLBACK_FUNCTION_S(Francois, draw);
+	ADD_CALLBACK_FUNCTION_SI(Francois, enterExitCompartment);
+	ADD_CALLBACK_FUNCTION_SI(Francois, enterExitCompartment2);
+	ADD_CALLBACK_FUNCTION_S(Francois, playSound);
+	ADD_CALLBACK_FUNCTION_II(Francois, savegame);
+	ADD_CALLBACK_FUNCTION_II(Francois, doWalk);
 	ADD_CALLBACK_FUNCTION(Francois, exitCompartment);
 	ADD_CALLBACK_FUNCTION(Francois, enterCompartment);
-	ADD_CALLBACK_FUNCTION(Francois, rampage);
+	ADD_CALLBACK_FUNCTION_I(Francois, rampage);
 	ADD_CALLBACK_FUNCTION(Francois, takeWalk);
 	ADD_CALLBACK_FUNCTION(Francois, haremVisit);
-	ADD_CALLBACK_FUNCTION(Francois, chaseBeetle);
+	ADD_CALLBACK_FUNCTION_TYPE(Francois, chaseBeetle, EntityParametersIISS);
 	ADD_CALLBACK_FUNCTION(Francois, findCath);
 	ADD_CALLBACK_FUNCTION(Francois, letsGo);
 	ADD_CALLBACK_FUNCTION(Francois, chapter1);
@@ -72,7 +71,7 @@ Francois::Francois(LastExpressEngine *engine) : Entity(engine, kEntityFrancois) 
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION(1, Francois, reset)
-	Entity::reset(savepoint, true);
+	Entity::reset(savepoint, kClothes1, true);
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
@@ -113,6 +112,7 @@ IMPLEMENT_FUNCTION_II(8, Francois, doWalk, CarIndex, EntityPosition)
 
 	case kActionNone:
 		if (getEntities()->updateEntity(_entityIndex, (CarIndex)params->param1, (EntityPosition)params->param2)) {
+			getData()->inventoryItem = kItemNone;
 			callbackAction();
 		} else {
 			if (!getEntities()->isDistanceBetweenEntities(kEntityFrancois, kEntityPlayer, 2000)
@@ -126,6 +126,8 @@ IMPLEMENT_FUNCTION_II(8, Francois, doWalk, CarIndex, EntityPosition)
 				 && !getEvent(kEventFrancoisShowBeetle)
 				 && !getEvent(kEventFrancoisShowBeetleD))
 					getData()->inventoryItem = kItemMatchBox;
+				else
+					getData()->inventoryItem = kItemNone;
 			} else {
 				getData()->inventoryItem = kItemFirebird;
 			}
@@ -145,12 +147,12 @@ IMPLEMENT_FUNCTION_II(8, Francois, doWalk, CarIndex, EntityPosition)
 		default:
 			break;
 
-		case 1:
+		case kItemMatchBox:
 			setCallback(2);
 			setup_savegame(kSavegameTypeEvent, kEventFrancoisShowBeetle);
 			break;
 
-		case 18:
+		case kItemFirebird:
 			if (isNight())
 				getAction()->playAnimation(getData()->entityPosition < getEntityData(kEntityPlayer)->entityPosition ? kEventFrancoisShowEggNightD : kEventFrancoisShowEggNight);
 			else
@@ -372,7 +374,7 @@ label_callback:
 			getData()->inventoryItem = kItemNone;
 
 			if (getSoundQueue()->isBuffered(kEntityFrancois))
-				getSoundQueue()->processEntry(kEntityFrancois);
+				getSoundQueue()->fade(kEntityFrancois);
 
 			setCallback(4);
 			setup_doWalk(kCarRedSleeping, kPosition_5790);
@@ -383,7 +385,7 @@ label_callback:
 		getData()->inventoryItem = kItemNone;
 
 		if (getSoundQueue()->isBuffered(kEntityFrancois))
-			getSoundQueue()->processEntry(kEntityFrancois);
+			getSoundQueue()->fade(kEntityFrancois);
 
 		setCallback(6);
 		setup_savegame(kSavegameTypeEvent, kEventFrancoisWhistle);
@@ -577,17 +579,20 @@ IMPLEMENT_FUNCTION(13, Francois, haremVisit)
 			getData()->location = kLocationOutsideCompartment;
 
 			setCallback(7);
-			setup_doWalk(kCarGreenSleeping, kPosition_4840);
+			setup_doWalk(kCarRedSleeping, kPosition_4840);
 			break;
 
 		case 7:
 			if (getInventory()->hasItem(kItemWhistle) || getInventory()->get(kItemWhistle)->location == kObjectLocation3) {
 				setCallback(10);
-				setup_doWalk(kCarGreenSleeping, kPosition_5790);
+				setup_doWalk(kCarRedSleeping, kPosition_5790);
 				break;
 			}
 
 			getEntities()->drawSequenceLeft(kEntityFrancois, "605He");
+			getEntities()->enterCompartment(kEntityFrancois, kObjectCompartmentE, true);
+			setCallback(8);
+			setup_playSound(rnd(2) ? "Fra2005B" : "Fra2005C");
 			break;
 
 		case 8:
@@ -599,7 +604,7 @@ IMPLEMENT_FUNCTION(13, Francois, haremVisit)
 			getEntities()->exitCompartment(kEntityFrancois, kObjectCompartmentE, true);
 
 			setCallback(10);
-			setup_doWalk(kCarGreenSleeping, kPosition_5790);
+			setup_doWalk(kCarRedSleeping, kPosition_5790);
 			break;
 
 		case 10:
@@ -630,8 +635,8 @@ IMPLEMENT_FUNCTION_IIS(14, Francois, chaseBeetle, ObjectIndex, EntityPosition)
 		break;
 
 	case kActionDefault:
-		strcpy((char *)&parameters->seq2, "605H");
-		strcat((char *)&parameters->seq2, (char *)&parameters->seq1);
+		Common::strcpy_s(parameters->seq2, "605H");
+		Common::strcat_s(parameters->seq2, parameters->seq1);
 
 		setCallback(1);
 		setup_exitCompartment();
@@ -649,7 +654,7 @@ IMPLEMENT_FUNCTION_IIS(14, Francois, chaseBeetle, ObjectIndex, EntityPosition)
 
 		case 2:
 			if (getInventory()->get(kItemBeetle)->location == kObjectLocation3) {
-				getEntities()->drawSequenceLeft(kEntityFrancois, (char *)&parameters->seq2);
+				getEntities()->drawSequenceLeft(kEntityFrancois, parameters->seq2);
 				getEntities()->enterCompartment(kEntityFrancois, (ObjectIndex)parameters->param1, true);
 
 				setCallback(3);
@@ -683,7 +688,7 @@ IMPLEMENT_FUNCTION_IIS(14, Francois, chaseBeetle, ObjectIndex, EntityPosition)
 			break;
 
 		case 8:
-			getEntities()->exitCompartment(kEntityFrancois, (ObjectIndex)parameters->param1);
+			getEntities()->exitCompartment(kEntityFrancois, (ObjectIndex)parameters->param1, true);
 			// fall through
 
 		case 9:
@@ -788,6 +793,7 @@ IMPLEMENT_FUNCTION(16, Francois, letsGo)
 	case kActionNone:
 		getData()->entityPosition = getEntityData(kEntityBoutarel)->entityPosition;
 		getData()->location = getEntityData(kEntityBoutarel)->location;
+		getData()->car = getEntityData(kEntityBoutarel)->car;
 		break;
 
 	case kActionDefault:
@@ -828,6 +834,7 @@ IMPLEMENT_FUNCTION(16, Francois, letsGo)
 
 			getData()->entityPosition = kPosition_5790;
 			getData()->location = kLocationInsideCompartment;
+			getEntities()->clearSequences(kEntityFrancois);
 
 			callbackAction();
 			break;
@@ -996,8 +1003,22 @@ label_callback_4:
 		}
 
 label_callback_5:
-		if (getInventory()->get(kItemWhistle)->location != kObjectLocation3) {
-			// TODO: do we also need to check if the whistle is in the inventory?
+		if (getInventory()->get(kItemBeetle)->location != kObjectLocation3) {
+			if (!getInventory()->hasItem(kItemWhistle) && getInventory()->get(kItemWhistle)->location != kObjectLocation3) {
+				// BUG in the original game: condition is always false
+				if (getState()->time < kTime1782000 && getState()->time > kTime1782000 && !params->param8) {
+					params->param8 = 1;
+					setCallback(9);
+					setup_takeWalk();
+					break;
+				}
+				if (getState()->time < kTime1813500 && getState()->time > kTime1813500 && !CURRENT_PARAM(1, 1)) {
+					CURRENT_PARAM(1, 1) = 1;
+					setCallback(10);
+					setup_takeWalk();
+					break;
+				}
+			}
 			break;
 		}
 
@@ -1010,11 +1031,11 @@ label_callback_5:
 		}
 
 label_callback_6:
-		if (timeCheckCallbackCompartment(kTime1782000, params->param6, 7, kObjectCompartmentC, kPosition_6470, "c"))
+		if (timeCheckCallbackCompartment(kTime1782000, params->param6, 7, kObjectCompartmentF, kPosition_4070, "f"))
 			break;
 
 label_callback_7:
-		timeCheckCallbackCompartment(kTime1813500, params->param7, 8, kObjectCompartmentF, kPosition_4070, "f");
+		timeCheckCallbackCompartment(kTime1813500, params->param7, 8, kObjectCompartmentC, kPosition_6470, "c");
 		break;
 
 	case kActionCallback:
@@ -1128,17 +1149,19 @@ label_callback_10:
 			}
 
 label_callback_11:
-			if (getInventory()->get(kItemWhistle)->location == kObjectLocation3) {
-				if (getState()->time <= kTimeEnd)
-					if (!getEntities()->isDistanceBetweenEntities(kEntityFrancois, kEntityPlayer, 2000) || !params->param4)
-						params->param4 = (uint)(getState()->time + 75);
+			if (getInventory()->get(kItemBeetle)->location == kObjectLocation3) {
+				if (CURRENT_PARAM(1, 4) != kTimeInvalid) {
+					if (getState()->time <= kTimeEnd)
+						if (!getEntities()->isDistanceBetweenEntities(kEntityFrancois, kEntityPlayer, 2000) || !CURRENT_PARAM(1, 4))
+							CURRENT_PARAM(1, 4) = (uint)(getState()->time + 75);
 
-				if (params->param4 < getState()->time || getState()->time > kTimeEnd) {
-					params->param4 = kTimeInvalid;
+					if (CURRENT_PARAM(1, 4) < getState()->time || getState()->time > kTimeEnd) {
+						CURRENT_PARAM(1, 4) = kTimeInvalid;
 
-					setCallback(12);
-					setup_playSound("Fra2010");
-					break;
+						setCallback(12);
+						setup_playSound("Fra2010");
+						break;
+					}
 				}
 
 label_callback_12:
@@ -1146,12 +1169,18 @@ label_callback_12:
 					break;
 
 label_callback_13:
-				if (timeCheckCallbackCompartment(kTime2040300, CURRENT_PARAM(1, 6), 14, kObjectCompartmentF, kPosition_4070, "f"))
+				if (timeCheckCallbackCompartment(kTime2146500, CURRENT_PARAM(1, 6), 14, kObjectCompartmentF, kPosition_4070, "f"))
 					break;
 
 label_callback_14:
-				timeCheckCallbackCompartment(kTime2040300, CURRENT_PARAM(1, 7), 15, kObjectCompartmentB, kPosition_7500, "b");
+				timeCheckCallbackCompartment(kTime2218500, CURRENT_PARAM(1, 7), 15, kObjectCompartmentB, kPosition_7500, "b");
 			}
+			// The original game has some code here similar to withMama marked as BUG:
+			// if [kItemBeetle].location != kObjectLocation3 && !has(kItemWhistle) && [kItemWhistle].location != kObjectLocation3,
+			// there are several always-false checks (time < N && time > N),
+			// kTime2040300 with callback 16, kTime2119500 with callback 17, kTime2146500 with callback 18, kTime2218500 with callback 19,
+			// with takeWalk as a payload.
+			// No point in reproducing it here.
 		}
 		break;
 

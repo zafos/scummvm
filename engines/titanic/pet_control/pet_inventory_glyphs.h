@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -50,7 +49,7 @@ private:
 
 	/**
 	 * Start a singular (non-repeating) animation for the item,
-	 * such as an item's transformation into a piece of Titania 
+	 * such as an item's transformation into a piece of Titania
 	 */
 	void startSingularMovie();
 
@@ -77,57 +76,57 @@ public:
 	/**
 	 * Called when the PET area is entered
 	 */
-	virtual void enter();
+	void enter() override;
 
 	/**
 	 * Called when the PET area is left
 	 */
-	virtual void leave();
+	void leave() override;
 
 	/**
 	 * Draw the glyph at a specified position
 	 */
-	virtual void drawAt(CScreenManager *screenManager, const Point &pt, bool isHighlighted);
+	void drawAt(CScreenManager *screenManager, const Point &pt, bool isHighlighted) override;
 
 	/**
 	 * Unhighlight any currently highlighted element
 	 */
-	virtual void unhighlightCurrent();
+	void unhighlightCurrent() override;
 
 	/**
 	 * Highlight any currently highlighted element
 	 */
-	virtual void highlightCurrent(const Point &pt);
+	void highlightCurrent(const Point &pt) override;
 
 	/**
 	 * Glyph has been shifted to be first visible one
 	 */
-	virtual void glyphFocused(const Point &topLeft, bool flag);
+	void glyphFocused(const Point &topLeft, bool flag) override;
 
 	/**
 	 * Called when a glyph drag starts
 	 */
-	virtual bool dragGlyph(const Point &topLeft, CMouseDragStartMsg *msg);
+	bool dragGlyph(const Point &topLeft, CMouseDragStartMsg *msg) override;
 
 	/**
 	 * Returns the tooltip text for when the glyph is selected
 	 */
-	virtual void getTooltip(CTextControl *text);
+	void getTooltip(CTextControl *text) override;
 
 	/**
 	 * Return whether the glyph is currently valid
 	 */
-	virtual bool isValid() const { return _item && _repeated; }
+	bool isValid() const override { return _item && _repeated; }
 
 	/**
 	 * Returns the object associated with the glyph
 	 */
-	virtual CGameObject *getObjectAt() { return _item; }
+	CGameObject *getObjectAt() override { return _item; }
 
 	/**
 	 * Does a processing action on the glyph
 	 */
-	virtual bool doAction(CGlyphAction *action);
+	bool doAction(CGlyphAction *action) override;
 
 	/**
 	 * Set the inventory item

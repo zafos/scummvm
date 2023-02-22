@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -39,6 +38,7 @@
 #include "engines/savestate.h"
 
 #include "drascula/console.h"
+#include "drascula/detection.h"
 
 #include "audio/mixer.h"
 
@@ -56,10 +56,6 @@ namespace Drascula {
 
 #define DRASCULA_DAT_VER 6
 #define DATAALIGNMENT 4
-
-enum DrasculaGameFeatures {
-	GF_PACKED = (1 << 0)
-};
 
 enum Languages {
 	kEnglish = 0,
@@ -319,19 +315,19 @@ struct RoomHandlers;
 class DrasculaEngine : public Engine {
 protected:
 	// Engine APIs
-	virtual Common::Error run();
+	Common::Error run() override;
 
 public:
 	DrasculaEngine(OSystem *syst, const DrasculaGameDescription *gameDesc);
-	virtual ~DrasculaEngine();
-	virtual bool hasFeature(EngineFeature f) const;
+	~DrasculaEngine() override;
+	bool hasFeature(EngineFeature f) const override;
 
-	virtual void syncSoundSettings();
+	void syncSoundSettings() override;
 
-	virtual Common::Error loadGameState(int slot);
-	virtual bool canLoadGameStateCurrently();
-	virtual Common::Error saveGameState(int slot, const Common::String &desc);
-	virtual bool canSaveGameStateCurrently();
+	Common::Error loadGameState(int slot) override;
+	bool canLoadGameStateCurrently() override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	bool canSaveGameStateCurrently() override;
 
 	Common::RandomSource *_rnd;
 	const DrasculaGameDescription *_gameDescription;
@@ -349,7 +345,7 @@ public:
 
 	void loadPic(int roomNum, byte *targetSurface, int colorCount = 1) {
 		char rm[20];
-		sprintf(rm, "%i.alg", roomNum);
+		Common::sprintf_s(rm, "%i.alg", roomNum);
 		loadPic(rm, targetSurface, colorCount);
 	}
 
@@ -732,9 +728,6 @@ public:
 	void update_62();
 	void update_62_pre();
 	void update_102();
-
-	Console *_console;
-	GUI::Debugger *getDebugger() { return _console; }
 
 private:
 	int _lang;

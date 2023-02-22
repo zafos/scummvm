@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1994-1998 Revolution Software Ltd.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 // MAKETEXT	- Constructs a single-frame text sprite: returns a handle to a
@@ -42,6 +41,7 @@
 
 
 #include "common/system.h"
+#include "common/unicode-bidi.h"
 #include "common/textconsole.h"
 
 #include "sword2/sword2.h"
@@ -83,7 +83,7 @@ namespace Sword2 {
  *         error-signal character (chequered flag)
  */
 
-byte *FontRenderer::makeTextSprite(byte *sentence, uint16 maxWidth, uint8 pen, uint32 fontRes, uint8 border) {
+byte *FontRenderer::makeTextSprite(const byte *sentence, uint16 maxWidth, uint8 pen, uint32 fontRes, uint8 border) {
 	debug(5, "makeTextSprite(\"%s\", maxWidth=%u)", sentence, maxWidth);
 
 	_borderPen = border;
@@ -123,7 +123,7 @@ byte *FontRenderer::makeTextSprite(byte *sentence, uint16 maxWidth, uint8 pen, u
 	return textSprite;
 }
 
-uint16 FontRenderer::analyzeSentence(byte *sentence, uint16 maxWidth, uint32 fontRes, LineInfo *line) {
+uint16 FontRenderer::analyzeSentence(const byte *sentence, uint16 maxWidth, uint32 fontRes, LineInfo *line) {
 	// joinWidth = how much extra space is needed to append a word to a
 	// line. NB. SPACE requires TWICE the '_charSpacing' to join a word
 	// to line
@@ -207,7 +207,7 @@ uint16 FontRenderer::analyzeSentence(byte *sentence, uint16 maxWidth, uint32 fon
  *         error-signal character (chequered flag)
  */
 
-byte *FontRenderer::buildTextSprite(byte *sentence, uint32 fontRes, uint8 pen, LineInfo *line, uint16 noOfLines) {
+byte *FontRenderer::buildTextSprite(const byte *sentence, uint32 fontRes, uint8 pen, LineInfo *line, uint16 noOfLines) {
 	uint16 i;
 
 	// Find the width of the widest line in the output text
@@ -266,18 +266,23 @@ byte *FontRenderer::buildTextSprite(byte *sentence, uint32 fontRes, uint8 pen, L
 
 	// Build the sprite, one line at a time
 
-	uint16 pos = 0;
-
 	for (i = 0; i < noOfLines; i++) {
 		// Center each line
 		byte *spritePtr = linePtr + (spriteWidth - line[i].width) / 2;
+		const byte *currTxtLine = sentence;
 
+		Common::String reversedString;
+		if (_vm->_isRTL) {
+			const Common::String textLogical((const char *)currTxtLine, line[i].length);
+			reversedString = Common::convertBiDiString(textLogical, Common::kWindows1255);
+			currTxtLine  = reinterpret_cast<const byte *>(reversedString.c_str());
+		}
 		// copy the sprite for each character in this line to the
 		// text sprite and inc the sprite ptr by the character's
 		// width minus the 'overlap'
 
 		for (uint j = 0; j < line[i].length; j++) {
-			byte *charPtr = findChar(sentence[pos++], charSet);
+			byte *charPtr = findChar(*currTxtLine++, charSet);
 
 			frame_head.read(charPtr);
 
@@ -294,7 +299,7 @@ byte *FontRenderer::buildTextSprite(byte *sentence, uint32 fontRes, uint8 pen, L
 		}
 
 		// Skip space at end of last word in this line
-		pos++;
+		sentence += line[i].length + 1;
 
 		if (Sword2Engine::isPsx())
 			linePtr += (char_height / 2 + _lineSpacing) * spriteWidth;
@@ -535,6 +540,10 @@ uint32 FontRenderer::buildNewBloc(byte *ascii, int16 x, int16 y, uint16 width, u
 		case POSITION_AT_CENTER_OF_TOP:
 			x -= (frame_head.width / 2);
 			break;
+		case POSITION_AT_CENTER_OF_CENTER:
+			x -= (frame_head.width / 2);
+			y -= (frame_head.height) / 2;
+			break;
 		case POSITION_AT_LEFT_OF_TOP:
 			// The given coords are already correct for this!
 			break;
@@ -554,6 +563,8 @@ uint32 FontRenderer::buildNewBloc(byte *ascii, int16 x, int16 y, uint16 width, u
 		case POSITION_AT_RIGHT_OF_CENTER:
 			x -= frame_head.width;
 			y -= (frame_head.height) / 2;
+			break;
+		default:
 			break;
 		}
 
@@ -672,7 +683,7 @@ void Sword2Engine::initializeFontResourceFlags() {
 	else
 		textLine = (char *)fetchTextLine(textFile, 54) + 2;
 
-	_system->setWindowCaption(textLine);
+	_system->setWindowCaption(Common::U32String(textLine, _isRTL ? Common::kWindows1255 : Common::kUtf8));
 	_resman->closeResource(TEXT_RES);
 }
 

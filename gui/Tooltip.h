@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -42,36 +41,37 @@ public:
 
 	void drawDialog(DrawLayer layerToDraw) override;
 
-	virtual void receivedFocus(int x = -1, int y = -1) override {}
+	void receivedFocus(int x = -1, int y = -1) override {}
 protected:
-	virtual void handleMouseDown(int x, int y, int button, int clickCount) override {
+	void handleMouseDown(int x, int y, int button, int clickCount) override {
 		close();
 		_parent->handleMouseDown(x + (getAbsX() - _parent->getAbsX()), y + (getAbsY() - _parent->getAbsY()), button, clickCount);
 	}
-	virtual void handleMouseUp(int x, int y, int button, int clickCount) override {
+	void handleMouseUp(int x, int y, int button, int clickCount) override {
 		close();
 		_parent->handleMouseUp(x + (getAbsX() - _parent->getAbsX()), y + (getAbsY() - _parent->getAbsY()), button, clickCount);
 	}
-	virtual void handleMouseWheel(int x, int y, int direction) override {
+	void handleMouseWheel(int x, int y, int direction) override {
 		close();
 		_parent->handleMouseWheel(x + (getAbsX() - _parent->getAbsX()), y + (getAbsX() - _parent->getAbsX()), direction);
 	}
-	virtual void handleKeyDown(Common::KeyState state) override {
+	void handleKeyDown(Common::KeyState state) override {
 		close();
 		_parent->handleKeyDown(state);
 	}
-	virtual void handleKeyUp(Common::KeyState state) override {
+	void handleKeyUp(Common::KeyState state) override {
 		close();
 		_parent->handleKeyUp(state);
 	}
-	virtual void handleMouseMoved(int x, int y, int button) override {
+	void handleMouseMoved(int x, int y, int button) override {
 		close();
 	}
 
 	int _maxWidth;
 	int _xdelta, _ydelta;
+	int _xpadding, _ypadding;
 
-	Common::StringArray _wrappedLines;
+	Common::U32StringArray _wrappedLines;
 };
 
 } // End of namespace GUI

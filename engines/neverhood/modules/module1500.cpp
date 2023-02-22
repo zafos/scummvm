@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -54,6 +53,8 @@ void Module1500::createScene(int sceneNum, int which) {
 	case 3:
 		_vm->gameState().sceneNum = 3;
 		_childObject = new Scene1501(_vm, this, 0x0CA04202, 0, 110, 48);
+		break;
+	default:
 		break;
 	}
 	SetUpdateHandler(&Module1500::updateScene);
@@ -126,6 +127,8 @@ uint32 Scene1501::handleMessage(int messageNum, const MessageParam &param, Entit
 	switch (messageNum) {
 	case NM_KEYPRESS_SPACE:
 		_skip = true;
+		break;
+	default:
 		break;
 	}
 	return messageResult;

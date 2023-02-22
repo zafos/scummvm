@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -48,19 +47,13 @@
 #include "prince/mob.h"
 #include "prince/object.h"
 #include "prince/pscr.h"
+#include "prince/detection.h"
 
 namespace Prince {
-
-enum PrinceGameType {
-	kPrinceDataUNK,
-	kPrinceDataDE,
-	kPrinceDataPL
-};
 
 struct SavegameHeader;
 
 class PrinceEngine;
-struct PrinceGameDescription;
 class GraphicsMan;
 class Script;
 class Interpreter;
@@ -75,12 +68,6 @@ class Hero;
 class Animation;
 class Room;
 class Pscr;
-
-enum {
-	GF_TRANSLATED = 1 << 0,
-	GF_EXTRACTED  = 1 << 1,
-	GF_NOVOICES   = 1 << 2
-};
 
 struct SavegameHeader {
 	uint8 version;
@@ -100,7 +87,16 @@ struct Text {
 	uint16 _time;
 	uint32 _color;
 
-	Text() : _str(nullptr), _x(0), _y(0), _time(0), _color(255){
+	Text() {
+		clear();
+	}
+
+	void clear() {
+		_str = nullptr;
+		_x = 0;
+		_y = 0;
+		_time = 0;
+		_color = 255;
 	}
 };
 
@@ -142,7 +138,7 @@ const int kStructSizeBASA = 8;
 // background and normal animation
 struct Anim {
 	BASA _basaData;
-	int32 _addr; //animation adress
+	int32 _addr; // animation address
 	int16 _usage;
 	int16 _state; // state of animation: 0 - turning on, 1 - turning off
 	int16 _flags;
@@ -184,7 +180,7 @@ struct Anim {
 		case kAnimX:
 			return _x;
 		default:
-			error("getAnimData() - Wrong offset type: %d", (int) offset);
+			error("getAnimData() - Wrong offset type: %d", (int)offset);
 		}
 	}
 
@@ -192,7 +188,7 @@ struct Anim {
 		if (offset == kAnimX) {
 			_x = value;
 		} else {
-			error("setAnimData() - Wrong offset: %d, value: %d", (int) offset, value);
+			error("setAnimData() - Wrong offset: %d, value: %d", (int)offset, value);
 		}
 	}
 };
@@ -273,25 +269,24 @@ enum Type {
 
 class PrinceEngine : public Engine {
 protected:
-	Common::Error run();
+	Common::Error run() override;
 
 public:
 	PrinceEngine(OSystem *syst, const PrinceGameDescription *gameDesc);
-	virtual ~PrinceEngine();
+	~PrinceEngine() override;
 
 	bool scummVMSaveLoadDialog(bool isSave);
 
-	virtual bool hasFeature(EngineFeature f) const;
-	virtual void pauseEngineIntern(bool pause);
-	virtual bool canSaveGameStateCurrently();
-	virtual bool canLoadGameStateCurrently();
-	virtual Common::Error saveGameState(int slot, const Common::String &desc);
-	virtual Common::Error loadGameState(int slot);
+	bool hasFeature(EngineFeature f) const override;
+	void pauseEngineIntern(bool pause) override;
+	bool canSaveGameStateCurrently() override;
+	bool canLoadGameStateCurrently() override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	Common::Error loadGameState(int slot) override;
 
 	void playVideo(Common::String videoFilename);
 
 	WARN_UNUSED_RESULT static bool readSavegameHeader(Common::InSaveFile *in, SavegameHeader &header, bool skipThumbnail = true);
-	Common::String generateSaveName(int slot);
 	void writeSavegameHeader(Common::OutSaveFile *out, SavegameHeader &header);
 	void syncGame(Common::SeekableReadStream *readStream, Common::WriteStream *writeStream);
 	bool loadGame(int slotNumber);
@@ -317,6 +312,8 @@ public:
 	uint32 _mobTranslationSize;
 	byte *_mobTranslationData;
 
+	bool _missingVoice;
+
 	bool loadLocation(uint16 locationNr);
 	bool loadAnim(uint16 animNr, bool loop);
 	bool loadVoice(uint32 textSlot, uint32 sampleSlot, const Common::String &name);
@@ -339,8 +336,6 @@ public:
 	void freeAllSamples();
 
 	void setVoice(uint16 slot, uint32 sampleSlot, uint16 flag);
-
-	virtual GUI::Debugger *getDebugger();
 
 	void changeCursor(uint16 curId);
 	void printAt(uint32 slot, uint8 color, char *s, uint16 x, uint16 y);
@@ -574,7 +569,7 @@ public:
 	byte *_roomPathBitmapTemp; // PL - SSala
 	byte *_coordsBufEnd;
 	byte *_coordsBuf; // optimal path
-	byte *_coords; // last path point adress from coordsBuf
+	byte *_coords; // last path point address from coordsBuf
 	byte *_coordsBuf2;
 	byte *_coords2;
 	byte *_coordsBuf3;

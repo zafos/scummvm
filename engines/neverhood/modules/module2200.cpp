@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,14 +46,18 @@ Module2200::~Module2200() {
 	_vm->_soundMan->deleteGroup(0x11391412);
 }
 
+bool Module2200::shouldSkipHall() {
+	return ConfMan.getBool("skiphallofrecordsscenes") || _vm->getLanguage() == Common::Language::JA_JPN;
+}
+
 void Module2200::createScene(int sceneNum, int which) {
-	if (sceneNum == 46 && ConfMan.getBool("skiphallofrecordsscenes")) {
+	if (sceneNum == 46 && shouldSkipHall()) {
 		// Skip the whole Hall of Records storyboard scenes,
 		// and teleport to the last scene
 		sceneNum = 41;
 	}
 
-	if (sceneNum == 40 && ConfMan.getBool("skiphallofrecordsscenes")) {
+	if (sceneNum == 40 && shouldSkipHall()) {
 		// Skip the whole Hall of Records storyboard scenes,
 		// and teleport back to the first scene
 		sceneNum = 5;
@@ -273,6 +276,8 @@ void Module2200::createScene(int sceneNum, int which) {
 				createStaticScene(0x08C74886, 0x74882084);
 		}
 		break;
+	default:
+		break;
 	}
 	SetUpdateHandler(&Module2200::updateScene);
 	_childObject->handleUpdate();
@@ -450,6 +455,8 @@ void Module2200::updateScene() {
 		case 47:
 			createScene(41, 1);
 			break;
+		default:
+			break;
 		}
 	}
 }
@@ -583,13 +590,15 @@ uint32 Scene2201::handleMessage(int messageNum, const MessageParam &param, Entit
 			setMessageList(0x004B81C8);
 		}
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
 
 Scene2202::Scene2202(NeverhoodEngine *vm, Module *parentModule, int which)
 	: Scene(vm, parentModule), _isSolved(false), _leaveScene(false), _isCubeMoving(false),
-	_ssMovingCube(NULL), _ssDoneMovingCube(NULL) {
+	_ssMovingCube(nullptr), _ssDoneMovingCube(nullptr) {
 
 	_vm->gameModule()->initCubeSymbolsPuzzle();
 
@@ -642,14 +651,14 @@ void Scene2202::update() {
 		if (freeCubePosition != -1) {
 			setSurfacePriority(_ssMovingCube->getSurface(), 700);
 			sendMessage(_ssMovingCube, 0x2001, freeCubePosition);
-			_ssMovingCube = NULL;
+			_ssMovingCube = nullptr;
 			_isCubeMoving = true;
 		}
 	}
 
 	if (_ssDoneMovingCube) {
 		setSurfacePriority(_ssDoneMovingCube->getSurface(), _surfacePriority);
-		_ssDoneMovingCube = NULL;
+		_ssDoneMovingCube = nullptr;
 		if (testIsSolved()) {
 			playSound(0);
 			setGlobalVar(V_TILE_PUZZLE_SOLVED, 1);
@@ -679,6 +688,8 @@ uint32 Scene2202::handleMessage(int messageNum, const MessageParam &param, Entit
 			_surfacePriority = 300;
 		else
 			_surfacePriority = 500;
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -816,6 +827,8 @@ uint32 Scene2203::handleMessage(int messageNum, const MessageParam &param, Entit
 			setMessageList(0x004B83F0);
 		}
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -921,6 +934,8 @@ uint32 Scene2205::handleMessage(int messageNum, const MessageParam &param, Entit
 		break;
 	case 0x480B:
 		setGlobalVar(V_LIGHTS_ON, getGlobalVar(V_LIGHTS_ON) ? 0 : 1);
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -1046,6 +1061,8 @@ uint32 Scene2206::handleMessage(int messageNum, const MessageParam &param, Entit
 	case NM_MOVE_TO_FRONT:
 		klaymenInFrontSpikes();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1146,11 +1163,11 @@ Scene2207::Scene2207(NeverhoodEngine *vm, Module *parentModule)
 		insertSprite<SsScene2207Symbol>(kScene2207FileHashes[getSubVar(VA_GOOD_CANNON_SYMBOLS_1, 0)], 0);
 		insertSprite<SsScene2207Symbol>(kScene2207FileHashes[getSubVar(VA_GOOD_CANNON_SYMBOLS_1, 1)], 1);
 		insertSprite<SsScene2207Symbol>(kScene2207FileHashes[getSubVar(VA_GOOD_CANNON_SYMBOLS_1, 2)], 2);
-		_asTape = NULL;
-		_asLever = NULL;
-		_asWallRobotAnimation = NULL;
-		_asWallCannonAnimation = NULL;
-		_ssButton = NULL;
+		_asTape = nullptr;
+		_asLever = nullptr;
+		_asWallRobotAnimation = nullptr;
+		_asWallCannonAnimation = nullptr;
+		_ssButton = nullptr;
 		_klaymen->setClipRect(0, _ssMaskPart1->getDrawRect().y, 640, 480);
 		_asElevator->setClipRect(0, _ssMaskPart1->getDrawRect().y, 640, 480);
 	}
@@ -1255,6 +1272,8 @@ uint32 Scene2207::handleMessage(int messageNum, const MessageParam &param, Entit
 			sendMessage(_klaymen, 0x2001, 0);
 		}
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1271,6 +1290,8 @@ uint32 Scene2207::handleMessage2(int messageNum, const MessageParam &param, Enti
 		sendEntityMessage(_klaymen, 0x1014, _asLever);
 		setMessageList(0x004B3920);
 		setRectList(0x004B3948);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -1404,6 +1425,8 @@ uint32 Scene2208::handleMessage(int messageNum, const MessageParam &param, Entit
 		if (param.asPoint().x <= 40 || param.asPoint().x >= 600)
 			leaveScene(0);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1432,7 +1455,11 @@ void Scene2208::drawRow(int16 rowIndex) {
 		_background->getSurface()->copyFrom(_backgroundSurface->getSurface(), 0, y, sourceRect);
 		if (rowIndex < (int)_strings.size()) {
 			const char *text = _strings[rowIndex];
-			_fontSurface->drawString(_background->getSurface(), 95, y, (const byte*)text);
+			int16 x = 95;
+			if (_vm->shouldOffsetFontNhc()) {
+				x += 15;
+			}
+			_fontSurface->drawString(_background->getSurface(), x, y, (const byte*)text);
 		}
 	}
 }
@@ -1529,6 +1556,8 @@ uint32 Scene2242::handleMessage(int messageNum, const MessageParam &param, Entit
 			setMessageList(0x004B3D50);
 		}
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1624,6 +1653,8 @@ uint32 HallOfRecordsScene::handleMessage(int messageNum, const MessageParam &par
 		if (param.asInteger() == 0x800C6694)
 			readClickedColumn();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1711,6 +1742,8 @@ uint32 Scene2247::handleMessage(int messageNum, const MessageParam &param, Entit
 	case NM_ANIMATION_START:
 		if (param.asInteger() == 0x800C6694)
 			readClickedColumn();
+		break;
+	default:
 		break;
 	}
 	return messageResult;

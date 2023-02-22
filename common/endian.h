@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,23 +24,28 @@
 
 #include "common/scummsys.h"
 
+
 /**
- *  \file endian.h
- *  Endian conversion and byteswap conversion functions or macros
+ * @defgroup common_endian Endian conversions
+ * @ingroup common
  *
- *  SWAP_BYTES_??(a)      - inverse byte order
- *  SWAP_CONSTANT_??(a)   - inverse byte order, implemented as macro.
- *                              Use with compiletime-constants only, the result will be a compiletime-constant aswell.
- *                              Unlike most other functions these can be used for eg. switch-case labels
+ * @brief  Functions and macros for endian conversions and byteswap conversions.
  *
- *  READ_UINT??(a)        - read native value from pointer a
- *  READ_??_UINT??(a)     - read LE/BE value from pointer a and convert it to native
- *  WRITE_??_UINT??(a, v) - write native value v to pointer a with LE/BE encoding
- *  TO_??_??(a)           - convert native value v to LE/BE
- *  FROM_??_??(a)         - convert LE/BE value v to native
- *  CONSTANT_??_??(a)     - convert LE/BE value v to native, implemented as macro.
- *                              Use with compiletime-constants only, the result will be a compiletime-constant aswell.
- *                              Unlike most other functions these can be used for eg. switch-case labels
+ * @details
+ *  - SWAP_BYTES_??(a) - Reverse byte order
+ *  - SWAP_CONSTANT_??(a) - Reverse byte order, implemented as a macro.
+ *                          Use with compile-time constants only, the result will be a compile-time constant as well.
+ *                          Unlike most other functions, these can be used for e.g. switch-case labels.
+ *  - READ_UINT??(a)   - Read native value from pointer @p a.
+ *  - READ_??_UINT??(a) - Read LE/BE value from pointer @p a and convert it to native.
+ *  - WRITE_??_UINT??(a, v) - Write a native value @p v to pointer @p a with LE/BE encoding.
+ *  - TO_??_??(a) - Convert native value @p v to LE/BE.
+ *  - FROM_??_??(a) - Convert LE/BE value @p v to native.
+ *  - CONSTANT_??_??(a) - Convert LE/BE value @p v to native, implemented as a macro.
+ *                        Use with compile-time constants only, the result will be a compile-time constant as well.
+ *                        Unlike most other functions these, can be used for e.g. switch-case labels.
+ *
+ * @{
  */
 
 // Sanity check
@@ -49,6 +53,10 @@
 #	error No endianness defined
 #endif
 
+/**
+ * Swap the bytes in a 64-bit word in order to convert LE encoded data to BE
+ * and vice versa. Use with compile-time constants only.
+ */
 #define SWAP_CONSTANT_64(a) \
 	((uint64)((((a) >> 56) & 0x000000FF) | \
 	          (((a) >> 40) & 0x0000FF00) | \
@@ -59,12 +67,20 @@
 	          (((a) & 0x0000FF00) << 40) | \
 	          (((a) & 0x000000FF) << 56) ))
 
+/**
+ * Swap the bytes in a 32-bit word in order to convert LE encoded data to BE
+ * and vice versa. Use with compile-time constants only.
+ */
 #define SWAP_CONSTANT_32(a) \
 	((uint32)((((a) >> 24) & 0x00FF) | \
 	          (((a) >>  8) & 0xFF00) | \
 	          (((a) & 0xFF00) <<  8) | \
 	          (((a) & 0x00FF) << 24) ))
 
+/**
+ * Swap the bytes in a 16-bit word in order to convert LE encoded data to BE
+ * and vice versa. Use with compile-time constants only.
+ */
 #define SWAP_CONSTANT_16(a) \
 	((uint16)((((a) >>  8) & 0x00FF) | \
 	          (((a) <<  8) & 0xFF00) ))
@@ -72,24 +88,23 @@
 
 
 /**
- * Swap the bytes in a 16 bit word in order to convert LE encoded data to BE
+ * Swap the bytes in a 16-bit word in order to convert LE encoded data to BE
  * and vice versa.
  */
 
-// compilerspecific variants come first, fallback last
+// compiler-specific variants come first, fallback last
+#if GCC_ATLEAST(4, 8) || defined(__clang__)
 
-// Test for GCC and if the target has the MIPS rel.2 instructions (we know the psp does)
-#if defined(__GNUC__) && (defined(__psp__) || defined(_MIPS_ARCH_MIPS32R2) || defined(_MIPS_ARCH_MIPS64R2))
-
-	FORCEINLINE uint16 SWAP_BYTES_16(const uint16 a) {
-		if (__builtin_constant_p(a)) {
-			return SWAP_CONSTANT_16(a);
-		} else {
-			uint16 result;
-			__asm__ ("wsbh %0,%1" : "=r" (result) : "r" (a));
-			return result;
-		}
+	FORCEINLINE uint16 SWAP_BYTES_16(uint16 a) {
+		return __builtin_bswap16(a);
 	}
+
+#elif defined(_MSC_VER)
+
+	FORCEINLINE uint16 SWAP_BYTES_16(uint16 a) {
+		return _byteswap_ushort(a);
+	}
+
 #else
 
 	inline uint16 SWAP_BYTES_16(const uint16 a) {
@@ -100,33 +115,12 @@
 
 
 /**
- * Swap the bytes in a 32 bit word in order to convert LE encoded data to BE
+ * Swap the bytes in a 32-bit word in order to convert LE encoded data to BE
  * and vice versa.
  */
 
-// machine/compiler-specific variants come first, fallback last
-
-// Test for GCC and if the target has the MIPS rel.2 instructions (we know the psp does)
-#if defined(__GNUC__) && (defined(__psp__) || defined(_MIPS_ARCH_MIPS32R2) || defined(_MIPS_ARCH_MIPS64R2))
-
-	FORCEINLINE uint32 SWAP_BYTES_32(const uint32 a) {
-		if (__builtin_constant_p(a)) {
-			return SWAP_CONSTANT_32(a);
-		} else {
-			uint32 result;
-#	if defined(__psp__)
-			// use special allegrex instruction
-			__asm__ ("wsbw %0,%1" : "=r" (result) : "r" (a));
-#	else
-			__asm__ ("wsbh %0,%1\n"
-			         "rotr %0,%0,16" : "=r" (result) : "r" (a));
-#	endif
-			return result;
-		}
-	}
-
-// Test for GCC >= 4.3.0 as this version added the bswap builtin
-#elif GCC_ATLEAST(4, 3)
+// compiler-specific variants come first, fallback last
+#if defined(__GNUC__)
 
 	FORCEINLINE uint32 SWAP_BYTES_32(uint32 a) {
 		return __builtin_bswap32(a);
@@ -149,30 +143,12 @@
 #endif
 
 /**
- * Swap the bytes in a 64 bit word in order to convert LE encoded data to BE
+ * Swap the bytes in a 64-bit word in order to convert LE encoded data to BE
  * and vice versa.
  */
 
-// machine/compiler-specific variants come first, fallback last
-
-// Test for GCC and if the target has the MIPS rel.2 instructions (we know the psp does)
-//
-#if defined(__GNUC__) && (defined(__psp__) || defined(_MIPS_ARCH_MIPS32R2) || defined(_MIPS_ARCH_MIPS64R2))
-
-	FORCEINLINE uint64 SWAP_BYTES_64(const uint64 a) {
-		if (__builtin_constant_p(a)) {
-			return SWAP_CONSTANT_64(a);
-		} else {
-			uint32 low = (uint32)a, high = (uint32)(a >> 32);
-			low = SWAP_BYTES_32(low);
-			high = SWAP_BYTES_32(high);
-
-			return (((uint64)low) << 32) | high;
-		}
-	}
-
-// Test for GCC >= 4.3.0 as this version added the bswap builtin
-#elif GCC_ATLEAST(4, 3)
+// compiler-specific variants come first, fallback last
+#if defined(__GNUC__)
 
 	FORCEINLINE uint64 SWAP_BYTES_64(uint64 a) {
 		return __builtin_bswap64(a);
@@ -205,8 +181,8 @@
  * A wrapper macro used around four character constants, like 'DATA', to
  * ensure portability. Typical usage: MKTAG('D','A','T','A').
  *
- * Why is this necessary? The C/C++ standard does not define the endianess to
- * be used for character constants. Hence if one uses multi-byte character
+ * This is required because the C/C++ standard does not define the endianess to
+ * be used for character constants. Hence, if one uses multi-byte character
  * constants, a potential portability problem opens up.
  */
 #define MKTAG(a0,a1,a2,a3) ((uint32)((a3) | ((a2) << 8) | ((a1) << 16) | ((a0) << 24)))
@@ -217,17 +193,16 @@
  */
 #define MKTAG16(a0,a1) ((uint16)((a1) | ((a0) << 8)))
 
-// Functions for reading/writing native integers.
-// They also transparently handle the need for alignment.
+/** @name Functions for reading and writing native integers
+ *  @brief Functions for reading and writing native integer values.
+ *         They also transparently handle the need for alignment.
+ *  @{
+ */
 
-// Test for GCC >= 4.0. These implementations will automatically use
+// Test for GCC and compatible. These implementations will automatically use
 // CPU-specific instructions for unaligned data when they are available (eg.
-// MIPS). See also this email thread on scummvm-devel for details:
-// <http://thread.gmane.org/gmane.games.devel.scummvm/8063>
-//
-// Moreover, we activate this code for GCC >= 3.3 but *only* if unaligned access
-// is allowed.
-#if GCC_ATLEAST(4, 0) || (GCC_ATLEAST(3, 3) && !defined(SCUMM_NEED_ALIGNMENT))
+// MIPS).
+#if defined(__GNUC__)
 
 	FORCEINLINE uint16 READ_UINT16(const void *ptr) {
 		struct Unaligned16 { uint16 val; } __attribute__ ((__packed__, __may_alias__));
@@ -366,11 +341,14 @@
 		}
 
 #	endif
-
+/** @} */
 #endif
 
 
-//  Map Funtions for reading/writing BE/LE integers depending on native endianess
+/** @name  Map functions for reading/writing BE/LE integers depending on native endianess
+ * @{
+ */
+
 #if defined(SCUMM_LITTLE_ENDIAN)
 
 	#define READ_LE_UINT16(a) READ_UINT16(a)
@@ -405,8 +383,13 @@
 	#define TO_BE_64(a) SWAP_BYTES_64(a)
 	#define CONSTANT_LE_64(a) ((uint64)(a))
 	#define CONSTANT_BE_64(a) SWAP_CONSTANT_64(a)
+/** @} */
 
-// if the unaligned load and the byteswap take alot instructions its better to directly read and invert
+/** @name  Functions for directly reading/writing and inverting
+ *  @brief Use these in case the unaligned load and byteswap take
+ *         a lot of instructions.
+ * @{
+ */
 #	if defined(SCUMM_NEED_ALIGNMENT) && !defined(__mips__)
 
 		inline uint16 READ_BE_UINT16(const void *ptr) {
@@ -503,7 +486,7 @@
 	#define CONSTANT_LE_64(a) SWAP_CONSTANT_64(a)
 	#define CONSTANT_BE_64(a) ((uint64)(a))
 
-// if the unaligned load and the byteswap take alot instructions its better to directly read and invert
+// if the unaligned load and the byteswap take a lot of instructions its better to directly read and invert
 #	if defined(SCUMM_NEED_ALIGNMENT) && !defined(__mips__)
 
 	inline uint16 READ_LE_UINT16(const void *ptr) {
@@ -573,16 +556,214 @@ inline uint32 READ_LE_UINT24(const void *ptr) {
 	return (b[2] << 16) | (b[1] << 8) | (b[0]);
 }
 
+inline void WRITE_LE_UINT24(void *ptr, uint32 value) {
+	uint8 *b = (uint8 *)ptr;
+	b[0] = (uint8)(value >> 0);
+	b[1] = (uint8)(value >> 8);
+	b[2] = (uint8)(value >> 16);
+}
+
 inline uint32 READ_BE_UINT24(const void *ptr) {
 	const uint8 *b = (const uint8 *)ptr;
 	return (b[0] << 16) | (b[1] << 8) | (b[2]);
 }
 
+inline void WRITE_BE_UINT24(void *ptr, uint32 value) {
+	uint8 *b = (uint8 *)ptr;
+	b[0] = (uint8)(value >> 16);
+	b[1] = (uint8)(value >>  8);
+	b[2] = (uint8)(value >>  0);
+}
+
 #ifdef SCUMM_LITTLE_ENDIAN
 #define READ_UINT24(a) READ_LE_UINT24(a)
+#define WRITE_UINT24(a,b) WRITE_LE_UINT24(a,b)
 #else
 #define READ_UINT24(a) READ_BE_UINT24(a)
+#define WRITE_UINT24(a,b) WRITE_BE_UINT24(a,b)
 #endif
+
+union SwapFloat {
+	float f;
+	uint32 u32;
+};
+
+STATIC_ASSERT(sizeof(float) == sizeof(uint32), Unexpected_size_of_float);
+
+inline float READ_LE_FLOAT32(const void *ptr) {
+	SwapFloat swap;
+	swap.u32 = READ_LE_UINT32(ptr);
+	return swap.f;
+}
+
+inline void WRITE_LE_FLOAT32(void *ptr, float value) {
+	SwapFloat swap;
+	swap.f = value;
+	WRITE_LE_UINT32(ptr, swap.u32);
+}
+
+inline float READ_BE_FLOAT32(const void *ptr) {
+	SwapFloat swap;
+	swap.u32 = READ_BE_UINT32(ptr);
+	return swap.f;
+}
+
+inline void WRITE_BE_FLOAT32(void *ptr, float value) {
+	SwapFloat swap;
+	swap.f = value;
+	WRITE_BE_UINT32(ptr, swap.u32);
+}
+
+#ifdef SCUMM_LITTLE_ENDIAN
+#define READ_FLOAT32(a) READ_LE_FLOAT32(a)
+#define WRITE_FLOAT32(a,b) WRITE_LE_FLOAT32(a,b)
+#else
+#define READ_FLOAT32(a) READ_BE_FLOAT32(a)
+#define WRITE_FLOAT32(a,b) WRITE_BE_FLOAT32(a,b)
+#endif
+
+#ifdef SCUMM_FLOAT_WORD_LITTLE_ENDIAN
+union SwapDouble {
+	double d;
+	uint64 u64;
+	struct {
+		uint32 low, high;
+	} u32;
+};
+#else
+union SwapDouble {
+	double d;
+	uint64 u64;
+	struct {
+		uint32 high, low;
+	} u32;
+};
+#endif
+
+STATIC_ASSERT(sizeof(double) == sizeof(uint64) || sizeof(double) == sizeof(uint32), Unexpected_size_of_double);
+
+template<size_t n> inline double READ_DOUBLE(const SwapDouble& sw);
+template<size_t n> inline void WRITE_DOUBLE(SwapDouble &sw, double d);
+
+// 64-bit double
+template<> inline double READ_DOUBLE<sizeof(uint64)>(const SwapDouble& sd)
+{
+  return sd.d;
+}
+
+template<> inline void WRITE_DOUBLE<sizeof(uint64)>(SwapDouble &sd, double d)
+{
+  sd.d = d;
+}
+
+// 32-bit double
+template<> inline double READ_DOUBLE<sizeof(uint32)>(const SwapDouble& sd)
+{
+  SwapFloat sf;
+  uint32 e = (sd.u32.high >> 20) & 0x7ff;
+  if (e <= 896) {
+    // Too small for normalized, create a zero with the correct sign
+    // (FIXME: Create denormalized numbers instead when possible?)
+    sf.u32 = (sd.u32.high & 0x80000000U); // sign bit
+    return sf.f;
+  } else if(e >= 1151) {
+    // Overflow, infinity or NaN
+    if (e < 2047) {
+      // Overflow; make sure result is infinity and not NaN
+      sf.u32 = (sd.u32.high & 0x80000000U) | // sign bit
+        (255 << 23); // exponent
+      return sf.f;
+    }
+    e = 255;
+  } else
+    e -= 896;
+  sf.u32 = (sd.u32.high & 0x80000000U) | // sign bit
+    (e << 23) | // exponent
+    ((sd.u32.high & 0xfffff) << 3) | (sd.u32.low >> 29); // mantissa
+  return sf.f;
+}
+
+template<> inline void WRITE_DOUBLE<sizeof(uint32)>(SwapDouble &sd, double d)
+{
+  SwapFloat sf;
+  sf.f = d;
+  uint32 e = (sf.u32 >> 23) & 0xff;
+  if (!e) {
+    // Denormalized or zero, create a zero with the correct sign
+    // (FIXME: Convert denormalized 32-bit to normalized 64-bit?)
+    sd.u32.high = (sf.u32 & 0x80000000U); // sign bit
+    sd.u32.low = 0;
+    return;
+  } else if (e == 255) {
+    // Infinity or NaN
+    e = 2047;
+  } else
+    e += 896;
+  sd.u32.high = (sf.u32 & 0x80000000U) | // sign bit
+    (e << 20) | // exponent
+    ((sf.u32 >> 3) & 0xfffff); // mantissa
+  sd.u32.low = sf.u32 << 29;
+}
+
+inline double READ_LE_FLOAT64(const void *ptr) {
+	SwapDouble swap;
+	const uint8 *b = (const uint8 *)ptr;
+	swap.u32.low  = READ_LE_UINT32(b);
+	swap.u32.high = READ_LE_UINT32(b + 4);
+	return READ_DOUBLE<sizeof(double)>(swap);
+}
+
+inline void WRITE_LE_FLOAT64(void *ptr, double value) {
+	SwapDouble swap;
+	WRITE_DOUBLE<sizeof(double)>(swap, value);
+	uint8 *b = (uint8 *)ptr;
+	WRITE_LE_UINT32(b,     swap.u32.low);
+	WRITE_LE_UINT32(b + 4, swap.u32.high);
+}
+
+inline double READ_BE_FLOAT64(const void *ptr) {
+	SwapDouble swap;
+	const uint8 *b = (const uint8 *)ptr;
+	swap.u32.high = READ_BE_UINT32(b);
+	swap.u32.low  = READ_BE_UINT32(b + 4);
+	return READ_DOUBLE<sizeof(double)>(swap);
+}
+
+inline void WRITE_BE_FLOAT64(void *ptr, double value) {
+	SwapDouble swap;
+	WRITE_DOUBLE<sizeof(double)>(swap, value);
+	uint8 *b = (uint8 *)ptr;
+	WRITE_BE_UINT32(b,     swap.u32.high);
+	WRITE_BE_UINT32(b + 4, swap.u32.low);
+}
+
+inline double READ_FPA_FLOAT64(const void *ptr) {
+	SwapDouble swap;
+	const uint8 *b = (const uint8 *)ptr;
+	swap.u32.high = READ_LE_UINT32(b);
+	swap.u32.low  = READ_LE_UINT32(b + 4);
+	return READ_DOUBLE<sizeof(double)>(swap);
+}
+
+inline void WRITE_FPA_FLOAT64(void *ptr, double value) {
+	SwapDouble swap;
+	WRITE_DOUBLE<sizeof(double)>(swap, value);
+	uint8 *b = (uint8 *)ptr;
+	WRITE_LE_UINT32(b,     swap.u32.high);
+	WRITE_LE_UINT32(b + 4, swap.u32.low);
+}
+
+inline double READ_FLOAT64(const void *ptr) {
+	SwapDouble swap;
+	swap.u64 = READ_UINT64(ptr);
+	return READ_DOUBLE<sizeof(double)>(swap);
+}
+
+inline void WRITE_FLOAT64(void *ptr, double value) {
+	SwapDouble swap;
+	WRITE_DOUBLE<sizeof(double)>(swap, value);
+	WRITE_UINT64(ptr, swap.u64);
+}
 
 inline int16 READ_LE_INT16(const void *ptr) {
 	return static_cast<int16>(READ_LE_UINT16(ptr));
@@ -615,5 +796,7 @@ inline int32 READ_BE_INT32(const void *ptr) {
 inline void WRITE_BE_INT32(void *ptr, int32 value) {
 	WRITE_BE_UINT32(ptr, static_cast<uint32>(value));
 }
+/** @} */
+/** @} */
 
 #endif

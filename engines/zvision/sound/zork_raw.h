@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -86,7 +85,7 @@ class RawZorkStream : public Audio::RewindableAudioStream {
 public:
 	RawZorkStream(uint32 rate, bool stereo, DisposeAfterUse::Flag disposeStream, Common::SeekableReadStream *stream);
 
-	~RawZorkStream() {
+	~RawZorkStream() override {
 	}
 
 public:
@@ -103,23 +102,23 @@ private:
 	RawChunkStream _streamReader;
 
 public:
-	int readBuffer(int16 *buffer, const int numSamples);
+	int readBuffer(int16 *buffer, const int numSamples) override;
 
-	bool isStereo() const {
+	bool isStereo() const override {
 		return _stereo;
 	}
-	bool endOfData() const {
+	bool endOfData() const override {
 		return _endOfData;
 	}
 
-	int getRate() const {
+	int getRate() const override {
 		return _rate;
 	}
 	Audio::Timestamp getLength() const {
 		return _playtime;
 	}
 
-	bool rewind();
+	bool rewind() override;
 };
 
 /**
@@ -131,9 +130,9 @@ public:
  * @return           The new SeekableAudioStream (or 0 on failure).
  */
 Audio::RewindableAudioStream *makeRawZorkStream(Common::SeekableReadStream *stream,
-        int rate,
-        bool stereo,
-        DisposeAfterUse::Flag disposeAfterUse = DisposeAfterUse::YES);
+		int rate,
+		bool stereo,
+		DisposeAfterUse::Flag disposeAfterUse = DisposeAfterUse::YES);
 
 Audio::RewindableAudioStream *makeRawZorkStream(const Common::String &filePath, ZVision *engine);
 

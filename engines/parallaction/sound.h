@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -57,7 +56,7 @@ public:
 	virtual ~SoundMan() { delete _impl; }
 	void execute(int command, int32 parm) {
 		char n[12];
-		sprintf(n, "%i", parm);
+		Common::sprintf_s(n, "%i", parm);
 		execute(command, n);
 	}
 	void execute(int command, const char *parm = 0) {
@@ -112,7 +111,7 @@ protected:
 
 public:
 	SoundMan_ns(Parallaction_ns *vm);
-	virtual ~SoundMan_ns() {}
+	~SoundMan_ns() override {}
 
 	virtual void playSfx(const char *filename, uint channel, bool looping, int volume = -1) { }
 	virtual void stopSfx(uint channel) { }
@@ -123,7 +122,7 @@ public:
 	virtual void playCharacterMusic(const char *character) = 0;
 	virtual void playLocationMusic(const char *location) = 0;
 	virtual void pause(bool p) { }
-	virtual void execute(int command, const char *parm);
+	void execute(int command, const char *parm) override;
 
 	void setMusicVolume(int value);
 };
@@ -139,14 +138,14 @@ class DosSoundMan_ns : public SoundMan_ns {
 
 public:
 	DosSoundMan_ns(Parallaction_ns *vm);
-	~DosSoundMan_ns();
-	void playMusic();
-	void stopMusic();
+	~DosSoundMan_ns() override;
+	void playMusic() override;
+	void stopMusic() override;
 
-	void playCharacterMusic(const char *character);
-	void playLocationMusic(const char *location);
+	void playCharacterMusic(const char *character) override;
+	void playLocationMusic(const char *location) override;
 
-	void pause(bool p);
+	void pause(bool p) override;
 };
 
 #define NUM_SFX_CHANNELS 4
@@ -165,20 +164,20 @@ class AmigaSoundMan_ns : public SoundMan_ns {
 
 public:
 	AmigaSoundMan_ns(Parallaction_ns *vm);
-	~AmigaSoundMan_ns();
-	void playMusic();
-	void stopMusic();
+	~AmigaSoundMan_ns() override;
+	void playMusic() override;
+	void stopMusic() override;
 
-	void playSfx(const char *filename, uint channel, bool looping, int volume);
-	void stopSfx(uint channel);
+	void playSfx(const char *filename, uint channel, bool looping, int volume) override;
+	void stopSfx(uint channel) override;
 
-	void playCharacterMusic(const char *character);
-	void playLocationMusic(const char *location);
+	void playCharacterMusic(const char *character) override;
+	void playLocationMusic(const char *location) override;
 };
 
 class DummySoundMan : public SoundManImpl {
 public:
-	void execute(int command, const char *parm) { }
+	void execute(int command, const char *parm) override { }
 };
 
 class SoundMan_br : public SoundManImpl {
@@ -204,13 +203,13 @@ protected:
 
 public:
 	SoundMan_br(Parallaction_br *vm);
-	~SoundMan_br();
+	~SoundMan_br() override;
 
 	virtual void playSfx(const char *filename, uint channel, bool looping, int volume = -1) { }
 	void stopSfx(uint channel);
 	void stopAllSfx();
 
-	virtual void execute(int command, const char *parm);
+	void execute(int command, const char *parm) override;
 	void setMusicFile(const char *parm);
 
 	void enableSfx(bool enable);
@@ -227,13 +226,13 @@ class DosSoundMan_br : public SoundMan_br {
 
 public:
 	DosSoundMan_br(Parallaction_br *vm);
-	~DosSoundMan_br();
+	~DosSoundMan_br() override;
 
-	void playMusic();
-	void stopMusic();
-	void pause(bool p);
+	void playMusic() override;
+	void stopMusic() override;
+	void pause(bool p) override;
 
-	void playSfx(const char *filename, uint channel, bool looping, int volume);
+	void playSfx(const char *filename, uint channel, bool looping, int volume) override;
 };
 
 class AmigaSoundMan_br : public SoundMan_br {
@@ -245,13 +244,13 @@ class AmigaSoundMan_br : public SoundMan_br {
 
 public:
 	AmigaSoundMan_br(Parallaction_br *vm);
-	~AmigaSoundMan_br();
+	~AmigaSoundMan_br() override;
 
-	void playMusic();
-	void stopMusic();
-	void pause(bool p);
+	void playMusic() override;
+	void stopMusic() override;
+	void pause(bool p) override;
 
-	void playSfx(const char *filename, uint channel, bool looping, int volume);
+	void playSfx(const char *filename, uint channel, bool looping, int volume) override;
 };
 
 } // namespace Parallaction

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -124,32 +123,10 @@ Interface::Interface(SagaEngine *vm) : _vm(vm) {
 	ByteArray resourceData;
 	int i;
 
-#if 0
-	// FTA2 related test code
-
-	// TODO: this will probably have to be moved to a new class
-	// It's left here for now till the code differences are figured out
-	if (_vm->getGameId() == GID_FTA2) {
-		_interfaceContext = _vm->_resource->getContext(GAME_IMAGEFILE);
-		_vm->_resource->loadResource(_interfaceContext, 22, resource, resourceLength);	// Julian's portrait
-
-		_vm->decodeBGImage(resource, resourceLength, &_mainPanel.image,
-			&_mainPanel.imageLength, &_mainPanel.imageWidth, &_mainPanel.imageHeight);
-
-		free(resource);
-		return;
-	}
-#endif
-
 	// Load interface module resource file context
 	_interfaceContext = _vm->_resource->getContext(GAME_RESOURCEFILE);
-	if (_interfaceContext == NULL) {
+	if (_interfaceContext == nullptr) {
 		error("Interface::Interface() resource context not found");
-	}
-
-	// Do nothing for SAGA2 games for now
-	if (_vm->isSaga2()) {
-		return;
 	}
 
 	// Main panel
@@ -157,7 +134,7 @@ Interface::Interface(SagaEngine *vm) : _vm(vm) {
 	_mainPanel.buttonsCount = _vm->getDisplayInfo().mainPanelButtonsCount;
 
 	for (i = 0; i < kVerbTypeIdsMax; i++) {
-		_verbTypeToPanelButton[i] = NULL;
+		_verbTypeToPanelButton[i] = nullptr;
 	}
 
 	for (i = 0; i < _mainPanel.buttonsCount; i++) {
@@ -173,6 +150,17 @@ Interface::Interface(SagaEngine *vm) : _vm(vm) {
 	_conversePanel.buttons = _vm->getDisplayInfo().conversePanelButtons;
 	_conversePanel.buttonsCount = _vm->getDisplayInfo().conversePanelButtonsCount;
 
+	if (_vm->getLanguage() == Common::HE_ISR) {
+		int converseUpButtonIndex = _vm->getDisplayInfo().converseUpButtonIndex;
+		int converseDownButtonIndex = _vm->getDisplayInfo().converseDownButtonIndex;
+		for (i = 0; i < _conversePanel.buttonsCount; i++) {
+			if (i == converseUpButtonIndex || i == converseDownButtonIndex)
+				_conversePanel.buttons[i].xOffset = 54;
+			else
+				_conversePanel.buttons[i].xOffset = 72;
+		}
+	}
+
 	_vm->_resource->loadResource(_interfaceContext, _vm->getResourceDescription()->conversePanelResourceId, resourceData);
 	_vm->decodeBGImage(resourceData, _conversePanel.image, &_conversePanel.imageWidth, &_conversePanel.imageHeight);
 
@@ -184,7 +172,7 @@ Interface::Interface(SagaEngine *vm) : _vm(vm) {
 		_vm->_resource->loadResource(_interfaceContext, _vm->getResourceDescription()->optionPanelResourceId, resourceData);
 		_vm->decodeBGImage(resourceData, _optionPanel.image, &_optionPanel.imageWidth, &_optionPanel.imageHeight);
 	} else {
-		_optionPanel.buttons = NULL;
+		_optionPanel.buttons = nullptr;
 		_optionPanel.buttonsCount = 0;
 		_optionPanel.sprites.clear();
 	}
@@ -219,7 +207,7 @@ Interface::Interface(SagaEngine *vm) : _vm(vm) {
 #endif
 
 	// Main panel sprites
-	_vm->_sprite->loadList(_vm->getResourceDescription()->mainPanelSpritesResourceId, _mainPanel.sprites);
+	_vm->_sprite->loadList(_vm->getResourceDescription()->mainPanelSpritesResourceId, _mainPanel.sprites, _vm->isECS() ? 0x10 : 0);
 	if (!_vm->_script->isNonInteractiveDemo()) {
 		// Option panel sprites
 		_vm->_sprite->loadList(_vm->getResourceDescription()->optionPanelSpritesResourceId, _optionPanel.sprites);
@@ -239,13 +227,26 @@ Interface::Interface(SagaEngine *vm) : _vm(vm) {
 
 	_mainPanel.x = _vm->getDisplayInfo().mainPanelXOffset;
 	_mainPanel.y = _vm->getDisplayInfo().mainPanelYOffset;
-	_mainPanel.currentButton = NULL;
+	_mainPanel.currentButton = nullptr;
+
+	if (_vm->getGameId() == GID_ITE && _vm->getLanguage() == Common::ZH_TWN) {
+		ByteArray n;
+		static const int kSkipLines = 4;
+		_mainPanel.imageHeight -= kSkipLines;
+		n.resize(_mainPanel.imageHeight * _mainPanel.imageWidth);
+		memcpy(n.getBuffer(), _mainPanel.image.getBuffer() + kSkipLines * _mainPanel.imageWidth, _mainPanel.imageHeight * _mainPanel.imageWidth);
+		// Fill button panel with blue to remove western button outlies. No idea why it was done in the code rather than resource itself
+		for (unsigned y = 0; y < 43; y++)
+			memset(n.getBuffer() + y * _mainPanel.imageWidth + 53, _vm->isECS() ? kITEECSBottomColorBlue : kITEDOSColorBlue89, 114);
+		_mainPanel.image = n;
+	}
+
 	_inventoryUpButton = _mainPanel.getButton(_vm->getDisplayInfo().inventoryUpButtonIndex);
 	_inventoryDownButton = _mainPanel.getButton(_vm->getDisplayInfo().inventoryDownButtonIndex);
 
 	_conversePanel.x = _vm->getDisplayInfo().conversePanelXOffset;
 	_conversePanel.y = _vm->getDisplayInfo().conversePanelYOffset;
-	_conversePanel.currentButton = NULL;
+	_conversePanel.currentButton = nullptr;
 	_converseUpButton = _conversePanel.getButton(_vm->getDisplayInfo().converseUpButtonIndex);
 	_converseDownButton = _conversePanel.getButton(_vm->getDisplayInfo().converseDownButtonIndex);
 
@@ -254,7 +255,7 @@ Interface::Interface(SagaEngine *vm) : _vm(vm) {
 
 	_optionPanel.x = _vm->getDisplayInfo().optionPanelXOffset;
 	_optionPanel.y = _vm->getDisplayInfo().optionPanelYOffset;
-	_optionPanel.currentButton = NULL;
+	_optionPanel.currentButton = nullptr;
 	_optionSaveFileSlider = _optionPanel.getButton(_vm->getDisplayInfo().optionSaveFileSliderIndex);
 	_optionSaveFilePanel = _optionPanel.getButton(_vm->getDisplayInfo().optionSaveFilePanelIndex);
 
@@ -264,7 +265,7 @@ Interface::Interface(SagaEngine *vm) : _vm(vm) {
 	_quitPanel.imageHeight = _vm->getDisplayInfo().quitPanelHeight;
 	_quitPanel.buttons = _vm->getDisplayInfo().quitPanelButtons;
 	_quitPanel.buttonsCount = _vm->getDisplayInfo().quitPanelButtonsCount;
-	_quitPanel.currentButton = NULL;
+	_quitPanel.currentButton = nullptr;
 
 	_loadPanel.x = _vm->getDisplayInfo().loadPanelXOffset;
 	_loadPanel.y = _vm->getDisplayInfo().loadPanelYOffset;
@@ -272,7 +273,7 @@ Interface::Interface(SagaEngine *vm) : _vm(vm) {
 	_loadPanel.imageHeight = _vm->getDisplayInfo().loadPanelHeight;
 	_loadPanel.buttons = _vm->getDisplayInfo().loadPanelButtons;
 	_loadPanel.buttonsCount = _vm->getDisplayInfo().loadPanelButtonsCount;
-	_loadPanel.currentButton = NULL;
+	_loadPanel.currentButton = nullptr;
 
 	_savePanel.x = _vm->getDisplayInfo().savePanelXOffset;
 	_savePanel.y = _vm->getDisplayInfo().savePanelYOffset;
@@ -281,7 +282,7 @@ Interface::Interface(SagaEngine *vm) : _vm(vm) {
 	_savePanel.buttons = _vm->getDisplayInfo().savePanelButtons;
 	_savePanel.buttonsCount = _vm->getDisplayInfo().savePanelButtonsCount;
 	_saveEdit = _savePanel.getButton(_vm->getDisplayInfo().saveEditIndex);
-	_savePanel.currentButton = NULL;
+	_savePanel.currentButton = nullptr;
 
 	_protectPanel.x = _vm->getDisplayInfo().protectPanelXOffset;
 	_protectPanel.y = _vm->getDisplayInfo().protectPanelYOffset;
@@ -290,7 +291,7 @@ Interface::Interface(SagaEngine *vm) : _vm(vm) {
 	_protectPanel.buttons = _vm->getDisplayInfo().protectPanelButtons;
 	_protectPanel.buttonsCount = _vm->getDisplayInfo().protectPanelButtonsCount;
 	_protectEdit = _protectPanel.getButton(_vm->getDisplayInfo().protectEditIndex);
-	_protectPanel.currentButton = NULL;
+	_protectPanel.currentButton = nullptr;
 
 	_active = true;
 	_panelMode = _lockedMode = kPanelNull;
@@ -424,14 +425,14 @@ void Interface::setMode(int mode) {
 		// FIXME: Implement IHNM differences from ExecuteInventoryPanel for IHNM (though I believe they're already
 		// implemented)
 
-		_mainPanel.currentButton = NULL;
+		_mainPanel.currentButton = nullptr;
 		break;
 	case kPanelConverse:
-		_conversePanel.currentButton = NULL;
+		_conversePanel.currentButton = nullptr;
 		converseDisplayText();
 		break;
 	case kPanelOption:
-		_optionPanel.currentButton = NULL;
+		_optionPanel.currentButton = nullptr;
 		_vm->fillSaveList();
 		calcOptionSaveSlider();
 		if (_optionSaveFileTitleNumber >= _vm->getDisplayInfo().optionSaveFileVisible) {
@@ -439,13 +440,13 @@ void Interface::setMode(int mode) {
 		}
 		break;
 	case kPanelLoad:
-		_loadPanel.currentButton = NULL;
+		_loadPanel.currentButton = nullptr;
 		break;
 	case kPanelQuit:
-		_quitPanel.currentButton = NULL;
+		_quitPanel.currentButton = nullptr;
 		break;
 	case kPanelSave:
-		_savePanel.currentButton = NULL;
+		_savePanel.currentButton = nullptr;
 		_textInputMaxWidth = _saveEdit->width - 10;
 		_textInput = true;
 		_textInputStringLength = strlen(_textInputString);
@@ -466,7 +467,7 @@ void Interface::setMode(int mode) {
 	case kPanelProtect:
 		if (_vm->getGameId() == GID_ITE) {
 			// This is used as the copy protection panel in ITE
-			_protectPanel.currentButton = NULL;
+			_protectPanel.currentButton = nullptr;
 			_textInputMaxWidth = _protectEdit->width - 10;
 			_textInput = true;
 			_textInputString[0] = 0;
@@ -476,6 +477,8 @@ void Interface::setMode(int mode) {
 			// In the IHNM demo, this panel mode is set by the scripts
 			// to flip through the pages of the help system
 		}
+		break;
+	default:
 		break;
 	}
 
@@ -655,6 +658,9 @@ bool Interface::processAscii(Common::KeyState keystate) {
 		case '9':
 			converseSetPos(ascii);
 			break;
+
+		default:
+			break;
 		}
 		break;
 	case kPanelMap:
@@ -708,16 +714,13 @@ bool Interface::processAscii(Common::KeyState keystate) {
 		}
 #endif
 		break;
+	default:
+		break;
 	}
 	return false;
 }
 
 void Interface::setStatusText(const char *text, int statusColor) {
-	if (_vm->getGameId() == GID_FTA2 || _vm->getGameId() == GID_DINO) {
-		warning("setStatusText not implemented for SAGA2");
-		return;
-	}
-
 	if (_vm->getGameId() == GID_IHNM) {
 		// Don't show the status text for the IHNM chapter selection screens (chapter 8), or
 		// scene 0 (IHNM demo introduction)
@@ -725,7 +728,7 @@ void Interface::setStatusText(const char *text, int statusColor) {
 			return;
 	}
 
-	assert(text != NULL);
+	assert(text != nullptr);
 	assert(strlen(text) < STATUS_TEXT_LEN);
 
 	if (_vm->_render->getFlags() & RF_MAP || _vm->_interface->getMode() == kPanelPlacard)
@@ -768,7 +771,10 @@ void Interface::drawVerbPanel(PanelButton* panelButton) {
 	point.x = _mainPanel.x + panelButton->xOffset;
 	point.y = _mainPanel.y + panelButton->yOffset;
 
-	_vm->_sprite->draw(_mainPanel.sprites, spriteNumber, point, 256);
+	// TODO: Find the correct sprite for Chinese version.
+	if (!(_vm->getGameId() == GID_ITE && _vm->getLanguage() == Common::ZH_TWN)) {
+		_vm->_sprite->draw(_mainPanel.sprites, spriteNumber, point, 256);
+	}
 
 	drawVerbPanelText(panelButton, textColor, kKnownColorVerbTextShadow);
 }
@@ -778,8 +784,14 @@ void Interface::draw() {
 	Point rightPortraitPoint;
 	Rect rect;
 
-	if (_vm->_scene->isInIntro() || _fadeMode == kFadeOut)
+	if (_fadeMode == kFadeOut) {
 		return;
+	}
+
+	_vm->_render->setSplitScreen(!_vm->_scene->isInIntro());
+	if (_vm->_scene->isInIntro()) {
+		return;
+	}
 
 	drawStatusBar();
 
@@ -789,7 +801,7 @@ void Interface::draw() {
 		_vm->_gfx->drawRegion(rect, _mainPanel.image.getBuffer());
 
 		for (int i = 0; i < kVerbTypeIdsMax; i++) {
-			if (_verbTypeToPanelButton[i] != NULL) {
+			if (_verbTypeToPanelButton[i] != nullptr) {
 				drawVerbPanel(_verbTypeToPanelButton[i]);
 			}
 		}
@@ -914,19 +926,26 @@ void Interface::drawPanelText(InterfacePanel *panel, PanelButton *panelButton) {
 	} else {
 		// The standard case is used for the things that look a bit like buttons
 		// but are not clickable, e.g. texts like "Music", "Sound", etc.
-		if (_vm->getGameId() == GID_ITE) {
+		if (_vm->getGameId() == GID_ITE && _vm->getPlatform() != Common::kPlatformPC98) {
 			rect.left = rect.right - textWidth - 3;
 		} else {
 			rect.left = (rect.right + rect.left - textWidth) / 2;
+			if (_vm->getGameId() == GID_ITE)
+				rect.left += 4;
 		}
 		rect.top = (rect.top + rect.bottom - textHeight) / 2;
 	}
 
 	textPoint.x = rect.left;
-	textPoint.y = rect.top + 1;
+	textPoint.y = rect.top + (_vm->getPlatform() == Common::kPlatformPC98 ? 0 : 1);
+
+	if (_vm->getGameId() == GID_ITE && _vm->getLanguage() == Common::ZH_TWN) {
+		textPoint.y -= 4;
+		textPoint.x -= 1;
+	}
 
 	_vm->_font->textDraw(textFont, text, textPoint,
-						_vm->KnownColor2ColorId(kKnownColorVerbText), _vm->KnownColor2ColorId(textShadowKnownColor), kFontShadow);
+						_vm->KnownColor2ColorId(kKnownColorVerbText), _vm->KnownColor2ColorId(textShadowKnownColor), _vm->getPlatform() == Common::kPlatformPC98 ?  kFontOutline : kFontShadow);
 }
 
 void Interface::drawOption() {
@@ -963,7 +982,7 @@ void Interface::drawOption() {
 
 	if (_optionSaveRectTop.height() > 0) {
 		if (_vm->getGameId() == GID_ITE)
-			_vm->_gfx->drawRect(_optionSaveRectTop, kITEColorDarkGrey);
+			_vm->_gfx->drawRect(_optionSaveRectTop, _vm->iteColorOptionsDarkGrey());
 	}
 
 	if (_vm->getGameId() == GID_ITE) {
@@ -977,7 +996,7 @@ void Interface::drawOption() {
 	}
 
 	if (_optionSaveRectBottom.height() > 0) {
-		_vm->_gfx->drawRect(_optionSaveRectBottom, kITEColorDarkGrey);
+		_vm->_gfx->drawRect(_optionSaveRectBottom, _vm->iteColorOptionsDarkGrey());
 	}
 
 	_optionPanel.calcPanelButtonRect(_optionSaveFilePanel, rect);
@@ -986,10 +1005,10 @@ void Interface::drawOption() {
 	fontHeight = _vm->_font->getHeight(kKnownFontSmall);
 	for (uint j = 0; j < _vm->getDisplayInfo().optionSaveFileVisible; j++) {
 		if (_vm->getGameId() == GID_ITE)
-			bgColor = kITEColorDarkGrey0C;
+			bgColor = _vm->iteColorOptionsDarkGrey0C();
 		else
 			bgColor = _vm->KnownColor2ColorId(kKnownColorBlack);
-		fgColor = kITEColorBrightWhite;
+		fgColor = _vm->iteColorOptionsBrightWhite();
 
 		idx = j + _optionSaveFileTop;
 		if (idx == _optionSaveFileTitleNumber) {
@@ -1037,7 +1056,7 @@ void Interface::handleQuitUpdate(const Point& mousePoint) {
 	bool releasedButton;
 
 	_quitPanel.currentButton = quitHitTest(mousePoint);
-	releasedButton = (_quitPanel.currentButton != NULL) && (_quitPanel.currentButton->state > 0) && (!_vm->mouseButtonPressed());
+	releasedButton = (_quitPanel.currentButton != nullptr) && (_quitPanel.currentButton->state > 0) && (!_vm->mouseButtonPressed());
 
 	if (!_vm->mouseButtonPressed()) {
 		_quitPanel.zeroAllButtonState();
@@ -1053,7 +1072,7 @@ void Interface::handleQuitClick(const Point& mousePoint) {
 
 	_quitPanel.zeroAllButtonState();
 
-	if (_quitPanel.currentButton == NULL) {
+	if (_quitPanel.currentButton == nullptr) {
 		return;
 	}
 
@@ -1061,7 +1080,7 @@ void Interface::handleQuitClick(const Point& mousePoint) {
 }
 
 void Interface::setQuit(PanelButton *panelButton) {
-	_quitPanel.currentButton = NULL;
+	_quitPanel.currentButton = nullptr;
 	switch (panelButton->id) {
 		case kTextCancel:
 			setMode(kPanelOption);
@@ -1073,6 +1092,8 @@ void Interface::setQuit(PanelButton *panelButton) {
 			else
 #endif
 				_vm->quitGame();
+			break;
+		default:
 			break;
 	}
 }
@@ -1103,7 +1124,7 @@ void Interface::handleLoadUpdate(const Point& mousePoint) {
 	bool releasedButton;
 
 	_loadPanel.currentButton = loadHitTest(mousePoint);
-	releasedButton = (_loadPanel.currentButton != NULL) && (_loadPanel.currentButton->state > 0) && (!_vm->mouseButtonPressed());
+	releasedButton = (_loadPanel.currentButton != nullptr) && (_loadPanel.currentButton->state > 0) && (!_vm->mouseButtonPressed());
 
 	if (!_vm->mouseButtonPressed()) {
 		_loadPanel.zeroAllButtonState();
@@ -1119,7 +1140,7 @@ void Interface::handleLoadClick(const Point& mousePoint) {
 
 	_loadPanel.zeroAllButtonState();
 
-	if (_loadPanel.currentButton == NULL) {
+	if (_loadPanel.currentButton == nullptr) {
 		return;
 	}
 
@@ -1127,7 +1148,7 @@ void Interface::handleLoadClick(const Point& mousePoint) {
 }
 
 void Interface::setLoad(PanelButton *panelButton) {
-	_loadPanel.currentButton = NULL;
+	_loadPanel.currentButton = nullptr;
 	switch (panelButton->id) {
 		case kTextOK:
 			if (_vm->getGameId() == GID_ITE) {
@@ -1146,6 +1167,8 @@ void Interface::setLoad(PanelButton *panelButton) {
 		case kTextCancel:
 			// IHNM only
 			setMode(kPanelOption);
+			break;
+		default:
 			break;
 	}
 }
@@ -1207,12 +1230,12 @@ bool Interface::processTextInput(Common::KeyState keystate) {
 	case Common::KEYCODE_DELETE:
 		if (_textInputPos <= _textInputStringLength) {
 			if (_textInputPos != 1) {
-				strncpy(tempString, _textInputString, _textInputPos - 1);
+				Common::strlcpy(tempString, _textInputString, _textInputPos);
 			}
 			if (_textInputPos != _textInputStringLength) {
-				strncat(tempString, &_textInputString[_textInputPos], _textInputStringLength - _textInputPos);
+				Common::strlcat(tempString, &_textInputString[_textInputPos], _textInputStringLength + 1);
 			}
-			strcpy(_textInputString, tempString);
+			Common::strcpy_s(_textInputString, tempString);
 			_textInputStringLength = strlen(_textInputString);
 		}
 		break;
@@ -1235,6 +1258,10 @@ bool Interface::processTextInput(Common::KeyState keystate) {
 	default:
 		if (((keystate.ascii <= 255) && (Common::isAlnum(keystate.ascii))) || (keystate.ascii == ' ') ||
 		    (keystate.ascii == '-') || (keystate.ascii == '_')) {
+			// This conversion actually works if the isAlnum() check is removed (which locks out all characters > 127).
+			// However, some glyphs seem to missing from the font, so it might be best to keep the limitation...
+			keystate.ascii = Common::U32String(Common::String::format("%c", keystate.ascii), Common::kISO8859_1).encode(_vm->getLanguage() == Common::JA_JPN ? Common::kWindows932 : Common::kDos850).firstChar();
+
 			if (_textInputStringLength < save_title_size - 1) {
 				ch[0] = keystate.ascii;
 				tempWidth = _vm->_font->getStringWidth(kKnownFontSmall, ch, 0, kFontNormal);
@@ -1243,17 +1270,17 @@ bool Interface::processTextInput(Common::KeyState keystate) {
 					break;
 				}
 				if (_textInputPos != 1) {
-					strncpy(tempString, _textInputString, _textInputPos - 1);
-					strcat(tempString, ch);
+					Common::strlcpy(tempString, _textInputString, _textInputPos);
+					Common::strcat_s(tempString, ch);
 				}
 				if ((_textInputStringLength == 0) || (_textInputPos == 1)) {
-					strcpy(tempString, ch);
+					Common::strcpy_s(tempString, ch);
 				}
 				if ((_textInputStringLength != 0) && (_textInputPos != _textInputStringLength)) {
-					strncat(tempString, &_textInputString[_textInputPos - 1], _textInputStringLength - _textInputPos + 1);
+					Common::strlcat(tempString, &_textInputString[_textInputPos - 1], _textInputStringLength + 1);
 				}
 
-				strcpy(_textInputString, tempString);
+				Common::strcpy_s(_textInputString, tempString);
 				_textInputStringLength = strlen(_textInputString);
 				_textInputPos++;
 			}
@@ -1347,7 +1374,7 @@ void Interface::handleSaveUpdate(const Point& mousePoint) {
 
 	validateSaveButtons();
 
-	releasedButton = (_savePanel.currentButton != NULL) &&
+	releasedButton = (_savePanel.currentButton != nullptr) &&
 		(_savePanel.currentButton->state > 0) && (!_vm->mouseButtonPressed());
 
 	if (!_vm->mouseButtonPressed()) {
@@ -1366,7 +1393,7 @@ void Interface::handleSaveClick(const Point& mousePoint) {
 
 	_savePanel.zeroAllButtonState();
 
-	if (_savePanel.currentButton == NULL) {
+	if (_savePanel.currentButton == nullptr) {
 		_textInput = false;
 		return;
 	}
@@ -1378,28 +1405,33 @@ void Interface::handleSaveClick(const Point& mousePoint) {
 }
 
 void Interface::setSave(PanelButton *panelButton) {
-	_savePanel.currentButton = NULL;
+	_savePanel.currentButton = nullptr;
 	uint titleNumber;
 	char *fileName;
+
+	char desc[28];
+	Common::strlcpy(desc, Common::U32String(_textInputString, Common::kDos850).encode(Common::kUtf8).c_str(), sizeof(desc));
+
 	switch (panelButton->id) {
 		case kTextSave:
 			if (_textInputStringLength == 0) {
 				break;
 			}
+
 			if (!_vm->isSaveListFull() && (_optionSaveFileTitleNumber == 0)) {
-				if (_vm->locateSaveFile(_textInputString, titleNumber)) {
+				if (_vm->locateSaveFile(desc, titleNumber)) {
 					fileName = _vm->calcSaveFileName(_vm->getSaveFile(titleNumber)->slotNumber);
-					_vm->save(fileName, _textInputString);
+					_vm->save(fileName, desc);
 					_optionSaveFileTitleNumber = titleNumber;
 				} else {
 					fileName = _vm->calcSaveFileName(_vm->getNewSaveSlotNumber());
-					_vm->save(fileName, _textInputString);
+					_vm->save(fileName, desc);
 					_vm->fillSaveList();
 					calcOptionSaveSlider();
 				}
 			} else {
 				fileName = _vm->calcSaveFileName(_vm->getSaveFile(_optionSaveFileTitleNumber)->slotNumber);
-				_vm->save(fileName, _textInputString);
+				_vm->save(fileName, desc);
 			}
 			resetSaveReminder();
 
@@ -1409,6 +1441,8 @@ void Interface::setSave(PanelButton *panelButton) {
 		case kTextCancel:
 			_textInput = false;
 			setMode(kPanelOption);
+			break;
+		default:
 			break;
 	}
 }
@@ -1450,7 +1484,7 @@ void Interface::handleOptionUpdate(const Point& mousePoint) {
 
 	validateOptionButtons();
 
-	releasedButton = (_optionPanel.currentButton != NULL) && (_optionPanel.currentButton->state > 0) && (!_vm->mouseButtonPressed());
+	releasedButton = (_optionPanel.currentButton != nullptr) && (_optionPanel.currentButton->state > 0) && (!_vm->mouseButtonPressed());
 
 	if (!_vm->mouseButtonPressed()) {
 		_optionPanel.zeroAllButtonState();
@@ -1470,7 +1504,7 @@ void Interface::handleOptionClick(const Point& mousePoint) {
 
 	_optionPanel.zeroAllButtonState();
 
-	if (_optionPanel.currentButton == NULL) {
+	if (_optionPanel.currentButton == nullptr) {
 		return;
 	}
 
@@ -1547,7 +1581,7 @@ void Interface::handleChapterSelectionClick(const Point& mousePoint) {
 		case kGameObjectHitZone:
 			hitZone = _vm->_scene->_objectMap->getHitZone(objectIdToIndex(obj));
 
-			if (hitZone == NULL)
+			if (hitZone == nullptr)
 				return;
 
 			if (hitZone->getFlags() & kHitZoneEnabled)
@@ -1562,6 +1596,9 @@ void Interface::handleChapterSelectionClick(const Point& mousePoint) {
 		case kGameObjectObject:
 			o = _vm->_actor->getObj(obj);
 			script = o->_scriptEntrypointNumber;
+			break;
+
+		default:
 			break;
 		}
 
@@ -1582,7 +1619,7 @@ void Interface::handleChapterSelectionClick(const Point& mousePoint) {
 }
 
 void Interface::setOption(PanelButton *panelButton) {
-	_optionPanel.currentButton = NULL;
+	_optionPanel.currentButton = nullptr;
 	switch (panelButton->id) {
 	case kTextContinuePlaying:
 		ConfMan.flushToDisk();
@@ -1623,7 +1660,7 @@ void Interface::setOption(PanelButton *panelButton) {
 		if (!_vm->isSaveListFull() && (_optionSaveFileTitleNumber == 0)) {
 			_textInputString[0] = 0;
 		} else {
-			strcpy(_textInputString, _vm->getSaveFile(_optionSaveFileTitleNumber)->name);
+			Common::strcpy_s(_textInputString, _vm->getSaveFile(_optionSaveFileTitleNumber)->name);
 		}
 		setMode(kPanelSave);
 		break;
@@ -1637,10 +1674,13 @@ void Interface::setOption(PanelButton *panelButton) {
 		}
 		break;
 	case kTextMusic:
-		_vm->_musicVolume = _vm->_musicVolume + 25;
-		if (_vm->_musicVolume > 255) _vm->_musicVolume = 0;
-		_vm->_music->setVolume(_vm->_musicVolume, 1);
-		ConfMan.setInt("music_volume", _vm->_musicVolume);
+		int userVolume;
+		userVolume = ConfMan.getInt("music_volume");
+		userVolume = userVolume + 25;
+		if (userVolume > 255)
+			userVolume = 0;
+		ConfMan.setInt("music_volume", userVolume);
+		_vm->_music->syncSoundSettings();
 		break;
 	case kTextSound:
 		_vm->_soundVolume = _vm->_soundVolume + 25;
@@ -1672,6 +1712,8 @@ void Interface::setOption(PanelButton *panelButton) {
 
 		ConfMan.setBool("subtitles", _vm->_subtitlesEnabled);
 		ConfMan.setBool("voices", _vm->_voicesEnabled);
+		break;
+	default:
 		break;
 	}
 }
@@ -1867,6 +1909,9 @@ void Interface::update(const Point& mousePoint, int updateFlag) {
 			_vm->_scene->showIHNMDemoSpecialScreen();
 #endif
 		break;
+
+	default:
+		break;
 	}
 
 	_lastMousePoint = mousePoint;
@@ -1878,7 +1923,7 @@ void Interface::drawStatusBar() {
 	int stringWidth;
 	int color;
 	// The default colors in the Spanish version of IHNM are shifted by one
-	// Fixes bug #1848016 - "IHNM: Wrong Subtitles Color (Spanish)". This
+	// Fixes bug #3498 - "IHNM: Wrong Subtitles Color (Spanish)". This
 	// also applies to the German and French versions (bug #7064 - "IHNM:
 	// text mistake in german version").
 	int offset = (_vm->getFeatures() & GF_IHNM_COLOR_FIX) ? 1 : 0;
@@ -1938,7 +1983,7 @@ void Interface::handleMainClick(const Point& mousePoint) {
 
 	panelButton = _mainPanel.hitTest(mousePoint, kPanelAllButtons);
 
-	if (panelButton != NULL) {
+	if (panelButton != nullptr) {
 		if (panelButton->type == kPanelButtonArrow) {
 			panelButton->state = 1;
 			converseChangePos(panelButton->id);
@@ -2000,7 +2045,7 @@ void Interface::handleMainUpdate(const Point& mousePoint) {
 
 	bool changed = false;
 
-	if ((panelButton != NULL) && (panelButton->type == kPanelButtonArrow)) {
+	if ((panelButton != nullptr) && (panelButton->type == kPanelButtonArrow)) {
 		if (panelButton->state == 1) {
 			inventoryChangePos(panelButton->id);
 		}
@@ -2127,7 +2172,7 @@ void Interface::drawInventory() {
 		_mainPanel.calcPanelButtonRect(&_mainPanel.buttons[i], rect);
 
 		if (_vm->getGameId() == GID_ITE)
-			_vm->_gfx->drawRect(rect, kITEColorDarkGrey);
+			_vm->_gfx->drawRect(rect, _vm->isECS() ? kITEECSBottomColorDarkGrey : kITEDOSColorDarkGrey);
 		else
 			_vm->_gfx->drawRect(rect, _vm->KnownColor2ColorId(kKnownColorBlack));
 
@@ -2142,7 +2187,7 @@ void Interface::drawInventory() {
 
 void Interface::setVerbState(int verb, int state) {
 	PanelButton * panelButton = getPanelButtonByVerbType(verb);
-	if (panelButton == NULL) return;
+	if (panelButton == nullptr) return;
 	if (state == 2) {
 		state = (_mainPanel.currentButton == panelButton) ? 1 : 0;
 	}
@@ -2161,19 +2206,19 @@ void Interface::drawButtonBox(const Rect& rect, ButtonKind kind, bool down) {
 	case kSlider:
 		cornerColor = 0x8b;
 		frameColor = _vm->KnownColor2ColorId(kKnownColorBlack);
-		fillColor = kITEColorLightBlue96;
-		odl = kITEColorDarkBlue8a;
-		our = kITEColorLightBlue92;
+		fillColor = _vm->iteColorOptionsLightBlue96();
+		odl = _vm->iteColorOptionsDarkBlue8a();
+		our = _vm->iteColorOptionsLightBlue92();
 		idl = 0x89;
 		iur = 0x94;
-		solidColor = down ? kITEColorLightBlue94 : kITEColorLightBlue96;
+		solidColor = down ? _vm->iteColorOptionsLightBlue94() : _vm->iteColorOptionsLightBlue96();
 		break;
 	case kEdit:
 		if (_vm->getGameId() == GID_ITE) {
-			cornerColor = frameColor = fillColor = kITEColorLightBlue96;
-			our = kITEColorDarkBlue8a;
-			odl = kITEColorLightBlue94;
-			solidColor = down ? kITEColorBlue : kITEColorDarkGrey0C;
+			cornerColor = frameColor = fillColor = _vm->iteColorOptionsLightBlue96();
+			our = _vm->iteColorOptionsDarkBlue8a();
+			odl = _vm->iteColorOptionsLightBlue94();
+			solidColor = down ? _vm->iteColorOptionsBlue() : _vm->iteColorOptionsDarkGrey0C();
 		} else {
 			cornerColor = frameColor = fillColor = _vm->KnownColor2ColorId(kKnownColorBlack);
 			our = odl = solidColor = _vm->KnownColor2ColorId(kKnownColorBlack);
@@ -2184,9 +2229,9 @@ void Interface::drawButtonBox(const Rect& rect, ButtonKind kind, bool down) {
 	default:
 		cornerColor = 0x8b;
 		frameColor = _vm->KnownColor2ColorId(kKnownColorBlack);
-		solidColor = fillColor = kITEColorLightBlue96;
-		odl = kITEColorDarkBlue8a;
-		our = kITEColorLightBlue94;
+		solidColor = fillColor = _vm->iteColorOptionsLightBlue96();
+		odl = _vm->iteColorOptionsDarkBlue8a();
+		our = _vm->iteColorOptionsLightBlue94();
 		idl = 0x97;
 		iur = 0x95;
 		if (down) {
@@ -2272,8 +2317,10 @@ void Interface::drawPanelButtonText(InterfacePanel *panel, PanelButton *panelBut
 		}
 		break;
 	case kTextMusic:
-		if (_vm->_musicVolume) {
-			textId = kText10Percent + _vm->_musicVolume / 25 - 1;
+		int userVolume;
+		userVolume = ConfMan.getInt("music_volume");
+		if (userVolume) {
+			textId = kText10Percent + userVolume / 25 - 1;
 			if (textId > kTextMax) {
 				textId = kTextMax;
 			}
@@ -2298,6 +2345,8 @@ void Interface::drawPanelButtonText(InterfacePanel *panel, PanelButton *panelBut
 			textId = kTextText;
 		else if (!_vm->_subtitlesEnabled && _vm->_voicesEnabled)
 			textId = kTextAudio;
+		break;
+	default:
 		break;
 	}
 	if (_vm->getGameId() == GID_ITE) {
@@ -2327,6 +2376,11 @@ void Interface::drawPanelButtonText(InterfacePanel *panel, PanelButton *panelBut
 
 	point.x = panel->x + panelButton->xOffset + (panelButton->width / 2) - (textWidth / 2);
 	point.y = panel->y + panelButton->yOffset + (panelButton->height / 2) - (textHeight / 2);
+
+	if (_vm->getGameId() == GID_ITE && _vm->getLanguage() == Common::ZH_TWN) {
+		point.y -= 3;
+		point.x += 1;
+	}
 
 	if (panelButton == panel->currentButton) {
 		textColor = kKnownColorVerbTextActive;
@@ -2367,7 +2421,7 @@ void Interface::drawPanelButtonText(InterfacePanel *panel, PanelButton *panelBut
 	}
 
 	_vm->_font->textDraw(textFont, text, point,
-		_vm->KnownColor2ColorId(textColor), _vm->KnownColor2ColorId(textShadowKnownColor), kFontShadow);
+		_vm->KnownColor2ColorId(textColor), _vm->KnownColor2ColorId(textShadowKnownColor), _vm->getPlatform() == Common::kPlatformPC98 ?  kFontOutline : kFontShadow);
 }
 
 void Interface::drawPanelButtonArrow(InterfacePanel *panel, PanelButton *panelButton) {
@@ -2420,7 +2474,7 @@ void Interface::drawVerbPanelText(PanelButton *panelButton, KnownColor textKnown
 
 	_vm->_font->textDraw(kKnownFontVerb, text, point,
 						_vm->KnownColor2ColorId(textKnownColor), _vm->KnownColor2ColorId(textShadowKnownColor),
-						(textShadowKnownColor != kKnownColorTransparent) ? kFontShadow : kFontNormal);
+						(textShadowKnownColor != kKnownColorTransparent) ? (_vm->getPlatform() == Common::kPlatformPC98 ?  kFontOutline : kFontShadow) : kFontNormal);
 }
 
 
@@ -2474,7 +2528,7 @@ bool Interface::converseAddText(const char *text, int strId, int replyId, byte r
 		}
 
 		_converseText[_converseTextCount].text.resize(i + 1);
-		strncpy(&_converseText[_converseTextCount].text.front(), _converseWorkString, i);
+		Common::strlcpy(&_converseText[_converseTextCount].text.front(), _converseWorkString, i + 1);
 
 		_converseText[_converseTextCount].strId = strId;
 		_converseText[_converseTextCount].text[i] = 0;
@@ -2490,7 +2544,7 @@ bool Interface::converseAddText(const char *text, int strId, int replyId, byte r
 		if (len == i)
 			break;
 
-		strncpy(_converseWorkString, &_converseWorkString[i + 1], len - i);
+		Common::strlcpy(_converseWorkString, &_converseWorkString[i + 1], CONVERSE_MAX_WORK_STRING);
 	}
 
 	_converseStrCount++;
@@ -2530,9 +2584,10 @@ void Interface::converseDisplayTextLines() {
 	byte bulletForegnd;
 	byte bulletBackgnd;
 	const char *str;
-	char bullet[2] = {
-		(char)0xb7, 0
+	static const char bulletStr[3][3] = {
+		"\xb7", "\x81\x45", ">"
 	};
+	const char *bullet = (_vm->getGameId() == GID_ITE) ? (_vm->getPlatform() == Common::kPlatformPC98 ? bulletStr[1] : bulletStr[0]) : bulletStr[2];
 
 	assert(_conversePanel.buttonsCount >= 6);
 	Rect rect(8, _vm->getDisplayInfo().converseTextLines * _vm->getDisplayInfo().converseTextHeight);
@@ -2541,16 +2596,15 @@ void Interface::converseDisplayTextLines() {
 	Point textPoint;
 
 	if (_vm->getGameId() == GID_ITE) {
-		bulletForegnd = kITEColorGreen;
-		bulletBackgnd = kITEColorBlack;
+		bulletForegnd = _vm->iteColorBottomGreen();
 	} else {
 		bulletForegnd = _vm->KnownColor2ColorId(kKnownColorBrightWhite);
-		bulletBackgnd = _vm->KnownColor2ColorId(kKnownColorBlack);
-		bullet[0] = '>';				// different bullet in IHNM
 	}
 
+	bulletBackgnd = _vm->KnownColor2ColorId(kKnownColorBlack);
+
 	if (_vm->getGameId() == GID_ITE)
-		_vm->_gfx->drawRect(rect, kITEColorDarkGrey);	// fill bullet place
+		_vm->_gfx->drawRect(rect, _vm->iteColorBottomDarkGrey());	// fill bullet place
 	else if (_vm->getGameId() == GID_IHNM)
 		// TODO: Add these to IHNM_DisplayInfo?
 		_vm->_gfx->drawRect(Common::Rect(118, 345, 603, 463), _vm->KnownColor2ColorId(kKnownColorBlack));	// fill converse rect
@@ -2564,16 +2618,16 @@ void Interface::converseDisplayTextLines() {
 
 		if (_conversePos >= 0 && _converseText[_conversePos].stringNum == _converseText[relPos].stringNum) {
 			if (_vm->getGameId() == GID_ITE) {
-				foregnd = kITEColorBrightWhite;
-				backgnd = (!_vm->leftMouseButtonPressed()) ? kITEColorDarkGrey : kITEColorGrey;
+				foregnd = _vm->iteColorBottomBrightWhite();
+				backgnd = (!_vm->leftMouseButtonPressed()) ? _vm->iteColorBottomDarkGrey() : _vm->iteColorBottomGrey();
 			} else {
 				foregnd = _vm->KnownColor2ColorId(kKnownColorVerbTextActive);
 				backgnd = _vm->KnownColor2ColorId(kKnownColorVerbTextActive);
 			}
 		} else {
 			if (_vm->getGameId() == GID_ITE) {
-				foregnd = kITEColorBlue;
-				backgnd = kITEColorDarkGrey;
+				foregnd = _vm->iteColorBottomBlue();
+				backgnd = _vm->iteColorBottomDarkGrey();
 			} else {
 				foregnd = _vm->KnownColor2ColorId(kKnownColorBrightWhite);
 				backgnd = _vm->KnownColor2ColorId(kKnownColorBlack);
@@ -2581,24 +2635,31 @@ void Interface::converseDisplayTextLines() {
 		}
 
 		_conversePanel.calcPanelButtonRect(&_conversePanel.buttons[i], rect);
-		rect.left += 8;
+		if (_vm->getLanguage() != Common::HE_ISR)
+			rect.left += 8;
+		else
+			rect.right -= 6;
 		_vm->_gfx->drawRect(rect, backgnd);
 
 		str = &_converseText[relPos].text.front();
 
 		if (_converseText[relPos].textNum == 0) { // first entry
-			textPoint.x = rect.left - 6;
+			textPoint.x = _vm->getLanguage() != Common::HE_ISR ? rect.left - 6 : rect.right;
 			textPoint.y = rect.top;
 
 			if (_vm->getGameId() == GID_ITE)
-				_vm->_font->textDraw(kKnownFontSmall, bullet, textPoint, bulletForegnd, bulletBackgnd, (FontEffectFlags)(kFontShadow | kFontDontmap));
+				_vm->_font->textDraw(kKnownFontSmall, bullet, textPoint, bulletForegnd, bulletBackgnd, _vm->getPlatform() == Common::kPlatformPC98 ?  kFontNormal : (FontEffectFlags)(kFontShadow | kFontDontmap));
 			else
 				_vm->_font->textDraw(kKnownFontVerb, bullet, textPoint, bulletForegnd, bulletBackgnd, (FontEffectFlags)(kFontShadow | kFontDontmap));
 		}
-		textPoint.x = rect.left + 1;
+		if (_vm->getLanguage() != Common::HE_ISR)
+			textPoint.x = rect.left + 1;
+		else
+			textPoint.x = rect.right - _vm->_font->getStringWidth(kKnownFontSmall, str, strlen(str), kFontNormal) - 1;
 		textPoint.y = rect.top;
 		if (_vm->getGameId() == GID_ITE)
-			_vm->_font->textDraw(kKnownFontSmall, str, textPoint, foregnd, kITEColorBlack, kFontShadow);
+			_vm->_font->textDraw(kKnownFontSmall, str, textPoint, foregnd, _vm->KnownColor2ColorId(kKnownColorBlack),
+					     _vm->getPlatform() == Common::kPlatformPC98 ?  kFontNormal : kFontShadow);
 		else
 			_vm->_font->textDraw(kKnownFontVerb, str, textPoint, foregnd, _vm->KnownColor2ColorId(kKnownColorBlack), kFontShadow);
 	}
@@ -2659,7 +2720,7 @@ void Interface::handleConverseUpdate(const Point& mousePoint) {
 	changed = last != _conversePanel.currentButton;
 
 
-	if (_conversePanel.currentButton == NULL) {
+	if (_conversePanel.currentButton == nullptr) {
 		_conversePos = -1;
 		if (changed) {
 			draw();
@@ -2683,7 +2744,7 @@ void Interface::handleConverseUpdate(const Point& mousePoint) {
 void Interface::handleConverseClick(const Point& mousePoint) {
 	_conversePanel.currentButton = converseHitTest(mousePoint);
 
-	if (_conversePanel.currentButton == NULL) {
+	if (_conversePanel.currentButton == nullptr) {
 		return;
 	}
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Virtual processor.
  */
@@ -48,6 +47,7 @@ extern int CallLibraryRoutine(CORO_PARAM, int operand, int32 *pp, const INT_CONT
 
 /** list of all opcodes */
 enum OPCODE {
+	OP_NOOP = 0x3F, ///< Do nothing (Actually 0 in Noir, but due to -1 we get this)
 	OP_HALT = 0,	///< end of program
 	OP_IMM = 1,		///< loads signed immediate onto stack
 	OP_ZERO = 2,	///< loads zero onto stack
@@ -100,11 +100,11 @@ enum OPCODE {
 
 #define	OPMASK		0x3F	///< mask to isolate the opcode
 
-bool g_bNoPause = false;
-
 //----------------- LOCAL GLOBAL DATA --------------------
 
-// FIXME: Avoid non-const global vars
+// These vars are reset upon engine destruction
+
+bool g_bNoPause = false;
 
 static int32 *g_pGlobals = 0;		// global vars
 
@@ -172,7 +172,7 @@ const WorkaroundEntry workaroundList[] = {
 	// restoring the game, it will error if you try to move. This
 	// fragment turns off NPC blocking for the Outside Inn rooms so that
 	// the luggage won't block Past Outside Inn.
-	// See bug report #2525010.
+	// See bug report #4101.
 	{TINSEL_V1, false, false, Common::kPlatformUnknown, 444622076, 0,  sizeof(fragment2), fragment2},
 	// Present Outside Inn
 	{TINSEL_V1, false, false, Common::kPlatformUnknown, 352600876, 0,  sizeof(fragment2), fragment2},
@@ -181,7 +181,7 @@ const WorkaroundEntry workaroundList[] = {
 	// STRING||| - this happens if you initiate dialog with one of the
 	// guards, but not the other. So these fragments provide the correct
 	// talk parameters where needed.
-	// See bug report #2831159.
+	// See bug report #4512.
 	{TINSEL_V1, false, false, Common::kPlatformUnknown, 310506872, 463, sizeof(fragment4), fragment4},
 	{TINSEL_V1, false, false, Common::kPlatformUnknown, 310506872, 485, sizeof(fragment5), fragment5},
 	{TINSEL_V1, false, false, Common::kPlatformUnknown, 310506872, 513, sizeof(fragment6), fragment6},
@@ -201,8 +201,8 @@ const WorkaroundEntry workaroundList[] = {
 	// which try to disable the bees animation, since they wait
 	// indefinitely for the global to be cleared, incorrectly believing
 	// the animation is currently playing. This includes:
-	//  * Giving the brochure to the beekeeper (bug #2680397)
-	//  * Stealing the mallets from the wizards (bug #2820788).
+	//  * Giving the brochure to the beekeeper (bug #4222)
+	//  * Stealing the mallets from the wizards (bug #4404).
 	// This fix ensures that the global is reset when the Garden scene
 	// is loaded (both entering and restoring a game).
 	{TINSEL_V2, true, false, Common::kPlatformUnknown, 2888147476U, 0, sizeof(fragment3), fragment3},
@@ -213,7 +213,7 @@ const WorkaroundEntry workaroundList[] = {
 
 	// DW1-GRA/SCN: Corrects the dead-end of being able to give the
 	// whistle back to the pirate before giving him the parrot.
-	// See bug report #2934211.
+	// See bug report #4755.
 	{TINSEL_V1, true, false, Common::kPlatformUnknown, 352601285, 1569, sizeof(fragment11), fragment11},
 	{TINSEL_V1, false, false, Common::kPlatformUnknown, 352602304, 1488, sizeof(fragment12), fragment12},
 
@@ -233,20 +233,32 @@ const WorkaroundEntry workaroundList[] = {
 	{TINSEL_V0, false, false, Common::kPlatformUnknown, 0, 0, 0, NULL}
 };
 
-//----------------- LOCAL GLOBAL DATA --------------------
+void ResetVarsPCode() {
+	g_bNoPause = false;
+
+	free(g_pGlobals);
+	g_pGlobals = nullptr;
+
+	g_numGlobals = 0;
+
+	free(g_icList);
+	g_icList = nullptr;
+
+	g_hMasterScript = 0;
+}
 
 /**
  * Keeps the code array pointer up to date.
  */
 void LockCode(INT_CONTEXT *ic) {
 	if (ic->GSort == GS_MASTER) {
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			// Get the srcipt handle from a specific global chunk
-			ic->code = (byte *)LockMem(g_hMasterScript);
+			ic->code = (byte *)_vm->_handle->LockMem(g_hMasterScript);
 		else
 			ic->code = (byte *)FindChunk(MASTER_SCNHANDLE, CHUNK_PCODE);
 	} else
-		ic->code = (byte *)LockMem(ic->hCode);
+		ic->code = (byte *)_vm->_handle->LockMem(ic->hCode);
 }
 
 /**
@@ -273,7 +285,7 @@ static INT_CONTEXT *AllocateInterpretContext(GSORT gsort) {
 	error("Out of interpret contexts");
 }
 
-static void FreeWaitCheck(PINT_CONTEXT pic, bool bVoluntary) {
+static void FreeWaitCheck(INT_CONTEXT * pic, bool bVoluntary) {
 	int i;
 
 	// Is this waiting for something?
@@ -306,7 +318,7 @@ static void FreeWaitCheck(PINT_CONTEXT pic, bool bVoluntary) {
  */
 static void FreeInterpretContextPi(INT_CONTEXT *pic) {
 	FreeWaitCheck(pic, true);
-	if (TinselV2)
+	if (TinselVersion >= 2)
 		memset(pic, 0, sizeof(INT_CONTEXT));
 	pic->GSort = GS_NONE;
 }
@@ -323,7 +335,7 @@ void FreeInterpretContextPr(Common::PROCESS *pProc) {
 	for (i = 0, pic = g_icList; i < NUM_INTERPRET; i++, pic++) {
 		if (pic->GSort != GS_NONE && pic->pProc == pProc) {
 			FreeWaitCheck(pic, false);
-			if (TinselV2)
+			if (TinselVersion >= 2)
 				memset(pic, 0, sizeof(INT_CONTEXT));
 			pic->GSort = GS_NONE;
 			break;
@@ -373,7 +385,7 @@ void FreeMasterInterpretContext() {
  * @param pinvo			Associated inventory object
  */
 INT_CONTEXT *InitInterpretContext(GSORT gsort, SCNHANDLE hCode,	TINSEL_EVENT event,
-		HPOLYGON hpoly, int actorid, INV_OBJECT *pinvo, int myEscape) {
+		HPOLYGON hpoly, int actorid, const InventoryObject *pinvo, int myEscape) {
 	INT_CONTEXT *ic;
 
 	ic = AllocateInterpretContext(gsort);
@@ -420,21 +432,21 @@ INT_CONTEXT *RestoreInterpretContext(INT_CONTEXT *ric) {
  * Allocates enough RAM to hold the global Glitter variables.
  */
 void RegisterGlobals(int num) {
-	if (g_pGlobals == NULL) {
+	if (g_pGlobals == nullptr) {
 		g_numGlobals = num;
 
-		g_hMasterScript = !TinselV2 ? 0 :
+		g_hMasterScript = (TinselVersion <= 1) ? 0 :
 			READ_32(FindChunk(MASTER_SCNHANDLE, CHUNK_MASTER_SCRIPT));
 
 		// Allocate RAM for pGlobals and make sure it's allocated
 		g_pGlobals = (int32 *)calloc(g_numGlobals, sizeof(int32));
-		if (g_pGlobals == NULL) {
+		if (g_pGlobals == nullptr) {
 			error("Cannot allocate memory for global data");
 		}
 
 		// Allocate RAM for interpret contexts and make sure it's allocated
 		g_icList = (INT_CONTEXT *)calloc(NUM_INTERPRET, sizeof(INT_CONTEXT));
-		if (g_icList == NULL) {
+		if (g_icList == nullptr) {
 			error("Cannot allocate memory for interpret contexts");
 		}
 		CoroScheduler.setResourceCallback(FreeInterpretContextPr);
@@ -446,7 +458,7 @@ void RegisterGlobals(int num) {
 		memset(g_icList, 0, NUM_INTERPRET * sizeof(INT_CONTEXT));
 	}
 
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		// read initial values
 		CdCD(Common::nullContext);
 
@@ -470,10 +482,10 @@ void RegisterGlobals(int num) {
 
 void FreeGlobals() {
 	free(g_pGlobals);
-	g_pGlobals = NULL;
+	g_pGlobals= nullptr;
 
 	free(g_icList);
-	g_icList = NULL;
+	g_icList= nullptr;
 }
 
 /**
@@ -491,9 +503,9 @@ void syncGlobInfo(Common::Serializer &s) {
 void INT_CONTEXT::syncWithSerializer(Common::Serializer &s) {
 	if (s.isLoading()) {
 		// Null out the pointer fields
-		pProc = NULL;
-		code = NULL;
-		pinvo = NULL;
+		pProc= nullptr;
+		code= nullptr;
+		pinvo= nullptr;
 	}
 	// Write out used fields
 	s.syncAsUint32LE(GSort);
@@ -531,7 +543,7 @@ static int32 GetBytes(const byte *scriptCode, const WorkaroundEntry* &wkEntry, i
 		if (ip >= wkEntry->numBytes) {
 			// Finished the workaround
 			ip = wkEntry->ip;
-			wkEntry = NULL;
+			wkEntry= nullptr;
 		} else {
 			code = wkEntry->script;
 		}
@@ -541,7 +553,7 @@ static int32 GetBytes(const byte *scriptCode, const WorkaroundEntry* &wkEntry, i
 	switch (numBytes) {
 	case 0:
 		// Instruction byte
-		tmp = code[ip++ * (TinselV0 ? 4 : 1)];
+		tmp = code[ip++ * ((TinselVersion == 0) ? 4 : 1)];
 		break;
 	case 1:
 		// Fetch and sign extend a 8 bit value to 32 bits.
@@ -553,7 +565,7 @@ static int32 GetBytes(const byte *scriptCode, const WorkaroundEntry* &wkEntry, i
 		ip += 2;
 		break;
 	default:
-		if (TinselV0)
+		if (TinselVersion == 0)
 			tmp = (int32)READ_LE_UINT32(code + ip++ * 4);
 		else {
 			tmp = (int32)READ_LE_UINT32(code + ip);
@@ -570,7 +582,7 @@ static int32 GetBytes(const byte *scriptCode, const WorkaroundEntry* &wkEntry, i
  * stream and advance the instruction pointer accordingly.
  */
 static int32 Fetch(byte opcode, const byte *code, const WorkaroundEntry* &wkEntry, int &ip) {
-	if (TinselV0)
+	if (TinselVersion == 0)
 		// Fetch a 32 bit value.
 		return GetBytes(code, wkEntry, ip, 4);
 	else if (opcode & OPSIZE8)
@@ -599,19 +611,25 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 					(wkEntry->ip == ip) &&
 					(wkEntry->isDemo == _vm->getIsADGFDemo()) &&
 					((wkEntry->platform == Common::kPlatformUnknown) || (wkEntry->platform == _vm->getPlatform())) &&
-					(!TinselV1 || (wkEntry->scnFlag == ((_vm->getFeatures() & GF_SCNFILES) != 0)))) {
+					((TinselVersion != 1) || (wkEntry->scnFlag == ((_vm->getFeatures() & GF_SCNFILES) != 0)))) {
 					// Point to start of workaround fragment
 					ip = 0;
 					break;
 				}
 			}
 			if (wkEntry->script == NULL)
-				wkEntry = NULL;
+				wkEntry= nullptr;
 		}
 
 		byte opcode = (byte)GetBytes(ic->code, wkEntry, ip, 0);
-		if (TinselV0 && ((opcode & OPMASK) > OP_IMM))
+		if ((TinselVersion == 0) && ((opcode & OPMASK) > OP_IMM))
 			opcode += 3;
+
+		if (TinselVersion == 3) {
+			// Discworld Noir adds a NOOP-operation as opcode 0, leaving everything
+			// else 1 higher, so we subtract 1, and add NOOP as the highest opcode instead.
+			opcode -= 1;
+		}
 
 		debug(7, "ip=%d  Opcode %d (-> %d)", ic->ip, opcode, opcode & OPMASK);
 		switch (opcode & OPMASK) {
@@ -702,10 +720,10 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 			tmp2 = CallLibraryRoutine(coroParam, tmp, &ic->stack[ic->sp], ic, &ic->resumeState);
 			if (coroParam)
 				return;
-			if (!TinselV0)
+			if (TinselVersion != 0)
 				ic->sp += tmp2;
 			LockCode(ic);
-			if (TinselV2 && (ic->resumeState == RES_1))
+			if ((TinselVersion >= 2) && (ic->resumeState == RES_1))
 				ic->resumeState = RES_NOT;
 			break;
 
@@ -724,7 +742,7 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 		case OP_JUMP:	// unconditional jump
 
 			ip = Fetch(opcode, ic->code, wkEntry, ip);
-			wkEntry = NULL;					// In case a jump occurs from a workaround
+			wkEntry= nullptr;					// In case a jump occurs from a workaround
 			break;
 
 		case OP_JMPFALSE:	// conditional jump
@@ -733,7 +751,7 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 			if (ic->stack[ic->sp--] == 0) {
 				// condition satisfied - do the jump
 				ip = tmp;
-				wkEntry = NULL;					// In case a jump occurs from a workaround
+				wkEntry= nullptr;					// In case a jump occurs from a workaround
 			}
 			break;
 
@@ -743,7 +761,7 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 			if (ic->stack[ic->sp--] != 0) {
 				// condition satisfied - do the jump
 				ip = tmp;
-				wkEntry = NULL;					// In case a jump occurs from a workaround
+				wkEntry= nullptr;					// In case a jump occurs from a workaround
 			}
 			break;
 
@@ -773,6 +791,8 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 
 			case OP_LOR:    tmp = (tmp || tmp2); break;
 			case OP_LAND:   tmp = (tmp && tmp2); break;
+
+			default: break;
 			}
 
 			ic->stack[ic->sp] = tmp;
@@ -803,6 +823,7 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 			case OP_AND:    tmp &= tmp2; break;
 			case OP_OR:     tmp |= tmp2; break;
 			case OP_EOR:    tmp ^= tmp2; break;
+			default: break;
 			}
 			ic->stack[ic->sp] = tmp;
 			break;
@@ -834,6 +855,12 @@ void Interpret(CORO_PARAM, INT_CONTEXT *ic) {
 		case OP_ESCOFF:
 			ic->escOn = false;
 			ic->myEscape = 0;
+			break;
+
+		case OP_NOOP:
+			if (TinselVersion != 3) {
+				error("OP_NOOP seen outside Discworld Noir");
+			}
 			break;
 
 		default:
@@ -898,7 +925,7 @@ void WaitInterpret(CORO_PARAM, Common::PPROCESS pWaitProc, bool *result) {
 	 */
 
 	CORO_BEGIN_CONTEXT;
-		PINT_CONTEXT picWaiter, picWaitee;
+		INT_CONTEXT *picWaiter, *picWaitee;
 	CORO_END_CONTEXT(_ctx);
 
 

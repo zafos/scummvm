@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,10 +33,10 @@ namespace LastExpress {
 
 Hadija::Hadija(LastExpressEngine *engine) : Entity(engine, kEntityHadija) {
 	ADD_CALLBACK_FUNCTION(Hadija, reset);
-	ADD_CALLBACK_FUNCTION(Hadija, enterExitCompartment);
-	ADD_CALLBACK_FUNCTION(Hadija, playSound);
-	ADD_CALLBACK_FUNCTION(Hadija, updateFromTime);
-	ADD_CALLBACK_FUNCTION(Hadija, updateEntity);
+	ADD_CALLBACK_FUNCTION_SI(Hadija, enterExitCompartment);
+	ADD_CALLBACK_FUNCTION_S(Hadija, playSound);
+	ADD_CALLBACK_FUNCTION_I(Hadija, updateFromTime);
+	ADD_CALLBACK_FUNCTION_II(Hadija, updateEntity);
 	ADD_CALLBACK_FUNCTION(Hadija, peekF);
 	ADD_CALLBACK_FUNCTION(Hadija, peekH);
 	ADD_CALLBACK_FUNCTION(Hadija, goFtoH);
@@ -151,15 +150,15 @@ label_callback2:
 						return;
 					}
 				}
-
-				if (params->param3 >= getState()->time)
-					return;
 			}
+			if (getState()->time > kTime1134000 || getState()->time > params->param3) {
 
-			params->param3 = kTimeInvalid;
+				params->param3 = kTimeInvalid;
 
-			setCallback(3);
-			setup_peekH();
+				setCallback(3);
+				setup_peekH();
+				break;
+			}
 		}
 
 label_callback3:
@@ -341,10 +340,6 @@ label_callback4:
 			if (Entity::timeCheckCar(kTime2254500, params->param5, 5, WRAP_SETUP_FUNCTION(Hadija, setup_peekF)))
 				break;
 		}
-		break;
-
-	case kActionDefault:
-		getSavePoints()->push(kEntityAlouan, kEntityTrain, kAction191070912, kPosition_4840);
 		break;
 
 	case kActionCallback:

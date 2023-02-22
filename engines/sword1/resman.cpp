@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -83,14 +82,13 @@ void ResMan::loadCluDescript(const char *fileName) {
 
 	if (!file.isOpen()) {
 		char msg[512];
-		sprintf(msg, "Couldn't open CLU description '%s'\n\nIf you are running from CD, please ensure you have read the ScummVM documentation regarding multi-cd games.", fileName);
+		Common::sprintf_s(msg, "Couldn't open CLU description '%s'\n\nIf you are running from CD, please ensure you have read the ScummVM documentation regarding multi-cd games.", fileName);
 		guiFatalError(msg);
 	}
 
 
 	_prj.noClu = file.readUint32LE();
-	_prj.clu = new Clu[_prj.noClu];
-	memset(_prj.clu, 0, _prj.noClu * sizeof(Clu));
+	_prj.clu = new Clu[_prj.noClu]();
 
 	uint32 *cluIndex = (uint32 *)malloc(_prj.noClu * 4);
 	file.read(cluIndex, _prj.noClu * 4);
@@ -205,7 +203,7 @@ void *ResMan::openFetchRes(uint32 id) {
 
 void ResMan::dumpRes(uint32 id) {
 	char outn[30];
-	sprintf(outn, "DUMP%08X.BIN", id);
+	Common::sprintf_s(outn, "DUMP%08X.BIN", id);
 	Common::DumpFile outf;
 	if (outf.open(outn)) {
 		resOpen(id);
@@ -313,13 +311,13 @@ Common::File *ResMan::resFile(uint32 id) {
 		// Supposes that big endian means mac cluster file and little endian means PC cluster file.
 		// This works, but we may want to separate the file name from the endianess or try .CLM extension if opening.clu file fail.
 		if (_isBigEndian)
-			sprintf(fileName, "%s.CLM", _prj.clu[(id >> 24) - 1].label);
+			Common::sprintf_s(fileName, "%s.CLM", _prj.clu[(id >> 24) - 1].label);
 		else
-			sprintf(fileName, "%s.CLU", _prj.clu[(id >> 24) - 1].label);
+			Common::sprintf_s(fileName, "%s.CLU", _prj.clu[(id >> 24) - 1].label);
 		cluster->file->open(fileName);
 		if (!cluster->file->isOpen()) {
 			char msg[512];
-			sprintf(msg, "Couldn't open game cluster file '%s'\n\nIf you are running from CD, please ensure you have read the ScummVM documentation regarding multi-cd games.", fileName);
+			Common::sprintf_s(msg, "Couldn't open game cluster file '%s'\n\nIf you are running from CD, please ensure you have read the ScummVM documentation regarding multi-cd games.", fileName);
 			guiFatalError(msg);
 		}
 		while (_openClus > MAX_OPEN_CLUS) {

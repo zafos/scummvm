@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,10 +24,28 @@
 #include "bladerunner/audio_player.h"
 #include "bladerunner/bladerunner.h"
 #include "bladerunner/game_info.h"
+#include "bladerunner/game_constants.h"
 
 namespace BladeRunner {
 
-const uint16 UISlider::kColors[] = { 0x0000, 0x0821, 0x1061, 0x1C82, 0x24C2, 0x2CE3, 0x3524, 0x4145, 0x4586, 0x4DC7, 0x5609, 0x5E4B, 0x668C, 0x6EEE, 0x7730, 0x7B92 };
+const Color256 UISlider::kColors[] = {
+	{   0,   0,   0 }, // Black - unpressed (framing rectange)
+	{  16,   8,   8 },
+	{  32,  24,   8 },
+	{  56,  32,  16 },
+	{  72,  48,  16 },
+	{  88,  56,  24 }, // Mouse-over (framing rectange)
+	{ 104,  72,  32 },
+	{ 128,  80,  40 },
+	{ 136,  96,  48 },
+	{ 152, 112,  56 },
+	{ 168, 128,  72 }, // Pressed (framing rectange)
+	{ 184, 144,  88 },
+	{ 200, 160,  96 },
+	{ 216, 184, 112 },
+	{ 232, 200, 128 },
+	{ 240, 224, 144 }
+};
 
 UISlider::UISlider(BladeRunnerEngine *vm, UIComponentCallback *valueChangedCallback, void *callbackData, Common::Rect rect, int maxValue, int value)
 	: UIComponent(vm) {
@@ -61,15 +78,17 @@ void UISlider::draw(Graphics::Surface &surface) {
 		frameColor = 0;
 	}
 
+	// Ensures animated transition of the frame's (outlining rectangle's) color to the new one
 	if (_currentFrameColor < frameColor) {
 		++_currentFrameColor;
 	}
 
+	// Ensures animated transition of the frame's (outlining rectangle's) color to the new one
 	if (_currentFrameColor > frameColor) {
 		--_currentFrameColor;
 	}
 
-	surface.frameRect(_rect, kColors[_currentFrameColor]);
+	surface.frameRect(_rect, surface.format.RGBToColor(kColors[_currentFrameColor].r, kColors[_currentFrameColor].g, kColors[_currentFrameColor].b));
 
 	int sliderX = 0;
 	if (_maxValue <= 1) {
@@ -86,7 +105,7 @@ void UISlider::draw(Graphics::Surface &surface) {
 
 	if (_rect.left + 1 < _rect.right - 1) {
 		int striding = _rect.left + sliderX;
-		for (int x = _rect.left + 1; x < _rect.right - 1; x++) {
+		for (int x = _rect.left + 1; x < _rect.right - 1; ++x) {
 			int colorIndex =  15 - (abs(sliderX - x) >> 2);
 
 			if (!_isEnabled) {
@@ -97,9 +116,9 @@ void UISlider::draw(Graphics::Surface &surface) {
 				colorIndex = 3;
 			}
 
-			uint16 color = kColors[colorIndex];
+			uint32 color = surface.format.RGBToColor(kColors[colorIndex].r, kColors[colorIndex].g, kColors[colorIndex].b);
 			if ((striding + x) & 1 || x == sliderX) {
-				color = 0;
+				color = surface.format.RGBToColor(0, 0, 0);
 			}
 
 			surface.vLine(x, _rect.top + 1, _rect.bottom - 2, color);
@@ -111,7 +130,7 @@ void UISlider::handleMouseMove(int mouseX, int mouseY) {
 	_mouseX = mouseX;
 	if (_rect.contains(mouseX, mouseY)) {
 		if (!_hasFocus && _isEnabled && _pressedStatus == 0) {
-			_vm->_audioPlayer->playAud(_vm->_gameInfo->getSfxTrack(508), 100, 0, 0, 50, 0);
+			_vm->_audioPlayer->playAud(_vm->_gameInfo->getSfxTrack(kSfxTEXT3), 100, 0, 0, 50, 0);
 		}
 		_hasFocus = true;
 	} else {

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -32,14 +31,14 @@
 #include "engines/wintermute/base/gfx/base_surface.h"
 #include "engines/wintermute/base/base_parser.h"
 #include "engines/wintermute/base/base_game.h"
+#include "engines/wintermute/base/base_engine.h"
 #include "engines/wintermute/base/base_file_manager.h"
 #include "engines/wintermute/utils/utils.h"
 #include "engines/wintermute/wintermute.h"
 #include "graphics/fonts/ttf.h"
 #include "graphics/fontman.h"
-#include "common/unzip.h"
-#include "common/config-manager.h" // For Scummmodern.zip
-#include <limits.h>
+#include "common/unicode-bidi.h"
+#include "common/compression/unzip.h"
 
 namespace Wintermute {
 
@@ -49,6 +48,7 @@ IMPLEMENT_PERSISTENT(BaseFontTT, false)
 BaseFontTT::BaseFontTT(BaseGame *inGame) : BaseFont(inGame) {
 	_fontHeight = 12;
 	_isBold = _isItalic = _isUnderline = _isStriked = false;
+	_charset = CHARSET_ANSI;
 
 	_fontFile = nullptr;
 	_font = nullptr;
@@ -117,11 +117,11 @@ int BaseFontTT::getTextWidth(const byte *text, int maxLength) {
 	if (_gameRef->_textEncoding == TEXT_UTF8) {
 		textStr = StringUtil::utf8ToWide((const char *)text);
 	} else {
-		textStr = StringUtil::ansiToWide((const char *)text);
+		textStr = StringUtil::ansiToWide((const char *)text, _charset);
 	}
 
 	if (maxLength >= 0 && textStr.size() > (uint32)maxLength) {
-		textStr = WideString(textStr.c_str(), (uint32)maxLength);
+		textStr = textStr.substr(0, (uint32)maxLength);
 	}
 	//text = text.substr(0, MaxLength); // TODO: Remove
 
@@ -138,7 +138,7 @@ int BaseFontTT::getTextHeight(const byte *text, int width) {
 	if (_gameRef->_textEncoding == TEXT_UTF8) {
 		textStr = StringUtil::utf8ToWide((const char *)text);
 	} else {
-		textStr = StringUtil::ansiToWide((const char *)text);
+		textStr = StringUtil::ansiToWide((const char *)text, _charset);
 	}
 
 
@@ -163,18 +163,18 @@ void BaseFontTT::drawText(const byte *text, int x, int y, int width, TTextAlign 
 	if (_gameRef->_textEncoding == TEXT_UTF8) {
 		textStr = StringUtil::utf8ToWide((const char *)text);
 	} else {
-		textStr = StringUtil::ansiToWide((const char *)text);
+		textStr = StringUtil::ansiToWide((const char *)text, _charset);
 	}
 
 	if (maxLength >= 0 && textStr.size() > (uint32)maxLength) {
-		textStr = WideString(textStr.c_str(), (uint32)maxLength);
+		textStr = textStr.substr(0, (uint32)maxLength);
 	}
 	//text = text.substr(0, MaxLength); // TODO: Remove
 
 	BaseRenderer *renderer = _gameRef->_renderer;
 
 	// find cached surface, if exists
-	uint32 minUseTime = UINT_MAX;
+	uint32 minUseTime = INT_MAX_VALUE;
 	int minIndex = -1;
 	BaseSurface *surface = nullptr;
 	int textOffset = 0;
@@ -234,7 +234,7 @@ void BaseFontTT::drawText(const byte *text, int x, int y, int width, TTextAlign 
 				color = BYTETORGBA(RGBCOLGetR(color), RGBCOLGetG(color), RGBCOLGetB(color), RGBCOLGetA(renderer->_forceAlphaColor));
 				renderer->_forceAlphaColor = 0;
 			}
-			surface->displayTransOffset(x, y - textOffset, rc, color, Graphics::BLEND_NORMAL, false, false, _layers[i]->_offsetX, _layers[i]->_offsetY);
+			surface->displayTrans(x, y - textOffset, rc, color, Graphics::BLEND_NORMAL, false, false, _layers[i]->_offsetX, _layers[i]->_offsetY);
 
 			renderer->_forceAlphaColor = origForceAlpha;
 		}
@@ -276,7 +276,13 @@ BaseSurface *BaseFontTT::renderTextToTexture(const WideString &text, int width, 
 	Common::Array<WideString>::iterator it;
 	int heightOffset = 0;
 	for (it = lines.begin(); it != lines.end(); ++it) {
-		_font->drawString(surface, *it, 0, heightOffset, width, useColor, alignment);
+		WideString str;
+		if (_gameRef->_textRTL) {
+			str = Common::convertBiDiU32String(*it, Common::BIDI_PAR_RTL);
+		} else {
+			str = Common::convertBiDiU32String(*it, Common::BIDI_PAR_LTR);
+		}
+		_font->drawString(surface, str, 0, heightOffset, width, useColor, alignment);
 		heightOffset += (int)_lineHeight;
 	}
 
@@ -413,7 +419,7 @@ bool BaseFontTT::loadBuffer(char *buffer) {
 			break;
 
 		case TOKEN_CHARSET:
-			// we don't need this anymore
+			parser.scanStr(params, "%d", &_charset);
 			break;
 
 		case TOKEN_COLOR: {
@@ -442,6 +448,8 @@ bool BaseFontTT::loadBuffer(char *buffer) {
 		}
 		break;
 
+		default:
+			break;
 		}
 	}
 	if (cmd == PARSERR_TOKENNOTFOUND) {
@@ -500,6 +508,9 @@ bool BaseFontTT::parseLayer(BaseTTFontLayer *layer, char *buffer) {
 			layer->_color = BYTETORGBA(RGBCOLGetR(layer->_color), RGBCOLGetG(layer->_color), RGBCOLGetB(layer->_color), a);
 		}
 		break;
+
+		default:
+			break;
 		}
 	}
 	if (cmd != PARSERR_EOF) {
@@ -520,6 +531,7 @@ bool BaseFontTT::persist(BasePersistenceManager *persistMgr) {
 	persistMgr->transferBool(TMEMBER(_isStriked));
 	persistMgr->transferSint32(TMEMBER(_fontHeight));
 	persistMgr->transferCharPtr(TMEMBER(_fontFile));
+	persistMgr->transferSint32(TMEMBER_INT(_charset));
 
 
 	// persist layers
@@ -587,35 +599,10 @@ bool BaseFontTT::initFont() {
 		file = nullptr;
 	}
 
-	// Fallback2: Try to find ScummModern.zip, and get the font from there:
+	// Fallback2: Try load the font from the common fonts archive:
 	if (!_font) {
-		Common::SeekableReadStream *themeFile = nullptr;
-		if (ConfMan.hasKey("themepath")) {
-			Common::FSNode themePath(ConfMan.get("themepath"));
-			if (themePath.exists()) {
-				Common::FSNode scummModern = themePath.getChild("scummmodern.zip");
-				if (scummModern.exists()) {
-					themeFile = scummModern.createReadStream();
-				}
-			}
-		}
-		if (!themeFile) { // Fallback 2.5: Search for ScummModern.zip in SearchMan.
-			themeFile = SearchMan.createReadStreamForMember("scummmodern.zip");
-		}
-		if (themeFile) {
-			Common::Archive *themeArchive = Common::makeZipArchive(themeFile);
-			if (themeArchive->hasFile(fallbackFilename)) {
-				file = nullptr;
-				file = themeArchive->createReadStreamForMember(fallbackFilename);
-				_deletableFont = Graphics::loadTTFFont(*file, _fontHeight, Graphics::kTTFSizeModeCharacter, 96); // Use the same dpi as WME (96 vs 72).
-				_font = _deletableFont;
-			}
-			// We're not using BaseFileManager, so clean up after ourselves:
-			delete file;
-			file = nullptr;
-			delete themeArchive;
-			themeArchive = nullptr;
-		}
+		_deletableFont = Graphics::loadTTFFontFromArchive(fallbackFilename, _fontHeight, Graphics::kTTFSizeModeCharacter, 96); // Use the same dpi as WME (96 vs 72).
+		_font = _deletableFont;
 	}
 
 	// Fallback3: Try to ask FontMan for the FreeSans.ttf ScummModern.zip uses:
@@ -635,6 +622,11 @@ bool BaseFontTT::initFont() {
 		warning("BaseFontTT::InitFont - Couldn't load font: %s", _fontFile);
 	}
 	_lineHeight = _font->getFontHeight();
+#ifdef ENABLE_FOXTAIL
+	if (BaseEngine::instance().isFoxTail(FOXTAIL_1_2_896, FOXTAIL_LATEST_VERSION)) {
+		_lineHeight -= 1;
+	}
+#endif
 	return STATUS_OK;
 }
 

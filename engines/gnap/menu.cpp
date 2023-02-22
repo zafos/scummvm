@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -161,7 +160,7 @@ void GnapEngine::insertInventorySprites() {
 	for (int i = 0; i < 9; ++i) {
 		_menuInventoryIndices[i] = -1;
 		_gameSys->removeSpriteDrawItem(_menuInventorySprites[_sceneClickedHotspot], 261);
-		_menuInventorySprites[i] = 0;
+		_menuInventorySprites[i] = nullptr;
 	}
 
 	_menuSpritesIndex = 0;
@@ -192,7 +191,7 @@ void GnapEngine::removeInventorySprites() {
 	for (int j = 0; j < _menuSpritesIndex; ++j) {
 		if (_menuInventorySprites[j]) {
 			deleteSurface(&_menuInventorySprites[j]);
-			_menuInventorySprites[j] = 0;
+			_menuInventorySprites[j] = nullptr;
 			_menuInventoryIndices[j] = -1;
 		}
 	}
@@ -256,6 +255,8 @@ void GnapEngine::runMenu() {
 			break;
 		case 4:
 			updateMenuStatusQueryQuit();
+			break;
+		default:
 			break;
 		}
 
@@ -525,9 +526,9 @@ void GnapEngine::updateMenuStatusMainMenu() {
 #endif
 }
 
-Common::Error GnapEngine::saveGameState(int slot, const Common::String &desc) {
+Common::Error GnapEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	Common::OutSaveFile *out = g_system->getSavefileManager()->openForSaving(
-		generateSaveName(slot));
+		getSaveStateName(slot));
 	if (!out)
 		return Common::kCreatingFileFailed;
 
@@ -628,7 +629,7 @@ WARN_UNUSED_RESULT bool GnapEngine::readSavegameHeader(Common::InSaveFile *in, G
 
 Common::Error GnapEngine::loadGameState(int slot) {
 	Common::InSaveFile *saveFile = g_system->getSavefileManager()->openForLoading(
-		generateSaveName(slot));
+		getSaveStateName(slot));
 	if (!saveFile)
 		return Common::kReadingFailed;
 
@@ -649,10 +650,6 @@ Common::Error GnapEngine::loadGameState(int slot) {
 
 	_loadGameSlot = slot;
 	return Common::kNoError;
-}
-
-Common::String GnapEngine::generateSaveName(int slot) {
-	return Common::String::format("%s.%03d", _targetName.c_str(), slot);
 }
 
 void GnapEngine::updateMenuStatusSaveGame() {

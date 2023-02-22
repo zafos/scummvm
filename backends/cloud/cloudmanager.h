@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -86,7 +85,7 @@ class CloudManager : public Common::Singleton<CloudManager>, public Common::Even
 	 * The periodical polling is used to update the OSD icon indicating
 	 * background sync activity.
 	 */
-	virtual bool pollEvent(Common::Event &event) override;
+	bool pollEvent(Common::Event &event) override;
 
 public:
 	CloudManager();
@@ -204,8 +203,16 @@ public:
 	 *
 	 * @param   index   Storage's index
 	 * @param   code    OAuth2 code received from user
+	 * @param	cb		callback to notify of success or error
 	 */
-	void connectStorage(uint32 index, Common::String code);
+	void connectStorage(uint32 index, Common::String code, Networking::ErrorCallback cb = nullptr);
+
+	/**
+	 * Remove Storage with a given index from config.
+	 *
+	 * @param   index   Storage's index
+	 */
+	void disconnectStorage(uint32 index);
 
 	/** Returns ListDirectoryResponse with list of files. */
 	Networking::Request *listDirectory(Common::String path, Storage::ListDirectoryCallback callback, Networking::ErrorCallback errorCallback, bool recursive = false);
@@ -219,6 +226,15 @@ public:
 	/** Returns storage's saves directory path with the trailing slash. */
 	Common::String savesDirectoryPath();
 
+	/** Returns whether given filename could be uploaded to or downloaded from storage. */
+	bool canSyncFilename(const Common::String &filename) const;
+
+	/** Returns whether current Storage is manually enabled by user (or false, if there is no active Storage). */
+	bool isStorageEnabled() const;
+
+	/** Sets Storage::_isEnabled to true and updates the config. */
+	void enableStorage();
+
 	/**
 	 * Starts saves syncing process in currently active storage if there is any.
 	 */
@@ -226,9 +242,6 @@ public:
 
 	/** Returns whether there are any requests running. */
 	bool isWorking() const;
-
-	/** Returns whether LocalWebserver is available to use for auth. */
-	static bool couldUseLocalServer();
 
 	///// SavesSyncRequest-related /////
 
@@ -238,6 +251,9 @@ public:
 	/** Returns a number in [0, 1] range which represents current sync downloading progress (1 = complete). */
 	double getSyncDownloadingProgress() const;
 
+	/** Fills a struct with numbers about current sync downloading progress. */
+	void getSyncDownloadingInfo(Storage::SyncDownloadingInfo &info) const;
+
 	/** Returns a number in [0, 1] range which represents current sync progress (1 = complete). */
 	double getSyncProgress() const;
 
@@ -246,9 +262,6 @@ public:
 
 	/** Cancels running sync. */
 	void cancelSync() const;
-
-	/** Sets SavesSyncRequest's target to given CommandReceiver. */
-	void setSyncTarget(GUI::CommandReceiver *target) const;
 
 	/** Shows a "cloud disabled" icon for three seconds. */
 	void showCloudDisabledIcon();

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -42,36 +41,36 @@ public:
 	bool getWindowObjects(BaseArray<UIObject *> &Objects, bool InteractiveOnly);
 
 	void cleanup();
-	virtual void makeFreezable(bool freezable);
+	void makeFreezable(bool freezable) override;
 
-	virtual bool handleMouseWheel(int delta);
+	bool handleMouseWheel(int32 delta) override;
 
 	bool close();
 	bool goSystemExclusive();
 	bool goExclusive();
 	bool moveFocus(bool forward = true);
-	virtual bool handleMouse(TMouseEvent Event, TMouseButton Button);
+	bool handleMouse(TMouseEvent Event, TMouseButton Button) override;
 	DECLARE_PERSISTENT(UIWindow, UIObject)
 	bool showWidget(const char *name, bool visible = true);
 	bool enableWidget(const char *name, bool enable = true);
 
-	virtual bool display(int offsetX = 0, int offsetY = 0) override;
+	bool display(int offsetX = 0, int offsetY = 0) override;
 	UIWindow(BaseGame *inGame);
-	virtual ~UIWindow();
-	virtual bool handleKeypress(Common::Event *event, bool printable = false) override;
+	~UIWindow() override;
+	bool handleKeypress(Common::Event *event, bool printable = false) override;
 	BaseArray<UIObject *> _widgets;
 
 	bool loadFile(const char *filename);
 	bool loadBuffer(char *buffer, bool complete = true);
 
-	virtual bool listen(BaseScriptHolder *param1, uint32 param2);
-	virtual bool saveAsText(BaseDynamicBuffer *buffer, int indent) override;
+	bool listen(BaseScriptHolder *param1, uint32 param2) override;
+	bool saveAsText(BaseDynamicBuffer *buffer, int indent) override;
 
 	// scripting interface
-	virtual ScValue *scGetProperty(const Common::String &name) override;
-	virtual bool scSetProperty(const char *name, ScValue *value) override;
-	virtual bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
-	virtual const char *scToString();
+	ScValue *scGetProperty(const Common::String &name) override;
+	bool scSetProperty(const char *name, ScValue *value) override;
+	bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
+	const char *scToString() override;
 
 	bool getInGame() const;
 	TWindowMode getMode() const;

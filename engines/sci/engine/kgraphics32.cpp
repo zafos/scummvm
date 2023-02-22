@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -29,10 +28,11 @@
 
 #include "sci/sci.h"
 #include "sci/event.h"
-#include "sci/resource.h"
+#include "sci/resource/resource.h"
 #include "sci/engine/features.h"
 #include "sci/engine/state.h"
 #include "sci/engine/selector.h"
+#include "sci/engine/tts.h"
 #include "sci/engine/kernel.h"
 #include "sci/graphics/animate.h"
 #include "sci/graphics/cache.h"
@@ -50,7 +50,7 @@
 #include "sci/graphics/cursor32.h"
 #include "sci/graphics/celobj32.h"
 #include "sci/graphics/controls32.h"
-#include "sci/graphics/font.h"	// TODO: remove once kBitmap is moved in a separate class
+#include "sci/graphics/scifont.h"	// TODO: remove once kBitmap is moved in a separate class
 #include "sci/graphics/frameout.h"
 #include "sci/graphics/paint32.h"
 #include "sci/graphics/palette32.h"
@@ -62,7 +62,7 @@
 namespace Sci {
 #ifdef ENABLE_SCI32
 
-extern void showScummVMDialog(const Common::String &message);
+extern int showScummVMDialog(const Common::U32String &message, const Common::U32String &altButton = Common::U32String(), bool alignCenter = true);
 
 reg_t kBaseSetter32(EngineState *s, int argc, reg_t *argv) {
 	reg_t object = argv[0];
@@ -155,7 +155,17 @@ reg_t kSetCursor32(EngineState *s, int argc, reg_t *argv) {
 }
 
 reg_t kShakeScreen32(EngineState *s, int argc, reg_t *argv) {
-	g_sci->_gfxFrameout->shakeScreen(argv[0].toSint16(), (ShakeDirection)argv[1].toSint16());
+	int16 shakeCount = argv[0].toSint16();
+
+	// SSCI didn't check the parameter count and assumed a direction parameter
+	//  was always passed. This parameter was optional in SCI16 and at least GK1
+	//  and QFG4 scripts continued to not pass it. This would shake in a random
+	//  direction depending on whatever happened to be in memory, or not at all.
+	//  We treat direction as optional with a a vertical default as in SCI16 as
+	//  that's what the scripts expect.
+	ShakeDirection directions = (argc > 1) ? (ShakeDirection)argv[1].toSint16() : kShakeVertical;
+
+	g_sci->_gfxFrameout->shakeScreen(shakeCount, directions);
 	return s->r_acc;
 }
 
@@ -181,7 +191,10 @@ reg_t kUpdateScreenItem(EngineState *s, int argc, reg_t *argv) {
 }
 
 reg_t kDeleteScreenItem(EngineState *s, int argc, reg_t *argv) {
-	debugC(6, kDebugLevelGraphics, "kDeleteScreenItem %x:%x (%s)", PRINT_REG(argv[0]), s->_segMan->getObjectName(argv[0]));
+	Common::String objectName = s->_segMan->getObjectName(argv[0]);
+	debugC(6, kDebugLevelGraphics, "kDeleteScreenItem %x:%x (%s)", PRINT_REG(argv[0]), objectName.c_str());
+	if (objectName == "DText")
+		g_sci->_tts->stop();
 	g_sci->_gfxFrameout->kernelDeleteScreenItem(argv[0]);
 	return s->r_acc;
 }
@@ -345,7 +358,7 @@ reg_t kWinHelp(EngineState *s, int argc, reg_t *argv) {
 	case 1:
 		// Load a help file
 		// Maybe in the future we can implement this, but for now this message should suffice
-		showScummVMDialog(Common::String::format(_("Please use an external viewer to open the game's help file: %s"), s->_segMan->getString(argv[1]).c_str()));
+		showScummVMDialog(Common::U32String::format(_("Please use an external viewer to open the game's help file: %s"), s->_segMan->getString(argv[1]).c_str()));
 		break;
 	case 2:
 		// Looks like some init function
@@ -383,18 +396,23 @@ reg_t kSetShowStyle(EngineState *s, int argc, reg_t *argv) {
 	int16 divisions;
 
 	// SCI 2–2.1early
-	if (getSciVersion() < SCI_VERSION_2_1_MIDDLE) {
+	// KQ7 2.0b uses a mismatched version of the Styler script (SCI2.1early script
+	// for SCI2.1mid engine), so the calls it makes to kSetShowStyle are wrong and
+	// put `divisions` where `pFadeArray` is supposed to be.
+	if (getSciVersion() <= SCI_VERSION_1_EARLY || g_sci->getGameId() == GID_KQ7) {
 		blackScreen = 0;
 		pFadeArray = NULL_REG;
 		divisions = argc > 7 ? argv[7].toSint16() : -1;
 	}
-	// SCI 2.1mid
-	else if (getSciVersion() < SCI_VERSION_2_1_LATE) {
+	// SCI 2.1mid and RAMA demo (2.1late) and noninteractive Lighthouse demo (2.1late)
+	else if (getSciVersion() <= SCI_VERSION_2_1_MIDDLE ||
+		(g_sci->getGameId() == GID_RAMA && g_sci->isDemo()) ||
+		(g_sci->getGameId() == GID_LIGHTHOUSE && g_sci->isDemo() && getSciVersion() == SCI_VERSION_2_1_LATE)) {
 		blackScreen = 0;
 		pFadeArray = argc > 7 ? argv[7] : NULL_REG;
 		divisions = argc > 8 ? argv[8].toSint16() : -1;
 	}
-	// SCI 2.1late-3
+	// SCI 2.1late-3. Includes Mac 2.1late games and LSL7 demo (2.1late)
 	else {
 		blackScreen = argv[7].toSint16();
 		pFadeArray = argc > 8 ? argv[8] : NULL_REG;
@@ -407,7 +425,7 @@ reg_t kSetShowStyle(EngineState *s, int argc, reg_t *argv) {
 
 	// The order of planeObj and showStyle are reversed because this is how
 	// SSCI3 called the corresponding method on the KernelMgr
-	g_sci->_gfxTransitions32->kernelSetShowStyle(argc, planeObj, (ShowStyleType)type, seconds, back, priority, animate, refFrame, pFadeArray, divisions, blackScreen);
+	g_sci->_gfxTransitions32->kernelSetShowStyle(planeObj, (ShowStyleType)type, seconds, back, priority, animate, refFrame, pFadeArray, divisions, blackScreen);
 
 	return s->r_acc;
 }
@@ -798,6 +816,10 @@ reg_t kBitmapGetInfo(EngineState *s, int argc, reg_t *argv) {
 
 reg_t kEditText(EngineState *s, int argc, reg_t *argv) {
 	return g_sci->_gfxControls32->kernelEditText(argv[0]);
+}
+
+reg_t kInputText(EngineState *s, int argc, reg_t *argv) {
+	return g_sci->_gfxControls32->kernelInputText(argv[0], argv[1], argv[2].toSint16());
 }
 
 reg_t kAddLine(EngineState *s, int argc, reg_t *argv) {

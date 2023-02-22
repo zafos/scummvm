@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -50,8 +49,6 @@ GfxPorts::~GfxPorts() {
 }
 
 void GfxPorts::init(bool usesOldGfxFunctions, GfxPaint16 *paint16, GfxText16 *text16) {
-	int16 offTop = 10;
-
 	_usesOldGfxFunctions = usesOldGfxFunctions;
 	_paint16 = paint16;
 	_text16 = text16;
@@ -86,6 +83,8 @@ void GfxPorts::init(bool usesOldGfxFunctions, GfxPaint16 *paint16, GfxText16 *te
 	// Mother Goose (SCI1) uses -Nw 0 0 159 262. The game will later use
 	// SetPort so we don't need to set the other fields.
 	// This actually meant not skipping the first 10 pixellines in windowMgrPort
+	int16 offTop = 10;
+	bool useMacStatusBarSizing = false;
 	switch (g_sci->getGameId()) {
 	case GID_JONES:
 	case GID_SLATER:
@@ -103,6 +102,21 @@ void GfxPorts::init(bool usesOldGfxFunctions, GfxPaint16 *paint16, GfxText16 *te
 		// Mixed-Up Fairy Tales (& its demo) uses -w 26 0 200 320. If we don't
 		// also do this we will get not-fully-removed windows everywhere.
 		offTop = 26;
+		break;
+	case GID_QFG1VGA:
+		// QFG1VGA relies on the initial state of the pic window, but its Mac
+		// interpreter sets this differently. The game draws its first pic without
+		// calling kSetPort first. In the PC version this drew pic 750 (320x190)
+		// under the usual 10 pixel black bar. But the Mac interpreter has a
+		// different initial state when its HasStatusBar config flag is set.
+		// (First byte in the `cnfg` resource in the interpreter's resource fork.)
+		// The first pic is instead drawn at the very top of the screen. This would
+		// have left a 10 pixel black bar at the bottom. Sierra fixed this by cloning
+		// pic 750 into pic 748 and extending it by 10 pixels to fill the screen.
+		// We achieve the same effect by adjusting the initial pic window size.
+		// HasStatusBar is also set in LSL6, Brain, and Hoyle4 but they don't depend
+		// on the altered initial state.
+		useMacStatusBarSizing = (g_sci->getPlatform() == Common::kPlatformMacintosh);
 		break;
 	default:
 		// For Mac games running with a height of 190, we do not have a menu bar
@@ -128,7 +142,11 @@ void GfxPorts::init(bool usesOldGfxFunctions, GfxPaint16 *paint16, GfxText16 *te
 	_wmgrPort->curLeft = 0;
 	_windowList.push_front(_wmgrPort);
 
-	_picWind = addWindow(Common::Rect(0, offTop, _screen->getScriptWidth(), _screen->getScriptHeight()), 0, 0, SCI_WINDOWMGR_STYLE_TRANSPARENT | SCI_WINDOWMGR_STYLE_NOFRAME, 0, true);
+	Common::Rect picWindowRect(0, offTop, _screen->getScriptWidth(), _screen->getScriptHeight());
+	if (useMacStatusBarSizing) {
+		picWindowRect.top = 0;
+	}
+	_picWind = addWindow(picWindowRect, nullptr, nullptr, SCI_WINDOWMGR_STYLE_TRANSPARENT | SCI_WINDOWMGR_STYLE_NOFRAME, 0, true);
 	// For SCI0 games till kq4 (.502 - not including) we set _picWind top to offTop instead
 	//  Because of the menu/status bar
 	if (_usesOldGfxFunctions)
@@ -210,12 +228,12 @@ reg_t GfxPorts::kernelGetActive() {
 }
 
 reg_t GfxPorts::kernelNewWindow(Common::Rect dims, Common::Rect restoreRect, uint16 style, int16 priority, int16 colorPen, int16 colorBack, const char *title) {
-	Window *wnd = NULL;
+	Window *wnd = nullptr;
 
 	if (restoreRect.bottom != 0 && restoreRect.right != 0)
 		wnd = addWindow(dims, &restoreRect, title, style, priority, false);
 	else
-		wnd = addWindow(dims, NULL, title, style, priority, false);
+		wnd = addWindow(dims, nullptr, title, style, priority, false);
 	wnd->penClr = colorPen;
 	wnd->backClr = colorBack;
 	drawWindow(wnd);
@@ -304,7 +322,7 @@ Window *GfxPorts::addWindow(const Common::Rect &dims, const Common::Rect *restor
 
 	// KQ1sci, KQ4, iceman, QfG2 always add windows to the back of the list.
 	// KQ5CD checks style.
-	// Hoyle3-demo also always adds to the back (#3036763).
+	// Hoyle3-demo also always adds to the back (#5040).
 	bool forceToBack = (getSciVersion() <= SCI_VERSION_1_EGA_ONLY) ||
 	                   (g_sci->getGameId() == GID_HOYLE3 && g_sci->isDemo());
 
@@ -394,7 +412,7 @@ Window *GfxPorts::addWindow(const Common::Rect &dims, const Common::Rect *restor
 	// invasive changes than this one, thus it's not really worth the effort
 	// for a feature that was not present in the original game, and its
 	// implementation is buggy in the first place.
-	// Adjusting the restore rect properly fixes bug #3575276.
+	// Adjusting the restore rect properly fixes bug #6154.
 
 	if (wmprect.top > pwnd->dims.top) {
 		pwnd->dims.moveTo(pwnd->dims.left, wmprect.top);
@@ -422,7 +440,7 @@ Window *GfxPorts::addWindow(const Common::Rect &dims, const Common::Rect *restor
 
 	pwnd->rect.moveTo(pwnd->rect.left + pwnd->dims.left - oldleft, pwnd->rect.top + pwnd->dims.top - oldtop);
 
-	if (restoreRect == 0)
+	if (restoreRect == nullptr)
 		pwnd->restoreRect = pwnd->dims;
 
 	if (pwnd->restoreRect.top < 0 && g_sci->getPlatform() == Common::kPlatformMacintosh &&
@@ -567,7 +585,7 @@ Port *GfxPorts::getPort() {
 }
 
 void GfxPorts::setOrigin(int16 left, int16 top) {
-	_curPort->left = left;
+	_curPort->left = left & 0xfffe; // SSCI clears the last bit
 	_curPort->top = top;
 }
 

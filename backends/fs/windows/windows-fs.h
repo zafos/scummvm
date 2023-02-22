@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,25 +15,17 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef WINDOWS_FILESYSTEM_H
 #define WINDOWS_FILESYSTEM_H
 
+#include <windows.h>
+
 #include "backends/fs/abstract-fs.h"
 
-#if defined(ARRAYSIZE)
-#undef ARRAYSIZE
-#endif
-#include <windows.h>
-// winnt.h defines ARRAYSIZE, but we want our own one...
-#undef ARRAYSIZE
-#ifdef _WIN32_WCE
-#undef GetCurrentDirectory
-#endif
 #include <io.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,7 +36,7 @@
  *
  * Parts of this class are documented in the base interface class, AbstractFSNode.
  */
-class WindowsFilesystemNode : public AbstractFSNode {
+class WindowsFilesystemNode final : public AbstractFSNode {
 protected:
 	Common::String _displayName;
 	Common::String _path;
@@ -57,7 +49,6 @@ public:
 	 * Creates a WindowsFilesystemNode with the root node as path.
 	 *
 	 * In regular windows systems, a virtual root path is used "".
-	 * In windows CE, the "\" root is used instead.
 	 */
 	WindowsFilesystemNode();
 
@@ -74,21 +65,21 @@ public:
 	 */
 	WindowsFilesystemNode(const Common::String &path, const bool currentDir);
 
-	virtual bool exists() const;
-	virtual Common::String getDisplayName() const { return _displayName; }
-	virtual Common::String getName() const { return _displayName; }
-	virtual Common::String getPath() const { return _path; }
-	virtual bool isDirectory() const { return _isDirectory; }
-	virtual bool isReadable() const;
-	virtual bool isWritable() const;
+	bool exists() const override;
+	Common::U32String getDisplayName() const override { return _displayName; }
+	Common::String getName() const override { return _displayName; }
+	Common::String getPath() const override { return _path; }
+	bool isDirectory() const override { return _isDirectory; }
+	bool isReadable() const override;
+	bool isWritable() const override;
 
-	virtual AbstractFSNode *getChild(const Common::String &n) const;
-	virtual bool getChildren(AbstractFSList &list, ListMode mode, bool hidden) const;
-	virtual AbstractFSNode *getParent() const;
+	AbstractFSNode *getChild(const Common::String &n) const override;
+	bool getChildren(AbstractFSList &list, ListMode mode, bool hidden) const override;
+	AbstractFSNode *getParent() const override;
 
-	virtual Common::SeekableReadStream *createReadStream();
-	virtual Common::WriteStream *createWriteStream();
-	virtual bool create(bool isDirectoryFlag);
+	Common::SeekableReadStream *createReadStream() override;
+	Common::SeekableWriteStream *createWriteStream() override;
+	bool createDirectory() override;
 
 private:
 	/**
@@ -104,20 +95,31 @@ private:
 	static void addFile(AbstractFSList &list, ListMode mode, const char *base, bool hidden, WIN32_FIND_DATA* find_data);
 
 	/**
-	 * Converts a Unicode string to Ascii format.
+	 * Converts a string of TCHARs returned from a Windows API function to
+	 * a character string. If UNICODE is defined then the incoming string
+	 * is wide characters and is converted to UTF8, otherwise the incoming
+	 * string is returned with no conversion.
 	 *
-	 * @param str Common::String to convert from Unicode to Ascii.
-	 * @return str in Ascii format.
+	 * @param str String to convert if UNICODE is defined
+	 * @return str in UTF8 format if UNICODE is defined, otherwise just str
 	 */
-	static char *toAscii(TCHAR *str);
+	static const char *tcharToChar(const TCHAR *str);
 
 	/**
-	 * Converts an Ascii string to Unicode format.
+	 * Converts a character string to a string of TCHARs for passing
+	 * to a Windows API function. If UNICODE is defined then the incoming
+	 * string is converted from UTF8 to wide characters, otherwise the incoming
+	 * string is returned with no conversion.
 	 *
-	 * @param str Common::String to convert from Ascii to Unicode.
-	 * @return str in Unicode format.
+	 * @param str String to convert if UNICODE is defined
+	 * @return str in wide character format if UNICODE is defined, otherwise just str
 	 */
-	static const TCHAR* toUnicode(const char *str);
+	static const TCHAR* charToTchar(const char *str);
+
+	/**
+	 * Tests and sets the _isValid and _isDirectory flags, using the GetFileAttributes() function.
+	 */
+	virtual void setFlags();
 };
 
 #endif

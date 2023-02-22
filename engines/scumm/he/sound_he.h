@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,6 +24,7 @@
 
 #include "common/scummsys.h"
 #include "scumm/sound.h"
+#include "audio/audiostream.h"
 
 namespace Scumm {
 
@@ -59,15 +59,15 @@ public: // Used by createSound()
 
 public:
 	SoundHE(ScummEngine *parent, Audio::Mixer *mixer);
-	~SoundHE();
+	~SoundHE() override;
 
-	virtual void addSoundToQueue(int sound, int heOffset = 0, int heChannel = 0, int heFlags = 0, int heFreq = 0, int hePan = 0, int heVol = 0);
-	virtual void addSoundToQueue2(int sound, int heOffset = 0, int heChannel = 0, int heFlags = 0, int heFreq = 0, int hePan = 0, int heVol = 0);
+	void addSoundToQueue(int sound, int heOffset = 0, int heChannel = 0, int heFlags = 0, int heFreq = 0, int hePan = 0, int heVol = 0) override;
+	void addSoundToQueue2(int sound, int heOffset = 0, int heChannel = 0, int heFlags = 0, int heFreq = 0, int hePan = 0, int heVol = 0) override;
 
-	virtual int isSoundRunning(int sound) const;
-	virtual void stopSound(int sound);
-	virtual void stopAllSounds();
-	virtual void setupSound();
+	int isSoundRunning(int sound) const override;
+	void stopSound(int sound) override;
+	void stopAllSounds() override;
+	void setupSound() override;
 
 	bool getHEMusicDetails(int id, int &musicOffs, int &musicSize);
 	int findFreeSoundChannel();
@@ -84,7 +84,12 @@ public:
 	void stopSoundChannel(int chan);
 
 protected:
-	virtual void processSoundQueues();
+	void processSoundQueues() override;
+
+private:
+	int _heTalkOffset;
+
+	Audio::RewindableAudioStream *tryLoadAudioOverride(int soundID, int *duration = nullptr);
 };
 
 

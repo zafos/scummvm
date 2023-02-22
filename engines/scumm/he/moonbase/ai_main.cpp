@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -491,6 +490,9 @@ int AI::masterControlProgram(const int paramCount, const int32 *params) {
 		case -1:
 			_aiState = STATE_LAUNCH;
 			break;
+
+		default:
+			break;
 		}
 
 		delete myTree;
@@ -778,8 +780,8 @@ int AI::masterControlProgram(const int paramCount, const int32 *params) {
 		}
 
 		if ((lastSource[currentPlayer] == launchAction[LAUNCH_SOURCE_HUB]) && (lastAngle[currentPlayer] == launchAction[LAUNCH_ANGLE]) && (lastPower[currentPlayer] == launchAction[LAUNCH_POWER])) {
-			randomAttenuation -= .2f;
-			randomAttenuation = MAX(randomAttenuation, 0.0f);
+			randomAttenuation -= .2F;
+			randomAttenuation = MAX(randomAttenuation, 0.0F);
 			debugC(DEBUG_MOONBASE_AI, "Attenuating...");
 		} else {
 			randomAttenuation = 1;
@@ -1643,7 +1645,7 @@ int AI::chooseTarget(int behavior) {
 		int returnBuilding = 0;
 
 		int savedTally = 0;
-		int savedDamage;
+		int savedDamage = 0;
 		float savedNumDefenses = 0;
 		int savedWorth = 0;
 
@@ -2381,11 +2383,8 @@ int *AI::defendTarget(int &targetX, int &targetY, int index) {
 	}
 
 	if (defStatus == -3) {
-		retVal = new int[4];
-		retVal[0] = 0;
+		retVal = new int[4]();
 		retVal[1] = SKIP_TURN;
-		retVal[2] = 0;
-		retVal[3] = 0;
 	}
 
 	assert(targetX >= 0 && targetY >= 0);
@@ -2710,7 +2709,7 @@ int AI::getUnitsWithinRadius(int x, int y, int radius) {
 	assert(y >= 0);
 	assert(radius >= 0);
 
-	debug(0, "getUnitsWithinRadius(%d, %d, %d)", x, y, radius);
+	debug(3, "getUnitsWithinRadius(%d, %d, %d)", x, y, radius);
 
 	int retVal = _vm->_moonbase->callScummFunction(_mcpParams[F_GET_UNITS_WITHIN_RADIUS], 3, x, y, radius);
 	return retVal;
@@ -2756,9 +2755,10 @@ int AI::energyPoolSize(int pool) {
 
 	case 63:
 		return 60;
-	}
 
-	return 0;
+	default:
+		return 0;
+	}
 }
 
 int AI::getMaxCollectors(int pool) {
@@ -2773,6 +2773,9 @@ int AI::getMaxCollectors(int pool) {
 
 	case 63:
 		return 2;
+
+	default:
+		break;
 	}
 
 	return 0;

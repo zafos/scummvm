@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995-1997 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -73,16 +72,17 @@ friend class InputHandler;
 
 public:
 	PegasusEngine(OSystem *syst, const PegasusGameDescription *gamedesc);
-	virtual ~PegasusEngine();
+	~PegasusEngine() override;
 
 	// Engine stuff
 	const PegasusGameDescription *_gameDescription;
-	bool hasFeature(EngineFeature f) const;
-	GUI::Debugger *getDebugger();
-	bool canLoadGameStateCurrently();
-	bool canSaveGameStateCurrently();
-	Common::Error loadGameState(int slot);
-	Common::Error saveGameState(int slot, const Common::String &desc);
+	bool hasFeature(EngineFeature f) const override;
+	bool canLoadGameStateCurrently() override;
+	bool canSaveGameStateCurrently() override;
+	Common::Error loadGameState(int slot) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+
+	static Common::Array<Common::Keymap *> initKeymaps();
 
 	// Base classes
 	GraphicsManager *_gfx;
@@ -99,6 +99,7 @@ public:
 	bool isDVDDemo() const;
 	bool isOldDemo() const;
 	bool isWindows() const;
+	bool isLinux() const;
 	void addIdler(Idler *idler);
 	void removeIdler(Idler *idler);
 	void addTimeBase(TimeBase *timeBase);
@@ -124,10 +125,12 @@ public:
 	int32 getSavedEnergyValue() { return _savedEnergyValue; }
 
 	// Death
+	Sound &getDeathSound() { return _deathSound; }
 	void setEnergyDeathReason(const DeathReason reason) { _deathReason = reason; }
 	DeathReason getEnergyDeathReason() { return _deathReason; }
 	void resetEnergyDeathReason();
 	void die(const DeathReason);
+	DeathReason getDeathReason() { return _deathReason; }
 	void playEndMessage();
 
 	// Volume
@@ -169,6 +172,12 @@ public:
 	bool canSolve();
 	void prepareForAIHint(const Common::String &);
 	void cleanUpAfterAIHint(const Common::String &);
+	void requestToggle(bool request = true) { _toggleRequested = request; }
+	bool toggleRequested() const { return _toggleRequested; }
+	bool isChattyAI() { return _chattyAI; }
+	void setChattyAI(bool);
+	bool isChattyArthur() { return _chattyArthur; }
+	void setChattyArthur(bool);
 	Common::SeekableReadStream *_aiSaveStream;
 
 	// Neighborhood
@@ -203,26 +212,23 @@ public:
 	static Common::StringArray listSaveFiles();
 
 protected:
-	Common::Error run();
-	void pauseEngineIntern(bool pause);
+	Common::Error run() override;
+	void pauseEngineIntern(bool pause) override;
 
 	Notification _shellNotification;
-	virtual void receiveNotification(Notification *notification, const NotificationFlags flags);
+	void receiveNotification(Notification *notification, const NotificationFlags flags) override;
 
-	void handleInput(const Input &input, const Hotspot *cursorSpot);
-	virtual bool isClickInput(const Input &, const Hotspot *);
-	virtual InputBits getClickFilter();
+	void handleInput(const Input &input, const Hotspot *cursorSpot) override;
+	bool isClickInput(const Input &, const Hotspot *) override;
+	InputBits getClickFilter() override;
 
-	void clickInHotspot(const Input &, const Hotspot *);
-	void activateHotspots(void);
+	void clickInHotspot(const Input &, const Hotspot *) override;
+	void activateHotspots(void) override;
 
-	void updateCursor(const Common::Point, const Hotspot *);
-	bool wantsCursor();
+	void updateCursor(const Common::Point, const Hotspot *) override;
+	bool wantsCursor() override;
 
 private:
-	// Console
-	PegasusConsole *_console;
-
 	// Intro
 	void runIntro();
 	void stopIntroTimer();
@@ -272,8 +278,7 @@ private:
 	void doSubChase();
 	uint getNeighborhoodCD(const NeighborhoodID neighborhood) const;
 	uint _currentCD;
-	void initKeymap();
-	InputBits getInputFilter();
+	InputBits getInputFilter() override;
 
 	// Menu
 	GameMenu *_gameMenu;
@@ -281,13 +286,21 @@ private:
 	void doInterfaceOverview();
 	ScreenDimmer _screenDimmer;
 	void pauseMenu(bool menuUp);
+	PauseToken _menuPauseToken;
+	bool _heardOverviewVoice;
 
 	// Energy
 	int32 _savedEnergyValue;
 
 	// Death
 	DeathReason _deathReason;
+	Sound _deathSound;
 	void doDeath();
+
+	// AI
+	bool _toggleRequested;
+	bool _chattyAI;
+	bool _chattyArthur;
 
 	// Neighborhood
 	Neighborhood *_neighborhood;
@@ -330,6 +343,8 @@ private:
 	void toggleInfo();
 	Movie _bigInfoMovie, _smallInfoMovie;
 };
+
+extern PegasusEngine *g_vm;
 
 } // End of namespace Pegasus
 

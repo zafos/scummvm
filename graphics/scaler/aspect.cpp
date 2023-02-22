@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -158,8 +157,10 @@ static inline void interpolate5Line(uint16 *dst, const uint16 *srcA, const uint1
 }
 #endif
 
-void makeRectStretchable(int &x, int &y, int &w, int &h) {
+void makeRectStretchable(int &x, int &y, int &w, int &h, bool interpolate) {
 #if ASPECT_MODE != kSuperFastAndUglyAspectMode
+	if (!interpolate)
+		return;
 	int m = real2Aspect(y) % 6;
 
 	// Ensure that the rect will start on a line that won't have its
@@ -203,8 +204,26 @@ void makeRectStretchable(int &x, int &y, int &w, int &h) {
  * srcY + height - 1, and it should be stretched to Y coordinates srcY
  * through real2Aspect(srcY + height - 1).
  */
+
+int stretch200To240Nearest(uint8 *buf, uint32 pitch, int width, int height, int srcX, int srcY, int origSrcY, const Graphics::PixelFormat &format) {
+	int maxDstY = real2Aspect(origSrcY + height - 1);
+	int y;
+	const uint8 *startSrcPtr = buf + srcX * format.bytesPerPixel + (srcY - origSrcY) * pitch;
+	uint8 *dstPtr = buf + srcX * format.bytesPerPixel + maxDstY * pitch;
+
+	for (y = maxDstY; y >= srcY; y--) {
+		const uint8 *srcPtr = startSrcPtr + aspect2Real(y) * pitch;
+		if (srcPtr == dstPtr)
+			break;
+		memcpy(dstPtr, srcPtr, format.bytesPerPixel * width);
+		dstPtr -= pitch;
+	}
+
+	return 1 + maxDstY - srcY;
+}
+
 template<typename ColorMask>
-int stretch200To240(uint8 *buf, uint32 pitch, int width, int height, int srcX, int srcY, int origSrcY) {
+int stretch200To240Interpolated(uint8 *buf, uint32 pitch, int width, int height, int srcX, int srcY, int origSrcY) {
 	int maxDstY = real2Aspect(origSrcY + height - 1);
 	int y;
 	const uint8 *startSrcPtr = buf + srcX * 2 + (srcY - origSrcY) * pitch;
@@ -212,13 +231,6 @@ int stretch200To240(uint8 *buf, uint32 pitch, int width, int height, int srcX, i
 
 	for (y = maxDstY; y >= srcY; y--) {
 		const uint8 *srcPtr = startSrcPtr + aspect2Real(y) * pitch;
-
-#if ASPECT_MODE == kSuperFastAndUglyAspectMode
-		if (srcPtr == dstPtr)
-			break;
-		memcpy(dstPtr, srcPtr, sizeof(uint16) * width);
-#else
-		// Bilinear filter
 		switch (y % 6) {
 		case 0:
 		case 5:
@@ -237,114 +249,24 @@ int stretch200To240(uint8 *buf, uint32 pitch, int width, int height, int srcX, i
 		case 4:
 			interpolate5Line<ColorMask, 1>((uint16 *)dstPtr, (const uint16 *)srcPtr, (const uint16 *)(srcPtr - pitch), width);
 			break;
+		default:
+			break;
 		}
-#endif
 		dstPtr -= pitch;
 	}
 
 	return 1 + maxDstY - srcY;
 }
 
-int stretch200To240(uint8 *buf, uint32 pitch, int width, int height, int srcX, int srcY, int origSrcY) {
-	extern int gBitFormat;
-	if (gBitFormat == 565)
-		return stretch200To240<Graphics::ColorMasks<565> >(buf, pitch, width, height, srcX, srcY, origSrcY);
-	else // gBitFormat == 555
-		return stretch200To240<Graphics::ColorMasks<555> >(buf, pitch, width, height, srcX, srcY, origSrcY);
-}
-
-
-template<typename ColorMask>
-void Normal1xAspectTemplate(const uint8 *srcPtr, uint32 srcPitch, uint8 *dstPtr, uint32 dstPitch, int width, int height) {
-
-	for (int y = 0; y < (height * 6 / 5); ++y) {
-
-#if ASPECT_MODE == kSuperFastAndUglyAspectMode
-		if ((y % 6) == 5)
-			srcPtr -= srcPitch;
-		memcpy(dstPtr, srcPtr, sizeof(uint16) * width);
-#else
-		// Bilinear filter five input lines onto six output lines
-		switch (y % 6) {
-		case 0:
-			// First output line is copied from first input line
-			memcpy(dstPtr, srcPtr, sizeof(uint16) * width);
-			break;
-		case 1:
-			// Second output line is mixed from first and second input line
-			interpolate5Line<ColorMask, 1>((uint16 *)dstPtr, (const uint16 *)(srcPtr - srcPitch), (const uint16 *)srcPtr, width);
-			break;
-		case 2:
-			// Third output line is mixed from second and third input line
-			interpolate5Line<ColorMask, 2>((uint16 *)dstPtr, (const uint16 *)(srcPtr - srcPitch), (const uint16 *)srcPtr, width);
-			break;
-		case 3:
-			// Fourth output line is mixed from third and fourth input line
-			interpolate5Line<ColorMask, 2>((uint16 *)dstPtr, (const uint16 *)srcPtr, (const uint16 *)(srcPtr - srcPitch), width);
-			break;
-		case 4:
-			// Fifth output line is mixed from fourth and fifth input line
-			interpolate5Line<ColorMask, 1>((uint16 *)dstPtr, (const uint16 *)srcPtr, (const uint16 *)(srcPtr - srcPitch), width);
-			break;
-		case 5:
-			// Sixth (and last) output line is copied from fifth (and last) input line
-			srcPtr -= srcPitch;
-			memcpy(dstPtr, srcPtr, sizeof(uint16) * width);
-			break;
-		}
+int stretch200To240(uint8 *buf, uint32 pitch, int width, int height, int srcX, int srcY, int origSrcY, bool interpolate, const Graphics::PixelFormat &format) {
+#if ASPECT_MODE != kSuperFastAndUglyAspectMode
+	if (interpolate && format.bytesPerPixel == 2) {
+		if (format.gLoss == 2)
+			return stretch200To240Interpolated<Graphics::ColorMasks<565> >(buf, pitch, width, height, srcX, srcY, origSrcY);
+		else if (format.gLoss == 3)
+			return stretch200To240Interpolated<Graphics::ColorMasks<555> >(buf, pitch, width, height, srcX, srcY, origSrcY);
+	}
 #endif
 
-		srcPtr += srcPitch;
-		dstPtr += dstPitch;
-	}
+	return stretch200To240Nearest(buf, pitch, width, height, srcX, srcY, origSrcY, format);
 }
-
-void Normal1xAspect(const uint8 *srcPtr, uint32 srcPitch, uint8 *dstPtr, uint32 dstPitch, int width, int height) {
-	extern int gBitFormat;
-	if (gBitFormat == 565)
-		Normal1xAspectTemplate<Graphics::ColorMasks<565> >(srcPtr, srcPitch, dstPtr, dstPitch, width, height);
-	else
-		Normal1xAspectTemplate<Graphics::ColorMasks<555> >(srcPtr, srcPitch, dstPtr, dstPitch, width, height);
-}
-
-#ifdef USE_ARM_SCALER_ASM
-extern "C" void Normal2xAspectMask(const uint8  *srcPtr,
-                                         uint32  srcPitch,
-                                         uint8  *dstPtr,
-                                         uint32  dstPitch,
-                                         int     width,
-                                         int     height,
-                                         uint32  mask);
-
-/**
- * A 2x scaler which also does aspect ratio correction.
- * This is Normal2x combined with vertical stretching,
- * so it will scale a 320x200 surface to a 640x480 surface.
- */
-void Normal2xAspect(const uint8  *srcPtr,
-                          uint32  srcPitch,
-                          uint8  *dstPtr,
-                          uint32  dstPitch,
-                          int     width,
-                          int     height) {
-	extern int gBitFormat;
-	if (gBitFormat == 565) {
-		Normal2xAspectMask(srcPtr,
-		                   srcPitch,
-		                   dstPtr,
-		                   dstPitch,
-		                   width,
-		                   height,
-		                   0x07e0F81F);
-	} else {
-		Normal2xAspectMask(srcPtr,
-		                   srcPitch,
-		                   dstPtr,
-		                   dstPitch,
-		                   width,
-		                   height,
-		                   0x03e07C1F);
-	}
-}
-
-#endif	// USE_ARM_SCALER_ASM

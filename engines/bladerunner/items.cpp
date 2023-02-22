@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -35,7 +34,11 @@ Items::Items(BladeRunnerEngine *vm) {
 }
 
 Items::~Items() {
-	for (int i = _items.size() - 1; i >= 0; i--) {
+	reset();
+}
+
+void Items::reset() {
+	for (int i = _items.size() - 1; i >= 0; --i) {
 		delete _items.remove_at(i);
 	}
 }
@@ -61,9 +64,16 @@ void Items::getWidthHeight(int itemId, int *width, int *height) const {
 	_items[itemIndex]->getWidthHeight(width, height);
 }
 
+void Items::getAnimationId(int itemId, int *animationId) const {
+	int itemIndex = findItem(itemId);
+	assert(itemIndex != -1);
+
+	_items[itemIndex]->getAnimationId(animationId);
+}
+
 void Items::tick() {
 	int setId = _vm->_scene->getSetId();
-	for (int i = 0; i < (int)_items.size(); i++) {
+	for (int i = 0; i < (int)_items.size(); ++i) {
 		if (_items[i]->_setId != setId) {
 			continue;
 		}
@@ -99,7 +109,7 @@ bool Items::addToSet(int setId) {
 	if (itemCount == 0) {
 		return true;
 	}
-	for (int i = 0; i < itemCount; i++) {
+	for (int i = 0; i < itemCount; ++i) {
 		Item *item = _items[i];
 		if (item->_setId == setId) {
 			_vm->_sceneObjects->addItem(item->_itemId + kSceneObjectOffsetItems, item->_boundingBox, item->_screenRectangle, item->isTarget(), item->_isVisible);
@@ -107,6 +117,23 @@ bool Items::addToSet(int setId) {
 	}
 	return true;
 }
+
+#if !BLADERUNNER_ORIGINAL_BUGS
+bool Items::removeFromCurrentSceneOnly(int itemId) {
+	if (_items.size() == 0) {
+		return false;
+	}
+	int itemIndex = findItem(itemId);
+	if (itemIndex == -1) {
+		return false;
+	}
+
+	if (_items[itemIndex]->_setId == _vm->_scene->getSetId()) {
+		_vm->_sceneObjects->remove(itemId + kSceneObjectOffsetItems);
+	}
+	return true;
+}
+#endif // !BLADERUNNER_ORIGINAL_BUGS
 
 bool Items::remove(int itemId) {
 	if (_items.size() == 0) {
@@ -164,7 +191,7 @@ bool Items::isPoliceMazeEnemy(int itemId) const {
 	if (itemIndex == -1) {
 		return false;
 	}
-	return _items[itemIndex]->isTarget();
+	return _items[itemIndex]->isPoliceMazeEnemy();
 }
 
 void Items::setPoliceMazeEnemy(int itemId, bool val) {
@@ -235,7 +262,7 @@ int Items::findTargetUnderMouse(int mouseX, int mouseY) const {
 }
 
 int Items::findItem(int itemId) const {
-	for (int i = 0; i < (int)_items.size(); i++) {
+	for (int i = 0; i < (int)_items.size(); ++i) {
 		if (_items[i]->_itemId == itemId) {
 			return i;
 		}
@@ -259,7 +286,7 @@ void Items::save(SaveFileWriteStream &f) {
 }
 
 void Items::load(SaveFileReadStream &f) {
-	for (int i = _items.size() - 1; i >= 0; i--) {
+	for (int i = _items.size() - 1; i >= 0; --i) {
 		delete _items.remove_at(i);
 	}
 	_items.resize(f.readInt());

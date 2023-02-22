@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,6 +26,7 @@
  */
 
 #include "engines/wintermute/base/base_game.h"
+#include "engines/wintermute/base/base_engine.h"
 #include "engines/wintermute/base/base_parser.h"
 #include "engines/wintermute/base/base_active_rect.h"
 #include "engines/wintermute/base/base_dynamic_buffer.h"
@@ -152,6 +152,7 @@ bool UIWindow::display(int offsetX, int offsetY) {
 	}
 
 	if (_fadeBackground) {
+		// TODO: This should be handled on renderer side
 		Graphics::PixelFormat format = _gameRef->_renderer->getPixelFormat();
 		byte fadeR, fadeG, fadeB, fadeA;
 		// First convert from the internal format to the screen-format
@@ -602,6 +603,13 @@ bool UIWindow::loadBuffer(char *buffer, bool complete) {
 	if (cmd == PARSERR_GENERIC) {
 		_gameRef->LOG(0, "Error loading WINDOW definition");
 		return STATUS_FAILED;
+	}
+
+	// HACK: Increase window title height by 1 for "5 Lethal Demons" game
+	// For some reason getFontHeight() is off-by-one comparing to height set in TITLE_RECT,
+	// Which made text being bigger then title rect and drawing was skipped.
+	if (BaseEngine::instance().getGameId() == "5ld" && !_titleRect.isRectEmpty() && _text) {
+		_titleRect.bottom ++;
 	}
 
 	correctSize();
@@ -1212,7 +1220,7 @@ bool UIWindow::handleKeypress(Common::Event *event, bool printable) {
 
 
 //////////////////////////////////////////////////////////////////////////
-bool UIWindow::handleMouseWheel(int Delta) {
+bool UIWindow::handleMouseWheel(int32 Delta) {
 	if (_focusedWidget) {
 		return _focusedWidget->handleMouseWheel(Delta);
 	} else {

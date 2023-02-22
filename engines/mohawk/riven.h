@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,14 +30,26 @@
 #include "common/random.h"
 #include "common/rect.h"
 
+#include "graphics/surface.h"
+
+namespace Common {
+class Keymap;
+}
+
+namespace GUI {
+class GuiObject;
+class OptionsContainerWidget;
+}
+
 namespace Mohawk {
 
 struct MohawkGameDescription;
 class MohawkArchive;
 class RivenGraphics;
 class RivenConsole;
+struct RivenLanguage;
 class RivenSaveLoad;
-class RivenOptionsDialog;
+class RivenOptionsWidget;
 class RivenStack;
 class RivenCard;
 class RivenHotspot;
@@ -95,42 +106,59 @@ public:
 	// Display debug rectangles around the hotspots
 	bool _showHotspots;
 
-	GUI::Debugger *getDebugger() override;
-
 	bool canLoadGameStateCurrently() override;
 	bool canSaveGameStateCurrently() override;
 	Common::Error loadGameState(int slot) override;
-	Common::Error saveGameState(int slot, const Common::String &desc) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	Common::String getSaveStateName(int slot) const override {
+		return Common::String::format("riven-%03d.rvn", slot);
+	}
+
+	static const RivenLanguage *getLanguageDesc(Common::Language language);
+	Common::Language getLanguage() const override;
+
 	bool hasFeature(EngineFeature f) const override;
 
+	void applyGameSettings() override;
+	static Common::Array<Common::Keymap *> initKeymaps(const char *target);
+
+	bool isInteractive() const;
 	void doFrame();
+	void processInput();
 
 private:
 	// Datafiles
 	MohawkArchive *_extrasFile; // We need a separate handle for the extra data
 	const char **listExpectedDatafiles() const;
+	void loadLanguageDatafile(char prefix, uint16 stackId);
 	bool checkDatafiles();
 
-	RivenConsole *_console;
 	RivenSaveLoad *_saveLoad;
-	RivenOptionsDialog *_optionsDialog;
 	InstallerArchive _installerArchive;
 
 	// Stack/Card-related functions and variables
 	RivenCard *_card;
 	RivenStack *_stack;
 
+	int _menuSavedCard;
+	int _menuSavedStack;
+	Common::ScopedPtr<Graphics::Surface, Graphics::SurfaceDeleter> _menuThumbnail;
+
 	bool _gameEnded;
+	uint32 _lastSaveTime;
+	Common::Language _currentLanguage;
 
 	// Variables
 	void initVars();
 
 	void pauseEngineIntern(bool) override;
+
 public:
 	// Stack/card/script funtions
 	RivenStack *constructStackById(uint16 id);
 	void changeToCard(uint16 dest);
 	void changeToStack(uint16 stackId);
+	void reloadCurrentCard();
 	RivenCard *getCard() const { return _card; }
 	RivenStack *getStack() const { return _stack; }
 
@@ -144,16 +172,15 @@ public:
 	uint32 &getStackVar(uint32 index);
 
 	// Miscellaneous
+	Common::Array<uint16> getResourceIDList(uint32 type) const;
 	Common::SeekableReadStream *getExtrasResource(uint32 tag, uint16 id);
 	bool _activatedPLST;
 	bool _activatedSLST;
 	void delay(uint32 ms);
+	void runOptionsDialog();
 
 	// Save / Load
-	void runLoadDialog();
-	void runSaveDialog();
-	void loadGameStateAndDisplayError(int slot);
-	void saveGameStateAndDisplayError(int slot, const Common::String &desc);
+	bool canSaveAutosaveCurrently() override;
 
 	/**
 	 * Has the game ended, or has the user requested to quit?
@@ -164,6 +191,13 @@ public:
 	 * End the game gracefully
 	 */
 	void setGameEnded();
+
+	// Main menu handling
+	void goToMainMenu();
+	void resumeFromMainMenu();
+	bool isInMainMenu() const;
+	bool isGameStarted() const;
+	void startNewGame();
 };
 
 } // End of namespace Mohawk

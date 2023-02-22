@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -33,7 +32,7 @@ public:
 		_curWidth = _sprite->origWidth;
 		_curHeight = _sprite->origHeight;
 	}
-	SpriteReaderStatus readPacket(PixelPacket &packet) {
+	SpriteReaderStatus readPacket(PixelPacket &packet) override {
 		if (_sprite->flags & 0x40) {
 			// shadow sprite
 			packet.count = _source[0] & 0x7F;
@@ -86,7 +85,7 @@ public:
 		_scalerStatus = 0;
 		_xerror = 0;
 	}
-	SpriteReaderStatus readPacket(PixelPacket &packet) {
+	SpriteReaderStatus readPacket(PixelPacket &packet) override {
 		SpriteReaderStatus status = kSrsPixelsLeft;
 		if (_scalerStatus == 0) {
 			_xerror = _sprite->xdelta;
@@ -139,7 +138,7 @@ public:
 		_sourcep = 0;
 		_xerror = 0;
 	}
-	SpriteReaderStatus readPacket(PixelPacket &packet) {
+	SpriteReaderStatus readPacket(PixelPacket &packet) override {
 		SpriteReaderStatus status;
 		if (_scalerStatus == 0) {
 			_xerror = _sprite->xdelta;

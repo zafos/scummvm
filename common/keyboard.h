@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,16 +24,26 @@
 
 #include "common/scummsys.h"
 
-#if defined(__amigaos4__)
-// KEYCODE_LESS and KEYCODE_GREATER are already defined in AmigaOS, inside
-// include/include_h/intuition/intuition.h (bug #3121350)
-#if defined(KEYCODE_LESS) && defined(KEYCODE_GREATER)
-#undef KEYCODE_LESS
-#undef KEYCODE_GREATER
-#endif
+#if defined(__amigaos4__) || defined(__MORPHOS__)
+	// KEYCODE_LESS and KEYCODE_GREATER are already defined in AmigaOS and MorphOS,
+	// inside "include/include_h/intuition/intuition.h" (fixes bug #5532)
+	#if defined(KEYCODE_LESS) && defined(KEYCODE_GREATER)
+		#undef KEYCODE_LESS
+		#undef KEYCODE_GREATER
+	#endif
 #endif
 
 namespace Common {
+
+/**
+ * @defgroup common_keyboard Keyboard
+ * @ingroup common
+ *
+ * @brief API for keyboard operations.
+ *
+ *
+ * @{
+ */
 
 enum KeyCode {
 	KEYCODE_INVALID     = 0,
@@ -50,16 +59,17 @@ enum KeyCode {
 	KEYCODE_QUOTEDBL    = 34,      // "
 	KEYCODE_HASH        = 35,      // #
 	KEYCODE_DOLLAR      = 36,      // $
+	KEYCODE_PERCENT     = 37,      // %
 	KEYCODE_AMPERSAND   = 38,      // &
 	KEYCODE_QUOTE       = 39,      // '
-	KEYCODE_LEFTPAREN   = 40,
-	KEYCODE_RIGHTPAREN  = 41,
+	KEYCODE_LEFTPAREN   = 40,      // (
+	KEYCODE_RIGHTPAREN  = 41,      // )
 	KEYCODE_ASTERISK    = 42,      // *
-	KEYCODE_PLUS        = 43,
-	KEYCODE_COMMA       = 44,
-	KEYCODE_MINUS       = 45,
-	KEYCODE_PERIOD      = 46,
-	KEYCODE_SLASH       = 47,
+	KEYCODE_PLUS        = 43,      // +
+	KEYCODE_COMMA       = 44,      // ,
+	KEYCODE_MINUS       = 45,      // -
+	KEYCODE_PERIOD      = 46,      // .
+	KEYCODE_SLASH       = 47,      // /
 	KEYCODE_0           = 48,
 	KEYCODE_1           = 49,
 	KEYCODE_2           = 50,
@@ -70,20 +80,20 @@ enum KeyCode {
 	KEYCODE_7           = 55,
 	KEYCODE_8           = 56,
 	KEYCODE_9           = 57,
-	KEYCODE_COLON       = 58,
-	KEYCODE_SEMICOLON   = 59,
-	KEYCODE_LESS        = 60,
-	KEYCODE_EQUALS      = 61,
-	KEYCODE_GREATER     = 62,
-	KEYCODE_QUESTION    = 63,
-	KEYCODE_AT          = 64,
+	KEYCODE_COLON       = 58,      // :
+	KEYCODE_SEMICOLON   = 59,      // ;
+	KEYCODE_LESS        = 60,      // <
+	KEYCODE_EQUALS      = 61,      // =
+	KEYCODE_GREATER     = 62,      // >
+	KEYCODE_QUESTION    = 63,      // ?
+	KEYCODE_AT          = 64,      // @
 
-	KEYCODE_LEFTBRACKET = 91,
-	KEYCODE_BACKSLASH   = 92,
-	KEYCODE_RIGHTBRACKET= 93,
-	KEYCODE_CARET       = 94,
-	KEYCODE_UNDERSCORE  = 95,
-	KEYCODE_BACKQUOTE   = 96,
+	KEYCODE_LEFTBRACKET = 91,      // [
+	KEYCODE_BACKSLASH   = 92,      // "\"
+	KEYCODE_RIGHTBRACKET= 93,      // ]
+	KEYCODE_CARET       = 94,      // ^
+	KEYCODE_UNDERSCORE  = 95,      // _
+	KEYCODE_BACKQUOTE   = 96,      // `
 	KEYCODE_a           = 97,
 	KEYCODE_b           = 98,
 	KEYCODE_c           = 99,
@@ -159,6 +169,9 @@ enum KeyCode {
 	KEYCODE_F13         = 294,
 	KEYCODE_F14         = 295,
 	KEYCODE_F15         = 296,
+	KEYCODE_F16         = 297,
+	KEYCODE_F17         = 298,
+	KEYCODE_F18         = 299,
 
 	// Key state modifier keys
 	KEYCODE_NUMLOCK     = 300,
@@ -185,7 +198,47 @@ enum KeyCode {
 	KEYCODE_MENU        = 319,
 	KEYCODE_POWER       = 320,      // Power Macintosh power key
 	KEYCODE_EURO        = 321,      // Some european keyboards
-	KEYCODE_UNDO        = 322       // Atari keyboard has Undo
+	KEYCODE_UNDO        = 322,      // Atari keyboard has Undo
+	KEYCODE_SLEEP       = 323,
+	KEYCODE_MUTE        = 324,
+	KEYCODE_EJECT       = 325,
+	KEYCODE_VOLUMEUP    = 326,
+	KEYCODE_VOLUMEDOWN  = 327,
+	KEYCODE_LEFTSOFT    = 328,
+	KEYCODE_RIGHTSOFT   = 329,
+	KEYCODE_CALL        = 330,
+	KEYCODE_HANGUP      = 331,
+	KEYCODE_CAMERA      = 332,
+	KEYCODE_WWW         = 333,
+	KEYCODE_MAIL        = 334,
+	KEYCODE_CALCULATOR  = 335,
+	KEYCODE_CUT         = 336,
+	KEYCODE_COPY        = 337,
+	KEYCODE_PASTE       = 338,
+	KEYCODE_SELECT      = 339,
+	KEYCODE_CANCEL      = 340,
+
+	// Action keys
+	KEYCODE_AC_SEARCH    = 341,
+	KEYCODE_AC_HOME      = 342,
+	KEYCODE_AC_BACK      = 343,
+	KEYCODE_AC_FORWARD   = 344,
+	KEYCODE_AC_STOP      = 345,
+	KEYCODE_AC_REFRESH   = 346,
+	KEYCODE_AC_BOOKMARKS = 347,
+
+	// Audio keys
+	KEYCODE_AUDIONEXT        = 348,
+	KEYCODE_AUDIOPREV        = 349,
+	KEYCODE_AUDIOSTOP        = 350,
+	KEYCODE_AUDIOPLAY        = 351,
+	KEYCODE_AUDIOPAUSE       = 352,
+	KEYCODE_AUDIOPLAYPAUSE   = 353,
+	KEYCODE_AUDIOMUTE        = 354,
+	KEYCODE_AUDIOREWIND      = 355,
+	KEYCODE_AUDIOFASTFORWARD = 356,
+
+	KEYCODE_LAST
 };
 
 /**
@@ -302,8 +355,8 @@ struct KeyState {
 
 	/**
 	 * Check if two key states are equal. This implementation ignores the state
-	 * of the sticky flags (caps lock, num lock, scroll lock) completely. This
-	 * functionality is currently only used by the keymapper.
+	 * of the sticky flags (caps lock, num lock, scroll lock) completely.
+	 * @todo is this still being used?
 	 */
 	bool operator==(const KeyState &x) const {
 		// Intentionally ignore ASCII, as the keycode and non-sticky flag
@@ -311,6 +364,8 @@ struct KeyState {
 		return keycode == x.keycode && hasFlags(x.flags & ~KBD_STICKY);
 	}
 };
+
+/** @} */
 
 } // End of namespace Common
 

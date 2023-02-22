@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -30,7 +29,7 @@ namespace Titanic {
 
 TTconcept::TTconcept() : _string1(" "), _string2(" "),
 		_nextP(nullptr), _scriptP(nullptr), _wordP(nullptr), _word2P(nullptr), _status(SS_VALID),
-		_scriptType(ST_UNKNOWN_SCRIPT), _field14(0), _field20(0), _field34(0) {
+		_scriptType(ST_UNKNOWN_SCRIPT), _field14(0), _field1C(0), _field20(0), _field30(0), _field34(0) {
 	if (setStatus())
 		setScriptType(ST_UNKNOWN_SCRIPT);
 	else
@@ -39,7 +38,8 @@ TTconcept::TTconcept() : _string1(" "), _string2(" "),
 
 TTconcept::TTconcept(TTscriptBase *script, ScriptType scriptType) :
 		_string1(" "), _string2(" "), _nextP(nullptr), _wordP(nullptr), _word2P(nullptr), _scriptP(nullptr),
-		_status(SS_VALID), _scriptType(ST_UNKNOWN_SCRIPT), _field14(0), _field20(0), _field34(0) {
+		_status(SS_VALID), _scriptType(ST_UNKNOWN_SCRIPT), _field14(0), _field1C(0), _field20(0), _field30(0),
+		_field34(0) {
 	if (!script->getStatus()) {
 		setScriptType(scriptType);
 		_scriptP = script;
@@ -53,7 +53,7 @@ TTconcept::TTconcept(TTscriptBase *script, ScriptType scriptType) :
 }
 
 TTconcept::TTconcept(TTword *word, ScriptType scriptType) :
-		_string1(" "), _string2(" "), _nextP(nullptr), _wordP(nullptr), _scriptP(nullptr),
+		_string1(" "), _string2(" "), _nextP(nullptr), _wordP(nullptr), _word2P(nullptr), _scriptP(nullptr),
 		_status(SS_VALID), _scriptType(ST_UNKNOWN_SCRIPT), _field14(0), _field1C(0), _field20(0),
 		_field30(0), _field34(0), _flag(false) {
 	if (!word || !setStatus() || word->getStatus()) {
@@ -257,7 +257,7 @@ bool TTconcept::checkWordId2() const {
 
 bool TTconcept::checkWordId3() const {
 	return isWordClass(WC_ABSTRACT) || isWordClass(WC_ADJECTIVE) ||
-		(isWordClass(WC_ADVERB) && getWordId() != 910);
+		(isWordClass(WC_ADVERB) && getTheWordId() != 910);
 }
 
 bool TTconcept::checkWordClass() const {
@@ -282,8 +282,8 @@ TTconcept *TTconcept::findByWordId(int id) {
 	return nullptr;
 }
 
-TTconcept *TTconcept::findByWordClass(WordClass wordClass) {
-	for (TTconcept *conceptP = this; conceptP; conceptP = conceptP->_nextP) {
+TTconcept *TTconcept::findByWordClass(TTconcept *conceptP, WordClass wordClass) {
+	for (; conceptP; conceptP = conceptP->_nextP) {
 		if (conceptP->_wordP && conceptP->_wordP->_wordClass == wordClass)
 			return conceptP;
 	}
@@ -300,12 +300,20 @@ TTconcept *TTconcept::findBy20(int val) {
 	return nullptr;
 }
 
-bool TTconcept::isWordId(int id) const {
+bool TTconcept::isTheWordId(int id) const {
 	return _wordP && _wordP->_id == id;
 }
 
-int TTconcept::getWordId() const {
+int TTconcept::getTheWordId() const {
 	return _wordP ? _wordP->_id : 0;
+}
+
+bool isWordId(const TTconcept *concept, int id) {
+	return concept ? concept->isTheWordId(id) : 0;
+}
+
+int getWordId(const TTconcept *concept) {
+	return concept ? concept->getTheWordId() : 0;
 }
 
 } // End of namespace Titanic

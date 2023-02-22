@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -142,6 +141,8 @@ void Scene49::checkObstacles() {
 					_obstacles[j]._splashSequenceId = 0;
 					_obstacles[j]._collisionSequenceId = 211;
 					break;
+				default:
+					break;
 				}
 				_obstacles[j]._prevId = _truckId;
 				_obstacles[j]._currId = _obstacles[j]._prevId;
@@ -178,6 +179,8 @@ void Scene49::updateObstacle(int id) {
 			obstacle._prevId = _truckId;
 		else
 			obstacle._prevId = _truckId - 1;
+		break;
+	default:
 		break;
 	}
 
@@ -316,6 +319,8 @@ void Scene49::run() {
 		_truckSequenceId = 0xAF;
 		_truckLaneNum = 3;
 		break;
+	default:
+		break;
 	}
 
 	int bgWidth1 = gameSys.getSpriteWidthById(0x5E);
@@ -409,6 +414,8 @@ void Scene49::run() {
 				break;
 			case 0xB2:
 				_truckLaneNum = 3;
+				break;
+			default:
 				break;
 			}
 			animToggle3 = !animToggle3;
@@ -651,7 +658,7 @@ bool Scene50::updateCountdown() {
 
 void Scene50::drawCountdown(int value) {
 	char str[8];
-	sprintf(str, "%02d", value);
+	Common::sprintf_s(str, "%02d", value);
 	_vm->_gameSys->fillSurface(nullptr, 371, 505, 50, 27, 0, 0, 0);
 	_vm->_gameSys->drawTextToSurface(nullptr, 381, 504, 255, 255, 255, str);
 }
@@ -681,6 +688,8 @@ void Scene50::playRoundAnim(int roundNum) {
 		break;
 	case 3:
 		sequenceId = 0xB1;
+		break;
+	default:
 		break;
 	}
 
@@ -765,6 +774,8 @@ int Scene50::getRightTongueAction() {
 			case 4:
 				sequenceId = 0xBB;
 				break;
+			default:
+				break;
 			}
 		} else {
 			switch (_vm->getRandom(4)) {
@@ -779,6 +790,8 @@ int Scene50::getRightTongueAction() {
 				break;
 			case 3:
 				sequenceId = 0xBE;
+				break;
+			default:
 				break;
 			}
 		}
@@ -1557,6 +1570,8 @@ void Scene51::updateGuyAnimation() {
 		case 4:
 			_guyNextSequenceId = 0xC7;
 			break;
+		default:
+			break;
 		}
 
 		_vm->_gameSys->insertSequence(_guyNextSequenceId, 39, _guySequenceId, 39, kSeqSyncWait, 0, 0, 0);
@@ -1579,6 +1594,8 @@ int Scene51::incCashAmount(int sequenceId) {
 		_cashAmount -= 10 * _vm->getRandom(5) + 50;
 		if (_cashAmount < 0)
 			_cashAmount = 0;
+		break;
+	default:
 		break;
 	}
 	if (_cashAmount > 1995)
@@ -2619,7 +2636,7 @@ void Scene52::initAnims() {
 
 void Scene52::drawScore(int score) {
 	char str[4];
-	sprintf(str, "%03d", score);
+	Common::sprintf_s(str, "%03d", score);
 	_vm->_gameSys->fillSurface(nullptr, 420, 80, 48, 30, 0, 0, 0);
 	_vm->_gameSys->drawTextToSurface(nullptr, 420, 80, 255, 255, 255, str);
 }

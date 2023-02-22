@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -52,6 +51,8 @@ void Insane::procIACT(byte *renderBitmap, int32 codecparam, int32 setupsan12,
 		break;
 	case 21:
 		iactScene21(renderBitmap, codecparam, setupsan12, setupsan13, b, size, flags, par1, par2, par3, par4);
+		break;
+	default:
 		break;
 	}
 }
@@ -140,6 +141,9 @@ void Insane::iactScene1(byte *renderBitmap, int32 codecparam, int32 setupsan12,
 			smlayer_setFluPalette(_smush_roadrsh3Rip, 0);
 			if (par5 == par6 - 1)
 				smlayer_setFluPalette(_smush_roadrashRip, 0);
+			break;
+		default:
+			break;
 		}
 		break;
 	case 7:
@@ -158,7 +162,11 @@ void Insane::iactScene1(byte *renderBitmap, int32 codecparam, int32 setupsan12,
 					smlayer_startSfx(86);
 			}
 			break;
+		default:
+			break;
 		}
+		break;
+	default:
 		break;
 	}
 
@@ -335,6 +343,8 @@ void Insane::iactScene4(byte *renderBitmap, int32 codecparam, int32 setupsan12,
 			else
 				setBit(par5);
 			break;
+		default:
+			break;
 		}
 		break;
 	case 6:
@@ -377,7 +387,11 @@ void Insane::iactScene4(byte *renderBitmap, int32 codecparam, int32 setupsan12,
 			_roadBranch = true;
 			_iactSceneId = par4;
 			break;
+		default:
+			break;
 		}
+		break;
+	default:
 		break;
 	}
 }
@@ -421,6 +435,8 @@ void Insane::iactScene6(byte *renderBitmap, int32 codecparam, int32 setupsan12,
 			else
 				setBit(par5);
 			break;
+		default:
+			break;
 		}
 		break;
 	case 6:
@@ -462,7 +478,11 @@ void Insane::iactScene6(byte *renderBitmap, int32 codecparam, int32 setupsan12,
 			_roadBranch = true;
 			_iactSceneId = par4;
 			break;
+		default:
+			break;
 		}
+		break;
+	default:
 		break;
 	}
 }
@@ -508,7 +528,11 @@ void Insane::iactScene17(byte *renderBitmap, int32 codecparam, int32 setupsan12,
 			_objectDetected = true;
 			_mineCaveIsNear = true;
 			break;
+		default:
+			break;
 		}
+		break;
+	default:
 		break;
 	}
 }

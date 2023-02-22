@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,9 +24,9 @@
 namespace BladeRunner {
 
 AIScriptPhotographer::AIScriptPhotographer(BladeRunnerEngine *vm) : AIScriptBase(vm) {
-	_var1 = 0;
-	_var2 = 0;
-	_flag = false;
+	_varNumOfTimesToHoldCurrentFrame = 0;
+	_var2 = 0; // is always set to 0, never checked, unused
+	_resumeIdleAfterFramesetCompletesFlag = false;
 }
 
 void AIScriptPhotographer::Initialize() {
@@ -36,21 +35,24 @@ void AIScriptPhotographer::Initialize() {
 	_animationStateNext = 0;
 	_animationNext = 0;
 
-	_var1 = 0;
+	_varNumOfTimesToHoldCurrentFrame = 0;
 	_var2 = 0;
-	_flag = false;
+	_resumeIdleAfterFramesetCompletesFlag = false;
 }
 
 bool AIScriptPhotographer::Update() {
-	if (Game_Flag_Query(450) != 1 || Game_Flag_Query(485))
-		return false;
+	if ( Game_Flag_Query(kFlagTB02ElevatorToTB05)
+	 && !Game_Flag_Query(kFlagTB06Photographer)
+	) {
+		Actor_Put_In_Set(kActorPhotographer, kSetFreeSlotC);
+		Actor_Set_At_Waypoint(kActorPhotographer, 35, 0);
+		Game_Flag_Set(kFlagTB06Photographer);
+		Actor_Set_Goal_Number(kActorPhotographer, 100);
 
-	Actor_Put_In_Set(kActorPhotographer, kSetFreeSlotC);
-	Actor_Set_At_Waypoint(kActorPhotographer, 35, 0);
-	Game_Flag_Set(485);
-	Actor_Set_Goal_Number(kActorPhotographer, 100);
+		return true;
+	}
 
-	return true;
+	return false;
 }
 
 void AIScriptPhotographer::TimerExpired(int timer) {
@@ -83,34 +85,42 @@ void AIScriptPhotographer::ReceivedClue(int clueId, int fromActorId) {
 }
 
 void AIScriptPhotographer::ClickedByPlayer() {
-	if (Actor_Clue_Query(kActorMcCoy, 44) != 1 || Actor_Clue_Query(kActorMcCoy, 50) || Game_Flag_Query(707)) {
-		AI_Movement_Track_Pause(37);
-		Actor_Face_Actor(kActorMcCoy, kActorPhotographer, 1);
-		Actor_Face_Actor(kActorPhotographer, kActorMcCoy, 1);
-		Actor_Says(kActorMcCoy, 5310, 11);
-		Actor_Says(kActorPhotographer, 40, 3);
-		AI_Movement_Track_Unpause(37);
-	} else {
-		AI_Movement_Track_Pause(37);
-		Actor_Face_Actor(kActorMcCoy, kActorPhotographer, 1);
+	if ( Actor_Clue_Query(kActorMcCoy, kClueDragonflyEarring)
+	 && !Actor_Clue_Query(kActorMcCoy, kClueVictimInformation)
+	 && !Game_Flag_Query(kFlagTB06PhotographTalk1)
+	) {
+		AI_Movement_Track_Pause(kActorPhotographer);
+		Actor_Face_Actor(kActorMcCoy, kActorPhotographer, true);
 		Actor_Says(kActorMcCoy, 5300, 14);
-		Actor_Face_Actor(kActorPhotographer, kActorMcCoy, 1);
-		Actor_Says(kActorPhotographer, 20, 3);
+		Actor_Face_Actor(kActorPhotographer, kActorMcCoy, true);
+		Actor_Says(kActorPhotographer, 20, kAnimationModeTalk);
 		Actor_Says(kActorMcCoy, 5305, 15);
-		Game_Flag_Set(707);
-		AI_Movement_Track_Unpause(37);
+		Game_Flag_Set(kFlagTB06PhotographTalk1);
+		AI_Movement_Track_Unpause(kActorPhotographer);
+	} else {
+		AI_Movement_Track_Pause(kActorPhotographer);
+		Actor_Face_Actor(kActorMcCoy, kActorPhotographer, true);
+		Actor_Face_Actor(kActorPhotographer, kActorMcCoy, true);
+		if (_vm->_cutContent && Random_Query(1, 10) < 3) {
+			Actor_Says(kActorMcCoy, 8516, 14); // Any idea if they were real dogs? (gets no answer)
+			Actor_Says(kActorPhotographer, 60, kAnimationModeTalk);
+		} else {
+			Actor_Says(kActorMcCoy, 5310, 11);
+			Actor_Says(kActorPhotographer, 40, kAnimationModeTalk);
+		}
+		AI_Movement_Track_Unpause(kActorPhotographer);
 	}
 }
 
-void AIScriptPhotographer::EnteredScene(int sceneId) {
+void AIScriptPhotographer::EnteredSet(int setId) {
 	// return false;
 }
 
-void AIScriptPhotographer::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptPhotographer::OtherAgentEnteredThisSet(int otherActorId) {
 	// return false;
 }
 
-void AIScriptPhotographer::OtherAgentExitedThisScene(int otherActorId) {
+void AIScriptPhotographer::OtherAgentExitedThisSet(int otherActorId) {
 	// return false;
 }
 
@@ -140,55 +150,49 @@ bool AIScriptPhotographer::GoalChanged(int currentGoalNumber, int newGoalNumber)
 		AI_Movement_Track_Flush(kActorPhotographer);
 		AI_Movement_Track_Append(kActorPhotographer, 35, 0);
 		AI_Movement_Track_Repeat(kActorPhotographer);
-
 		return true;
 
 	case 101:
 		AI_Movement_Track_Flush(kActorPhotographer);
-		switch (Random_Query(1, 3) - 1) {
-		case 0:
+		switch (Random_Query(1, 3)) {
+		case 1:
 			AI_Movement_Track_Append(kActorPhotographer, 280, 4);
 			break;
 
-		case 1:
+		case 2:
 			AI_Movement_Track_Append(kActorPhotographer, 279, 8);
 			break;
 
-		case 2:
+		case 3:
 			AI_Movement_Track_Append(kActorPhotographer, 280, 3);
 			break;
 		}
-
 		AI_Movement_Track_Repeat(kActorPhotographer);
-
 		return false;
 
 	case 102:
 		AI_Movement_Track_Flush(kActorPhotographer);
 		AI_Movement_Track_Append(kActorPhotographer, 279, 5);
 		AI_Movement_Track_Repeat(kActorPhotographer);
-		return 1;
+		return true;
 
 	case 199:
 		Actor_Put_In_Set(kActorPhotographer, kSetFreeSlotC);
 		Actor_Set_At_Waypoint(kActorPhotographer, 35, 0);
 		Actor_Put_In_Set(kActorMarcus, kSetFreeSlotI);
 		Actor_Set_At_Waypoint(kActorMarcus, 41, 0);
-
-		if (Game_Flag_Query(102)) {
-			Item_Remove_From_World(103);
-			Item_Remove_From_World(104);
-			Item_Remove_From_World(105);
+		if (Game_Flag_Query(kFlagTB06Visited)) {
+			Item_Remove_From_World(kItemDeadDogA);
+			Item_Remove_From_World(kItemDeadDogB);
+			Item_Remove_From_World(kItemDeadDogC);
 		}
-
-		if (!Actor_Clue_Query(kActorMcCoy, 65)) {
-			Actor_Clue_Acquire(kActorSteele, kClueDogCollar1, 1, -1);
-			if (Game_Flag_Query(102)) {
-				Item_Remove_From_World(84);
+		if (!Actor_Clue_Query(kActorMcCoy, kClueDogCollar1)) {
+			Actor_Clue_Acquire(kActorSteele, kClueDogCollar1, true, -1);
+			if (Game_Flag_Query(kFlagTB06Visited)) {
+				Item_Remove_From_World(kItemDogCollar);
 			}
-			Global_Variable_Increment(14, 1);
+			Global_Variable_Increment(kVariableMcCoyEvidenceMissed, 1);
 		}
-
 		return true;
 
 	default:
@@ -199,83 +203,94 @@ bool AIScriptPhotographer::GoalChanged(int currentGoalNumber, int newGoalNumber)
 bool AIScriptPhotographer::UpdateAnimation(int *animation, int *frame) {
 	switch (_animationState) {
 	case 0:
-		*animation = 745;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(745)) {
+		*animation = kModelAnimationPhotographerIdle;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationPhotographerIdle)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 1:
-		*animation = 744;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(744)) {
+		*animation = kModelAnimationPhotographerWalking;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationPhotographerWalking)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 2:
-		*animation = 747;
-		if (!_animationFrame && _flag) {
-			*animation = 745;
+		*animation = kModelAnimationPhotographerCalmTalk;
+		if (_animationFrame == 0 && _resumeIdleAfterFramesetCompletesFlag) {
+			*animation = kModelAnimationPhotographerIdle;
 			_animationState = 0;
 			_var2 = 0;
-			_flag = 0;
+			_resumeIdleAfterFramesetCompletesFlag = false;
 		} else {
-			_animationFrame++;
-			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(747)) {
+			++_animationFrame;
+			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationPhotographerCalmTalk)) {
 				_animationFrame = 0;
 			}
 		}
 		break;
 
 	case 3:
-		*animation = 749;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(749)) {
+#if BLADERUNNER_ORIGINAL_BUGS
+		// TODO A bug? This is identical to case 4 for animation 749, but 748 talk animation is left unused
+		*animation = kModelAnimationPhotographerExplainTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationPhotographerExplainTalk)) {
 			_animationFrame = 0;
 			_animationState = 2;
-			*animation = 747;
+			*animation = kModelAnimationPhotographerCalmTalk;
 		}
+#else
+		*animation = kModelAnimationPhotographerMoreHeadMoveTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationPhotographerMoreHeadMoveTalk)) {
+			_animationFrame = 0;
+			_animationState = 2;
+			*animation = kModelAnimationPhotographerCalmTalk;
+		}
+#endif // BLADERUNNER_ORIGINAL_BUGS
 		break;
 
 	case 4:
-		*animation = 749;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(749)) {
+		*animation = kModelAnimationPhotographerExplainTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationPhotographerExplainTalk)) {
 			_animationFrame = 0;
 			_animationState = 2;
-			*animation = 747;
+			*animation = kModelAnimationPhotographerCalmTalk;
 		}
 		break;
 
 	case 5:
-		*animation = 750;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(750)) {
+		*animation = kModelAnimationPhotographerSuggestTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationPhotographerSuggestTalk)) {
 			_animationFrame = 0;
 			_animationState = 2;
-			*animation = 747;
+			*animation = kModelAnimationPhotographerCalmTalk;
 		}
 		break;
 
 	case 6:
-		*animation = 746;
+		*animation = kModelAnimationPhotographerTakingAPhoto;
 		if (_animationFrame == 11) {
-			Ambient_Sounds_Play_Sound(463, 80, -20, -20, 20);
+			Ambient_Sounds_Play_Sound(kSfxCAMCOP1, 80, -20, -20, 20);
 		}
-		if (_var1) {
-			--_var1;
+		if (_varNumOfTimesToHoldCurrentFrame) {
+			--_varNumOfTimesToHoldCurrentFrame;
 		} else {
-			_animationFrame++;
+			++_animationFrame;
 			if (_animationFrame == 10) {
-				_var1 = 5;
+				_varNumOfTimesToHoldCurrentFrame = 5;
 			}
-			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(746)) {
-				*animation = 745;
+			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationPhotographerTakingAPhoto)) {
+				*animation = kModelAnimationPhotographerIdle;
 				_animationState = 0;
 				_animationFrame = 0;
-				Actor_Change_Animation_Mode(kActorPhotographer, 0);
+				Actor_Change_Animation_Mode(kActorPhotographer, kAnimationModeIdle);
 			}
 		}
 		break;
@@ -290,48 +305,48 @@ bool AIScriptPhotographer::UpdateAnimation(int *animation, int *frame) {
 
 bool AIScriptPhotographer::ChangeAnimationMode(int mode) {
 	switch (mode) {
-	case 0:
-		if (_animationState > 5) {
+	case kAnimationModeIdle:
+		if (_animationState < 2 || _animationState > 5) {
 			_animationState = 0;
 			_var2 = 0;
 			_animationFrame = 0;
 		} else {
-			_flag = 1;
+			_resumeIdleAfterFramesetCompletesFlag = true;
 		}
 		break;
 
-	case 1:
+	case kAnimationModeWalk:
 		_animationState = 1;
 		_var2 = 0;
 		_animationFrame = 0;
 		break;
 
-	case 3:
+	case kAnimationModeTalk:
 		_animationState = 2;
 		_var2 = 0;
 		_animationFrame = 0;
-		_flag = 0;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		break;
 
 	case 12:
 		_animationState = 3;
 		_var2 = 0;
 		_animationFrame = 0;
-		_flag = 0;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		break;
 
 	case 13:
 		_animationState = 4;
 		_var2 = 0;
 		_animationFrame = 0;
-		_flag = 0;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		break;
 
 	case 14:
 		_animationState = 5;
 		_var2 = 0;
 		_animationFrame = 0;
-		_flag = 0;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		break;
 
 	case 43:
@@ -360,8 +375,12 @@ void AIScriptPhotographer::SetAnimationState(int animationState, int animationFr
 }
 
 bool AIScriptPhotographer::ReachedMovementTrackWaypoint(int waypointId) {
-	if (waypointId == 276 || waypointId == 278 || waypointId == 280)
+	if (waypointId == 276
+	 || waypointId == 278
+	 || waypointId == 280
+	) {
 		ChangeAnimationMode(43);
+	}
 
 	return true;
 }

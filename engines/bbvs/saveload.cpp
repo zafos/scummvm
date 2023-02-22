@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -109,8 +108,8 @@ void BbvsEngine::loadgame(const char *filename) {
 
 	g_engine->setTotalPlayTime(header.playTime * 1000);
 
-	memset(_sceneObjects, 0, sizeof(_sceneObjects));
 	for (int i = 0; i < kSceneObjectsCount; ++i) {
+		_sceneObjects[i].clear();
 		_sceneObjects[i].walkDestPt.x = -1;
 		_sceneObjects[i].walkDestPt.y = -1;
 	}
@@ -161,7 +160,7 @@ void BbvsEngine::loadgame(const char *filename) {
 		obj->turnTicks = in->readUint32LE();
 		obj->walkDestPt.x = in->readUint16LE();
 		obj->walkDestPt.y = in->readUint16LE();
-		obj->anim = obj->animIndex > 0 ? _gameModule->getAnimation(obj->animIndex) : 0;
+		obj->anim = obj->animIndex > 0 ? _gameModule->getAnimation(obj->animIndex) : nullptr;
 	}
 
 	updateWalkableRects();
@@ -174,7 +173,7 @@ void BbvsEngine::loadgame(const char *filename) {
 		}
 	}
 
-	_currAction = 0;
+	_currAction = nullptr;
 	_currActionCommandIndex = -1;
 
 	delete in;
@@ -182,21 +181,15 @@ void BbvsEngine::loadgame(const char *filename) {
 }
 
 Common::Error BbvsEngine::loadGameState(int slot) {
-	const char *fileName = getSavegameFilename(slot);
-	loadgame(fileName);
+	Common::String fileName = getSaveStateName(slot);
+	loadgame(fileName.c_str());
 	return Common::kNoError;
 }
 
-Common::Error BbvsEngine::saveGameState(int slot, const Common::String &description) {
-	const char *fileName = getSavegameFilename(slot);
-	savegame(fileName, description.c_str());
+Common::Error BbvsEngine::saveGameState(int slot, const Common::String &description, bool isAutosave) {
+	Common::String fileName = getSaveStateName(slot);
+	savegame(fileName.c_str(), description.c_str());
 	return Common::kNoError;
-}
-
-const char *BbvsEngine::getSavegameFilename(int num) {
-	static Common::String filename;
-	filename = getSavegameFilename(_targetName, num);
-	return filename.c_str();
 }
 
 Common::String BbvsEngine::getSavegameFilename(const Common::String &target, int num) {

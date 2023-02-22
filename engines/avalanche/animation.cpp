@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -260,6 +259,9 @@ void AnimationType::walk() {
 			case kMagicOpenDoor:
 				_anim->_vm->openDoor((Room)(magic->_data >> 8), magic->_data & 0xff, magicColor);
 				break;
+			case kMagicNothing:
+			default:
+				break;
 			}
 		}
 	}
@@ -495,6 +497,8 @@ void Animation::catacombMove(byte ped) {
 		_sprites[0]->_moveY = 1;
 		_sprites[0]->_moveX = 0;
 		return;
+	default:
+		break;
 	}
 
 	if (!_vm->_enterCatacombsFromLustiesRoom)
@@ -564,6 +568,8 @@ void Animation::catacombMove(byte ped) {
 		_vm->_magics[1]._operation = kMagicNothing; // Sloping wall.
 		_vm->_magics[2]._operation = kMagicSpecial; // Straight wall.
 		break;
+	default:
+		break;
 	}
 
 	/*  ---- */
@@ -617,6 +623,8 @@ void Animation::catacombMove(byte ped) {
 		_vm->_magics[5]._operation = kMagicSpecial; // Straight wall.
 		_vm->_portals[6]._operation = kMagicNothing; // Door.
 		break;
+	default:
+		break;
 	}
 
 	switch ((here & 0xf00) >> 8) { // South
@@ -647,6 +655,8 @@ void Animation::catacombMove(byte ped) {
 		_vm->_magics[11]._operation = kMagicSpecial; // Left exit south.
 		_vm->_magics[6]._operation = kMagicBounce;
 		_vm->_magics[12]._operation = kMagicBounce;
+		break;
+	default:
 		break;
 	}
 
@@ -724,6 +734,8 @@ void Animation::catacombMove(byte ped) {
 		_vm->_background->draw(-1, -1, 0);
 		_vm->_portals[3]._operation = kMagicSpecial; // Door.
 		break;
+	default:
+		break;
 	}
 
 	switch (xy) {
@@ -756,6 +768,8 @@ void Animation::catacombMove(byte ped) {
 		_vm->_background->draw(-1, -1, 11);
 		_vm->_background->draw(-1, -1, 12);
 		break; // [1,1] : the other two.
+	default:
+		break;
 	}
 
 	if (_vm->_geidaFollows && (ped > 0)) {
@@ -935,6 +949,8 @@ void Animation::callSpecial(uint16 which) {
 		appearPed(0, 2);
 		dawnDelay();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1037,7 +1053,7 @@ void Animation::faceAvvy(byte tripnum) {
 
 void Animation::arrowProcs(byte tripnum) {
 	AnimationType *tripSpr = _sprites[tripnum];
-	AnimationType *avvy = _sprites[tripnum];
+	AnimationType *avvy = _sprites[0];
 
 	if (tripSpr->_homing) {
 		// Arrow is still in flight.

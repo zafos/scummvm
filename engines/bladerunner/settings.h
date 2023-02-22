@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -29,15 +28,9 @@ class BladeRunnerEngine;
 class SaveFileReadStream;
 class SaveFileWriteStream;
 
-enum PlayerAgenda {
-	kPlayerAgendaPolite = 0,
-	kPlayerAgendaNormal = 1,
-	kPlayerAgendaSurly = 2,
-	kPlayerAgendaErratic = 3,
-	kPlayerAgendaUserChoice = 4
-};
-
 class Settings {
+	static const int kAmmoTypesCount = 3;
+
 	BladeRunnerEngine *_vm;
 
 	int   _chapter;
@@ -63,12 +56,14 @@ class Settings {
 	int   _playerAgenda;
 
 	int   _ammoType;
-	int   _ammoAmounts[3];
+	int   _ammoAmounts[kAmmoTypesCount];
 
 	bool  _learyMode;
 
 public:
 	Settings(BladeRunnerEngine *vm);
+
+	void reset();
 
 	void setGamma(float gamma) {
 		_gamma = gamma;
@@ -109,20 +104,21 @@ public:
 		_newChapter = newChapter;
 	}
 
-	void setLoadingGame(bool loadingGame) {
-		_loadingGame = loadingGame;
+	void setLoadingGame() {
+		_loadingGame = true;
 	}
 
-	bool getLoadingGame() const {
+	bool isLoadingGame() const {
 		return _loadingGame;
 	}
 
-	void setStartingGame(bool startingGame) {
-		_startingGame = startingGame;
+	void setStartingGame() {
+		_startingGame = true;
 	}
 
 	bool openNewScene();
 
+	static int getAmmoTypesCount();
 	int getAmmoType() const;
 	void setAmmoType(int ammoType);
 	int getAmmo(int ammoType) const;
@@ -130,6 +126,7 @@ public:
 	void decreaseAmmo();
 
 	int getDifficulty() const;
+	void setDifficulty(int difficulty);
 
 	int getPlayerAgenda() const;
 	void setPlayerAgenda(int agenda);

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -50,7 +49,7 @@ void Wiz::clearWizBuffer() {
 void Wiz::polygonClear() {
 	for (int i = 0; i < ARRAYSIZE(_polygons); i++) {
 		if (_polygons[i].flag == 1)
-			memset(&_polygons[i], 0, sizeof(WizPolygon));
+			_polygons[i].reset();
 	}
 }
 
@@ -173,7 +172,7 @@ void Wiz::polygonCalcBoundBox(Common::Point *vert, int numVerts, Common::Rect &b
 void Wiz::polygonErase(int fromId, int toId) {
 	for (int i = 0; i < ARRAYSIZE(_polygons); i++) {
 		if (_polygons[i].id >= fromId && _polygons[i].id <= toId)
-			memset(&_polygons[i], 0, sizeof(WizPolygon));
+			_polygons[i].reset();
 	}
 }
 
@@ -444,6 +443,8 @@ static void decodeWizMask(uint8 *&dst, uint8 &mask, int w, int maskType) {
 				++dst;
 			}
 		}
+		break;
+	default:
 		break;
 	}
 }
@@ -1848,7 +1849,9 @@ struct PolygonDrawData {
 	int pAreasNum;
 
 	PolygonDrawData(int n) {
-		memset(mat, 0, sizeof(mat));
+		for (uint i = 0; i < ARRAYSIZE(mat); i++) {
+			mat[i] = Common::Point();
+		}
 		pa = new PolygonArea[n];
 		for (int i = 0; i < n; ++i) {
 			pa[i].xmin = 0x7FFFFFFF;

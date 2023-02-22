@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
-#include "common/scummsys.h"
+#ifdef ENABLE_MADSV2
+
 #include "mads/mads.h"
 #include "mads/conversations.h"
-#include "mads/scene.h"
 #include "mads/phantom/phantom_scenes.h"
 #include "mads/phantom/phantom_scenes5.h"
 
@@ -406,6 +405,9 @@ void Scene501::actions() {
 					_vm->_gameConv->stop();
 					_scene->_nextSceneId = 506;
 					break;
+
+				default:
+					break;
 				}
 			}
 		} else {
@@ -454,6 +456,9 @@ void Scene501::actions() {
 					_globals._sequenceIndexes[1] = _scene->_sequences.addStampCycle(_globals._spriteIndexes[1], false, 5);
 					_scene->_sequences.setDepth(_globals._sequenceIndexes[1], 1);
 					_scene->_nextSceneId = 502;
+					break;
+
+				default:
 					break;
 				}
 			} else {
@@ -1297,6 +1302,9 @@ void Scene502::room_502_initialize_panels() {
 		case 4:
 			curPuzzleSprite = 38;
 			break;
+
+		default:
+			break;
 		}
 	}
 }
@@ -1343,6 +1351,9 @@ void Scene502::animateFireBursts() {
 				_scene->_sequences.addTimer(_vm->getRandomNumber(300, 600), 69);
 				_fire4ActiveFl = true;
 			}
+			break;
+
+		default:
 			break;
 		}
 	}
@@ -4306,3 +4317,5 @@ void Scene506::preActions() {
 
 } // End of namespace Phantom
 } // End of namespace MADS
+
+#endif

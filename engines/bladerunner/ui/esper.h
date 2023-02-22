@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -33,6 +32,7 @@ namespace BladeRunner {
 class BladeRunnerEngine;
 class Font;
 class Shape;
+class Shapes;
 class VQAPlayer;
 class UIImagePicker;
 class ESPERScript;
@@ -101,9 +101,9 @@ class ESPER {
 	VQAPlayer *_vqaPlayerPhoto;
 	int        _vqaLastFrame;
 
-	Shape                 *_shapeButton;
-	Common::Array<Shape *> _shapesPhotos;
-	Shape                 *_shapeThumbnail;
+	Shapes *_shapesButtons;
+	Shapes *_shapesPhotos;
+	const Shape *_shapeThumbnail;
 
 	Photo _photos[kPhotoCount];
 	int   _photoIdSelected;
@@ -119,19 +119,20 @@ class ESPER {
 	bool _isMouseDown;
 	int  _mouseOverScroll;
 
-	float _zoomHorizontal;
-	float _zoomVertical;
-	float _zoom;
-	float _zoomMin;
-	float _zoomTarget;
-	float _zoomDelta;
-	float _blur;
-	int   _zoomSteps;
-	int   _zoomStep;
-	int   _timeZoomNext;
+	float  _zoomHorizontal;
+	float  _zoomVertical;
+	float  _zoom;
+	float  _zoomMin;
+	float  _zoomTarget;
+	float  _zoomDelta;
+	float  _blur;
+	int    _zoomSteps;
+	int    _zoomStep;
+	uint32 _timeZoomNextDiff;
+	uint32 _timeZoomNextStart;
 
-	bool _isZoomingOut;
-	int  _timeZoomOutNext;
+	bool   _isZoomingOut;
+	uint32 _timeZoomOutNextStart;
 
 	Common::Rect _screen;
 
@@ -159,20 +160,21 @@ class ESPER {
 	int          _selectionCrosshairX;
 	int          _selectionCrosshairY;
 
-	int _selectionBlinkingCounter;
-	int _selectionBlinkingStyle;
-	int _timeSelectionBlinkingNext;
+	int    _selectionBlinkingCounter;
+	int    _selectionBlinkingStyle;
+	uint32 _timeSelectionBlinkingNextStart;
 
-	int _selectionZoomStep;
-	int _timeSelectionZoomNext;
+	int    _selectionZoomStep;
+	uint32 _timeSelectionZoomNextStart;
 
-	int _photoOpeningWidth;
-	int _photoOpeningHeight;
-	int _timePhotoOpeningNext;
+	int    _photoOpeningWidth;
+	int    _photoOpeningHeight;
+	uint32 _timePhotoOpeningNextDiff;
+	uint32 _timePhotoOpeningNextStart;
 
-	bool _isScrolling;
-	int  _scrollingDirection;
-	int  _timeScrollNext;
+	bool   _isScrolling;
+	int    _scrollingDirection;
+	uint32 _timeScrollNextStart;
 
 	int _soundId1;
 	int _volume1;
@@ -194,8 +196,6 @@ public:
 	void handleMouseDown(int x, int y, bool buttonLeft);
 
 	void tick();
-
-	void resume();
 
 	void addPhoto(const char *name, int photoId, int shapeId);
 	void defineRegion(int regionId, Common::Rect inner, Common::Rect outer, Common::Rect selection, const char *name);
@@ -220,7 +220,7 @@ private:
 	void setStateMain(EsperMainStates state);
 	void setStatePhoto(EsperPhotoStates state);
 
-	void wait(int timeout);
+	void wait(uint32 timeout);
 	void playSound(int soundId, int volume);
 
 	void draw(Graphics::Surface &surface);
@@ -244,9 +244,9 @@ private:
 
 	void flashViewport();
 
-	void copyImageScale(Graphics::Surface *src, Common::Rect srcRect, Graphics::Surface *dst, Common::Rect dstRect);
-	void copyImageBlur(Graphics::Surface *src, Common::Rect srcRect, Graphics::Surface *dst, Common::Rect dstRect, float u);
-	void copyImageBlit(Graphics::Surface *src, Common::Rect srcRect, Graphics::Surface *dst, Common::Rect dstRect);
+	void copyImageScale(Graphics::Surface &src, Common::Rect srcRect, Graphics::Surface &dst, Common::Rect dstRect);
+	void copyImageBlur(Graphics::Surface &src, Common::Rect srcRect, Graphics::Surface &dst, Common::Rect dstRect, float u);
+	void copyImageBlit(Graphics::Surface &src, Common::Rect srcRect, Graphics::Surface &dst, Common::Rect dstRect);
 
 	void tickSound();
 	void tickScroll();

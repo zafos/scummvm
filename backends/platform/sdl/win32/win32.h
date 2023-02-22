@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,39 +23,52 @@
 #define PLATFORM_SDL_WIN32_H
 
 #include "backends/platform/sdl/sdl.h"
+#include "backends/platform/sdl/win32/win32-window.h"
 
-class OSystem_Win32 : public OSystem_SDL {
+class OSystem_Win32 final : public OSystem_SDL {
 public:
-	virtual void init();
-	virtual void initBackend();
+	OSystem_Win32();
 
-	virtual void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0);
+	void init() override;
+	void initBackend() override;
 
-	virtual bool hasFeature(Feature f);
+#ifdef USE_OPENGL
+	GraphicsManagerType getDefaultGraphicsManager() const override;
+#endif
 
-	virtual bool displayLogFile();
+	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0) override;
 
-	virtual bool openUrl(const Common::String &url);
+	bool hasFeature(Feature f) override;
 
-	virtual Common::String getScreenshotsPath();
+	bool displayLogFile() override;
+
+	bool openUrl(const Common::String &url) override;
+
+	void logMessage(LogMessageType::Type type, const char *message) override;
+
+	Common::String getSystemLanguage() const override;
+
+	// Default paths
+	Common::String getDefaultIconsPath() override;
+	Common::String getScreenshotsPath() override;
 
 protected:
-	/**
-	 * The path of the currently open log file, if any.
-	 *
-	 * @note This is currently a string and not an FSNode for simplicity;
-	 * e.g. we don't need to include fs.h here, and currently the
-	 * only use of this value is to use it to open the log file in an
-	 * editor; for that, we need it only as a string anyway.
-	 */
-	Common::String _logFilePath;
+	Common::String getDefaultConfigFileName() override;
+	Common::String getDefaultLogFileName() override;
 
-	virtual Common::String getDefaultConfigFileName();
-	virtual Common::WriteStream *createLogFile();
-
-	// Override createAudioCDManager() to get our Mac-specific
+	// Override createAudioCDManager() to get our Windows-specific
 	// version.
-	virtual AudioCDManager *createAudioCDManager();
+	AudioCDManager *createAudioCDManager() override;
+
+	HWND getHwnd() { return ((SdlWindow_Win32*)_window)->getHwnd(); }
+
+private:
+	bool _isPortable;
+	bool detectPortableConfigFile();
+
+#if defined(USE_JPEG)
+	void initializeJpegLibraryForWin95();
+#endif
 };
 
 #endif

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -37,21 +36,21 @@ namespace LastExpress {
 
 Alexei::Alexei(LastExpressEngine *engine) : Entity(engine, kEntityAlexei) {
 	ADD_CALLBACK_FUNCTION(Alexei, reset);
-	ADD_CALLBACK_FUNCTION(Alexei, playSound);
-	ADD_CALLBACK_FUNCTION(Alexei, updateFromTicks);
-	ADD_CALLBACK_FUNCTION(Alexei, draw);
-	ADD_CALLBACK_FUNCTION(Alexei, updatePosition);
-	ADD_CALLBACK_FUNCTION(Alexei, enterExitCompartment);
+	ADD_CALLBACK_FUNCTION_S(Alexei, playSound);
+	ADD_CALLBACK_FUNCTION_I(Alexei, updateFromTime);
+	ADD_CALLBACK_FUNCTION_S(Alexei, draw);
+	ADD_CALLBACK_FUNCTION_SII(Alexei, updatePosition);
+	ADD_CALLBACK_FUNCTION_SI(Alexei, enterExitCompartment);
 	ADD_CALLBACK_FUNCTION(Alexei, callbackActionOnDirection);
-	ADD_CALLBACK_FUNCTION(Alexei, callSavepoint);
-	ADD_CALLBACK_FUNCTION(Alexei, savegame);
-	ADD_CALLBACK_FUNCTION(Alexei, updateEntity);
-	ADD_CALLBACK_FUNCTION(Alexei, draw2);
+	ADD_CALLBACK_FUNCTION_SIIS(Alexei, callSavepoint);
+	ADD_CALLBACK_FUNCTION_II(Alexei, savegame);
+	ADD_CALLBACK_FUNCTION_II(Alexei, updateEntity);
+	ADD_CALLBACK_FUNCTION_SSI(Alexei, draw2);
 	ADD_CALLBACK_FUNCTION(Alexei, callbackActionRestaurantOrSalon);
 	ADD_CALLBACK_FUNCTION(Alexei, enterComparment);
 	ADD_CALLBACK_FUNCTION(Alexei, exitCompartment);
 	ADD_CALLBACK_FUNCTION(Alexei, pacingAtWindow);
-	ADD_CALLBACK_FUNCTION(Alexei, compartmentLogic);
+	ADD_CALLBACK_FUNCTION_IS(Alexei, compartmentLogic);
 	ADD_CALLBACK_FUNCTION(Alexei, chapter1);
 	ADD_CALLBACK_FUNCTION(Alexei, atDinner);
 	ADD_CALLBACK_FUNCTION(Alexei, returnCompartment);
@@ -97,8 +96,8 @@ IMPLEMENT_FUNCTION_S(2, Alexei, playSound)
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION_I(3, Alexei, updateFromTicks, uint32)
-	Entity::updateFromTicks(savepoint);
+IMPLEMENT_FUNCTION_I(3, Alexei, updateFromTime, uint32)
+	Entity::updateFromTime(savepoint);
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
@@ -394,7 +393,7 @@ IMPLEMENT_FUNCTION_IS(16, Alexei, compartmentLogic, TimeValue)
 
 		case 7:
 			setCallback(8);
-			setup_updateFromTicks(300);
+			setup_updateFromTime(300);
 			break;
 
 		case 8:
@@ -675,7 +674,7 @@ IMPLEMENT_FUNCTION(20, Alexei, goSalon)
 
 		case 4:
 			getData()->location = kLocationInsideCompartment;
-			setup_function26();
+			setup_sitting();
 			break;
 		}
 		break;
@@ -689,7 +688,7 @@ IMPLEMENT_FUNCTION(21, Alexei, sitting)
 		break;
 
 	case kActionNone:
-		if (Entity::updateParameterCheck(params->param2, getState()->time, params->param1)) {
+		if (Entity::updateParameterCheck(params->param2, getState()->time, params->param1) && getEntities()->isSomebodyInsideRestaurantOrSalon()) {
 			getData()->location = kLocationOutsideCompartment;
 			getData()->inventoryItem = kItemNone;
 
@@ -738,6 +737,7 @@ IMPLEMENT_FUNCTION(21, Alexei, sitting)
 		case 3:
 			getEntities()->drawSequenceLeft(kEntityAlexei, "103B");
 			getEntities()->updatePositionExit(kEntityAlexei, kCarRestaurant, 52);
+			getData()->location = kLocationInsideCompartment;
 			break;
 		}
 		break;
@@ -751,7 +751,7 @@ IMPLEMENT_FUNCTION(22, Alexei, standingAtWindow)
 		break;
 
 	case kActionNone:
-		if (Entity::updateParameter(params->param2, getState()->time, params->param2)) {
+		if (Entity::updateParameterCheck(params->param2, getState()->time, params->param1)) {
 			if (getEntities()->isSomebodyInsideRestaurantOrSalon()) {
 				getData()->location = kLocationOutsideCompartment;
 				getData()->inventoryItem = kItemNone;
@@ -768,7 +768,7 @@ IMPLEMENT_FUNCTION(22, Alexei, standingAtWindow)
 		if (getState()->time > kTime1138500) {
 			params->param3 = kTimeInvalid;
 		} else {
-			if (!getEntities()->isInSalon(kEntityPlayer) || getEntities()->isInSalon(kEntityPlayer) || !params->param3)
+			if ((!getEntities()->isInSalon(kEntityPlayer) && !getEntities()->isInRestaurant(kEntityPlayer)) || !params->param3)
 				params->param3 = (uint)getState()->time;
 
 			if (params->param3 >= getState()->time)
@@ -788,7 +788,7 @@ IMPLEMENT_FUNCTION(22, Alexei, standingAtWindow)
 		break;
 
 	case kActionDefault:
-		params->param1 = 255 * (4 * rnd(4) + 8);
+		params->param1 = 225 * (4 * rnd(4) + 8);
 		getEntities()->drawSequenceLeft(kEntityAlexei, "103E");
 		if (!getEvent(kEventAlexeiSalonPoem))
 			getData()->inventoryItem = kItemParchemin;
@@ -821,7 +821,7 @@ IMPLEMENT_FUNCTION(22, Alexei, standingAtWindow)
 			getEntities()->updatePositionExit(kEntityAlexei, kCarRestaurant, 52);
 			getData()->location = kLocationInsideCompartment;
 
-			setup_standingAtWindow();
+			setup_sitting();
 			break;
 		}
 		break;
@@ -835,7 +835,7 @@ IMPLEMENT_FUNCTION(23, Alexei, waitingForTatiana)
 		break;
 
 	case kActionNone:
-		getData()->inventoryItem = (!getEntities()->isInRestaurant(kEntityAlexei) || getEvent(kEventAlexeiSalonPoem)) ? kItemNone : kItemParchemin;
+		getData()->inventoryItem = (!getEntities()->isInRestaurant(kEntityTatiana) || getEvent(kEventAlexeiSalonPoem)) ? kItemNone : kItemParchemin;
 		break;
 
 	case kAction1:
@@ -913,7 +913,7 @@ IMPLEMENT_FUNCTION(24, Alexei, upset)
 
 		case 1:
 			getAction()->playAnimation(kEventAlexeiSalonCath);
-			getData()->car = kCarRestaurant;
+			getData()->car = kCarRedSleeping;
 			getData()->entityPosition = kPosition_9460;
 			getEntities()->clearSequences(kEntityAlexei);
 			getScenes()->loadSceneFromPosition(kCarRestaurant, 55);
@@ -1125,7 +1125,7 @@ IMPLEMENT_FUNCTION(30, Alexei, atBreakfast)
 			break;
 
 		case 2:
-			getSound()->playSound(kEntityAlexei, "TAt2116A");
+			getSound()->playSound(kEntityAlexei, "TAT2116A");
 			getEntities()->updatePositionEnter(kEntityAlexei, kCarRestaurant, 63);
 
 			setCallback(3);
@@ -1333,7 +1333,7 @@ IMPLEMENT_FUNCTION(35, Alexei, pacing3)
 
 	case kActionNone:
 		if (getEntities()->isInSalon(kEntityPlayer)) {
-			if (Entity::updateParameter(params->param2, getState()->time, 2700)) {
+			if (Entity::updateParameterCheck(params->param2, getState()->time, 2700)) {
 				setCallback(1);
 				setup_callbackActionRestaurantOrSalon();
 				break;
@@ -1342,7 +1342,7 @@ IMPLEMENT_FUNCTION(35, Alexei, pacing3)
 			params->param2 = 0;
 		}
 
-		if (Entity::updateParameter(params->param3, getState()->time, params->param1)) {
+		if (Entity::updateParameterCheck(params->param3, getState()->time, params->param1)) {
 			if (getEntities()->isSomebodyInsideRestaurantOrSalon()) {
 				setCallback(3);
 				setup_pacingAtWindow();
@@ -1535,10 +1535,10 @@ IMPLEMENT_FUNCTION(39, Alexei, meetTatiana)
 					break;
 			}
 
-			params->param4 = kTimeInvalid;
+			params->param5 = kTimeInvalid;
 
-			getEntities()->updatePositionEnter(kEntityAlexei, kCarGreenSleeping, 70);
-			getEntities()->updatePositionEnter(kEntityAlexei, kCarGreenSleeping, 71);
+			getEntities()->updatePositionExit(kEntityAlexei, kCarGreenSleeping, 70);
+			getEntities()->updatePositionExit(kEntityAlexei, kCarGreenSleeping, 71);
 
 			if (getEntities()->isInGreenCarEntrance(kEntityPlayer)) {
 				getSound()->excuseMe(kEntityAlexei);
@@ -1725,10 +1725,7 @@ IMPLEMENT_FUNCTION(43, Alexei, pacing)
 		break;
 
 	case kActionNone:
-		if (getState()->time < kTime1806300 && params->param2 < getState()->time) {
-			if (!params->param2)
-				params->param2 = (uint)getState()->time + params->param1;
-
+		if (getState()->time < kTime1806300 && Entity::updateParameterCheck(params->param2, getState()->time, params->param1)) {
 			if (getEntities()->isSomebodyInsideRestaurantOrSalon()) {
 				setCallback(1);
 				setup_pacingAtWindow();
@@ -1782,7 +1779,7 @@ IMPLEMENT_FUNCTION(44, Alexei, goToPlatform)
 		break;
 
 	case kActionNone:
-		if (getState()->time > kTime2457000 && !params->param1) {
+		if (getState()->time > kTime2475000 && !params->param1) {
 			params->param1 = 1;
 
 			getEntities()->updatePositionExit(kEntityAlexei, kCarGreenSleeping, 70);
@@ -1794,8 +1791,8 @@ IMPLEMENT_FUNCTION(44, Alexei, goToPlatform)
 				if (getEntities()->isPlayerPosition(kCarGreenSleeping, 62))
 					getScenes()->loadSceneFromPosition(kCarGreenSleeping, 72);
 
-				setup_returnCompartment4();
 			}
+			setup_returnCompartment4();
 		}
 		break;
 
@@ -1986,7 +1983,7 @@ IMPLEMENT_FUNCTION(47, Alexei, function47)
 
 		getData()->entityPosition = kPositionNone;
 		getData()->location = kLocationOutsideCompartment;
-		getData()->car = kCarNone;
+		getData()->car = kCarLocomotive;
 
 		getObjects()->update(kObjectCompartment2, kEntityPlayer, kObjectLocationNone, kCursorHandKnock, kCursorHand);
 		getObjects()->update(kObjectHandleInsideBathroom, kEntityPlayer, kObjectLocationNone, kCursorHandKnock, kCursorHand);

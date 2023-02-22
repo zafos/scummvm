@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,6 +24,7 @@
 
 #include "gui/dialog.h"
 #include "common/str.h"
+#include "common/ustr.h"
 
 namespace GUI {
 class LauncherDialog;
@@ -59,21 +59,21 @@ class DownloadDialog : public Dialog {
 	Common::String _localDirectory;
 	bool _close;
 
-	Common::String getSizeLabelText();
-	Common::String getSpeedLabelText();
+	Common::U32String getSizeLabelText();
+	Common::U32String getSpeedLabelText();
 
 	void refreshWidgets();
 	bool selectDirectories();
 
 public:
 	DownloadDialog(uint32 storageId, LauncherDialog *launcher);
-	virtual ~DownloadDialog();
+	~DownloadDialog() override;
 
-	virtual void open();
-	virtual void close();
-	virtual void handleCommand(CommandSender *sender, uint32 cmd, uint32 data);
-	virtual void handleTickle();
-	virtual void reflowLayout();
+	void open() override;
+	void close() override;
+	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data) override;
+	void handleTickle() override;
+	void reflowLayout() override;
 };
 
 } // End of namespace GUI

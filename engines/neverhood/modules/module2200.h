@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,18 +33,19 @@ namespace Neverhood {
 class Module2200 : public Module {
 public:
 	Module2200(NeverhoodEngine *vm, Module *parentModule, int which);
-	virtual ~Module2200();
+	~Module2200() override;
 protected:
 	int _sceneNum;
 	void createScene(int sceneNum, int which);
 	void updateScene();
 	void createHallOfRecordsScene(int which, uint32 hallOfRecordsInfoId);
+	bool shouldSkipHall();
 };
 
 class Scene2201 : public Scene {
 public:
 	Scene2201(NeverhoodEngine *vm, Module *parentModule, int which);
-	~Scene2201();
+	~Scene2201() override;
 protected:
 	NRect _clipRects[2];
 	Sprite *_ssDoorLight;
@@ -60,7 +60,7 @@ protected:
 class Scene2202 : public Scene {
 public:
 	Scene2202(NeverhoodEngine *vm, Module *parentModule, int which);
-	~Scene2202();
+	~Scene2202() override;
 protected:
 	Sprite *_ssMovingCube;
 	Sprite *_ssDoneMovingCube;
@@ -78,7 +78,7 @@ protected:
 class Scene2203 : public Scene {
 public:
 	Scene2203(NeverhoodEngine *vm, Module *parentModule, int which);
-	~Scene2203();
+	~Scene2203() override;
 protected:
 	Sprite *_asLeftDoor;
 	Sprite *_asRightDoor;
@@ -108,7 +108,7 @@ protected:
 class Scene2206 : public Scene {
 public:
 	Scene2206(NeverhoodEngine *vm, Module *parentModule, int which);
-	~Scene2206();
+	~Scene2206() override;
 protected:
 	Sprite *_sprite1;
 	Sprite *_sprite2;
@@ -146,7 +146,7 @@ protected:
 class Scene2208 : public Scene {
 public:
 	Scene2208(NeverhoodEngine *vm, Module *parentModule, int which);
-	~Scene2208();
+	~Scene2208() override;
 protected:
 	FontSurface *_fontSurface;
 	BaseSurface *_backgroundSurface;
@@ -168,7 +168,7 @@ protected:
 class Scene2242 : public Scene {
 public:
 	Scene2242(NeverhoodEngine *vm, Module *parentModule, int which);
-	~Scene2242();
+	~Scene2242() override;
 protected:
 	Sprite *_asTape;
 	bool _isKlaymenInLight;
@@ -180,7 +180,7 @@ protected:
 class HallOfRecordsScene : public Scene {
 public:
 	HallOfRecordsScene(NeverhoodEngine *vm, Module *parentModule, int which, uint32 hallOfRecordsInfoId);
-	~HallOfRecordsScene();
+	~HallOfRecordsScene() override;
 protected:
 	HallOfRecordsInfo *_hallOfRecordsInfo;
 	uint32 handleMessage(int messageNum, const MessageParam &param, Entity *sender);
@@ -190,7 +190,7 @@ protected:
 class Scene2247 : public Scene {
 public:
 	Scene2247(NeverhoodEngine *vm, Module *parentModule, int which);
-	~Scene2247();
+	~Scene2247() override;
 protected:
 	uint32 handleMessage(int messageNum, const MessageParam &param, Entity *sender);
 	void readClickedColumn();

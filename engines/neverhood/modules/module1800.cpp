@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -108,6 +107,8 @@ void Module1800::createScene(int sceneNum, int which) {
 		// NOTE: Newly introduced sceneNum 1009 (was duplicate 3 with own update handler)
 		createSmackerScene(0x0A840C01, true, true, false);
 		break;
+	default:
+		break;
 	}
 	SetUpdateHandler(&Module1800::updateScene);
 	_childObject->handleUpdate();
@@ -168,12 +169,16 @@ void Module1800::updateScene() {
 		case 1009:
 			leaveModule(0);
 			break;
+		default:
+			break;
 		}
 	} else {
 		switch (_sceneNum) {
 		case 0:
 			if (navigationScene()->isWalkingForward() && navigationScene()->getNavigationIndex() == 2)
 				_vm->_soundMan->setTwoSoundsPlayFlag(false);
+			break;
+		default:
 			break;
 		}
 	}

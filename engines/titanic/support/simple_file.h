@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,7 +26,7 @@
 #include "titanic/support/rect.h"
 #include "common/savefile.h"
 #include "common/stream.h"
-#include "common/zlib.h"
+#include "common/compression/zlib.h"
 #include "titanic/support/string.h"
 
 namespace Titanic {
@@ -41,7 +40,7 @@ class DecompressorData;
  */
 class File : public Common::File {
 public:
-	virtual bool open(const Common::String &filename);
+	bool open(const Common::Path &filename) override;
 };
 
 /**
@@ -265,19 +264,19 @@ public:
 class CompressedFile : public SimpleFile {
 public:
 	CompressedFile() : SimpleFile() {}
-	virtual ~CompressedFile() {}
+	~CompressedFile() override {}
 
 	/**
 	 * Set up a stream for read access
 	 */
-	virtual void open(Common::SeekableReadStream *stream) {
+	void open(Common::SeekableReadStream *stream) override {
 		SimpleFile::open(Common::wrapCompressedReadStream(stream));
 	}
 
 	/**
 	 * Set up a stream for write access
 	 */
-	virtual void open(Common::OutSaveFile *stream) {
+	void open(Common::OutSaveFile *stream) override {
 		SimpleFile::open(new Common::OutSaveFile(Common::wrapCompressedWriteStream(stream)));
 	}
 };
@@ -288,7 +287,7 @@ public:
 class StdCWadFile : public SimpleFile {
 public:
 	StdCWadFile() : SimpleFile() {}
-	virtual ~StdCWadFile() {}
+	~StdCWadFile() override {}
 
 	/**
 	 * Open up the specified file
@@ -298,12 +297,12 @@ public:
 	/**
 	 * Unsupported open method from parent class
 	 */
-	virtual void open(Common::SeekableReadStream *stream) {}
+	void open(Common::SeekableReadStream *stream) override {}
 
 	/**
 	 * Unsupported open method from parent class
 	 */
-	virtual void open(Common::OutSaveFile *stream) {}
+	void open(Common::OutSaveFile *stream) override {}
 
 	/**
 	 * Return a reference to the read stream

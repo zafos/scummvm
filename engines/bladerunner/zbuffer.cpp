@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,15 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "bladerunner/zbuffer.h"
 
 #include "bladerunner/decompress_lzo.h"
+
+#include "common/debug.h"
 
 namespace BladeRunner {
 
@@ -51,7 +52,7 @@ void ZBufferDirtyRects::extendExisting() {
 	for (i = 0; i != _count - 1; ++i) {
 		if (last.intersects(_rects[i])) {
 			_rects[i].extend(last);
-			_count--;
+			--_count;
 			break;
 		}
 	}
@@ -70,13 +71,18 @@ bool ZBufferDirtyRects::popRect(Common::Rect *rect) {
 }
 
 ZBuffer::ZBuffer() {
-	reset();
+	_zbuf1 = nullptr;
+	_zbuf2 = nullptr;
+	_dirtyRects = new ZBufferDirtyRects();
+	_width = 0;
+	_height = 0;
+	enable();
 }
 
 ZBuffer::~ZBuffer() {
-	delete _dirtyRects;
-	delete[] _zbuf1;
 	delete[] _zbuf2;
+	delete[] _zbuf1;
+	delete _dirtyRects;
 }
 
 void ZBuffer::init(int width, int height) {
@@ -85,26 +91,26 @@ void ZBuffer::init(int width, int height) {
 
 	_zbuf1 = new uint16[width * height];
 	_zbuf2 = new uint16[width * height];
-
-	_dirtyRects = new ZBufferDirtyRects();
 }
 
 static int decodePartialZBuffer(const uint8 *src, uint16 *curZBUF, uint32 srcLen) {
-	uint32 dstSize = 640 * 480; // This is taken from global variables?
+	const uint32 dstSize = BladeRunnerEngine::kOriginalGameWidth * BladeRunnerEngine::kOriginalGameHeight;
 	uint32 dstRemain = dstSize;
 
 	uint16 *curzp = curZBUF;
-	const uint16 *inp = (const uint16 *)src;
+	const uint8 *inp8 = src;
 
-	while (dstRemain && (inp - (const uint16 *)src) < (std::ptrdiff_t)srcLen) {
-		uint32 count = FROM_LE_16(*inp++);
+	while (dstRemain && (inp8 - src) < (ptrdiff_t)srcLen) {
+		uint32 count = READ_LE_UINT16(inp8);
+		inp8+=2;
 
 		if (count & 0x8000) {
 			count = MIN(count & 0x7fff, dstRemain);
 			dstRemain -= count;
 
 			while (count--) {
-				uint16 value = FROM_LE_16(*inp++);
+				uint16 value = READ_LE_UINT16(inp8);
+				inp8+=2;
 				if (value)
 					*curzp = value;
 				++curzp;
@@ -112,7 +118,8 @@ static int decodePartialZBuffer(const uint8 *src, uint16 *curZBUF, uint32 srcLen
 		} else {
 			count = MIN(count, dstRemain);
 			dstRemain -= count;
-			uint16 value = FROM_LE_16(*inp++);
+			uint16 value = READ_LE_UINT16(inp8);
+			inp8+=2;
 
 			if (!value) {
 				curzp += count;
@@ -149,6 +156,13 @@ bool ZBuffer::decodeData(const uint8 *data, int size) {
 		resetUpdates();
 		size_t zbufOutSize;
 		decompress_lzo1x(data, size, (uint8 *)_zbuf1, &zbufOutSize);
+#ifdef SCUMM_BIG_ENDIAN
+		// As the compression is working with 8-bit data, on big-endian architectures we have to switch order of bytes in uncompressed data
+		uint8 *rawZbuf = (uint8 *)_zbuf1;
+		for (size_t i = 0; i < zbufOutSize - 1; i += 2) {
+			SWAP(rawZbuf[i], rawZbuf[i + 1]);
+		}
+#endif
 		memcpy(_zbuf2, _zbuf1, 2 * _width * _height);
 	} else {
 		clean();
@@ -167,20 +181,11 @@ uint16 ZBuffer::getZValue(int x, int y) const {
 	assert(x >= 0 && x < _width);
 	assert(y >= 0 && y < _height);
 
-	if (!_zbuf2) {
+	if (_zbuf2 == nullptr) {
 		return 0;
 	}
 
 	return _zbuf2[y * _width + x];
-}
-
-void ZBuffer::reset() {
-	_zbuf1 = nullptr;
-	_zbuf2 = nullptr;
-	_dirtyRects = nullptr;
-	_width = 0;
-	_height = 0;
-	enable();
 }
 
 void ZBuffer::blit(Common::Rect rect) {

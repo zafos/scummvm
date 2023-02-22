@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * MIT License:
  *
@@ -49,15 +48,17 @@
 #include "common/debug-channels.h"
 #include "common/error.h"
 #include "common/events.h"
+#include "common/punycode.h"
 #include "common/system.h"
 
 #include "engines/engine.h"
 #include "engines/util.h"
 
+#include "graphics/macgui/macdialog.h"
+
 #include "wage/wage.h"
 #include "wage/entities.h"
 #include "wage/gui.h"
-#include "wage/dialog.h"
 #include "wage/script.h"
 #include "wage/world.h"
 
@@ -83,11 +84,9 @@ WageEngine::WageEngine(OSystem *syst, const ADGameDescription *desc) : Engine(sy
 
 	_gui = NULL;
 	_world = NULL;
-	_console = NULL;
 	_offer = NULL;
 
 	_resManager = NULL;
-	_debugger = NULL;
 
 	debug("WageEngine::WageEngine()");
 }
@@ -95,27 +94,37 @@ WageEngine::WageEngine(OSystem *syst, const ADGameDescription *desc) : Engine(sy
 WageEngine::~WageEngine() {
 	debug("WageEngine::~WageEngine()");
 
-	DebugMan.clearAllDebugChannels();
 	delete _world;
 	delete _resManager;
 	delete _gui;
 	delete _rnd;
-	delete _console;
 }
+
+bool WageEngine::pollEvent(Common::Event &event) {
+	return _eventMan->pollEvent(event);
+} 
 
 Common::Error WageEngine::run() {
 	debug("WageEngine::init");
 
-	initGraphics(512, 342);
+	int width = 512;
+	int height = 342;
 
-	// Create debugger console. It requires GFX to be initialized
-	_console = new Console(this);
+	if (getFeatures() & GF_RES800) {
+		width = 800;
+		height = 600;
+	} else if (getFeatures() & GF_RES1024) {
+		width = 1024;
+		height = 768;
+	}
 
-	_debugger = new Debugger(this);
+	initGraphics(width, height);
+
+	setDebugger(new Debugger(this));
 
 	// Your main event loop should be (invoked from) here.
 	_resManager = new Common::MacResManager();
-	if (!_resManager->open(getGameFile()))
+	if (!_resManager->open(Common::Path(getGameFile()).punycodeDecode().toString('/')))
 		error("Could not open %s as a resource fork", getGameFile());
 
 	_world = new World(this);
@@ -143,8 +152,6 @@ Common::Error WageEngine::run() {
 	_temporarilyHidden = false;
 
 	while (!_shouldQuit) {
-		_debugger->onFrame();
-
 		processEvents();
 
 		_gui->draw();
@@ -170,7 +177,7 @@ void WageEngine::processEvents() {
 		case Common::EVENT_KEYDOWN:
 			switch (event.kbd.keycode) {
 			case Common::KEYCODE_RETURN: {
-					_inputText = _gui->_consoleWindow->getInput();
+					_inputText = Common::convertFromU32String(_gui->_consoleWindow->getInput());
 					Common::String inp = _inputText + '\n';
 
 					_gui->appendText(inp.c_str());
@@ -185,11 +192,6 @@ void WageEngine::processEvents() {
 					break;
 				}
 			default:
-				if (event.kbd.ascii == '~') {
-					_debugger->attach();
-					break;
-				}
-
 				break;
 			}
 			break;
@@ -217,13 +219,21 @@ void WageEngine::appendText(const char *str) {
 }
 
 void WageEngine::gameOver() {
-	DialogButtonArray buttons;
+	Graphics::MacDialogButtonArray buttons;
 
-	buttons.push_back(new DialogButton("OK", 66, 67, 68, 28));
+	buttons.push_back(new Graphics::MacDialogButton("OK", 66, 67, 68, 28));
 
-	Dialog gameOverDialog(_gui, 199, _world->_gameOverMessage->c_str(), &buttons, 0);
+	Graphics::MacFont font;
 
-	gameOverDialog.run();
+	Graphics::MacText gameOverMessage(*_world->_gameOverMessage, _gui->_wm, &font, Graphics::kColorBlack,
+									  Graphics::kColorWhite, 199, Graphics::kTextAlignCenter);
+
+	Graphics::MacDialog gameOverDialog(&_gui->_screen, _gui->_wm,  199, &gameOverMessage, 199, &buttons, 0);
+
+	int button = gameOverDialog.run();
+
+	if (button == Graphics::kMacDialogQuitRequested)
+		_shouldQuit = true;
 
 	doClose();
 
@@ -232,25 +242,51 @@ void WageEngine::gameOver() {
 }
 
 bool WageEngine::saveDialog() {
-	DialogButtonArray buttons;
+	Graphics::MacDialogButtonArray buttons;
 
-	buttons.push_back(new DialogButton("No", 19, 67, 68, 28));
-	buttons.push_back(new DialogButton("Yes", 112, 67, 68, 28));
-	buttons.push_back(new DialogButton("Cancel", 205, 67, 68, 28));
+	buttons.push_back(new Graphics::MacDialogButton("No", 19, 67, 68, 28));
+	buttons.push_back(new Graphics::MacDialogButton("Yes", 112, 67, 68, 28));
+	buttons.push_back(new Graphics::MacDialogButton("Cancel", 205, 67, 68, 28));
 
-	Dialog save(_gui, 291, _world->_saveBeforeCloseMessage->c_str(), &buttons, 1);
+	Graphics::MacFont font; 
+
+	Graphics::MacText saveBeforeCloseMessage(*_world->_saveBeforeCloseMessage, _gui->_wm, &font, Graphics::kColorBlack,
+									  Graphics::kColorWhite, 291, Graphics::kTextAlignCenter);
+
+	Graphics::MacDialog save(&_gui->_screen, _gui->_wm, 291, &saveBeforeCloseMessage, 291, &buttons, 1);
 
 	int button = save.run();
 
-	if (button == 2) // Cancel
+	if (button == Graphics::kMacDialogQuitRequested)
+		_shouldQuit = true;
+	else if (button == 2) // Cancel
 		return false;
-
-	if (button == 1)
+	else if (button == 1)
 		saveGame();
 
 	doClose();
 
 	return true;
+}
+
+void WageEngine::aboutDialog() {
+	Graphics::MacDialogButtonArray buttons;
+
+	buttons.push_back(new Graphics::MacDialogButton("OK", 191, 167, 68, 28));
+
+	Graphics::MacText aboutMessage(_world->_aboutMessage, _gui->_wm, _gui->_consoleWindow->getTextWindowFont(), Graphics::kColorBlack,
+											 Graphics::kColorWhite, 400, Graphics::kTextAlignCenter);
+
+	Common::U32String disclaimer("\n\n\n\nThis adventure was produced with World Builder\xAA\nthe adventure game creation system.\n© Copyright 1986 by William C. Appleton, All Right Reserved\nPublished by Silicon Beach Software, Inc.");
+
+	aboutMessage.appendText(disclaimer, 3, 9, 0, false);
+
+	Graphics::MacDialog about(&_gui->_screen, _gui->_wm, 450, &aboutMessage, 400, &buttons, 0);
+
+	int button = about.run();
+
+	if (button == Graphics::kMacDialogQuitRequested)
+		_shouldQuit = true;
 }
 
 void WageEngine::saveGame() {

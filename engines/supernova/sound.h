@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,6 +30,7 @@ class SupernovaEngine;
 class ResourceManager;
 
 enum AudioId {
+	// Supernova 1
 	kAudioFoundLocation,        // 44|0
 	kAudioCrash,                // 45|0
 	kAudioVoiceHalt,            // 46|0
@@ -51,12 +51,35 @@ enum AudioId {
 	kAudioSlideDoor,            // 54|24020
 	kAudioDoorOpen,             // 54|30030
 	kAudioDoorClose,            // 54|31040
-	kAudioNumSamples
+	kAudioNumSamples1,
+
+	// Supernova 2
+	kAudioIntroDing = 0,
+	kAudioSuccess2,
+	kAudioTaxiOpen,
+	kAudioTaxiLeaving,
+	kAudioTaxiArriving,
+	kAudioKiosk,
+	kAudioStage1,
+	kAudioStage2,
+	kAudioAppearance1,
+	kAudioAppearance2,
+	kAudioAppearance3,
+	kAudioElevatorBell,
+	kAudioElevator1,
+	kAudioShip1,
+	kAudioShip2,
+	kAudioShip3,
+	kAudioShipDeath,
+	kAudioDeath2,
+	kAudioCaught,
+	kAudioNumSamples2
 };
 
 enum MusicId {
-	kMusicIntro = 49,
-	kMusicOutro = 52
+	kMusicIntro,
+	kMusicOutro,
+	kMusicMadMonkeys
 };
 
 class Sound {
@@ -67,6 +90,9 @@ public:
 
 	void play(AudioId index);
 	void play(MusicId index);
+	void playSiren();
+	void setVolume(int volume);
+	int getVolume();
 	void stop();
 	bool isPlaying();
 private:

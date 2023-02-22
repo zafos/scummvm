@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,13 +15,12 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "titanic/star_control/base_stars.h"
-#include "titanic/star_control/star_camera.h"
+#include "titanic/star_control/camera.h"
 #include "titanic/star_control/star_closeup.h"
 #include "titanic/star_control/star_ref.h"
 #include "titanic/support/files_manager.h"
@@ -126,7 +125,7 @@ void CBaseStars::resetEntry(CBaseStarEntry &entry) {
 		entry._data[idx] = 0;
 }
 
-void CBaseStars::draw(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarCloseup *closeup) {
+void CBaseStars::draw(CSurfaceArea *surfaceArea, CCamera *camera, CStarCloseup *closeup) {
 	if (!_data.empty()) {
 		switch (camera->getStarColor()) {
 		case WHITE: // draw white, green, and red stars (mostly white)
@@ -161,13 +160,13 @@ void CBaseStars::draw(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarClose
 	}
 }
 
-void CBaseStars::draw1(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarCloseup *closeup) {
+void CBaseStars::draw1(CSurfaceArea *surfaceArea, CCamera *camera, CStarCloseup *closeup) {
 	FPose pose = camera->getPose();
 	camera->getRelativeXCenterPixels(&_value1, &_value2, &_value3, &_value4);
 
 	const double MAX_VAL = 1.0e9 * 1.0e9;
 	FPoint centroid = surfaceArea->_centroid + FPoint(0.5, 0.5);
-	double threshold = camera->getThreshold();
+	double threshold = camera->getFrontClip();
 	double minVal = threshold - 9216.0;
 	int width1 = surfaceArea->_width - 1;
 	int height1 = surfaceArea->_height - 1;
@@ -184,7 +183,7 @@ void CBaseStars::draw1(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarClos
 
 		tempY = vector._x * pose._row1._y + vector._y * pose._row2._y + vector._z * pose._row3._y + pose._vector._y;
 		tempX = vector._x * pose._row1._x + vector._y * pose._row2._x + vector._z * pose._row3._x + pose._vector._x;
-		total2 = tempY * tempY + tempX * tempX + tempZ * tempZ; 
+		total2 = tempY * tempY + tempX * tempX + tempZ * tempZ;
 
 		if (total2 < 1.0e12) {
 			closeup->draw(pose, vector, FVector(centroid._x, centroid._y, total2),
@@ -246,13 +245,13 @@ void CBaseStars::draw1(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarClos
 	}
 }
 
-void CBaseStars::draw2(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarCloseup *closeup) {
+void CBaseStars::draw2(CSurfaceArea *surfaceArea, CCamera *camera, CStarCloseup *closeup) {
 	FPose pose = camera->getPose();
 	camera->getRelativeXCenterPixels(&_value1, &_value2, &_value3, &_value4);
 
 	const double MAX_VAL = 1.0e9 * 1.0e9;
 	FPoint centroid = surfaceArea->_centroid + FPoint(0.5, 0.5);
-	double threshold = camera->getThreshold();
+	double threshold = camera->getFrontClip();
 	double minVal = threshold - 9216.0;
 	int width1 = surfaceArea->_width - 1;
 	int height1 = surfaceArea->_height - 1;
@@ -332,13 +331,13 @@ void CBaseStars::draw2(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarClos
 	}
 }
 
-void CBaseStars::draw3(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarCloseup *closeup) {
+void CBaseStars::draw3(CSurfaceArea *surfaceArea, CCamera *camera, CStarCloseup *closeup) {
 	FPose pose = camera->getPose();
 	camera->getRelativeXCenterPixels(&_value1, &_value2, &_value3, &_value4);
 
 	const double MAX_VAL = 1.0e9 * 1.0e9;
 	FPoint centroid = surfaceArea->_centroid + FPoint(0.5, 0.5);
-	double threshold = camera->getThreshold();
+	double threshold = camera->getFrontClip();
 	double minVal = threshold - 9216.0;
 	int width1 = surfaceArea->_width - 1;
 	int height1 = surfaceArea->_height - 1;
@@ -439,13 +438,13 @@ void CBaseStars::draw3(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarClos
 	}
 }
 
-void CBaseStars::draw4(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarCloseup *closeup) {
+void CBaseStars::draw4(CSurfaceArea *surfaceArea, CCamera *camera, CStarCloseup *closeup) {
 	FPose pose = camera->getPose();
 	camera->getRelativeXCenterPixels(&_value1, &_value2, &_value3, &_value4);
 
 	const double MAX_VAL = 1.0e9 * 1.0e9;
 	FPoint centroid = surfaceArea->_centroid + FPoint(0.5, 0.5);
-	double threshold = camera->getThreshold();
+	double threshold = camera->getFrontClip();
 	double minVal = threshold - 9216.0;
 	int width1 = surfaceArea->_width - 1;
 	int height1 = surfaceArea->_height - 1;
@@ -462,7 +461,7 @@ void CBaseStars::draw4(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarClos
 			+ vector._z * pose._row3._z + pose._vector._z;
 		if (tempZ <= minVal)
 			continue;
-	
+
 		tempY = vector._x * pose._row1._y + vector._y * pose._row2._y + vector._z * pose._row3._y + pose._vector._y;
 		tempX = vector._x * pose._row1._x + vector._y * pose._row2._x + vector._z * pose._row3._x + pose._vector._x;
 		total2 = tempY * tempY + tempX * tempX + tempZ * tempZ;
@@ -547,23 +546,17 @@ void CBaseStars::draw4(CSurfaceArea *surfaceArea, CStarCamera *camera, CStarClos
 	}
 }
 
-int CBaseStars::findStar(CSurfaceArea *surfaceArea, CStarCamera *camera,
+int CBaseStars::findStar(CSurfaceArea *surfaceArea, CCamera *camera,
 		const Common::Point &pt) {
 	CStarRef1 ref(this, pt);
 	ref.process(surfaceArea, camera);
 	return ref._index;
 }
 
-int CBaseStars::baseFn2(CSurfaceArea *surfaceArea, CStarCamera *camera) {
+int CBaseStars::baseFn2(CSurfaceArea *surfaceArea, CCamera *camera) {
 	CStarRef3 ref(this);
 	ref.process(surfaceArea, camera);
 	return ref._index;
-}
-
-/*------------------------------------------------------------------------*/
-
-void CStarVector::apply() {
-	_owner->addLockedStar(_vector);
 }
 
 } // End of namespace Titanic

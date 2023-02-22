@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,7 +40,9 @@ public:
 	Facing _facing;
 	int _descId;
 	int _verbId;
+	bool _valid;	// V2
 	int _articleNumber;
+	byte _syntax;	// V2
 	CursorType _cursor;
 
 	/**
@@ -79,7 +80,7 @@ public:
 
 	Common::Array<MADS::DynamicHotspot>::size_type size() const { return _entries.size(); }
 	DynamicHotspot &operator[](uint idx) { return _entries[idx]; }
-	int add(int descId, int verbId, int syntax, int seqIndex, const Common::Rect &bounds);
+	int add(int descId, int verbId, byte syntax, int seqIndex, const Common::Rect &bounds);	// V2
 	int add(int descId, int verbId, int seqIndex, const Common::Rect &bounds);
 	int setPosition(int index, const Common::Point &pos, Facing facing);
 	int setCursor(int index, CursorType cursor);
@@ -107,6 +108,7 @@ public:
 	Facing _facing;
 	int _articleNumber;
 	bool _active;
+	byte _syntax;	// V2
 	CursorType _cursor;
 	int _vocabId;
 	int _verbId;

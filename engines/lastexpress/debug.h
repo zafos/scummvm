@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -32,17 +31,15 @@
 namespace LastExpress {
 
 enum {
-	kLastExpressDebugAll      = 1 << 0,
-	kLastExpressDebugGraphics = 1 << 1,
-	kLastExpressDebugResource = 1 << 2,
-	kLastExpressDebugCursor   = 1 << 3,
-	kLastExpressDebugSound    = 1 << 4,
-	kLastExpressDebugSubtitle = 1 << 5,
-	kLastExpressDebugSavegame = 1 << 6,
-	kLastExpressDebugLogic    = 1 << 7,
-	kLastExpressDebugScenes   = 1 << 8,
-	kLastExpressDebugUnknown  = 1 << 9
-	// the current limitation is 32 debug levels (1 << 31 is the last one)
+	kLastExpressDebugGraphics = 1 << 0,
+	kLastExpressDebugResource = 1 << 1,
+	kLastExpressDebugCursor   = 1 << 2,
+	kLastExpressDebugSound    = 1 << 3,
+	kLastExpressDebugSubtitle = 1 << 4,
+	kLastExpressDebugSavegame = 1 << 5,
+	kLastExpressDebugLogic    = 1 << 6,
+	kLastExpressDebugScenes   = 1 << 7,
+	kLastExpressDebugUnknown  = 1 << 8
 };
 
 class LastExpressEngine;
@@ -50,7 +47,7 @@ class LastExpressEngine;
 class Debugger : public GUI::Debugger {
 public:
 	Debugger(LastExpressEngine *engine);
-	~Debugger();
+	~Debugger() override;
 
 	bool hasCommand() const;
 	void callCommand();

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -393,11 +392,9 @@ void PrinceEngine::inventoryLeftMouseButton() {
 	if (_optionEnabled == 0) {
 		int invObjExamEvent = _script->scanMobEvents(_invMobList[_selectedMob]._mask, _script->_scriptInfo.invObjExam);
 		if (invObjExamEvent == -1) {
-			// do_standard
-			// FIXME: UB?
-			// Constness of the pointer returned by c_str() is cast away (which generates a compiler warning)
-			// while it potentially gets modified inside printAt()
-			printAt(0, 216, (char *)_invMobList[_selectedMob]._examText.c_str(), kNormalWidth / 2, _invExamY);
+			static char buf[256];
+			strncpy(buf, _invMobList[_selectedMob]._examText.c_str(), 256);
+			printAt(0, 216, buf, kNormalWidth / 2, _invExamY);
 			_interpreter->setCurrentString(_invMobList[_selectedMob]._mask + 70000);
 			setVoice(0, 28, 1);
 			playSample(28, 0);
@@ -532,8 +529,15 @@ void PrinceEngine::checkOptions() {
 			case Common::EN_ANY:
 				optText = optionsTextEN[i];
 				break;
+			case Common::ES_ESP:
+				optText = optionsTextES[i];
+				break;
 			case Common::RU_RUS:
-				optText = optionsTextRU[i];
+				if (getFeatures() & GF_RUSPROJEDITION) {
+					optText = optionsTextRU2[i];
+				} else {
+					optText = optionsTextRU[i];
+				}
 				break;
 			default:
 				break;
@@ -584,8 +588,15 @@ void PrinceEngine::checkInvOptions() {
 			case Common::EN_ANY:
 				invText = invOptionsTextEN[i];
 				break;
+			case Common::ES_ESP:
+				invText = invOptionsTextES[i];
+				break;
 			case Common::RU_RUS:
-				invText = invOptionsTextRU[i];
+				if (getFeatures() & GF_RUSPROJEDITION) {
+					invText = invOptionsTextRU2[i];
+				} else {
+					invText = invOptionsTextRU[i];
+				}
 				break;
 			default:
 				error("Unknown game language %d", getLanguage());
@@ -671,7 +682,6 @@ void PrinceEngine::displayInventory() {
 		if (shouldQuit())
 			return;
 
-		getDebugger()->onFrame();
 		_graph->update(_graph->_screenForInventory);
 		pausePrinceEngine();
 	}

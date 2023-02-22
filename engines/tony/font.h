@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 /*
@@ -59,8 +58,8 @@ private:
 	public:
 		RMFontPrimitive() : RMGfxPrimitive() { _nChar = 0; }
 		RMFontPrimitive(RMGfxTask *task) : RMGfxPrimitive(task) { _nChar = 0; }
-		virtual ~RMFontPrimitive() { }
-		virtual RMGfxPrimitive *duplicate() {
+		~RMFontPrimitive() override { }
+		RMGfxPrimitive *duplicate() override {
 			return new RMFontPrimitive(*this);
 		}
 
@@ -87,14 +86,14 @@ public:
 
 public:
 	RMFont();
-	virtual ~RMFont();
+	~RMFont() override;
 
 	// Initialization and closing
 	virtual void init() = 0;
 	virtual void close();
 
 	// Drawing
-	virtual void draw(CORO_PARAM, RMGfxTargetBuffer &bigBug, RMGfxPrimitive *prim);
+	void draw(CORO_PARAM, RMGfxTargetBuffer &bigBug, RMGfxPrimitive *prim) override;
 
 	// Create a primitive for a letter
 	RMGfxPrimitive *makeLetterPrimitive(byte bChar, int &nLength);
@@ -110,7 +109,7 @@ private:
 
 public:
 	RMFontColor();
-	virtual ~RMFontColor();
+	~RMFontColor() override;
 	virtual void setBaseColor(byte r, byte g, byte b);
 };
 
@@ -124,20 +123,20 @@ protected:
 
 protected:
 	// Overloaded methods
-	int convertToLetter(byte nChar);
-	int letterLength(int nChar, int nNext = 0);
+	int convertToLetter(byte nChar) override;
+	int letterLength(int nChar, int nNext = 0) override;
 
 public:
-	int letterHeight() {
+	int letterHeight() override {
 		return _hDefault;
 	}
-	virtual ~RMFontWithTables() {}
+	~RMFontWithTables() override {}
 };
 
 class RMFontDialog : public RMFontColor, public RMFontWithTables {
 public:
-	void init();
-	virtual ~RMFontDialog() {}
+	void init() override;
+	~RMFontDialog() override {}
 };
 
 class RMFontObj : public RMFontColor, public RMFontWithTables {
@@ -145,21 +144,21 @@ private:
 	void setBothCase(int nChar, int nNext, signed char spiazz);
 
 public:
-	void init();
-	virtual ~RMFontObj() {}
+	void init() override;
+	~RMFontObj() override {}
 };
 
 class RMFontMacc : public RMFontColor, public RMFontWithTables {
 public:
-	void init();
-	virtual ~RMFontMacc() {}
+	void init() override;
+	~RMFontMacc() override {}
 };
 
 class RMFontCredits : public RMFontColor, public RMFontWithTables {
 public:
-	void init();
-	virtual ~RMFontCredits() {}
-	virtual void setBaseColor(byte r, byte g, byte b) {}
+	void init() override;
+	~RMFontCredits() override {}
+	void setBaseColor(byte r, byte g, byte b) override {}
 };
 
 /**
@@ -194,7 +193,7 @@ protected:
 
 public:
 	RMText();
-	virtual ~RMText();
+	~RMText() override;
 	static void initStatics();
 	static void unload();
 
@@ -209,10 +208,10 @@ public:
 	void writeText(Common::String text, RMFontColor *font, int *time = NULL);
 
 	// Overloaded function to decide when you delete the object from the OT list
-	virtual void removeThis(CORO_PARAM, bool &result);
+	void removeThis(CORO_PARAM, bool &result) override;
 
 	// Overloading of the Draw to center the text, if necessary
-	virtual void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim);
+	void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim) override;
 
 	// Set the base color
 	void setColor(byte r, byte g, byte b);
@@ -239,20 +238,20 @@ protected:
 
 public:
 	RMTextDialog();
-	virtual ~RMTextDialog();
+	~RMTextDialog() override;
 
 	// Write the text
 	void writeText(const Common::String &text, int font, int *time = NULL);
 	void writeText(const Common::String &text, RMFontColor *font, int *time = NULL);
 
 	// Overloaded function to decide when you delete the object from the OT list
-	virtual void removeThis(CORO_PARAM, bool &result);
+	void removeThis(CORO_PARAM, bool &result) override;
 
 	// Overloaded de-registration
-	virtual void unregister();
+	void unregister() override;
 
 	// Overloading of the Draw to center the text, if necessary
-	virtual void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim);
+	void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim) override;
 
 	// Set the position
 	void setPosition(const RMPoint &pt);
@@ -280,14 +279,14 @@ protected:
 	RMLocation *_curLoc;
 	RMPoint _startScroll;
 
-	virtual void clipOnScreen(RMGfxPrimitive *prim);
+	void clipOnScreen(RMGfxPrimitive *prim) override;
 
 public:
 	RMTextDialogScrolling();
 	RMTextDialogScrolling(RMLocation *loc);
-	virtual ~RMTextDialogScrolling();
+	~RMTextDialogScrolling() override;
 
-	virtual void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim);
+	void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim) override;
 };
 
 /**
@@ -301,18 +300,18 @@ protected:
 
 public:
 	RMTextItemName();
-	virtual ~RMTextItemName();
+	~RMTextItemName() override;
 
 	void setMouseCoord(const RMPoint &m);
 
 	void doFrame(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMLocation &loc, RMPointer &ptr, RMInventory &inv);
-	virtual void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim);
+	void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim) override;
 
 	RMPoint getHotspot();
 	RMItem *getSelectedItem();
 	bool isItemSelected();
 
-	virtual void removeThis(CORO_PARAM, bool &result);
+	void removeThis(CORO_PARAM, bool &result) override;
 };
 
 /**
@@ -337,14 +336,14 @@ protected:
 	void setSelected(CORO_PARAM, int pos);
 
 public:
-	virtual void removeThis(CORO_PARAM, bool &result);
-	virtual void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim);
-	void unregister();
+	void removeThis(CORO_PARAM, bool &result) override;
+	void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim) override;
+	void unregister() override;
 
 public:
 	// Initialization
 	RMDialogChoice();
-	virtual ~RMDialogChoice();
+	~RMDialogChoice() override;
 
 	// Initialization and closure
 	using RMGfxWoodyBuffer::init;

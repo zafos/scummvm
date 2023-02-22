@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,7 +30,7 @@
 
 namespace Scumm {
 
-    // Helper functions for ManiacMansion workarounds
+	// Helper functions for ManiacMansion workarounds
 #define MM_SCRIPT(script)  (script + (_game.version == 0 ? 0 : 5))
 #define MM_VALUE(v0,v1)    (_game.version == 0 ? v0 : v1)
 
@@ -397,6 +396,38 @@ void ScummEngine_v2::decodeParseString() {
 	}
 	*ptr = 0;
 
+	// WORKAROUND bug #13473: in the French version of Maniac Mansion, the cutscene
+	// where Purple Tentacle is bullying Sandy hangs once Dr Fred is done talking,
+	// because his reaction line in shorter in this translation (which is unusual for
+	// French which tends to be more verbose) and the `unless (VAR_CHARCOUNT > 90)`
+	// loop in script #155 hasn't been ajusted for this shorter length.
+	//
+	// So we add some extra spaces at the end of the string if it's too short; this
+	// unblocks the cutscene and also lets Sandy react as intended.
+	//
+	// (Not using `_enableEnhancements` because some users could be really confused
+	// by the game hanging and they may not know about the Esc key.)
+	if (_game.id == GID_MANIAC && _game.platform != Common::kPlatformNES && _language == Common::FR_FRA && vm.slot[_currentScript].number == 155 && _roomResource == 31 && _actorToPrintStrFor == 9) {
+		while (ptr - buffer < 100) {
+			*ptr++ = ' ';
+		}
+		*ptr = 0;
+	}
+
+	// WORKAROUND: There is a typo in Syd's biography ("tring" instead of
+	// "trying") in the English DOS version of Maniac Mansion (v1). As far
+	// as I know, this is the only version with the typo.
+	else if (_game.id == GID_MANIAC && _game.version == 1
+		&& _game.platform == Common::kPlatformDOS
+		&& !(_game.features & GF_DEMO) && _language == Common::EN_ANY
+		&& vm.slot[_currentScript].number == 260 && _enableEnhancements
+		&& strncmp((char *)buffer + 26, " tring ", 7) == 0) {
+		for (byte *p = ptr; p >= buffer + 29; p--)
+			*(p + 1) = *p;
+
+		buffer[29] = 'y';
+	}
+
 	int textSlot = 0;
 	_string[textSlot].xpos = 0;
 	_string[textSlot].ypos = 0;
@@ -432,6 +463,25 @@ void ScummEngine_v2::writeVar(uint var, int value) {
 		// Remap the cutscene exit key in earlier games
 		if (value == 4 || value == 13 || value == 64)
 			value = 27;
+	}
+
+	// WORKAROUND: According to the Maniac Mansion manual, you should be
+	// able to execute your command by clicking on the sentence line. But
+	// this does not work until later games. The main difference between
+	// the verb scripts (script 4) in Maniac Mansion and Zak McKracken is
+	// that Zak will set variable 34 when you click on the sentence line
+	// (as indicated by VAR_CLICK_AREA), and Maniac Mansion will not.
+	//
+	// When VAR_CLICK_AREA is 5, there is only one place where variable 34
+	// is initialized to 0, so that seems like a good place to inject our
+	// own check.
+
+	if (_game.id == GID_MANIAC && (_game.version == 1 || _game.version == 2)
+			&& _game.platform != Common::kPlatformNES
+			&& vm.slot[_currentScript].number == 4
+			&& VAR(VAR_CLICK_AREA) == kSentenceClickArea
+			&& var == 34 && value == 0 && _enableEnhancements) {
+		value = 1;
 	}
 
 	_scummVars[var] = value;
@@ -684,7 +734,7 @@ void ScummEngine_v2::o2_actorOps() {
 		a->setPalette(i, arg);
 		break;
 	case 3:		// SO_ACTOR_NAME
-		loadPtrToResource(rtActorName, a->_number, NULL);
+		loadPtrToResource(rtActorName, a->_number, nullptr);
 		break;
 	case 4:		// SO_COSTUME
 		a->setActorCostume(arg);
@@ -813,13 +863,13 @@ void ScummEngine_v2::o2_verbOps() {
 			vs->color = 1;
 			vs->hicolor = 1;
 			vs->dimcolor = 1;
-		} else if (_game.version == 1) {
-			vs->color = (_game.id == GID_MANIAC && (_game.features & GF_DEMO)) ? 16 : 5;
+		} else if (_game.platform == Common::kPlatformC64) {
+			vs->color = 5;
 			vs->hicolor = 7;
 			vs->dimcolor = 11;
 		} else {
 			vs->color = (_game.id == GID_MANIAC && (_game.features & GF_DEMO)) ? 13 : 2;
-			vs->hicolor = 14;
+			vs->hicolor = _hiLiteColorVerbArrow;
 			vs->dimcolor = 8;
 		}
 		vs->type = kTextVerbType;
@@ -831,7 +881,7 @@ void ScummEngine_v2::o2_verbOps() {
 		vs->imgindex = 0;
 		vs->prep = prep;
 
-		vs->curRect.left = x;
+		vs->curRect.left = vs->origLeft = x;
 		vs->curRect.top = y;
 
 		// FIXME: these keyboard map depends on the language of the game.
@@ -856,7 +906,7 @@ void ScummEngine_v2::o2_verbOps() {
 		}
 
 		// It follows the verb name
-		loadPtrToResource(rtVerb, slot, NULL);
+		loadPtrToResource(rtVerb, slot, nullptr);
 		}
 		break;
 	}
@@ -939,7 +989,7 @@ void ScummEngine_v2::o2_doSentence() {
 				}
 			}
 
-			runObjectScript(st->objectA, st->verb, isBackgroundScript, isSpecialVerb, NULL, slot);
+			runObjectScript(st->objectA, st->verb, isBackgroundScript, isSpecialVerb, nullptr, slot);
 		}
 		break;
 	case 2:
@@ -968,6 +1018,7 @@ void ScummEngine_v2::drawPreposition(int index) {
 			{ " ", " in", " con", " su", " a" },     // Italian
 			{ " ", " en", " con", " en", " a" },     // Spanish
 			{ " ", " \x7f", " \x7f", " na", " \x7f" },// Russian
+			{ " ", " B", " SN", " SM", " M" },       // Hebrew
 			};
 		int lang;
 		switch (_language) {
@@ -986,6 +1037,9 @@ void ScummEngine_v2::drawPreposition(int index) {
 		case Common::RU_RUS:
 			lang = 5;
 			break;
+		case Common::HE_ISR:
+			lang = 6;
+			break;
 		default:
 			lang = 0;	// Default to english
 		}
@@ -997,98 +1051,7 @@ void ScummEngine_v2::drawPreposition(int index) {
 }
 
 void ScummEngine_v2::o2_drawSentence() {
-	Common::Rect sentenceline;
-	const byte *temp;
-	int slot = getVerbSlot(VAR(VAR_SENTENCE_VERB), 0);
-
-	if (!((_userState & USERSTATE_IFACE_SENTENCE) ||
-	      (_game.platform == Common::kPlatformNES && (_userState & USERSTATE_IFACE_ALL))))
-		return;
-
-	if (getResourceAddress(rtVerb, slot))
-		_sentenceBuf = (char *)getResourceAddress(rtVerb, slot);
-	else
-		return;
-
-	if (VAR(VAR_SENTENCE_OBJECT1) > 0) {
-		temp = getObjOrActorName(VAR(VAR_SENTENCE_OBJECT1));
-		if (temp) {
-			_sentenceBuf += " ";
-			_sentenceBuf += (const char *)temp;
-		}
-
-		// For V1 games, the engine must compute the preposition.
-		// In all other Scumm versions, this is done by the sentence script.
-		if ((_game.id == GID_MANIAC && _game.version == 1 && !(_game.platform == Common::kPlatformNES)) && (VAR(VAR_SENTENCE_PREPOSITION) == 0)) {
-			if (_verbs[slot].prep == 0xFF) {
-				byte *ptr = getOBCDFromObject(VAR(VAR_SENTENCE_OBJECT1));
-				assert(ptr);
-				VAR(VAR_SENTENCE_PREPOSITION) = (*(ptr + 12) >> 5);
-			} else
-				VAR(VAR_SENTENCE_PREPOSITION) = _verbs[slot].prep;
-		}
-	}
-
-	if (0 < VAR(VAR_SENTENCE_PREPOSITION) && VAR(VAR_SENTENCE_PREPOSITION) <= 4) {
-		drawPreposition(VAR(VAR_SENTENCE_PREPOSITION));
-	}
-
-	if (VAR(VAR_SENTENCE_OBJECT2) > 0) {
-		temp = getObjOrActorName(VAR(VAR_SENTENCE_OBJECT2));
-		if (temp) {
-			_sentenceBuf += " ";
-			_sentenceBuf += (const char *)temp;
-		}
-	}
-
-	_string[2].charset = 1;
-	_string[2].ypos = _virtscr[kVerbVirtScreen].topline;
-	_string[2].xpos = 0;
-	_string[2].right = _virtscr[kVerbVirtScreen].w - 1;
-	if (_game.platform == Common::kPlatformNES) {
-		_string[2].xpos = 16;
-		_string[2].color = 0;
-	} else if (_game.version == 1)
-		_string[2].color = 16;
-	else
-		_string[2].color = 13;
-
-	byte string[80];
-	const char *ptr = _sentenceBuf.c_str();
-	int i = 0, len = 0;
-
-	// Maximum length of printable characters
-	int maxChars = (_game.platform == Common::kPlatformNES) ? 60 : 40;
-	while (*ptr) {
-		if (*ptr != '@')
-			len++;
-		if (len > maxChars) {
-			break;
-		}
-
-		string[i++] = *ptr++;
-
-		if (_game.platform == Common::kPlatformNES && len == 30) {
-			string[i++] = 0xFF;
-			string[i++] = 8;
-		}
-	}
-	string[i] = 0;
-
-	if (_game.platform == Common::kPlatformNES) {
-		sentenceline.top = _virtscr[kVerbVirtScreen].topline;
-		sentenceline.bottom = _virtscr[kVerbVirtScreen].topline + 16;
-		sentenceline.left = 16;
-		sentenceline.right = _virtscr[kVerbVirtScreen].w - 1;
-	} else {
-		sentenceline.top = _virtscr[kVerbVirtScreen].topline;
-		sentenceline.bottom = _virtscr[kVerbVirtScreen].topline + 8;
-		sentenceline.left = 0;
-		sentenceline.right = _virtscr[kVerbVirtScreen].w - 1;
-	}
-	restoreBackground(sentenceline);
-
-	drawString(2, (byte *)string);
+	drawSentence();
 }
 
 void ScummEngine_v2::o2_ifClassOfIs() {
@@ -1098,7 +1061,7 @@ void ScummEngine_v2::o2_ifClassOfIs() {
 
 	byte *obcd = getOBCDFromObject(obj);
 
-	if (obcd == 0) {
+	if (obcd == nullptr) {
 		o5_jumpRelative();
 		return;
 	}
@@ -1113,7 +1076,10 @@ void ScummEngine_v2::o2_walkActorTo() {
 
 	int act = getVarOrDirectByte(PARAM_1);
 
-	// WORKAROUND bug #1252606
+	// WORKAROUND bug #2110: crash when trying to fly back to San Francisco.
+	// walkActorTo() is called with an invalid actor number by script 115,
+	// after the room is loaded. The original DOS interpreter probably let
+	// this slip by.
 	if (_game.id == GID_ZAK && _game.version == 1 && vm.slot[_currentScript].number == 115 && act == 249) {
 		act = VAR(VAR_EGO);
 	}
@@ -1149,7 +1115,7 @@ void ScummEngine_v2::o2_startScript() {
 			return;
 	}
 
-	// WORKAROUND bug #1447058: In Maniac Mansion, when the door bell
+	// WORKAROUND bug #2524: In Maniac Mansion, when the door bell
 	// rings, then this normally causes Ted Edison to leave his room.
 	// This is controlled by script 87. On the other hand, when the
 	// player enters Ted's room while Ted is in it, then Ted captures
@@ -1188,48 +1154,42 @@ void ScummEngine_v2::o2_startScript() {
 		}
 	}
 
-    // WORKAROUND bug #4556: Purple Tentacle can appear in the lab, after being 
-    // chased out and end up stuck in the room. This bug is triggered if the player
-    // enters the lab within 45 minutes of first entering the mansion and has chased Purple Tentacle
-    // out. Eventually the cutscene with Purple Tentacle chasing Sandy in the lab
-    // will play. This script leaves Purple Tentacle in the room causing him to become
-    // a permanent resident.
-    // Our fix is simply to prevent the Cutscene playing, if the lab has already been stormed
-    if (_game.id == GID_MANIAC) {
-        if (_game.version >= 1 && script == 155) {
-            if (VAR(120) == 1)
-                return;
-        }
-        // Script numbers are different in V0
-        if (_game.version == 0 && script == 150) {
-            if (VAR(104) == 1)
-                return;
-        }
-    }
+	// WORKAROUND bug #4556: Purple Tentacle can appear in the lab, after being
+	// chased out and end up stuck in the room. This bug is triggered if the player
+	// enters the lab within 45 minutes of first entering the mansion and has chased Purple Tentacle
+	// out. Eventually the cutscene with Purple Tentacle chasing Sandy in the lab
+	// will play. This script leaves Purple Tentacle in the room causing him to become
+	// a permanent resident.
+	// Our fix is simply to prevent the Cutscene playing, if the lab has already been stormed
+	if (_game.id == GID_MANIAC) {
+		if (script == MM_SCRIPT(150)) {
+			if (VAR(MM_VALUE(104, 120)) == 1)
+				return;
+		}
+	}
 
-	runScript(script, 0, 0, 0);
+	runScript(script, 0, 0, nullptr);
 }
 
 void ScummEngine_v2::stopScriptCommon(int script) {
-    
-    // WORKAROUND bug #4112: If you enter the lab while Dr. Fred has the powered turned off
-    // to repair the Zom-B-Matic, the script will be stopped and the power will never turn
-    // back on. This fix forces the power on, when the player enters the lab, 
-    // if the script which turned it off is running
-    if (_game.id == GID_MANIAC && _roomResource == 4 && isScriptRunning(MM_SCRIPT(138))) {
+	// WORKAROUND bug #4112: If you enter the lab while Dr. Fred has the power turned off
+	// to repair the Zom-B-Matic, the script will be stopped and the power will never turn
+	// back on. This fix forces the power on, when the player enters the lab,
+	// if the script which turned it off is running
+	if (_game.id == GID_MANIAC && _roomResource == 4 && isScriptRunning(MM_SCRIPT(138))) {
 
-        if (vm.slot[_currentScript].number == MM_VALUE(130, 163)) {
+		if (vm.slot[_currentScript].number == MM_VALUE(130, 163)) {
 
-            if (script == MM_SCRIPT(138)) {
+			if (script == MM_SCRIPT(138)) {
 
-                int obj = MM_VALUE(124, 157);
-                putState(obj, getState(obj) & ~kObjectState_08);
-            }
-        }
-    }
+				int obj = MM_VALUE(124, 157);
+				putState(obj, getState(obj) & ~kObjectState_08);
+			}
+		}
+	}
 
 	if (_game.id == GID_MANIAC && _roomResource == 26 && vm.slot[_currentScript].number == 10001) {
-	// FIXME: Nasty hack for bug #915575
+	// FIXME: Nasty hack for bug #1529
 	// Don't let the exit script for room 26 stop the script (116), when
 	// switching to the dungeon (script 89)
 		if (script == MM_SCRIPT(111) && isScriptRunning(MM_SCRIPT(84)))
@@ -1320,7 +1280,7 @@ void ScummEngine_v2::o2_putActorInRoom() {
 	// Var[245] is set to have the Disguise on in most situations
 	//
 	// We don't touch the variable in the following situations
-	//  If the Caponian is being put into the space ship room, or the current room is the 
+	//  If the Caponian is being put into the space ship room, or the current room is the
 	//  space ship and the Caponian is being put into the backroom of the telephone company (you didnt show your fan club card)
 	if (_game.id == GID_ZAK && _game.version <= 2 && act == 7) {
 		// Is script-96 cutscene done
@@ -1485,7 +1445,7 @@ void ScummEngine_v2::o2_loadRoomWithEgo() {
 	if (x >= 0 && y >= 0) {
 		a->startWalkActor(x, y, -1);
 	}
-	runScript(5, 0, 0, 0);
+	runScript(5, 0, 0, nullptr);
 }
 
 void ScummEngine_v2::o2_setOwnerOf() {
@@ -1543,6 +1503,8 @@ void ScummEngine_v2::o2_roomOps() {
 		}
 		_fullRedraw = true;
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1583,7 +1545,7 @@ void ScummEngine_v2::o2_endCutscene() {
 		if (camera._mode == kFollowActorCameraMode) {
 			actorFollowCamera(VAR(VAR_EGO));
 		} else if (vm.cutSceneData[2] != _currentRoom) {
-			startScene(vm.cutSceneData[2], 0, 0);
+			startScene(vm.cutSceneData[2], nullptr, 0);
 		}
 	} else {
 		actorFollowCamera(VAR(VAR_EGO));
@@ -1603,7 +1565,7 @@ void ScummEngine_v2::o2_chainScript() {
 	int script = getVarOrDirectByte(PARAM_1);
 	stopScript(vm.slot[_currentScript].number);
 	_currentScript = 0xFF;
-	runScript(script, 0, 0, 0);
+	runScript(script, 0, 0, nullptr);
 }
 
 void ScummEngine_v2::o2_pickupObject() {

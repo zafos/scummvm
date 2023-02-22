@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,9 +42,9 @@ ComputerManager::ComputerManager(HopkinsEngine *vm) {
 		memset(_menuText[i]._line, 0, ARRAYSIZE(_menuText[0]._line));
 	}
 	Common::fill(&_inputBuf[0], &_inputBuf[200], '\0');
-	_breakoutSpr = NULL;
+	_breakoutSpr = nullptr;
 	_textColor = 0;
-	_breakoutLevel = (int16 *)NULL;
+	_breakoutLevel = (int16 *)nullptr;
 	_breakoutBrickNbr = 0;
 	_breakoutScore = 0;
 	_breakoutLives = 0;
@@ -229,6 +228,8 @@ void ComputerManager::showComputer(ComputerEnum mode) {
 				case '5':
 					readText(4);
 					break;
+				default:
+					break;
 				}
 			} else if (mode == COMPUTER_SAMANTHA) {
 				clearScreen();
@@ -252,6 +253,8 @@ void ComputerManager::showComputer(ComputerEnum mode) {
 				case '6':
 					readText(10);
 					_vm->_globals->_saveData->_data[svField270] = 4;
+					break;
+				default:
 					break;
 				}
 			}
@@ -501,6 +504,8 @@ void ComputerManager::readText(int idx) {
 	case LANG_SP:
 		filename = "THOPKES.TXT";
 		break;
+	default:
+		break;
 	}
 
 	byte *ptr = _vm->_fileIO->loadFile(filename);
@@ -549,9 +554,9 @@ void ComputerManager::displayGamesSubMenu() {
 
 	_vm->_globals->_speed = 1;
 	_vm->_events->changeMouseCursor(0);
-	_breakoutSpr = NULL;
+	_breakoutSpr = nullptr;
 	_vm->_events->_breakoutFl = true;
-	_breakoutLevel = (int16 *)NULL;
+	_breakoutLevel = (int16 *)nullptr;
 	_breakoutBrickNbr = 0;
 	_breakoutScore = 0;
 	_breakoutLives = 5;
@@ -712,6 +717,8 @@ void ComputerManager::displayBricks() {
 			break;
 		case 31:
 			_vm->_graphicsMan->fastDisplay2(_breakoutSpr, cellLeft, cellTop, 23);
+			break;
+		default:
 			break;
 		}
 	}
@@ -916,7 +923,7 @@ void ComputerManager::getScoreName() {
 	_score[scoreLine]._score = "         ";
 
 	char score[16];
-	sprintf(score, "%d", _breakoutScore);
+	Common::sprintf_s(score, "%d", _breakoutScore);
 	int scoreLen = 0;
 	do {
 		++scoreLen;
@@ -1069,6 +1076,8 @@ int ComputerManager::moveBall() {
 	case 4:
 		_minBreakoutMoveSpeed = 3;
 		_maxBreakoutMoveSpeed = 2;
+		break;
+	default:
 		break;
 	}
 
@@ -1241,6 +1250,8 @@ void ComputerManager::checkBallCollisions() {
 						break;
 					case 6:
 						_breakoutScore += 40;
+						break;
+					default:
 						break;
 					}
 					displayScore();

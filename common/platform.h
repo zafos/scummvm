@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,8 +23,17 @@
 #define COMMON_PLATFORM_H
 
 #include "common/scummsys.h"
+#include "common/list.h"
 
 namespace Common {
+
+/**
+ * @defgroup common_platform Game platforms
+ * @ingroup common
+ *
+ * @brief API for managing game platforms.
+ * @{
+ */
 
 class String;
 
@@ -35,9 +43,10 @@ class String;
  * This may be optional or required, depending on the game engine and the
  * game in question.
  */
-enum Platform {
+enum Platform : int8 {
 	kPlatformDOS,
 	kPlatformAmiga,
+	kPlatformAmstradCPC,
 	kPlatformAtari8Bit,
 	kPlatformAtariST,
 	kPlatformMacintosh,
@@ -45,6 +54,7 @@ enum Platform {
 	kPlatformWindows,
 	kPlatformNES,
 	kPlatformC64,
+	kPlatformCoCo,
 	kPlatformCoCo3,
 	kPlatformLinux,
 	kPlatformAcorn,
@@ -56,10 +66,21 @@ enum Platform {
 	kPlatformPC98,
 	kPlatformWii,
 	kPlatformPSX,
+	kPlatformPS2,
+	kPlatformXbox,
 	kPlatformCDi,
 	kPlatformIOS,
+	kPlatformAndroid,
 	kPlatformOS2,
 	kPlatformBeOS,
+	kPlatformPocketPC,
+	kPlatformMegaDrive,
+	kPlatformSaturn,
+	kPlatformPippin,
+	kPlatformMacintoshII,
+	kPlatformShockwave,
+	kPlatformZX,
+	kPlatformTI994,
 
 	kPlatformUnknown = -1
 };
@@ -79,6 +100,10 @@ extern Platform parsePlatform(const String &str);
 extern const char *getPlatformCode(Platform id);
 extern const char *getPlatformAbbrev(Platform id);
 extern const char *getPlatformDescription(Platform id);
+
+List<String> getPlatformList();
+
+/** @} */
 
 } // End of namespace Common
 

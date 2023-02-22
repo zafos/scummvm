@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,26 +25,32 @@
 #include "video/smk_decoder.h"
 #include "neverhood/neverhood.h"
 #include "neverhood/entity.h"
+#include "neverhood/subtitles.h"
 
 namespace Neverhood {
 
 class Scene;
 class Palette;
+class SmackerPlayer;
 
 class SmackerSurface : public BaseSurface {
 public:
 	SmackerSurface(NeverhoodEngine *vm);
-	virtual void draw();
+	void draw() override;
 	void setSmackerFrame(const Graphics::Surface *smackerFrame);
 	void unsetSmackerFrame();
+	void renderSubtitles();
 protected:
 	const Graphics::Surface *_smackerFrame;
+	Common::ScopedPtr<SubtitlePlayer> _subtitles;
+	uint32 frameNumber;
+	friend class SmackerPlayer;
 };
 
 class SmackerDoubleSurface : public SmackerSurface {
 public:
 	SmackerDoubleSurface(NeverhoodEngine *vm);
-	virtual void draw();
+	void draw() override;
 };
 
 class NeverhoodSmackerDecoder : public Video::SmackerDecoder {
@@ -56,8 +61,8 @@ public:
 class SmackerPlayer : public Entity {
 public:
 	SmackerPlayer(NeverhoodEngine *vm, Scene *scene, uint32 fileHash, bool doubleSurface, bool flag, bool paused = false);
-	~SmackerPlayer();
-	BaseSurface *getSurface() { return _smackerSurface; }
+	~SmackerPlayer() override;
+        Common::SharedPtr<BaseSurface> getSurface() { return _smackerSurface; }
 	void open(uint32 fileHash, bool keepLastFrame);
 	void close();
 	void gotoFrame(int frameNumber);
@@ -72,7 +77,7 @@ protected:
 	Scene *_scene;
 	Palette *_palette;
 	NeverhoodSmackerDecoder *_smackerDecoder;
-	SmackerSurface *_smackerSurface;
+	Common::SharedPtr<SmackerSurface> _smackerSurface;
 	uint32 _fileHash;
 	bool _smackerFirst;
 	bool _doubleSurface;

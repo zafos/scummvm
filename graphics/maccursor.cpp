@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,18 +42,20 @@ void MacCursor::clear() {
 	memset(_palette, 0, 256 * 3);
 }
 
-bool MacCursor::readFromStream(Common::SeekableReadStream &stream, bool forceMonochrome) {
+bool MacCursor::readFromStream(Common::SeekableReadStream &stream, bool forceMonochrome, byte monochromeInvertedPixelColor, bool forceCURSFormat) {
 	clear();
 
-	// Older Mac CURS monochrome cursors had a set size
-	// All crsr cursors are larger than this
-	if (stream.size() == 32 * 2 + 4)
-		return readFromCURS(stream);
+	const int minCursSize = 32 * 2 + 4;
 
-	return readFromCRSR(stream, forceMonochrome);
+	// Older Mac CURS monochrome cursors had a set size, but sometimes contain extra unused bytes
+	// All crsr cursors are larger than this
+	if (stream.size() == minCursSize || (forceCURSFormat && stream.size() >= minCursSize))
+		return readFromCURS(stream, monochromeInvertedPixelColor);
+
+	return readFromCRSR(stream, forceMonochrome, monochromeInvertedPixelColor);
 }
 
-bool MacCursor::readFromCURS(Common::SeekableReadStream &stream) {
+bool MacCursor::readFromCURS(Common::SeekableReadStream &stream, byte monochromeInvertedPixelColor) {
 	// Grab B/W icon data
 	_surface = new byte[16 * 16];
 	for (int i = 0; i < 32; i++) {
@@ -66,9 +67,15 @@ bool MacCursor::readFromCURS(Common::SeekableReadStream &stream) {
 	// Apply mask data
 	for (int i = 0; i < 32; i++) {
 		byte imageByte = stream.readByte();
-		for (int b = 0; b < 8; b++)
-			if ((imageByte & (0x80 >> b)) == 0)
-				_surface[i * 8 + b] = 0xff;
+		for (int b = 0; b < 8; b++) {
+			if ((imageByte & (0x80 >> b)) == 0) {
+				// if an image bit is set outside the mask then the destination pixel
+				//  would have been inverted on macintosh, otherwise it's transparent.
+				//  we don't currently implement this inversion effect so instead we
+				//  use the optional color provided by the caller for these pixels.
+				_surface[i * 8 + b] = _surface[i * 8 + b] ? 0xff : monochromeInvertedPixelColor;
+			}
+		}
 	}
 
 	_hotspotY = stream.readUint16BE();
@@ -82,7 +89,7 @@ bool MacCursor::readFromCURS(Common::SeekableReadStream &stream) {
 	return !stream.eos();
 }
 
-bool MacCursor::readFromCRSR(Common::SeekableReadStream &stream, bool forceMonochrome) {
+bool MacCursor::readFromCRSR(Common::SeekableReadStream &stream, bool forceMonochrome, byte monochromeInvertedPixelColor) {
 	stream.readUint16BE(); // type
 	stream.readUint32BE(); // offset to pixel map
 	stream.readUint32BE(); // offset to pixel data
@@ -91,7 +98,7 @@ bool MacCursor::readFromCRSR(Common::SeekableReadStream &stream, bool forceMonoc
 	stream.readUint32BE(); // reserved
 
 	// Read the B/W data first
-	if (!readFromCURS(stream))
+	if (!readFromCURS(stream, monochromeInvertedPixelColor))
 		return false;
 
 	// Use b/w cursor on backends which don't support cursor palettes
@@ -155,6 +162,18 @@ bool MacCursor::readFromCRSR(Common::SeekableReadStream &stream, bool forceMonoc
 		_palette[c * 3 + 2] = stream.readUint16BE() >> 8;
 	}
 
+	// Find black so that Macintosh black (255) can be remapped.
+	// This is necessary because we use 255 for the color key.
+	byte black = 0;
+	for (byte c = 0; c < 255; c++) {
+		if (_palette[c * 3 + 0] == 0 &&
+			_palette[c * 3 + 1] == 0 &&
+			_palette[c * 3 + 2] == 0) {
+			black = c;
+			break;
+		}
+	}
+
 	int pixelsPerByte = (iconBounds[2] - iconBounds[0]) / iconRowBytes;
 	int bpp           = 8 / pixelsPerByte;
 
@@ -170,8 +189,13 @@ bool MacCursor::readFromCRSR(Common::SeekableReadStream &stream, bool forceMonoc
 		for (int b = 0; b < pixelsPerByte; b++) {
 			int idx = j * pixelsPerByte + (pixelsPerByte - 1 - b);
 
-			if (_surface[idx] != 0xff) // if mask is not there
+			if (_surface[idx] != 0xff) { // if mask is not there
 				_surface[idx] = (byte)((iconData[j] >> (b * bpp)) & bitmask);
+				// Remap Macintosh black
+				if (_surface[idx] == 255) {
+					_surface[idx] = black;
+				}
+			}
 		}
 	}
 

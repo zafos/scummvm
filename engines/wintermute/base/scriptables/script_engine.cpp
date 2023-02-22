@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -65,6 +64,13 @@ ScEngine::ScEngine(BaseGame *inGame) : BaseClass(inGame) {
 		ScValue val(_gameRef);
 		val.setNative(_gameRef->_mathClass, true);
 		_globals->setProp("Math", &val);
+	}
+
+	// register 'Directory' as global variable
+	if (!_globals->propExists("Directory")) {
+		ScValue val(_gameRef);
+		val.setNative(_gameRef->_directoryClass, true);
+		_globals->setProp("Directory", &val);
 	}
 
 	// prepare script cache
@@ -174,6 +180,17 @@ ScScript *ScEngine::runScript(const char *filename, BaseScriptHolder *owner) {
 
 		return script;
 	}
+}
+
+
+//////////////////////////////////////////////////////////////////////////
+bool ScEngine::isRunningScript(const char *filename) {
+	for (uint32 i = 0; i < _scripts.size(); i++) {
+		if (strcmp(_scripts[i]->_filename, filename) == 0) {
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -433,7 +450,15 @@ int ScEngine::getNumScripts(int *running, int *waiting, int *persistent) {
 			numPersistent++;
 			break;
 		default:
-			warning("ScEngine::GetNumScripts - unhandled enum");
+			// Those states were not handled in original WME as well:
+			// * SCRIPT_FINISHED,
+			// * SCRIPT_ERROR,
+			// * SCRIPT_WAITING_SCRIPT,
+			// * SCRIPT_THREAD_FINISHED
+			debugN("ScEngine::GetNumScripts - unhandled enum: %d\n", _scripts[i]->_state);
+
+			// This method calculates thread counts to be shown at debug screen only
+			// Extend BaseGame::displayDebugInfo() if you want to handle those states
 			break;
 		}
 		numTotal++;

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -45,11 +44,11 @@ class Scene200: public SceneExt {
 	/* Actions */
 	class Action1: public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2: public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	SequenceManager _sequenceManager;
@@ -59,19 +58,19 @@ public:
 	IntroObject  _object7, _object8, _object9;
 	NamedObject _object10, _object11;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void remove();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void remove() override;
 };
 
 class Scene210: public SceneExt {
 	/* Actions */
 	class Action1: public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2: public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	SequenceManager _sequenceManager;
@@ -81,19 +80,19 @@ public:
 	NamedObject _object9, _object10, _object11, _object12;
 	NamedObject _object13, _object14, _object15;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void remove();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void remove() override;
 };
 
 class Scene220: public SceneExt {
 	/* Actions */
 	class Action1: public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2: public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	SequenceManager _sequenceManager;
@@ -104,35 +103,35 @@ public:
 	IntroObject _object10, _object11, _object12, _object13;
 	IntroObject _object14, _object15, _object16;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void remove();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void remove() override;
 };
 
 class Scene225: public SceneExt {
 	/* Actions */
 	class Action1: public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2: public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action3: public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action4: public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action5: public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action6: public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	SequenceManager _sequenceManager;
@@ -149,48 +148,48 @@ public:
 	NamedObject _object17, _object18, _object19;
 	NamedObject _object20, _object21;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void remove();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void remove() override;
 };
 
 class Scene265: public SceneExt {
 	/* Actions */
 	class Action1: public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	Action1 _action1;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void remove();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void remove() override;
 };
 
 class Scene270: public SceneExt {
 	/* Actions */
 	class Action1: public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 	/* Objects */
 	class Lyle: public NamedObject {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 	class Grandma: public NamedObject {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 
 	/* Items */
 	class Item: public NamedHotspot {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 	class Exit: public NamedHotspot {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 public:
 	SequenceManager _sequenceManager1, _sequenceManager2, _sequenceManager3;
@@ -215,34 +214,34 @@ public:
 	Common::Point _tempPos;
 
 	Scene270();
-	virtual void synchronize(Serializer &s);
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void signal();
-	virtual void process(Event &event);
-	virtual void dispatch();
+	void synchronize(Serializer &s) override;
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void signal() override;
+	void process(Event &event) override;
+	void dispatch() override;
 };
 
 class Scene271: public PalettedScene {
 	/* Actions */
 	class Action1: public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 	/* Objects */
 	class Object12: public NamedObject {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 
 	/* Items */
 	class Item: public NamedHotspot {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 	class Exit: public NamedHotspot {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 public:
 	SequenceManager _sequenceManager1, _sequenceManager2, _sequenceManager3;
@@ -269,26 +268,26 @@ public:
 	Common::Point _tempPos;
 
 	Scene271();
-	virtual void synchronize(Serializer &s);
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void signal();
-	virtual void process(Event &event);
-	virtual void dispatch();
+	void synchronize(Serializer &s) override;
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void signal() override;
+	void process(Event &event) override;
+	void dispatch() override;
 };
 
 class Scene280: public PalettedScene {
 	/* Actions */
 	class Action1: public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	Action1 _action1;
 	SpeakerGameText _gameTextSpeaker;
 	NamedObject _jake, _dad, _mum, _object4;
 
-	void postInit(SceneObjectList *OwnerList);
-	virtual void signal();
+	void postInit(SceneObjectList *OwnerList) override;
+	void signal() override;
 };
 
 } // End of namespace BlueForce

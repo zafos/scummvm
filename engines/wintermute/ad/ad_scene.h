@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -44,16 +43,42 @@ class AdPath;
 class AdScaleLevel;
 class AdRotLevel;
 class AdPathPoint;
+#ifdef ENABLE_WME3D
+class AdSceneGeometry;
+#endif
 class AdScene : public BaseObject {
 public:
+
+#ifdef ENABLE_WME3D
+	uint32 _ambientLightColor;
+	TShadowType _maxShadowType;
+	bool _scroll3DCompatibility;
+
+	bool _fogEnabled;
+	uint32 _fogColor;
+	float _fogStart;
+	float _fogEnd;
+#endif
 
 	BaseObject *getNextAccessObject(BaseObject *currObject);
 	BaseObject *getPrevAccessObject(BaseObject *currObject);
 	bool getSceneObjects(BaseArray<AdObject *> &objects, bool interactiveOnly);
 	bool getRegionObjects(AdRegion *region, BaseArray<AdObject *> &objects, bool interactiveOnly);
 
+#ifdef ENABLE_WME3D
+	bool _2DPathfinding;
+#endif
 	bool afterLoad();
 
+	void setMaxShadowType(TShadowType shadowType);
+
+#ifdef ENABLE_WME3D
+	float _nearPlane;
+	float _farPlane;
+	float _fov;
+	int32 _editorResolutionWidth;
+	int32 _editorResolutionHeight;
+#endif
 	bool getRegionsAt(int x, int y, AdRegion **regionList, int numRegions);
 	bool handleItemAssociations(const char *itemName, bool show);
 	UIWindow *_shieldWindow;
@@ -87,7 +112,11 @@ public:
 	float getScaleAt(int y);
 	bool sortScaleLevels();
 	bool sortRotLevels();
-	virtual bool saveAsText(BaseDynamicBuffer *buffer, int indent) override;
+	bool saveAsText(BaseDynamicBuffer *buffer, int indent) override;
+#ifdef ENABLE_WME3D
+	AdSceneGeometry *_sceneGeometry;
+	bool _showGeometry;
+#endif
 	uint32 getAlphaAt(int x, int y, bool colorCheck = false);
 	bool _paralaxScrolling;
 	void skipTo(int offsetX, int offsetY);
@@ -96,7 +125,7 @@ public:
 	void skipToObject(BaseObject *object);
 	void scrollToObject(BaseObject *object);
 	void scrollTo(int offsetX, int offsetY);
-	virtual bool update() override;
+	bool update() override;
 	bool _autoScroll;
 	int32 _targetOffsetTop;
 	int32 _targetOffsetLeft;
@@ -109,7 +138,7 @@ public:
 	uint32 _scrollTimeH;
 	uint32 _lastTimeH;
 
-	virtual bool display();
+	bool display() override;
 	uint32 _pfMaxTime;
 	bool initLoop();
 	void pathFinderStep();
@@ -119,7 +148,7 @@ public:
 	float getZoomAt(int x, int y);
 	bool getPath(const BasePoint &source, const BasePoint &target, AdPath *path, BaseObject *requester = nullptr);
 	AdScene(BaseGame *inGame);
-	virtual ~AdScene();
+	~AdScene() override;
 	BaseArray<AdLayer *> _layers;
 	BaseArray<AdObject *> _objects;
 	BaseArray<AdWaypointGroup *> _waypointGroups;
@@ -152,15 +181,15 @@ public:
 	BaseArray<AdScaleLevel *> _scaleLevels;
 	BaseArray<AdRotLevel *> _rotLevels;
 
-	virtual bool restoreDeviceObjects();
+	bool restoreDeviceObjects() override;
 	int getPointsDist(const BasePoint &p1, const BasePoint &p2, BaseObject *requester = nullptr);
 
 	// scripting interface
-	virtual ScValue *scGetProperty(const Common::String &name) override;
-	virtual bool scSetProperty(const char *name, ScValue *value) override;
-	virtual bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
-	virtual const char *scToString() override;
-	virtual Common::String debuggerToString() const override;
+	ScValue *scGetProperty(const Common::String &name) override;
+	bool scSetProperty(const char *name, ScValue *value) override;
+	bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
+	const char *scToString() override;
+	Common::String debuggerToString() const override;
 
 private:
 	bool persistState(bool saving = true);

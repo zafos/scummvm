@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,7 +30,9 @@ DynamicHotspot::DynamicHotspot() {
 	_facing = FACING_NONE;
 	_descId = 0;
 	_verbId = 0;
+	_valid = false;	// V2
 	_articleNumber = 0;
+	_syntax = 0;	// V2
 	_cursor = CURSOR_NONE;
 	_active = false;
 }
@@ -53,9 +54,36 @@ DynamicHotspots::DynamicHotspots(MADSEngine *vm) : _vm(vm) {
 	_count = 0;
 }
 
-int DynamicHotspots::add(int descId, int verbId, int syntax, int seqIndex, const Common::Rect &bounds) {
-	warning("TODO: DynamicHotspots::add(5 params))");
-	return add(descId, verbId, seqIndex, bounds);
+int DynamicHotspots::add(int descId, int verbId, byte syntax, int seqIndex, const Common::Rect &bounds) {
+	// Find a free slot
+	uint idx = 0;
+	while ((idx < _entries.size()) && _entries[idx]._active)
+		++idx;
+	if (idx == _entries.size())
+		error("DynamicHotspots overflow");
+
+	_entries[idx]._active = true;
+	_entries[idx]._descId = descId;
+	_entries[idx]._seqIndex = seqIndex;
+	_entries[idx]._bounds = bounds;
+	_entries[idx]._feetPos = Common::Point(-3, 0);
+	_entries[idx]._facing = FACING_NONE;
+	_entries[idx]._verbId = verbId;
+	_entries[idx]._articleNumber = PREP_IN;
+	_entries[idx]._syntax = syntax;
+	_entries[idx]._cursor = CURSOR_NONE;
+	_entries[idx]._valid = true;
+	_entries[idx]._animIndex = -1;
+
+	++_count;
+	_changed = true;
+
+	if (seqIndex >= 0) {
+		_vm->_game->_scene._sequences[seqIndex]._dynamicHotspotIndex = idx;
+		_entries[idx]._valid = false;
+	}
+
+	return idx;
 }
 
 int DynamicHotspots::add(int descId, int verbId, int seqIndex, const Common::Rect &bounds) {
@@ -138,11 +166,13 @@ void DynamicHotspots::refresh() {
 	ScreenObjects &scrObjects = _vm->_game->_screenObjects;
 	scrObjects.resize(scrObjects._uiCount);
 
+	 bool isV2 = (_vm->getGameID() != GType_RexNebular);
+
 	// Loop through adding hotspots
 	for (uint i = 0; i < _entries.size(); ++i) {
 		DynamicHotspot &dh = (*this)[i];
 
-		if ((*this)[i]._active) {
+		if ((*this)[i]._active && (!isV2 || (*this)[i]._valid)) {
 			switch (scrObjects._inputMode) {
 			case kInputBuildingSentences:
 			case kInputLimitedSentences:
@@ -203,7 +233,7 @@ Hotspot::Hotspot(Common::SeekableReadStream &f, bool isV2) {
 	_cursor = (CursorType)f.readByte();
 	if (isV2) {
 		f.skip(1);		// cursor
-		f.skip(1);		// syntax
+		_syntax = f.readByte();
 	}
 	_vocabId = f.readUint16LE();
 	_verbId = f.readUint16LE();

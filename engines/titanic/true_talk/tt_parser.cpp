@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,17 +40,24 @@ TTparser::TTparser(CScriptHandler *owner) : _owner(owner), _sentenceConcept(null
 }
 
 TTparser::~TTparser() {
+	clear();
+}
+
+void TTparser::clear() {
 	if (_nodesP) {
 		_nodesP->deleteSiblings();
 		delete _nodesP;
+		_nodesP = nullptr;
 	}
 
 	if (_conceptP) {
 		_conceptP->deleteSiblings();
 		delete _conceptP;
+		_conceptP = nullptr;
 	}
 
 	delete _currentWordP;
+	_currentWordP = nullptr;
 }
 
 void TTparser::loadArray(StringArray &arr, const CString &name) {
@@ -372,7 +378,7 @@ int TTparser::searchAndReplace(TTstring &line, int startIndex, const StringArray
 		const CString &replacementStr = strings[idx + 1];
 
 		if (!strncmp(line.c_str() + startIndex, origStr.c_str(), strings[idx].size())) {
-			// Ensure that that a space follows the match, or the end of string,
+			// Ensure that a space follows the match, or the end of string,
 			// so the end of the string doesn't match on parts of larger words
 			char c = line[startIndex + strings[idx].size()];
 			if (c == ' ' || c == '\0') {
@@ -531,6 +537,7 @@ int TTparser::findFrames(TTsentence *sentence) {
 
 	if (status <= 1) {
 		status = checkForAction();
+		clear();
 	}
 
 	delete line;
@@ -650,7 +657,7 @@ int TTparser::loadRequests(TTword *word) {
 		if (_sentence->checkCategory()) {
 			_sentenceConcept->_field1C = 1;
 			_sentenceConcept = _sentenceConcept->addSibling();
-			delete this;
+			clear();
 		} else {
 			addNode(WORD_TYPE_IS_SENTENCE_TYPE);
 		}
@@ -681,6 +688,7 @@ int TTparser::loadRequests(TTword *word) {
 		default:
 			break;
 		}
+		break;
 
 	case WC_ADJECTIVE:
 		if (word->_id == 304) {
@@ -792,7 +800,7 @@ int TTparser::considerRequests(TTword *word) {
 			if (!_sentenceConcept->_concept0P) {
 				flag = filterConcepts(5, 0);
 			} else if (_sentenceConcept->_concept0P->compareTo("?") &&
-						_sentenceConcept->_concept1P->isWordId(113) &&
+						(_sentenceConcept->_concept1P && isWordId(_sentenceConcept->_concept1P, 113)) &&
 						word->_wordClass == WC_THING) {
 				TTconcept *oldConcept = _sentenceConcept->_concept0P;
 				_sentenceConcept->_concept0P = nullptr;
@@ -817,13 +825,13 @@ int TTparser::considerRequests(TTword *word) {
 				if (flag)
 					delete oldConcept;
 			} else if (!_sentenceConcept->_concept3P &&
-					(!_sentenceConcept->_concept1P || (_sentenceConcept->_concept1P->getWordId() != 113 &&
-					_sentenceConcept->_concept1P->getWordId() != 112)) &&
+					(!_sentenceConcept->_concept1P || (getWordId(_sentenceConcept->_concept1P) != 113 &&
+					getWordId(_sentenceConcept->_concept1P) != 112)) &&
 					_sentenceConcept->_concept2P->checkWordId1() &&
 					(word->_wordClass == WC_THING || word->_wordClass == WC_PRONOUN)) {
 				_sentenceConcept->changeConcept(0, &_sentenceConcept->_concept2P, 3);
 
-				if (_conceptP && _conceptP->isWordId(word->_id)) {
+				if (_conceptP && isWordId(_conceptP, word->_id)) {
 					status = _sentenceConcept->replaceConcept(0, 2, _conceptP);
 					removeConcept(_conceptP);
 				} else {
@@ -918,7 +926,7 @@ int TTparser::considerRequests(TTword *word) {
 
 		case SEEK_OWNERSHIP:
 			if (word->_id == 601) {
-				if (_conceptP->findByWordClass(WC_THING))
+				if (TTconcept::findByWordClass(_conceptP, WC_THING))
 					status = _conceptP->setOwner(word, false);
 
 				flag = true;
@@ -960,7 +968,7 @@ int TTparser::considerRequests(TTword *word) {
 				case WC_ABSTRACT:
 					if (word->_id != 300) {
 						status = processModifiers(3, word);
-					} else if (!_conceptP || !_conceptP->findByWordClass(WC_THING)) {
+					} else if (!TTconcept::findByWordClass(_conceptP, WC_THING)) {
 						status = processModifiers(3, word);
 					} else {
 						word->_id = atoi(word->_text.c_str());
@@ -971,7 +979,7 @@ int TTparser::considerRequests(TTword *word) {
 						addToConceptList(word);
 					break;
 				case WC_ADJECTIVE: {
-					TTconcept *conceptP = _conceptP->findByWordClass(WC_THING);
+					TTconcept *conceptP = TTconcept::findByWordClass(_conceptP, WC_THING);
 					if (conceptP) {
 						conceptP->_string2 += ' ';
 						conceptP->_string2 += word->getText();
@@ -988,7 +996,7 @@ int TTparser::considerRequests(TTword *word) {
 								currP->_field34 = 1;
 						}
 					} else {
-						TTconcept *conceptP = _conceptP->findByWordClass(WC_ACTION);
+						TTconcept *conceptP = TTconcept::findByWordClass(_conceptP, WC_ACTION);
 
 						if (conceptP) {
 							conceptP->_string2 += ' ';
@@ -1469,11 +1477,11 @@ int TTparser::checkForAction() {
 	}
 
 	if (flag && _conceptP) {
-		if (actionFlag && (!_sentenceConcept->_concept1P || _sentenceConcept->_concept1P->isWordId(113))) {
+		if (actionFlag && (!_sentenceConcept->_concept1P || isWordId(_sentenceConcept->_concept1P, 113))) {
 			_sentenceConcept->replaceConcept(0, 1, _conceptP);
 		} else if (!_sentenceConcept->_concept5P) {
 			_sentenceConcept->replaceConcept(1, 5, _conceptP);
-		} else if (_sentenceConcept->_concept5P->isWordId(904)) {
+		} else if (isWordId(_sentenceConcept->_concept5P, 904)) {
 			_sentenceConcept->replaceConcept(0, 5, _conceptP);
 		}
 
@@ -1760,7 +1768,7 @@ void TTparser::preprocessGerman(TTstring &line) {
 			continue;
 
 		const char *wordEndP = p + _replacements4[idx].size();
-		
+
 		for (int sIdx = 0; sIdx < 12; ++sIdx) {
 			const char *suffixP = SUFFIXES[sIdx];
 			if (!strncmp(wordEndP, suffixP, strlen(suffixP))) {

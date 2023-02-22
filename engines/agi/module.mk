@@ -5,7 +5,6 @@ MODULE_OBJS := \
 	checks.o \
 	console.o \
 	cycle.o \
-	detection.o \
 	font.o \
 	global.o \
 	graphics.o \
@@ -17,6 +16,7 @@ MODULE_OBJS := \
 	logic.o \
 	lzw.o \
 	menu.o \
+	metaengine.o \
 	motion.o \
 	objects.o \
 	opcodes.o \
@@ -24,10 +24,6 @@ MODULE_OBJS := \
 	op_dbg.o \
 	op_test.o \
 	picture.o \
-	preagi.o \
-	preagi_mickey.o \
-	preagi_troll.o \
-	preagi_winnie.o \
 	saveload.o \
 	sound.o \
 	sound_2gs.o \
@@ -39,9 +35,11 @@ MODULE_OBJS := \
 	systemui.o \
 	text.o \
 	view.o \
-	wagparser.o \
-	words.o
-
+	words.o \
+	preagi/preagi.o \
+	preagi/mickey.o \
+	preagi/troll.o \
+	preagi/winnie.o
 
 # This module can be built as a plugin
 ifeq ($(ENABLE_AGI), DYNAMIC_PLUGIN)
@@ -50,3 +48,11 @@ endif
 
 # Include common rules
 include $(srcdir)/rules.mk
+
+# Detection objects
+DETECT_OBJS += $(MODULE)/detection.o
+
+# External dependencies of detection.
+# This is unneeded by the engine module itself,
+# so separate it completely.
+DETECT_OBJS += $(MODULE)/wagparser.o

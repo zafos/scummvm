@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -78,7 +77,7 @@ public:
 class PictureResource : public Resource {
 public:
 	PictureResource();
-	virtual ~PictureResource();
+	~PictureResource() override;
 	void load(byte *source, int size);
 	Graphics::Surface *getPicture() const { return _picture; }
 	byte *getPalette() const { return _picturePalette; }
@@ -96,7 +95,7 @@ protected:
 class AnimationResource : public Resource {
 public:
 	AnimationResource();
-	virtual ~AnimationResource();
+	~AnimationResource() override;
 	void load(byte *source, int size);
 	int getCount() const { return _frames.size(); }
 	Graphics::Surface *getFrame(int index) const {
@@ -119,10 +118,11 @@ protected:
 class SoundResource : public Resource {
 public:
 	SoundResource();
-	virtual ~SoundResource();
+	~SoundResource() override;
 	virtual void load(byte *source, int size);
 	Audio::AudioStream *getAudioStream(int soundRate, bool loop = false);
 	SoundEnergyArray *getSoundEnergyArray() const { return _soundEnergyArray; }
+	int getSoundSize() const { return _soundSize; }
 protected:
 	byte *_soundData;
 	int _soundSize;
@@ -132,14 +132,14 @@ protected:
 class SoundResourceV1 : public SoundResource {
 public:
 	SoundResourceV1() {}
-	virtual ~SoundResourceV1() {}
-	void load(byte *source, int size);
+	~SoundResourceV1() override {}
+	void load(byte *source, int size) override;
 };
 
 class MenuResource : public Resource {
 public:
 	MenuResource();
-	virtual ~MenuResource();
+	~MenuResource() override;
 	void load(byte *source, int size);
 	int getCount() const { return _strings.size(); }
 	const char *getString(uint index) const;
@@ -150,7 +150,7 @@ protected:
 class FontResource : public Resource {
 public:
 	FontResource();
-	virtual ~FontResource();
+	~FontResource() override;
 	void load(byte *source, int size);
 	int getHeight() const;
 	int getCharWidth(uint c) const;
@@ -165,7 +165,7 @@ protected:
 class GenericResource : public Resource {
 public:
 	GenericResource();
-	virtual ~GenericResource();
+	~GenericResource() override;
 	void load(byte *source, int size);
 	byte *getData() const { return _data; }
 	int getSize() const { return _size; }

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -70,8 +69,8 @@ namespace Parallaction {
 
 class MidiParser_MSC : public MidiParser {
 protected:
-	virtual void parseNextEvent(EventInfo &info);
-	virtual bool loadMusic(byte *data, uint32 size);
+	void parseNextEvent(EventInfo &info) override;
+	bool loadMusic(byte *data, uint32 size) override;
 
 	uint8  read1(byte *&data) {
 		return *data++;
@@ -86,7 +85,7 @@ protected:
 	byte *_trackEnd;
 
 public:
-	MidiParser_MSC() : byte_11C5A(false), _beats(0), _lastEvent(0), _trackEnd(NULL) {
+	MidiParser_MSC() : byte_11C5A(false), _beats(0), _lastEvent(0), _trackEnd(nullptr) {
 	}
 };
 
@@ -95,7 +94,7 @@ void MidiParser_MSC::parseMetaEvent(EventInfo &info) {
 	uint8 len = read1(_position._playPos);
 	info.ext.type = type;
 	info.length = len;
-	info.ext.data = 0;
+	info.ext.data = nullptr;
 
 	if (type == 0x51) {
 		info.ext.data = _position._playPos;
@@ -207,12 +206,12 @@ public:
 
 	void play(Common::SeekableReadStream *stream);
 	virtual void pause(bool p);
-	virtual void pause() { assert(0); } // overridden
-	virtual void setVolume(int volume);
-	virtual void onTimer();
+	void pause() override { assert(0); } // overridden
+	void setVolume(int volume) override;
+	void onTimer() override;
 
 	// MidiDriver_BASE interface
-	virtual void send(uint32 b);
+	void send(uint32 b) override;
 
 
 private:
@@ -302,6 +301,8 @@ void MidiPlayer_MSC::send(uint32 b) {
 	case 0x07B0: // volume change
 		_channelsVolume[ch] = param2;
 		break;
+	default:
+		break;
 	}
 
 	sendToChannel(ch, b);
@@ -372,7 +373,7 @@ void DosSoundMan_br::pause(bool p) {
 }
 
 AmigaSoundMan_br::AmigaSoundMan_br(Parallaction_br *vm) : SoundMan_br(vm)  {
-	_musicStream = 0;
+	_musicStream = nullptr;
 }
 
 AmigaSoundMan_br::~AmigaSoundMan_br() {
@@ -381,7 +382,7 @@ AmigaSoundMan_br::~AmigaSoundMan_br() {
 
 Audio::AudioStream *AmigaSoundMan_br::loadChannelData(const char *filename, Channel *ch, bool looping) {
 	Common::SeekableReadStream *stream = _vm->_disk->loadSound(filename);
-	Audio::AudioStream *input = 0;
+	Audio::AudioStream *input = nullptr;
 
 	if (_vm->getFeatures() & GF_DEMO) {
 		uint32 dataSize = stream->size();
@@ -454,7 +455,7 @@ void AmigaSoundMan_br::stopMusic() {
 	if (_mixer->isSoundHandleActive(_musicHandle)) {
 		_mixer->stopHandle(_musicHandle);
 		delete _musicStream;
-		_musicStream = 0;
+		_musicStream = nullptr;
 	}
 }
 
@@ -498,11 +499,11 @@ void SoundMan_br::stopSfx(uint channel) {
 
 	debugC(1, kDebugAudio, "SoundMan_br::stopSfx(%i)", channel);
 	_mixer->stopHandle(_channels[channel].handle);
-	_channels[channel].stream = 0;
+	_channels[channel].stream = nullptr;
 }
 
 void SoundMan_br::execute(int command, const char *parm) {
-	uint32 n = parm ? strtoul(parm, 0, 10) : 0;
+	uint32 n = parm ? strtoul(parm, nullptr, 10) : 0;
 	bool b = (n == 1) ? true : false;
 
 	switch (command) {
@@ -539,6 +540,9 @@ void SoundMan_br::execute(int command, const char *parm) {
 
 	case SC_PAUSE:
 		pause(b);
+		break;
+
+	default:
 		break;
 	}
 }

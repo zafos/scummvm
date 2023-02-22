@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -108,8 +107,8 @@ void FighterPlayerMilos::update() {
 			setSequenceAndDraw(5, kFightSequenceType1);
 			_opponent->setSequenceAndDraw(6, kFightSequenceType1);
 
-			getSoundQueue()->removeFromQueue(kEntityTables0);
-			getSound()->playSound(kEntityTrain, "MUS029", kFlagDefault);
+			getSoundQueue()->stop(kEntityTables0);
+			getSound()->playSound(kEntityTrain, "MUS029", kVolumeFull);
 
 			handleAction(kFightActionWin);
 		}
@@ -149,7 +148,7 @@ FighterOpponentMilos::FighterOpponentMilos(LastExpressEngine *engine) : Opponent
 	_sequences.push_back(loadSequence("2001dbk.seq"));
 	_sequences.push_back(loadSequence("2001wbk.seq"));
 
-	getSound()->playSound(kEntityTables0, "MUS027", kFlagDefault);
+	getSound()->playSound(kEntityTables0, "MUS027", kVolumeFull);
 
 	_field_38 = 35;
 }
@@ -211,7 +210,7 @@ void FighterOpponentMilos::update() {
 			_opponent->handleAction((FightAction)_sequenceIndex);
 
 		if (_opponent->getCountdown() <= 0) {
-			getSoundQueue()->removeFromQueue(kEntityTables0);
+			getSoundQueue()->stop(kEntityTables0);
 			handleAction(kFightActionLost);
 		}
 	}

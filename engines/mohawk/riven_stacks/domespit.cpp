@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -115,7 +114,7 @@ void DomeSpit::checkDomeSliders() {
 
 void DomeSpit::checkSliderCursorChange(uint16 startHotspot) {
 	// Set the cursor based on _sliderState and what hotspot we're over
-	int16 sliderSlot = getSliderSlotAtPos(startHotspot, getMousePosition());
+	int16 sliderSlot = getSliderSlotClosestToPos(startHotspot, getMousePosition());
 
 	if (sliderSlot >= 0 && isSliderAtSlot(sliderSlot)) {
 		_vm->_cursor->setCursor(kRivenOpenHandCursor);
@@ -124,10 +123,26 @@ void DomeSpit::checkSliderCursorChange(uint16 startHotspot) {
 	}
 }
 
-int16 DomeSpit::getSliderSlotAtPos(uint16 startHotspot, const Common::Point &pos) const {
+int16 DomeSpit::getSliderSlotClosestToPos(uint16 startHotspot, const Common::Point &pos) const {
+	// Emperically found min x and max x hotspot are used to bound mouse position into
+	// the slider area vertically. This and the y mouse position being directly put into
+	// the slider area allows the user to move the cursor out of the slider area and still
+	// be able to move the slider.
+	int16 minXHotspot = 211; // suitable min x value hotspot for all domes
+	int16 maxXHotspot = 407; // suitable max x value hotspot for all domes
+
+	// Find the slider slot closest to pos. This is not necessarily the slider being moved.
 	for (uint16 i = 0; i < kDomeSliderSlotCount; i++) {
 		RivenHotspot *hotspot = _vm->getCard()->getHotspotByBlstId(startHotspot + i);
-		if (hotspot->containsPoint(pos)) {
+		Common::Rect srcRect = hotspot->getRect();
+		// Only the x value of mouse position being in the hotspot matters
+		// the y value of srcRect.top is chosen because it is in the rect.
+		Common::Point posBounded(pos.x, srcRect.top);
+		// Now clip the x value so it lies in the x extremes of the slider hotspots.
+		// If this is not done then the user can move the x position past the
+		// slider area and the slider won't go all the way to that end.
+		posBounded.x = CLIP<int16>(posBounded.x, minXHotspot, maxXHotspot - 1);
+		if (hotspot->containsPoint(posBounded)) {
 			return i;
 		}
 	}
@@ -140,7 +155,7 @@ bool DomeSpit::isSliderAtSlot(int16 slot) const {
 }
 
 void DomeSpit::dragDomeSlider(uint16 startHotspot) {
-	int16 draggedSliderSlot = getSliderSlotAtPos(startHotspot, getMousePosition());
+	int16 draggedSliderSlot = getSliderSlotClosestToPos(startHotspot, getMousePosition());
 
 	// We're not over any slider
 	if (draggedSliderSlot < 0 || !isSliderAtSlot(draggedSliderSlot)) {
@@ -151,7 +166,7 @@ void DomeSpit::dragDomeSlider(uint16 startHotspot) {
 	_vm->_cursor->setCursor(kRivenClosedHandCursor);
 
 	while (mouseIsDown() && !_vm->hasGameEnded()) {
-		int16 hoveredHotspot = getSliderSlotAtPos(startHotspot, getMousePosition());
+		int16 hoveredHotspot = getSliderSlotClosestToPos(startHotspot, getMousePosition());
 		if (hoveredHotspot >= 0) {
 			if (hoveredHotspot > draggedSliderSlot && draggedSliderSlot < 24 && !isSliderAtSlot(draggedSliderSlot + 1)) {
 				// We've moved the slider right one space

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -32,7 +31,7 @@ namespace Neverhood {
 class AsScene1401Pipe : public AnimatedSprite {
 public:
 	AsScene1401Pipe(NeverhoodEngine *vm);
-	virtual ~AsScene1401Pipe();
+	~AsScene1401Pipe() override;
 protected:
 	int _countdown1;
 	int _countdown2;
@@ -89,7 +88,7 @@ struct AsCommonProjectorItem {
 class AsCommonProjector : public AnimatedSprite {
 public:
 	AsCommonProjector(NeverhoodEngine *vm, Scene *parentScene, Sprite *klaymen, Sprite *asPipe);
-	virtual ~AsCommonProjector();
+	~AsCommonProjector() override;
 protected:
 	Scene *_parentScene;
 	Sprite *_klaymen;
@@ -169,28 +168,28 @@ class KmScene1401 : public Klaymen {
 public:
 	KmScene1401(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16 y);
 protected:
-	uint32 xHandleMessage(int messageNum, const MessageParam &param);
+	uint32 xHandleMessage(int messageNum, const MessageParam &param) override;
 };
 
 class KmScene1402 : public Klaymen {
 public:
 	KmScene1402(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16 y);
 protected:
-	uint32 xHandleMessage(int messageNum, const MessageParam &param);
+	uint32 xHandleMessage(int messageNum, const MessageParam &param) override;
 };
 
 class KmScene1403 : public Klaymen {
 public:
 	KmScene1403(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16 y);
 protected:
-	uint32 xHandleMessage(int messageNum, const MessageParam &param);
+	uint32 xHandleMessage(int messageNum, const MessageParam &param) override;
 };
 
 class KmScene1404 : public Klaymen {
 public:
 	KmScene1404(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16 y);
 protected:
-	uint32 xHandleMessage(int messageNum, const MessageParam &param);
+	uint32 xHandleMessage(int messageNum, const MessageParam &param) override;
 };
 
 } // End of namespace Neverhood

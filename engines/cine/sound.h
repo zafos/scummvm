@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,6 +25,7 @@
 #include "common/util.h"
 #include "common/mutex.h"
 #include "audio/mixer.h"
+#include "audio/mididrv.h"
 
 namespace Audio {
 class AudioStream;
@@ -38,14 +38,16 @@ class CineEngine;
 class Sound {
 public:
 
-	Sound(Audio::Mixer *mixer, CineEngine *vm) : _mixer(mixer), _vm(vm) {}
+	Sound(Audio::Mixer *mixer, CineEngine *vm) : _mixer(mixer), _vm(vm), _musicType(MT_INVALID) {}
 	virtual ~Sound() {}
 
+	virtual MusicType musicType();
 	virtual void loadMusic(const char *name) = 0;
 	virtual void playMusic() = 0;
 	virtual void stopMusic() = 0;
 	virtual void fadeOutMusic() = 0;
 
+	virtual void playSound(int mode, int channel, int param3, int param4, int param5, int size) = 0;
 	virtual void playSound(int channel, int frequency, const uint8 *data, int size, int volumeStep, int stepCount, int volume, int repeat) = 0;
 	virtual void stopSound(int channel) = 0;
 	virtual void setBgMusic(int num) = 0;
@@ -54,6 +56,7 @@ protected:
 
 	Audio::Mixer *_mixer;
 	CineEngine *_vm;
+	MusicType _musicType;
 };
 
 class PCSoundDriver;
@@ -63,16 +66,17 @@ class PCSound : public Sound {
 public:
 
 	PCSound(Audio::Mixer *mixer, CineEngine *vm);
-	virtual ~PCSound();
+	~PCSound() override;
 
-	virtual void loadMusic(const char *name);
-	virtual void playMusic();
-	virtual void stopMusic();
-	virtual void fadeOutMusic();
+	void loadMusic(const char *name) override;
+	void playMusic() override;
+	void stopMusic() override;
+	void fadeOutMusic() override;
 
-	virtual void playSound(int channel, int frequency, const uint8 *data, int size, int volumeStep, int stepCount, int volume, int repeat);
-	virtual void stopSound(int channel);
-	virtual void setBgMusic(int num);
+	void playSound(int mode, int channel, int param3, int param4, int param5, int size) override;
+	void playSound(int channel, int frequency, const uint8 *data, int size, int volumeStep, int stepCount, int volume, int repeat) override;
+	void stopSound(int channel) override;
+	void setBgMusic(int num) override;
 
 protected:
 
@@ -86,16 +90,17 @@ class PaulaSound : public Sound {
 public:
 
 	PaulaSound(Audio::Mixer *mixer, CineEngine *vm);
-	virtual ~PaulaSound();
+	~PaulaSound() override;
 
-	virtual void loadMusic(const char *name);
-	virtual void playMusic();
-	virtual void stopMusic();
-	virtual void fadeOutMusic();
+	void loadMusic(const char *name) override;
+	void playMusic() override;
+	void stopMusic() override;
+	void fadeOutMusic() override;
 
-	virtual void playSound(int channel, int frequency, const uint8 *data, int size, int volumeStep, int stepCount, int volume, int repeat);
-	virtual void stopSound(int channel);
-	virtual void setBgMusic(int num);
+	void playSound(int mode, int channel, int param3, int param4, int param5, int size) override;
+	void playSound(int channel, int frequency, const uint8 *data, int size, int volumeStep, int stepCount, int volume, int repeat) override;
+	void stopSound(int channel) override;
+	void setBgMusic(int num) override;
 
 	enum {
 		PAULA_FREQ = 3579545,

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,7 +46,8 @@
 
 namespace Neverhood {
 
-NeverhoodEngine::NeverhoodEngine(OSystem *syst, const NeverhoodGameDescription *gameDesc) : Engine(syst), _gameDescription(gameDesc), _console(nullptr) {
+NeverhoodEngine::NeverhoodEngine(OSystem *syst, const ADGameDescription *gameDesc) :
+		Engine(syst), _gameDescription(gameDesc), _haveSubtitles(false), _nhcOffsetFont(false) {
 	// Setup mixer
 	if (!_mixer->isReady()) {
 		warning("Sound initialization failed.");
@@ -68,8 +68,16 @@ Common::Error NeverhoodEngine::run() {
 	initGraphics(640, 480);
 
 	const Common::FSNode gameDataDir(ConfMan.get("path"));
+	const Common::String extraPath(ConfMan.get("extrapath"));
 
 	SearchMan.addSubDirectoryMatching(gameDataDir, "data");
+	SearchMan.addSubDirectoryMatching(gameDataDir, "language");
+
+	if(!extraPath.empty()) {
+		const Common::FSNode extraDir(extraPath);
+		SearchMan.addSubDirectoryMatching(extraDir, "data");
+		SearchMan.addSubDirectoryMatching(extraDir, "language");
+	}
 
 	_isSaveAllowed = false;
 
@@ -84,7 +92,7 @@ Common::Error NeverhoodEngine::run() {
 	_gameVars = new GameVars();
 	_screen = new Screen(this);
 	_res = new ResourceMan();
-	_console = new Console(this);
+	setDebugger(new Console(this));
 
 	if (isDemo()) {
 		_res->addArchive("a.blb");
@@ -94,9 +102,41 @@ Common::Error NeverhoodEngine::run() {
 		_res->addArchive("c.blb");
 		_res->addArchive("hd.blb");
 		_res->addArchive("i.blb");
-		_res->addArchive("m.blb");
+		// Japanese version is missing "making of".
+		_res->addArchive("m.blb", getLanguage() == Common::Language::JA_JPN);
 		_res->addArchive("s.blb");
 		_res->addArchive("t.blb");
+	}
+
+	Common::String nhcFile = ConfMan.get("nhc_file");
+	if (!nhcFile.empty() && _res->addNhcArchive(nhcFile + ".nhc")) {
+		uint32 fontSpecHash = calcHash("asRecFont");
+		if (_res->nhcExists(fontSpecHash, kResTypeData)) {
+			DataResource fontData(this);
+			fontData.load(fontSpecHash);
+
+			_nhcOffsetFont = (fontData.getPoint(calcHash("meNumRows")).x == 14
+			    && fontData.getPoint(calcHash("meFirstChar")).x == 32
+			    && fontData.getPoint(calcHash("meCharHeight")).x == 34
+			    && fontData.getPointArray(calcHash("meTracking"))->size() == 224);
+		}
+		if (ConfMan.getBool("subtitles")) {
+			Common::SeekableReadStream *s = _res->createNhcStream(0x544E4F46, kResNhcTypeSubFont);
+			if (s && s->size() >= 4096) {
+				for (uint i = 0; i < 256; i++) {
+					s->read(&_subFont[i].bitmap, sizeof(_subFont[i].bitmap));
+					for (uint j = 0; j < 16; j++)
+						_subFont[i].outline[j] = (_subFont[i].bitmap[j] << 1) | (_subFont[i].bitmap[j] >> 1);
+					for (uint j = 1; j < 16; j++)
+						_subFont[i].outline[j] |= _subFont[i].bitmap[j-1];
+					for (uint j = 0; j < 15; j++)
+						_subFont[i].outline[j] |= _subFont[i].bitmap[j+1];
+					for (uint j = 0; j < 16; j++)
+						_subFont[i].outline[j] &= ~_subFont[i].bitmap[j];
+				}
+				_haveSubtitles = true;
+			}
+		}
 	}
 
 	CursorMan.showMouse(false);
@@ -110,7 +150,7 @@ Common::Error NeverhoodEngine::run() {
 	_updateSound = true;
 	_enableMusic = !_mixer->isSoundTypeMuted(Audio::Mixer::kMusicSoundType);
 
-	if (isDemo()) {
+	if (isDemo() && !isBigDemo()) {
 		// Adjust this navigation list for the demo version
 		NavigationList *navigationList = _staticData->getNavigationList(0x004B67E8);
 		(*navigationList)[0].middleSmackerFileHash = 0;
@@ -135,7 +175,6 @@ Common::Error NeverhoodEngine::run() {
 	delete _soundMan;
 	delete _audioResourceMan;
 
-	delete _console;
 	delete _res;
 	delete _screen;
 
@@ -153,11 +192,6 @@ void NeverhoodEngine::mainLoop() {
 		while (eventMan->pollEvent(event)) {
 			switch (event.type) {
 			case Common::EVENT_KEYDOWN:
-				if (event.kbd.hasFlags(Common::KBD_CTRL) && event.kbd.keycode == Common::KEYCODE_d) {
-					// Open debugger console
-					_console->attach();
-					continue;
-				}
 				_gameModule->handleKeyDown(event.kbd.keycode);
 				_gameModule->handleAsciiKey(event.kbd.ascii);
 				break;
@@ -190,7 +224,6 @@ void NeverhoodEngine::mainLoop() {
 			_gameModule->checkRequests();
 			_gameModule->handleUpdate();
 			_gameModule->draw();
-			_console->onFrame();
 			_screen->update();
 			if (_updateSound)
 				_soundMan->update();

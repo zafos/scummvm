@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,19 +15,18 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#include <curl/curl.h>
 #include "backends/cloud/box/boxtokenrefresher.h"
 #include "backends/cloud/box/boxstorage.h"
 #include "backends/networking/curl/networkreadstream.h"
 #include "common/debug.h"
-#include "common/json.h"
-#include <curl/curl.h>
+#include "common/formats/json.h"
 
 namespace Cloud {
 namespace Box {
@@ -41,7 +40,7 @@ void BoxTokenRefresher::tokenRefreshed(Storage::BoolResponse response) {
 	if (!response.value) {
 		//failed to refresh token, notify user with NULL in original callback
 		warning("BoxTokenRefresher: failed to refresh token");
-		finishError(Networking::ErrorResponse(this, false, true, "", -1));
+		finishError(Networking::ErrorResponse(this, false, true, "BoxTokenRefresher::tokenRefreshed: failed to refresh token", -1));
 		return;
 	}
 
@@ -99,7 +98,7 @@ void BoxTokenRefresher::finishJson(Common::JSONValue *json) {
 
 			pause();
 			delete json;
-			_parentStorage->getAccessToken(new Common::Callback<BoxTokenRefresher, Storage::BoolResponse>(this, &BoxTokenRefresher::tokenRefreshed));
+			_parentStorage->refreshAccessToken(new Common::Callback<BoxTokenRefresher, Storage::BoolResponse>(this, &BoxTokenRefresher::tokenRefreshed));
 			return;
 		}
 	}
@@ -108,10 +107,10 @@ void BoxTokenRefresher::finishJson(Common::JSONValue *json) {
 	CurlJsonRequest::finishJson(json);
 }
 
-void BoxTokenRefresher::finishError(Networking::ErrorResponse error) {
+void BoxTokenRefresher::finishError(Networking::ErrorResponse error, Networking::RequestState state) {
 	if (error.httpResponseCode == 401) { // invalid_token
 		pause();
-		_parentStorage->getAccessToken(new Common::Callback<BoxTokenRefresher, Storage::BoolResponse>(this, &BoxTokenRefresher::tokenRefreshed));
+		_parentStorage->refreshAccessToken(new Common::Callback<BoxTokenRefresher, Storage::BoolResponse>(this, &BoxTokenRefresher::tokenRefreshed));
 		return;
 	}
 
@@ -124,7 +123,7 @@ void BoxTokenRefresher::finishError(Networking::ErrorResponse error) {
 void BoxTokenRefresher::setHeaders(Common::Array<Common::String> &headers) {
 	_headers = headers;
 	curl_slist_free_all(_headersList);
-	_headersList = 0;
+	_headersList = nullptr;
 	for (uint32 i = 0; i < headers.size(); ++i)
 		CurlJsonRequest::addHeader(headers[i]);
 }

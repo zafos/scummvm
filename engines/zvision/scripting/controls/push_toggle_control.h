@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,7 +33,7 @@ namespace ZVision {
 class PushToggleControl : public Control {
 public:
 	PushToggleControl(ZVision *engine, uint32 key, Common::SeekableReadStream &stream);
-	~PushToggleControl();
+	~PushToggleControl() override;
 
 	/**
 	 * Called when LeftMouse is pushed. Default is NOP.
@@ -42,14 +41,14 @@ public:
 	 * @param screenSpacePos             The position of the mouse in screen space
 	 * @param backgroundImageSpacePos    The position of the mouse in background image space
 	 */
-	bool onMouseDown(const Common::Point &screenSpacePos, const Common::Point &backgroundImageSpacePos);
+	bool onMouseDown(const Common::Point &screenSpacePos, const Common::Point &backgroundImageSpacePos) override;
 	/**
 	 * Called when LeftMouse is lifted. Calls ScriptManager::setStateValue(_key, 1);
 	 *
 	 * @param screenSpacePos             The position of the mouse in screen space
 	 * @param backgroundImageSpacePos    The position of the mouse in background image space
 	 */
-	bool onMouseUp(const Common::Point &screenSpacePos, const Common::Point &backgroundImageSpacePos);
+	bool onMouseUp(const Common::Point &screenSpacePos, const Common::Point &backgroundImageSpacePos) override;
 	/**
 	 * Called on every MouseMove. Tests if the mouse is inside _hotspot, and if so, sets the cursor.
 	 *
@@ -58,7 +57,7 @@ public:
 	 * @param backgroundImageSpacePos    The position of the mouse in background image space
 	 * @return                           Was the cursor changed?
 	 */
-	bool onMouseMove(const Common::Point &screenSpacePos, const Common::Point &backgroundImageSpacePos);
+	bool onMouseMove(const Common::Point &screenSpacePos, const Common::Point &backgroundImageSpacePos) override;
 
 private:
 	/**

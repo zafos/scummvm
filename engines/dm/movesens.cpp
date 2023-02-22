@@ -1,29 +1,28 @@
 /* ScummVM - Graphic Adventure Engine
-*
-* ScummVM is the legal property of its developers, whose names
-* are too numerous to list here. Please refer to the COPYRIGHT
-* file distributed with this source distribution.
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-*
-*/
+ *
+ * ScummVM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 /*
-* Based on the Reverse Engineering work of Christophe Fontanel,
-* maintainer of the Dungeon Master Encyclopaedia (http://dmweb.free.fr/)
-*/
+ * Based on the Reverse Engineering work of Christophe Fontanel,
+ * maintainer of the Dungeon Master Encyclopaedia (http://dmweb.free.fr/)
+ */
 
 #include "dm/movesens.h"
 #include "dm/champion.h"
@@ -615,6 +614,7 @@ int16 MovesensMan::getSound(CreatureType creatureType) {
 	case kDMCreatureTypeLordChaos:
 	case kDMCreatureTypeLordOrder:
 	case kDMCreatureTypeGreyLord:
+	default:
 		return 35;
 	case kDMCreatureTypeGiggler:
 	case kDMCreatureTypeStoneGolem:
@@ -736,7 +736,7 @@ void MovesensMan::processThingAdditionOrRemoval(uint16 mapX, uint16 mapY, Thing 
 			if (curThingType == kDMThingTypeGroup)
 				squareContainsGroup = true;
 			else if ((curThingType == kDMstringTypeText) && (thingType == kDMThingTypeParty) && addThing && !partySquare) {
-				dungeon.decodeText(_vm->_stringBuildBuffer, curThing, kDMTextTypeMessage);
+				dungeon.decodeText(_vm->_stringBuildBuffer, sizeof(_vm->_stringBuildBuffer), curThing, kDMTextTypeMessage);
 				txtMan.printMessage(kDMColorWhite, _vm->_stringBuildBuffer);
 			} else if ((curThingType > kDMThingTypeGroup) && (curThingType < kDMThingTypeProjectile)) {
 				squareContainsObject = true;
@@ -969,30 +969,35 @@ void MovesensMan::processRotationEffect() {
 	switch (_sensorRotationEffect) {
 	case kDMSensorEffectClear:
 	case kDMSensorEffectToggle:
-		Thing firstSensorThing = dungeon.getSquareFirstThing(_sensorRotationEffMapX, _sensorRotationEffMapY);
-		while ((firstSensorThing.getType() != kDMThingTypeSensor)
-			|| ((_sensorRotationEffCell != kDMCellAny) && (firstSensorThing.getCell() != _sensorRotationEffCell))) {
-			firstSensorThing = dungeon.getNextThing(firstSensorThing);
-		}
-		Sensor *firstSensor = (Sensor *)dungeon.getThingData(firstSensorThing);
-		Thing lastSensorThing = firstSensor->getNextThing();
-		while ((lastSensorThing != _vm->_thingEndOfList)
-		    && ((lastSensorThing.getType() != kDMThingTypeSensor)
+		{
+			Thing firstSensorThing = dungeon.getSquareFirstThing(_sensorRotationEffMapX, _sensorRotationEffMapY);
+			while ((firstSensorThing.getType() != kDMThingTypeSensor)
+				|| ((_sensorRotationEffCell != kDMCellAny) && (firstSensorThing.getCell() != _sensorRotationEffCell))) {
+				firstSensorThing = dungeon.getNextThing(firstSensorThing);
+			}
+			Sensor *firstSensor = (Sensor *)dungeon.getThingData(firstSensorThing);
+			Thing lastSensorThing = firstSensor->getNextThing();
+			while ((lastSensorThing != _vm->_thingEndOfList)
+				&& ((lastSensorThing.getType() != kDMThingTypeSensor)
 				|| ((_sensorRotationEffCell != kDMCellAny) && (lastSensorThing.getCell() != _sensorRotationEffCell)))) {
+				lastSensorThing = dungeon.getNextThing(lastSensorThing);
+			}
+			if (lastSensorThing == _vm->_thingEndOfList)
+				break;
+			dungeon.unlinkThingFromList(firstSensorThing, Thing(0), _sensorRotationEffMapX, _sensorRotationEffMapY);
+			Sensor *lastSensor = (Sensor *)dungeon.getThingData(lastSensorThing);
 			lastSensorThing = dungeon.getNextThing(lastSensorThing);
+			while (((lastSensorThing != _vm->_thingEndOfList) && (lastSensorThing.getType() == kDMThingTypeSensor))) {
+				if ((_sensorRotationEffCell == kDMCellAny) || (lastSensorThing.getCell() == _sensorRotationEffCell))
+					lastSensor = (Sensor *)dungeon.getThingData(lastSensorThing);
+				lastSensorThing = dungeon.getNextThing(lastSensorThing);
+			}
+			firstSensor->setNextThing(lastSensor->getNextThing());
+			lastSensor->setNextThing(firstSensorThing);
 		}
-		if (lastSensorThing == _vm->_thingEndOfList)
-			break;
-		dungeon.unlinkThingFromList(firstSensorThing, Thing(0), _sensorRotationEffMapX, _sensorRotationEffMapY);
-		Sensor *lastSensor = (Sensor *)dungeon.getThingData(lastSensorThing);
-		lastSensorThing = dungeon.getNextThing(lastSensorThing);
-		while (((lastSensorThing != _vm->_thingEndOfList) && (lastSensorThing.getType() == kDMThingTypeSensor))) {
-			if ((_sensorRotationEffCell == kDMCellAny) || (lastSensorThing.getCell() == _sensorRotationEffCell))
-				lastSensor = (Sensor *)dungeon.getThingData(lastSensorThing);
-			lastSensorThing = dungeon.getNextThing(lastSensorThing);
-		}
-		firstSensor->setNextThing(lastSensor->getNextThing());
-		lastSensor->setNextThing(firstSensorThing);
+		break;
+	default:
+		break;
 	}
 	_sensorRotationEffect = kDMSensorEffectNone;
 }

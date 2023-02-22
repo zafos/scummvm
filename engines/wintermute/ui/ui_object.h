@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -42,30 +41,30 @@ public:
 
 	bool getTotalOffset(int *offsetX, int *offsetY);
 	bool focus();
-	virtual bool handleMouse(TMouseEvent event, TMouseButton button);
+	bool handleMouse(TMouseEvent event, TMouseButton button) override;
 	bool isFocused();
 
 	DECLARE_PERSISTENT(UIObject, BaseObject)
 	UIObject *_parent;
-	virtual bool display() override { return display(0, 0); }
+	bool display() override { return display(0, 0); }
 	virtual bool display(int offsetX) { return display(offsetX, 0); }
 	virtual bool display(int offsetX, int offsetY);
 	virtual void correctSize();
 	void setText(const char *text);
 
 	UIObject(BaseGame *inGame = nullptr);
-	virtual ~UIObject();
+	~UIObject() override;
 	void setListener(BaseScriptHolder *object, BaseScriptHolder *listenerObject, uint32 listenerParam);
 	BaseScriptHolder *getListener() const;
 
 	UIObject *_focusedWidget;
-	virtual bool saveAsText(BaseDynamicBuffer *buffer, int indent) override;
+	bool saveAsText(BaseDynamicBuffer *buffer, int indent) override;
 
 	// scripting interface
-	virtual ScValue *scGetProperty(const Common::String &name) override;
-	virtual bool scSetProperty(const char *name, ScValue *value) override;
-	virtual bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
-	virtual const char *scToString() override;
+	ScValue *scGetProperty(const Common::String &name) override;
+	bool scSetProperty(const char *name, ScValue *value) override;
+	bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
+	const char *scToString() override;
 	TUIObjectType _type;
 
 	int32 getWidth() const;

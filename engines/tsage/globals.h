@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -75,7 +74,7 @@ public:
 	int _gfxEdgeAdjust;
 public:
 	Globals();
-	~Globals();
+	~Globals() override;
 
 	void setFlag(int flagNum) {
 		assert((flagNum >= 0) && (flagNum < MAX_FLAGS));
@@ -91,8 +90,8 @@ public:
 	}
 
 	GfxManager &gfxManager() { return **_gfxManagers.begin(); }
-	virtual Common::String getClassName() { return "Globals"; }
-	virtual void synchronize(Serializer &s);
+	Common::String getClassName() override { return "Globals"; }
+	void synchronize(Serializer &s) override;
 	virtual void reset();
 
 	void dispatchSounds();
@@ -111,8 +110,8 @@ public:
 	ASoundExt _inventorySound;
 
 	TsAGE2Globals();
-	virtual void reset();
-	virtual void synchronize(Serializer &s);
+	void reset() override;
+	void synchronize(Serializer &s) override;
 };
 
 extern Globals *g_globals;
@@ -220,9 +219,9 @@ public:
 	BlueForceGlobals();
 	bool getHasBullets();
 
-	virtual Common::String getClassName() { return "BFGlobals"; }
-	virtual void reset();
-	virtual void synchronize(Serializer &s);
+	Common::String getClassName() override { return "BFGlobals"; }
+	void reset() override;
+	void synchronize(Serializer &s) override;
 	void set2Flags(int flagNum);
 	bool removeFlag(int flagNum);
 };
@@ -297,9 +296,9 @@ public:
 	ScannerDialog *_scannerDialog;
 
 	Ringworld2Globals();
-	virtual ~Ringworld2Globals();
-	virtual void reset();
-	virtual void synchronize(Serializer &s);
+	~Ringworld2Globals() override;
+	void reset() override;
+	void synchronize(Serializer &s) override;
 };
 
 } // End of namespace Ringworld2

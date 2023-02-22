@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,10 +33,6 @@
 #include "common/keyboard.h"
 #include "common/file.h"
 #include "common/savefile.h"
-
-#if defined(__DS__) && defined(ENABLE_AGI)
-#include "backends/platform/ds/arm9/source/wordcompletion.h"
-#endif
 
 namespace GUI {
 
@@ -68,23 +63,43 @@ enum {
 };
 
 PredictiveDialog::PredictiveDialog() : Dialog("Predictive") {
-	new StaticTextWidget(this, "Predictive.Headline", "Enter Text");
+	new StaticTextWidget(this, "Predictive.Headline", _("Enter Text"));
 
-	_button[kCancelAct] =  new ButtonWidget(this, "Predictive.Cancel",  _("Cancel")   , 0, kCancelCmd);
-	_button[kOkAct] =      new ButtonWidget(this, "Predictive.OK",      _("Ok")       , 0, kOkCmd);
-	_button[kButton1Act] = new ButtonWidget(this, "Predictive.Button1", "1  `-.&"     , 0, kBut1Cmd);
-	_button[kButton2Act] = new ButtonWidget(this, "Predictive.Button2", "2  abc"      , 0, kBut2Cmd);
-	_button[kButton3Act] = new ButtonWidget(this, "Predictive.Button3", "3  def"      , 0, kBut3Cmd);
-	_button[kButton4Act] = new ButtonWidget(this, "Predictive.Button4", "4  ghi"      , 0, kBut4Cmd);
-	_button[kButton5Act] = new ButtonWidget(this, "Predictive.Button5", "5  jkl"      , 0, kBut5Cmd);
-	_button[kButton6Act] = new ButtonWidget(this, "Predictive.Button6", "6  mno"      , 0, kBut6Cmd);
-	_button[kButton7Act] = new ButtonWidget(this, "Predictive.Button7", "7  pqrs"     , 0, kBut7Cmd);
-	_button[kButton8Act] = new ButtonWidget(this, "Predictive.Button8", "8  tuv"      , 0, kBut8Cmd);
-	_button[kButton9Act] = new ButtonWidget(this, "Predictive.Button9", "9  wxyz"     , 0, kBut9Cmd);
-	_button[kButton0Act] = new ButtonWidget(this, "Predictive.Button0", "0"           , 0, kBut0Cmd);
+	_button[kCancelAct] =  new ButtonWidget(this, "Predictive.Cancel",  _("Cancel")   , Common::U32String(), kCancelCmd);
+	_button[kOkAct] =      new ButtonWidget(this, "Predictive.OK",      _("OK")       , Common::U32String(), kOkCmd);
+
+	if (g_gui.useRTL()) {
+		/** If using RTL, swap the internal name of odd columns, to be flipped again when drawing.
+			We flip them back to original, because the keyboard layout stays the same in LTR & RTL.
+			The rest, like okButton, cancel, etc are all flipped.
+		*/
+
+		_button[kButton3Act] = new ButtonWidget(this, "Predictive.Button1", Common::U32String("3  def"      ), Common::U32String(), kBut3Cmd);
+		_button[kButton2Act] = new ButtonWidget(this, "Predictive.Button2", Common::U32String("2  abc"      ), Common::U32String(), kBut2Cmd);
+		_button[kButton1Act] = new ButtonWidget(this, "Predictive.Button3", Common::U32String("1  `-.&"     ), Common::U32String(), kBut1Cmd);
+		_button[kButton6Act] = new ButtonWidget(this, "Predictive.Button4", Common::U32String("6  mno"      ), Common::U32String(), kBut6Cmd);
+		_button[kButton5Act] = new ButtonWidget(this, "Predictive.Button5", Common::U32String("5  jkl"      ), Common::U32String(), kBut5Cmd);
+		_button[kButton4Act] = new ButtonWidget(this, "Predictive.Button6", Common::U32String("4  ghi"      ), Common::U32String(), kBut4Cmd);
+		_button[kButton9Act] = new ButtonWidget(this, "Predictive.Button7", Common::U32String("9  wxyz"     ), Common::U32String(), kBut9Cmd);
+		_button[kButton8Act] = new ButtonWidget(this, "Predictive.Button8", Common::U32String("8  tuv"      ), Common::U32String(), kBut8Cmd);
+		_button[kButton7Act] = new ButtonWidget(this, "Predictive.Button9", Common::U32String("7  pqrs"     ), Common::U32String(), kBut7Cmd);
+		_button[kButton0Act] = new ButtonWidget(this, "Predictive.Button0", Common::U32String("0"           ), Common::U32String(), kBut0Cmd);
+	} else {
+		_button[kButton1Act] = new ButtonWidget(this, "Predictive.Button1", Common::U32String("1  `-.&"     ), Common::U32String(), kBut1Cmd);
+		_button[kButton2Act] = new ButtonWidget(this, "Predictive.Button2", Common::U32String("2  abc"      ), Common::U32String(), kBut2Cmd);
+		_button[kButton3Act] = new ButtonWidget(this, "Predictive.Button3", Common::U32String("3  def"      ), Common::U32String(), kBut3Cmd);
+		_button[kButton4Act] = new ButtonWidget(this, "Predictive.Button4", Common::U32String("4  ghi"      ), Common::U32String(), kBut4Cmd);
+		_button[kButton5Act] = new ButtonWidget(this, "Predictive.Button5", Common::U32String("5  jkl"      ), Common::U32String(), kBut5Cmd);
+		_button[kButton6Act] = new ButtonWidget(this, "Predictive.Button6", Common::U32String("6  mno"      ), Common::U32String(), kBut6Cmd);
+		_button[kButton7Act] = new ButtonWidget(this, "Predictive.Button7", Common::U32String("7  pqrs"     ), Common::U32String(), kBut7Cmd);
+		_button[kButton8Act] = new ButtonWidget(this, "Predictive.Button8", Common::U32String("8  tuv"      ), Common::U32String(), kBut8Cmd);
+		_button[kButton9Act] = new ButtonWidget(this, "Predictive.Button9", Common::U32String("9  wxyz"     ), Common::U32String(), kBut9Cmd);
+		_button[kButton0Act] = new ButtonWidget(this, "Predictive.Button0", Common::U32String("0"           ), Common::U32String(), kBut0Cmd);
+	}
+
 	// I18N: You must leave "#" as is, only word 'next' is translatable
-	_button[kNextAct] =    new ButtonWidget(this, "Predictive.Next",    _("#  next")  , 0, kNextCmd);
-	_button[kAddAct] =     new ButtonWidget(this, "Predictive.Add",     _("add")      , 0, kAddCmd);
+	_button[kNextAct] =    new ButtonWidget(this, "Predictive.Next",    _("#  next")  , Common::U32String(), kNextCmd);
+	_button[kAddAct]  =    new ButtonWidget(this, "Predictive.Add",     _("add")      , Common::U32String(), kAddCmd);
 	_button[kAddAct]->setEnabled(false);
 
 #ifndef DISABLE_FANCY_THEMES
@@ -94,10 +109,10 @@ PredictiveDialog::PredictiveDialog() : Dialog("Predictive") {
 		((PicButtonWidget *)_button[kDelAct])->setGfx(g_gui.theme()->getImageSurface(ThemeEngine::kImageDelButton));
 	} else
 #endif
-		_button[kDelAct] = new ButtonWidget(this, "Predictive.Delete" , _("<") , 0, kDelCmd);
+		_button[kDelAct] = new ButtonWidget(this, "Predictive.Delete" , _("<") , Common::U32String(), kDelCmd);
 	// I18N: Pre means 'Predictive', leave '*' as is
-	_button[kModeAct] = new ButtonWidget(this, "Predictive.Pre", _("*  Pre"), 0, kModeCmd);
-	_editText = new EditTextWidget(this, "Predictive.Word", _search, 0, 0, 0);
+	_button[kModeAct] = new ButtonWidget(this, "Predictive.Pre", _("*  Pre"), Common::U32String(), kModeCmd);
+	_editText = new EditTextWidget(this, "Predictive.Word", _search, Common::U32String(), 0, 0);
 
 	_userDictHasChanged = false;
 
@@ -145,6 +160,8 @@ PredictiveDialog::PredictiveDialog() : Dialog("Predictive") {
 
 	_curPressedButton = kNoAct;
 	_needRefresh = true;
+	_isPressed = false;
+
 }
 
 PredictiveDialog::~PredictiveDialog() {
@@ -159,7 +176,7 @@ PredictiveDialog::~PredictiveDialog() {
 void PredictiveDialog::reflowLayout() {
 #ifndef DISABLE_FANCY_THEMES
 	removeWidget(_button[kDelAct]);
-	_button[kDelAct]->setNext(0);
+	_button[kDelAct]->setNext(nullptr);
 	delete _button[kDelAct];
 	_button[kDelAct] = nullptr;
 
@@ -168,7 +185,7 @@ void PredictiveDialog::reflowLayout() {
 		((PicButtonWidget *)_button[kDelAct])->useThemeTransparency(true);
 		((PicButtonWidget *)_button[kDelAct])->setGfx(g_gui.theme()->getImageSurface(ThemeEngine::kImageDelButton));
 	} else {
-		_button[kDelAct] = new ButtonWidget(this, "Predictive.Delete" , _("<") , 0, kDelCmd);
+		_button[kDelAct] = new ButtonWidget(this, "Predictive.Delete" , _("<") , Common::U32String(), kDelCmd);
 	}
 #endif
 
@@ -196,9 +213,16 @@ void PredictiveDialog::handleKeyUp(Common::KeyState state) {
 		_button[_curPressedButton]->setUnpressedState();
 		processButton(_curPressedButton);
 	}
+
+	_isPressed = false;
 }
 
 void PredictiveDialog::handleKeyDown(Common::KeyState state) {
+	if (_isPressed) {
+		return;
+	}
+
+	_isPressed = true;
 	_curPressedButton = kNoAct;
 	_needRefresh = false;
 
@@ -456,7 +480,7 @@ void PredictiveDialog::processButton(ButtonId button) {
 		"next",    "add",
 		"<",
 		"Cancel",  "OK",
-		"Pre", "(0) ", NULL
+		"Pre", "(0) ", nullptr
 	};
 
 	if (_mode == kModeAbc) {
@@ -485,8 +509,7 @@ void PredictiveDialog::processButton(ButtonId button) {
 			if (_mode == kModePre && _unitedDict.dictActLine && _numMatchingWords > 1 && _wordNumber != 0)
 				bringWordtoTop(_unitedDict.dictActLine, _wordNumber);
 
-			strncpy(_temp, _currentWord.c_str(), _currentCode.size());
-			_temp[_currentCode.size()] = 0;
+			Common::strcpy_s(_temp, _currentWord.c_str());
 			_prefix += _temp;
 			_prefix += " ";
 			_currentCode.clear();
@@ -532,17 +555,18 @@ void PredictiveDialog::processButton(ButtonId button) {
 						_temp[x] = buttons[_currentCode[x] - '1'][_repeatcount[x]];
 				_temp[_currentCode.size()] = 0;
 				_currentWord = _temp;
+			default:
+				break;
 			}
 		} else if (button == kNextAct) { // next
 			if (_mode == kModePre) {
 				if (_unitedDict.dictActLine && _numMatchingWords > 1) {
 					_wordNumber = (_wordNumber + 1) % _numMatchingWords;
 					char tmp[kMaxLineLen];
-					strncpy(tmp, _unitedDict.dictActLine, kMaxLineLen);
-					tmp[kMaxLineLen - 1] = 0;
+					Common::strlcpy(tmp, _unitedDict.dictActLine, kMaxLineLen);
 					char *tok = strtok(tmp, " ");
 					for (uint8 i = 0; i <= _wordNumber; i++)
-						tok = strtok(NULL, " ");
+						tok = strtok(nullptr, " ");
 					_currentWord = Common::String(tok, _currentCode.size());
 				}
 			} else if (_mode == kModeAbc) {
@@ -671,8 +695,7 @@ void PredictiveDialog::bringWordtoTop(char *str, int wordnum) {
 
 	if (!str)
 		return;
-	strncpy(buf, str, kMaxLineLen);
-	buf[kMaxLineLen - 1] = 0;
+	Common::strlcpy(buf, str, kMaxLineLen);
 	char *word = strtok(buf, " ");
 	if (!word) {
 		debug(5, "Predictive Dialog: Invalid dictionary line");
@@ -680,7 +703,7 @@ void PredictiveDialog::bringWordtoTop(char *str, int wordnum) {
 	}
 
 	words.push_back(word);
-	while ((word = strtok(NULL, " ")) != NULL)
+	while ((word = strtok(nullptr, " ")) != nullptr)
 		words.push_back(word);
 	words.insert_at(1, words.remove_at(wordnum + 1));
 
@@ -736,7 +759,7 @@ bool PredictiveDialog::matchWord() {
 	int line = binarySearch(_unitedDict.dictLine, code, _unitedDict.dictLineCount);
 	if (line < 0) {
 		line = -(line + 1);
-		_unitedDict.dictActLine = NULL;
+		_unitedDict.dictActLine = nullptr;
 	} else {
 		_unitedDict.dictActLine = _unitedDict.dictLine[line];
 	}
@@ -745,11 +768,10 @@ bool PredictiveDialog::matchWord() {
 	_wordNumber = 0;
 	if (0 == strncmp(_unitedDict.dictLine[line], _currentCode.c_str(), _currentCode.size())) {
 		char tmp[kMaxLineLen];
-		strncpy(tmp, _unitedDict.dictLine[line], kMaxLineLen);
-		tmp[kMaxLineLen - 1] = 0;
+		Common::strlcpy(tmp, _unitedDict.dictLine[line], kMaxLineLen);
 		char *tok;
 		strtok(tmp, " ");
-		tok = strtok(NULL, " ");
+		tok = strtok(nullptr, " ");
 		_currentWord = Common::String(tok, _currentCode.size());
 		return true;
 	} else {
@@ -779,7 +801,7 @@ bool PredictiveDialog::searchWord(const char *const where, const Common::String 
 }
 
 void PredictiveDialog::addWord(Dict &dict, const Common::String &word, const Common::String &code) {
-	char *newLine = 0;
+	char *newLine = nullptr;
 	Common::String tmpCode = code + ' ';
 	int line = binarySearch(dict.dictLine, tmpCode, dict.dictLineCount);
 	if (line >= 0) {
@@ -795,10 +817,10 @@ void PredictiveDialog::addWord(Dict &dict, const Common::String &word, const Com
 			newLine = (char *)malloc(newLineSize + 1);
 
 			char *ptr = newLine;
-			strncpy(ptr, dict.dictLine[line], oldLineSize);
+			Common::strcpy_s(ptr, newLineSize + 1, dict.dictLine[line]);
 			ptr += oldLineSize;
-			Common::String tmp = ' ' + word + '\0';
-			strncpy(ptr, tmp.c_str(), tmp.size());
+			Common::String tmp = ' ' + word;
+			Common::strcpy_s(ptr, newLineSize + 1 - oldLineSize, tmp.c_str());
 
 			dict.dictLine[line] = newLine;
 			_memoryList[_numMemory++] = newLine;
@@ -820,7 +842,7 @@ void PredictiveDialog::addWord(Dict &dict, const Common::String &word, const Com
 					int len = (predictLine == _predictiveDict.dictLineCount - 1) ? &_predictiveDict.dictText[_predictiveDict.dictTextSize] - _predictiveDict.dictLine[predictLine] :
 					          _predictiveDict.dictLine[predictLine + 1] - _predictiveDict.dictLine[predictLine];
 					newLine = (char *)malloc(len);
-					strncpy(newLine, _predictiveDict.dictLine[predictLine], len);
+					Common::strlcpy(newLine, _predictiveDict.dictLine[predictLine], len);
 				} else {
 					// if there is no word in predictive dictionary, we need to copy to
 					// user dictionary mathed line + new word.
@@ -828,27 +850,26 @@ void PredictiveDialog::addWord(Dict &dict, const Common::String &word, const Com
 					          _predictiveDict.dictLine[predictLine + 1] - _predictiveDict.dictLine[predictLine];
 					newLine = (char *)malloc(len + word.size() + 1);
 					char *ptr = newLine;
-					strncpy(ptr, _predictiveDict.dictLine[predictLine], len);
+					Common::strlcpy(ptr, _predictiveDict.dictLine[predictLine], len);
 					ptr[len - 1] = ' ';
 					ptr += len;
-					strncpy(ptr, word.c_str(), word.size());
-					ptr[len + word.size()] = '\0';
+					Common::strlcpy(ptr, word.c_str(), word.size() + 1);
 				}
 			} else {
 				// if we didnt find line in predictive dialog, we should copy to user dictionary
 				// code + word
 				Common::String tmp;
-				tmp = tmpCode + word + '\0';
-				newLine = (char *)malloc(tmp.size());
-				strncpy(newLine, tmp.c_str(), tmp.size());
+				tmp = tmpCode + word;
+				newLine = (char *)malloc(tmp.size() + 1);
+				Common::strcpy_s(newLine, tmp.size() + 1, tmp.c_str());
 			}
 		} else {
 			// if want to insert line to different from user dictionary, we should copy to this
 			// dictionary code + word
 			Common::String tmp;
-			tmp = tmpCode + word + '\0';
-			newLine = (char *)malloc(tmp.size());
-			strncpy(newLine, tmp.c_str(), tmp.size());
+			tmp = tmpCode + word;
+			newLine = (char *)malloc(tmp.size() + 1);
+			Common::strcpy_s(newLine, tmp.size() + 1, tmp.c_str());
 		}
 	}
 
@@ -935,7 +956,7 @@ void PredictiveDialog::loadDictionary(Common::SeekableReadStream *in, Dict &dict
 	}
 
 	dict.dictLine = (char **)calloc(lines, sizeof(char *));
-	if (dict.dictLine == NULL) {
+	if (dict.dictLine == nullptr) {
 		warning("Predictive Dialog: Cannot allocate memory for line index buffer");
 		return;
 	}
@@ -945,10 +966,6 @@ void PredictiveDialog::loadDictionary(Common::SeekableReadStream *in, Dict &dict
 	while ((ptr = strchr(ptr, '\n'))) {
 		*ptr = 0;
 		ptr++;
-#if defined(__DS__) && defined(ENABLE_AGI)
-		// Pass the line on to the DS word list
-		DS::addAutoCompleteLine(dict.dictLine[i - 1]);
-#endif
 		dict.dictLine[i++] = ptr;
 	}
 	if (dict.dictLine[lines - 1][0] == 0)
@@ -958,12 +975,7 @@ void PredictiveDialog::loadDictionary(Common::SeekableReadStream *in, Dict &dict
 	debug(5, "Predictive Dialog: Loaded %d lines", dict.dictLineCount);
 
 	// FIXME: We use binary search on _predictiveDict.dictLine, yet we make no at_tempt
-	// to ever sort this array (except for the DS port). That seems risky, doesn't it?
-
-#if defined(__DS__) && defined(ENABLE_AGI)
-	// Sort the DS word completion list, to allow for a binary chop later (in the ds backend)
-	DS::sortAutoCompleteWordList();
-#endif
+	// to ever sort this array. That seems risky, doesn't it?
 
 	uint32 time3 = g_system->getMillis();
 	debug(5, "Predictive Dialog: Time to parse %s: %d, total: %d", ConfMan.get(dict.nameDict).c_str(), time3 - time2, time3 - time1);
@@ -993,7 +1005,7 @@ void PredictiveDialog::loadAllDictionary(Dict &dict) {
 void PredictiveDialog::pressEditText() {
 	Common::strlcpy(_predictiveResult, _prefix.c_str(), sizeof(_predictiveResult));
 	Common::strlcat(_predictiveResult, _currentWord.c_str(), sizeof(_predictiveResult));
-	_editText->setEditString(_predictiveResult);
+	_editText->setEditString(Common::convertToU32String(_predictiveResult));
 	//_editText->setCaretPos(_prefix.size() + _currentWord.size());
 	_editText->markAsDirty();
 }

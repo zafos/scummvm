@@ -35,7 +35,6 @@ MODULE_OBJS := \
 	compression.o \
 	conversations.o \
 	debugger.o \
-	detection.o \
 	dialogs.o \
 	events.o \
 	font.o \
@@ -48,6 +47,8 @@ MODULE_OBJS := \
 	menu_views.o \
 	messages.o \
 	msurface.o \
+	metaengine.o \
+	mps_installer.o \
 	palette.o \
 	player.o \
 	rails.o \
@@ -68,3 +69,6 @@ endif
 
 # Include common rules
 include $(srcdir)/rules.mk
+
+# Detection objects
+DETECT_OBJS += $(MODULE)/detection.o

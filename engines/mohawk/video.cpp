@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -54,6 +53,10 @@ VideoEntry::~VideoEntry() {
 void VideoEntry::close() {
 	delete _video;
 	_video = nullptr;
+
+	if (_subtitles.isLoaded()) {
+		g_system->hideOverlay();
+	}
 }
 
 bool VideoEntry::endOfVideo() const {
@@ -111,16 +114,41 @@ void VideoEntry::setRate(const Common::Rational &rate) {
 void VideoEntry::pause(bool isPaused) {
 	assert(_video);
 	_video->pauseVideo(isPaused);
+
+	if (_subtitles.isLoaded()) {
+		if (isPaused) {
+			g_system->hideOverlay();
+		} else {
+			g_system->showOverlay(false);
+			g_system->clearOverlay();
+			_subtitles.drawSubtitle(_video->getTime(), true);
+		}
+	}
 }
 
 void VideoEntry::start() {
 	assert(_video);
 	_video->start();
+
+	if (_subtitles.isLoaded()) {
+		const int16 h = g_system->getOverlayHeight(),
+			        w = g_system->getOverlayWidth();
+		_subtitles.setBBox(Common::Rect(20, h - 120, w - 20, h - 20));
+		_subtitles.setColor(0xff, 0xff, 0xff);
+		_subtitles.setFont("FreeSans.ttf");
+
+		g_system->showOverlay(false);
+		g_system->clearOverlay();
+	}
 }
 
 void VideoEntry::stop() {
 	assert(_video);
 	_video->stop();
+
+	if (_subtitles.isLoaded()) {
+		g_system->hideOverlay();
+	}
 }
 
 bool VideoEntry::isPlaying() const {
@@ -140,7 +168,7 @@ void VideoEntry::setVolume(int volume) {
 
 VideoManager::VideoManager(MohawkEngine *vm) : _vm(vm) {
 	// Set dithering enabled, if required
-	_enableDither = (_vm->getGameType() == GType_MYST || _vm->getGameType() == GType_MAKINGOF) && !(_vm->getFeatures() & GF_ME);
+	_enableDither = (_vm->getGameType() == GType_MYST || _vm->getGameType() == GType_MAKINGOF) && !_vm->isGameVariant(GF_ME);
 }
 
 VideoManager::~VideoManager() {
@@ -168,6 +196,10 @@ VideoEntryPtr VideoManager::playMovie(const Common::String &fileName, Audio::Mix
 	VideoEntryPtr ptr = open(fileName, soundType);
 	if (!ptr)
 		return VideoEntryPtr();
+
+
+	Common::String subtitlesName = Common::String::format("%s.srt", fileName.substr(0, fileName.size() - 4).c_str());
+	ptr->loadSubtitles(subtitlesName.c_str());
 
 	ptr->start();
 	return ptr;
@@ -212,6 +244,8 @@ bool VideoManager::updateMovies() {
 			if (drawNextFrame(*it)) {
 				updateScreen = true;
 			}
+
+			updateScreen |= (*it)->_subtitles.drawSubtitle(video->getTime(), false);
 		}
 
 		// Remember to increase the iterator

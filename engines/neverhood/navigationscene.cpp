@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -83,7 +82,7 @@ void NavigationScene::update() {
 		_smackerFileHash = 0;
 	} else if (_smackerDone) {
 		if (_leaveSceneAfter) {
-			_vm->_screen->setSmackerDecoder(NULL);
+			_vm->_screen->setSmackerDecoder(nullptr);
 			sendMessage(_parentModule, 0x1009, _navigationIndex);
 		} else {
 			const NavigationItem &navigationItem = (*_navigationList)[_navigationIndex];
@@ -120,6 +119,8 @@ uint32 NavigationScene::handleMessage(int messageNum, const MessageParam &param,
 		break;
 	case NM_ANIMATION_STOP:
 		_smackerDone = true;
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -168,7 +169,7 @@ void NavigationScene::handleNavigation(const NPoint &mousePos) {
 			} while (!(*_navigationList)[_navigationIndex].interactive);
 			setGlobalVar(V_NAVIGATION_INDEX, _navigationIndex);
 		} else {
-			_vm->_screen->setSmackerDecoder(NULL);
+			_vm->_screen->setSmackerDecoder(nullptr);
 			sendMessage(_parentModule, 0x1009, _navigationIndex);
 		}
 		break;
@@ -185,7 +186,7 @@ void NavigationScene::handleNavigation(const NPoint &mousePos) {
 			} while (!(*_navigationList)[_navigationIndex].interactive);
 			setGlobalVar(V_NAVIGATION_INDEX, _navigationIndex);
 		} else {
-			_vm->_screen->setSmackerDecoder(NULL);
+			_vm->_screen->setSmackerDecoder(nullptr);
 			sendMessage(_parentModule, 0x1009, _navigationIndex);
 		}
 		break;
@@ -193,7 +194,7 @@ void NavigationScene::handleNavigation(const NPoint &mousePos) {
 	case 3:
 	case 4:
 		if (navigationItem.middleFlag) {
-			_vm->_screen->setSmackerDecoder(NULL);
+			_vm->_screen->setSmackerDecoder(nullptr);
 			sendMessage(_parentModule, 0x1009, _navigationIndex);
 		} else if (navigationItem.middleSmackerFileHash != 0) {
 			_smackerFileHash = navigationItem.middleSmackerFileHash;
@@ -202,6 +203,8 @@ void NavigationScene::handleNavigation(const NPoint &mousePos) {
 			_isTurning = false;
 			_leaveSceneAfter = true;
 		}
+		break;
+	default:
 		break;
 	}
 

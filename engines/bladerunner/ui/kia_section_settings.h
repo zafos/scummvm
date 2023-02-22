@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,19 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef BLADERUNNER_KIA_SECTION_SETTINGS_H
 #define BLADERUNNER_KIA_SECTION_SETTINGS_H
 
+#include "bladerunner/bladerunner.h" // for BLADERUNNER_ORIGINAL_SETTINGS macro
+#include "bladerunner/color.h"
 #include "bladerunner/ui/kia_section_base.h"
+
+#include "common/config-manager.h"
+#include "common/rect.h"
 
 namespace BladeRunner {
 
@@ -32,17 +36,32 @@ class UIContainer;
 class UICheckBox;
 class UIImagePicker;
 class UISlider;
+class UIScrollBox;
+class UIDropDown;
 
 class KIASectionSettings : public KIASectionBase {
+	enum State {
+		kStateNormal         = 0,
+		kStateLanguageSelect = 1
+	};
+
 	static const char *kLeary;
+	static const Color256 kColors[];
 
 	UIContainer   *_uiContainer;
 	UISlider      *_musicVolume;
 	UISlider      *_soundEffectVolume;
-	UISlider      *_ambientSoundVolume;
 	UISlider      *_speechVolume;
+	UISlider      *_ambientSoundVolume;
+#if BLADERUNNER_ORIGINAL_SETTINGS
 	UISlider      *_gammaCorrection;
+#endif
 	UICheckBox    *_directorsCut;
+	UICheckBox    *_subtitlesEnable;
+	Common::String _selectedTextLanguageStr;
+	int            _selectedTextLanguageId;
+
+	UIDropDown    *_textLanguageDropdown;
 	UIImagePicker *_playerAgendaSelector;
 
 	int            _mouseX;
@@ -50,29 +69,40 @@ class KIASectionSettings : public KIASectionBase {
 
 	int            _learyPos;
 
+	State          _state;
+
 public:
 	KIASectionSettings(BladeRunnerEngine *vm);
-	~KIASectionSettings();
+	~KIASectionSettings() override;
 
-	void open();
-	void close();
+	void open() override;
+	void close() override;
 
-	void draw(Graphics::Surface &surface);
+	void draw(Graphics::Surface &surface) override;
 
-	void handleKeyUp(const Common::KeyState &kbd);
-	void handleMouseMove(int mouseX, int mouseY);
-	void handleMouseDown(bool mainButton);
-	void handleMouseUp(bool mainButton);
+	void handleKeyDown(const Common::KeyState &kbd) override;
+	void handleMouseMove(int mouseX, int mouseY) override;
+	void handleMouseDown(bool mainButton) override;
+	void handleMouseUp(bool mainButton) override;
+	void handleMouseScroll(int direction) override;
+
+	void showTextSelectionDropdown(bool showToggle);
 
 private:
 	static void sliderCallback(void *callbackData, void *source);
 	static void checkBoxCallback(void *callbackData, void *source);
 	static void mouseInCallback(int buttonId, void *callbackData);
 	static void mouseUpCallback(int buttonId, void *callbackData);
+	static void dropdownSelectedCallback(void *callbackData, void *source, int lineData, int mouseButton);
+	static void dropdownCancelledCallback(void *callbackData, void *source);
+	static void dropdownClickedTopFrameCallback(void *callbackData, void *source);
 
-	void onButtonPressed(int buttonId);
+	void onButtonPressed(int buttonId) override;
 
 	void initConversationChoices();
+	void populateLanguageSelection();
+
+	void changeState(State state);
 };
 
 } // End of namespace BladeRunner

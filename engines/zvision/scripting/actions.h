@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -59,18 +58,18 @@ protected:
 class ActionAdd : public ResultAction {
 public:
 	ActionAdd(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	uint32 _key;
-	int _value;
+	ValueSlot *_value;
 };
 
 class ActionAssign : public ResultAction {
 public:
 	ActionAssign(ZVision *engine, int32 slotkey, const Common::String &line);
-	~ActionAssign();
-	bool execute();
+	~ActionAssign() override;
+	bool execute() override;
 
 private:
 	uint32 _key;
@@ -80,7 +79,7 @@ private:
 class ActionAttenuate : public ResultAction {
 public:
 	ActionAttenuate(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	uint32 _key;
@@ -90,7 +89,7 @@ private:
 class ActionChangeLocation : public ResultAction {
 public:
 	ActionChangeLocation(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	char _world;
@@ -103,7 +102,7 @@ private:
 class ActionCrossfade : public ResultAction {
 public:
 	ActionCrossfade(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	uint32 _keyOne;
@@ -118,7 +117,7 @@ private:
 class ActionCursor : public ResultAction {
 public:
 	ActionCursor(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	uint8 _action;
@@ -127,7 +126,7 @@ private:
 class ActionDelayRender : public ResultAction {
 public:
 	ActionDelayRender(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	uint32 _framesToDelay;
@@ -136,7 +135,7 @@ private:
 class ActionDisableControl : public ResultAction {
 public:
 	ActionDisableControl(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	uint32 _key;
@@ -145,7 +144,7 @@ private:
 class ActionDisplayMessage : public ResultAction {
 public:
 	ActionDisplayMessage(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	int16 _control;
@@ -155,14 +154,14 @@ private:
 class ActionDissolve : public ResultAction {
 public:
 	ActionDissolve(ZVision *engine);
-	bool execute();
+	bool execute() override;
 };
 
 class ActionDistort : public ResultAction {
 public:
 	ActionDistort(ZVision *engine, int32 slotkey, const Common::String &line);
-	~ActionDistort();
-	bool execute();
+	~ActionDistort() override;
+	bool execute() override;
 
 private:
 	int16 _distSlot;
@@ -176,7 +175,7 @@ private:
 class ActionEnableControl : public ResultAction {
 public:
 	ActionEnableControl(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	uint32 _key;
@@ -185,13 +184,13 @@ private:
 class ActionFlushMouseEvents : public ResultAction {
 public:
 	ActionFlushMouseEvents(ZVision *engine, int32 slotkey);
-	bool execute();
+	bool execute() override;
 };
 
 class ActionInventory : public ResultAction {
 public:
 	ActionInventory(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 private:
 	int8 _type;
 	int32 _key;
@@ -200,7 +199,7 @@ private:
 class ActionKill : public ResultAction {
 public:
 	ActionKill(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	uint32 _key;
@@ -210,7 +209,7 @@ private:
 class ActionMenuBarEnable : public ResultAction {
 public:
 	ActionMenuBarEnable(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 private:
 	uint16 _menus;
 };
@@ -218,8 +217,8 @@ private:
 class ActionMusic : public ResultAction {
 public:
 	ActionMusic(ZVision *engine, int32 slotkey, const Common::String &line, bool global);
-	~ActionMusic();
-	bool execute();
+	~ActionMusic() override;
+	bool execute() override;
 
 private:
 	Common::String _fileName;
@@ -234,8 +233,8 @@ private:
 class ActionPanTrack : public ResultAction {
 public:
 	ActionPanTrack(ZVision *engine, int32 slotkey, const Common::String &line);
-	~ActionPanTrack();
-	bool execute();
+	~ActionPanTrack() override;
+	bool execute() override;
 
 private:
 	int32 _pos;
@@ -245,8 +244,8 @@ private:
 class ActionPlayAnimation : public ResultAction {
 public:
 	ActionPlayAnimation(ZVision *engine, int32 slotkey, const Common::String &line);
-	~ActionPlayAnimation();
-	bool execute();
+	~ActionPlayAnimation() override;
+	bool execute() override;
 
 private:
 	Common::String _fileName;
@@ -264,7 +263,7 @@ private:
 class ActionPlayPreloadAnimation : public ResultAction {
 public:
 	ActionPlayPreloadAnimation(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	uint32 _controlKey;
@@ -280,8 +279,8 @@ private:
 class ActionPreloadAnimation : public ResultAction {
 public:
 	ActionPreloadAnimation(ZVision *engine, int32 slotkey, const Common::String &line);
-	~ActionPreloadAnimation();
-	bool execute();
+	~ActionPreloadAnimation() override;
+	bool execute() override;
 
 private:
 	Common::String _fileName;
@@ -292,7 +291,7 @@ private:
 class ActionPreferences : public ResultAction {
 public:
 	ActionPreferences(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	bool _save;
@@ -301,14 +300,14 @@ private:
 class ActionQuit : public ResultAction {
 public:
 	ActionQuit(ZVision *engine, int32 slotkey) : ResultAction(engine, slotkey) {}
-	bool execute();
+	bool execute() override;
 };
 
 class ActionRegion : public ResultAction {
 public:
 	ActionRegion(ZVision *engine, int32 slotkey, const Common::String &line);
-	~ActionRegion();
-	bool execute();
+	~ActionRegion() override;
+	bool execute() override;
 
 private:
 	Common::String _art;
@@ -324,7 +323,7 @@ private:
 class ActionUnloadAnimation : public ResultAction {
 public:
 	ActionUnloadAnimation(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 private:
 	uint32 _key;
 };
@@ -332,8 +331,8 @@ private:
 class ActionRandom : public ResultAction {
 public:
 	ActionRandom(ZVision *engine, int32 slotkey, const Common::String &line);
-	~ActionRandom();
-	bool execute();
+	~ActionRandom() override;
+	bool execute() override;
 
 private:
 	ValueSlot *_max;
@@ -342,7 +341,7 @@ private:
 class ActionRestoreGame : public ResultAction {
 public:
 	ActionRestoreGame(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	Common::String _fileName;
@@ -351,7 +350,7 @@ private:
 class ActionRotateTo : public ResultAction {
 public:
 	ActionRotateTo(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	int32 _toPos;
@@ -361,7 +360,7 @@ private:
 class ActionSetPartialScreen : public ResultAction {
 public:
 	ActionSetPartialScreen(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	uint _x;
@@ -373,7 +372,7 @@ private:
 class ActionSetScreen : public ResultAction {
 public:
 	ActionSetScreen(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	Common::String _fileName;
@@ -382,7 +381,7 @@ private:
 class ActionStop : public ResultAction {
 public:
 	ActionStop(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	uint32 _key;
@@ -391,7 +390,7 @@ private:
 class ActionStreamVideo : public ResultAction {
 public:
 	ActionStreamVideo(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	enum {
@@ -410,7 +409,7 @@ private:
 class ActionSyncSound : public ResultAction {
 public:
 	ActionSyncSound(ZVision *engine, int32 slotkey, const Common::String &line);
-	bool execute();
+	bool execute() override;
 
 private:
 	int _syncto;
@@ -420,8 +419,8 @@ private:
 class ActionTimer : public ResultAction {
 public:
 	ActionTimer(ZVision *engine, int32 slotkey, const Common::String &line);
-	~ActionTimer();
-	bool execute();
+	~ActionTimer() override;
+	bool execute() override;
 private:
 	ValueSlot *_time;
 };
@@ -429,8 +428,8 @@ private:
 class ActionTtyText : public ResultAction {
 public:
 	ActionTtyText(ZVision *engine, int32 slotkey, const Common::String &line);
-	~ActionTtyText();
-	bool execute();
+	~ActionTtyText() override;
+	bool execute() override;
 
 private:
 	Common::String _filename;

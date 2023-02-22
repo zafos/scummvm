@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,7 +23,6 @@
 #define TITANIC_TITLE_ENGINE_H
 
 #include "common/stream.h"
-#include "common/winexe_pe.h"
 #include "titanic/support/string.h"
 #include "titanic/true_talk/script_handler.h"
 #include "titanic/true_talk/tt_response.h"
@@ -73,24 +71,24 @@ public:
 	Common::Array<byte> _data;
 public:
 	STtitleEngine();
-	virtual ~STtitleEngine();
+	~STtitleEngine() override;
 
 	void reset();
 
 	/**
 	 * Setup the engine
 	 */
-	virtual void setup(int val1, VocabMode vocabMode = VOCAB_MODE_NONE);
+	void setup(int val1, VocabMode vocabMode = VOCAB_MODE_NONE) override;
 
 	/**
 	 * Sets a conversation reponse
 	 */
-	virtual int setResponse(TTscriptBase *script, TTresponse *response);
+	int setResponse(TTscriptBase *script, TTresponse *response) override;
 
 	/**
 	 * Open a designated file
 	 */
-	virtual SimpleFile *open(const CString &name);
+	SimpleFile *open(const CString &name) override;
 };
 
 } // End of namespace Titanic

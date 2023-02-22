@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -346,6 +345,9 @@ void ScummEngine_v100he::setupScummVars() {
 	ScummEngine_v90he::setupScummVars();
 
 	if (_game.id == GID_MOONBASE) {
+		VAR_REMOTE_START_SCRIPT = 98;
+		VAR_NETWORK_AVAILABLE = 100;
+		VAR_NETWORK_RECEIVE_ARRAY_SCRIPT = 101;
 		VAR_U32_USER_VAR_A = 108;
 		VAR_U32_USER_VAR_B = 109;
 		VAR_U32_USER_VAR_C = 110;
@@ -556,6 +558,9 @@ void ScummEngine_v8::setupScummVars() {
 	VAR_KEYPRESS = 132;
 	VAR_BLAST_ABOVE_TEXT = 133;
 	VAR_SYNC = 134;
+
+	VAR_SAVELOAD_PAGE = 175;
+	VAR_OBJECT_LABEL_FLAG = 176;
 }
 #endif
 
@@ -735,6 +740,18 @@ void ScummEngine_v99he::resetScummVars() {
 		VAR(157) = 0;
 	}
 }
+
+void ScummEngine_v100he::resetScummVars() {
+	ScummEngine_v99he::resetScummVars();
+
+	if (_game.id == GID_MOONBASE) {
+#ifdef USE_LIBCURL
+		VAR(VAR_NETWORK_AVAILABLE) = 1;
+#else
+		VAR(VAR_NETWORK_AVAILABLE) = 0;
+#endif
+	}
+}
 #endif
 
 void ScummEngine::resetScummVars() {
@@ -769,22 +786,7 @@ void ScummEngine::resetScummVars() {
 			break;
 		}
 
-		if (_game.platform == Common::kPlatformFMTowns)
-			VAR(VAR_VIDEOMODE) = 42;
-		// Value only used by the Macintosh version of Indiana Jones and the Last Crusade
-		else if (_game.platform == Common::kPlatformMacintosh && _game.version == 3)
-			VAR(VAR_VIDEOMODE) = 50;
-		// Value only used by the Amiga version of Monkey Island 2
-		else if (_game.platform == Common::kPlatformAmiga)
-			VAR(VAR_VIDEOMODE) = 82;
-		else if (_renderMode == Common::kRenderCGA)
-			VAR(VAR_VIDEOMODE) = 4;
-		else if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG)
-			VAR(VAR_VIDEOMODE) = 30;
-		else if (_renderMode == Common::kRenderEGA)
-			VAR(VAR_VIDEOMODE) = 13;
-		else
-			VAR(VAR_VIDEOMODE) = 19;
+		setVideoModeVarToCurrentConfig();
 
 		if (_game.platform == Common::kPlatformMacintosh && (_game.features & GF_OLD_BUNDLE)) {
 			// Set screen size for the Macintosh version of Indy3/Loom
@@ -829,6 +831,30 @@ void ScummEngine::resetScummVars() {
 
 	VAR(VAR_CHARINC) = 4;
 	setTalkingActor(0);
+}
+
+void ScummEngine::setVideoModeVarToCurrentConfig() {
+	if (VAR_VIDEOMODE == 0xFF)
+		return;
+
+	if (_game.platform == Common::kPlatformFMTowns)
+		VAR(VAR_VIDEOMODE) = 42;
+	// Value only used by the Macintosh version of Indiana Jones and the Last Crusade
+	else if (_game.platform == Common::kPlatformMacintosh && _game.version == 3)
+		VAR(VAR_VIDEOMODE) = 50;
+	// Value only used by the Amiga version of Monkey Island 2
+	else if (_game.platform == Common::kPlatformAmiga)
+		VAR(VAR_VIDEOMODE) = 82;
+	else if (_renderMode == Common::kRenderCGA || _renderMode == Common::kRenderCGAComp)
+		VAR(VAR_VIDEOMODE) = 4;
+	else if (_renderMode == Common::kRenderCGA_BW)
+		VAR(VAR_VIDEOMODE) = 6;
+	else if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG)
+		VAR(VAR_VIDEOMODE) = 30;
+	else if (_renderMode == Common::kRenderEGA)
+		VAR(VAR_VIDEOMODE) = 13;
+	else
+		VAR(VAR_VIDEOMODE) = 19;
 }
 
 } // End of namespace Scumm

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -352,6 +351,8 @@ int RMTony::getCurPattern() {
 		return PAT_WALKLEFT;
 	case PAT_PAST_WALKRIGHT:
 		return PAT_WALKRIGHT;
+	default:
+		break;
 	}
 
 	return nPatt;
@@ -384,6 +385,8 @@ void RMTony::setPattern(int nPatt, bool bPlayP0) {
 		case PAT_WALKRIGHT:
 			nPatt = PAT_PAST_WALKRIGHT;
 			break;
+		default:
+			break;
 		}
 	}
 
@@ -408,6 +411,8 @@ void RMTony::take(int nWhere, int nPart) {
 			case 2:
 				setPattern(PAT_TAKEUP_DOWN1);
 				break;
+			default:
+				break;
 			}
 			break;
 
@@ -421,6 +426,8 @@ void RMTony::take(int nWhere, int nPart) {
 				break;
 			case 2:
 				setPattern(PAT_TAKERIGHT_DOWN1);
+				break;
+			default:
 				break;
 			}
 			break;
@@ -436,7 +443,12 @@ void RMTony::take(int nWhere, int nPart) {
 			case 2:
 				setPattern(PAT_TAKELEFT_DOWN1);
 				break;
+			default:
+				break;
 			}
+			break;
+
+		default:
 			break;
 		}
 	} else if (nPart == 1) {
@@ -460,6 +472,9 @@ void RMTony::take(int nWhere, int nPart) {
 		case PAT_TAKERIGHT_DOWN2:
 			setPattern(PAT_STANDRIGHT);
 			break;
+
+		default:
+			break;
 		}
 	}
 }
@@ -481,6 +496,8 @@ void RMTony::put(int nWhere, int nPart) {
 			case 2:
 				setPattern(PAT_PUTUP_DOWN1);
 				break;
+			default:
+				break;
 			}
 			break;
 
@@ -494,6 +511,8 @@ void RMTony::put(int nWhere, int nPart) {
 				break;
 			case 2:
 				setPattern(PAT_PUTRIGHT_DOWN1);
+				break;
+			default:
 				break;
 			}
 			break;
@@ -509,7 +528,12 @@ void RMTony::put(int nWhere, int nPart) {
 			case 2:
 				setPattern(PAT_PUTLEFT_DOWN1);
 				break;
+			default:
+				break;
 			}
+			break;
+
+		default:
 			break;
 		}
 	} else if (nPart == 1) {
@@ -533,12 +557,15 @@ void RMTony::put(int nWhere, int nPart) {
 		case PAT_PUTRIGHT_DOWN2:
 			setPattern(PAT_STANDRIGHT);
 			break;
+
+		default:
+			break;
 		}
 	}
 }
 
 bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, int &bodyStartPat,
-                                int &headLoopPat, int &bodyLoopPat) {
+								int &headLoopPat, int &bodyLoopPat) {
 	assert(!_bIsTalking);
 
 	_bIsTalking = true;
@@ -574,6 +601,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 		case PAT_STANDUP:
 			_talkDirection = UP;
 			break;
+
+		default:
+			break;
 		}
 
 		// Puts the body in front by default
@@ -597,6 +627,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 
 		case RIGHT:
 			setPattern(PAT_PAST_TALKRIGHT);
+			break;
+
+		default:
 			break;
 		}
 		return false;
@@ -635,6 +668,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			bodyLoopPat = BPAT_STANDUP;
 			_nBodyOffset.set(6, 53);
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -672,6 +708,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			headLoopPat = PAT_TALK_RIGHT;
 			bodyLoopPat = BPAT_HIPSRIGHT_LOOP;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -703,6 +742,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			headLoopPat = PAT_LAUGHRIGHT_LOOP;
 			bodyLoopPat = BPAT_LAUGHRIGHT;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -725,6 +767,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			headLoopPat = PAT_LAUGHRIGHT_LOOP;
 			bodyLoopPat = BPAT_LAUGHRIGHT;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -742,6 +787,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			_nBodyOffset.set(5, 40);
 			headLoopPat = PAT_TALK_RIGHT;
 			bodyLoopPat = BPAT_INDICATERIGHT;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -778,6 +826,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			bodyStartPat = BPAT_SCAREDLEFT_START;
 			headLoopPat = PAT_SCAREDLEFT_LOOP;
 			bodyLoopPat = BPAT_SCAREDLEFT_LOOP;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -819,6 +870,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 
 			headStartPat = PAT_SCAREDLEFT_START;
 			headLoopPat = PAT_SCAREDLEFT_LOOP;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -866,6 +920,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			headLoopPat = PAT_TALK_RIGHT;
 			bodyLoopPat = BPAT_WITHRABBITRIGHT_LOOP;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -885,6 +942,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			bodyStartPat = BPAT_WITHRECIPERIGHT_START;
 			headLoopPat = PAT_TALK_RIGHT;
 			bodyLoopPat = BPAT_WITHRECIPERIGHT_LOOP;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -906,6 +966,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			headLoopPat = PAT_TALK_RIGHT;
 			bodyLoopPat = BPAT_WITHCARDSRIGHT_LOOP;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -926,6 +989,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			headLoopPat = PAT_TALK_RIGHT;
 			bodyLoopPat = BPAT_WITHSNOWMANRIGHT_LOOP;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -945,6 +1011,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 		case RIGHT:
 			headLoopPat = PAT_TALK_RIGHT;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -963,6 +1032,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			headLoopPat = PAT_TALKBEARD_RIGHT;
 			bodyLoopPat = BPAT_STANDRIGHT;
 			_nBodyOffset.set(6, 56);
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -984,6 +1056,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			bodyStartPat = BPAT_STANDRIGHT;
 			headLoopPat = PAT_DISGUSTEDRIGHT_LOOP;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1003,6 +1078,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			headStartPat = PAT_SARCASTICRIGHT_START;
 			bodyStartPat = BPAT_STANDRIGHT;
 			headLoopPat = PAT_SARCASTICRIGHT_LOOP;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -1087,6 +1165,9 @@ bool RMTony::startTalkCalculate(CharacterTalkType nTalkType, int &headStartPat, 
 			break;
 		}
 		break;
+
+	default:
+		break;
 	}
 
 	return true;
@@ -1149,6 +1230,9 @@ bool RMTony::endTalkCalculate(int &headStandPat, int &headEndPat, int &bodyEndPa
 		finalPat = PAT_STANDRIGHT;
 		headStandPat = PAT_HEAD_RIGHT;
 		break;
+
+	default:
+		break;
 	}
 
 	if (_bShepherdess) {
@@ -1180,6 +1264,9 @@ bool RMTony::endTalkCalculate(int &headStandPat, int &headEndPat, int &bodyEndPa
 		case RIGHT:
 			bodyEndPat = BPAT_HIPSRIGHT_END;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1208,6 +1295,9 @@ bool RMTony::endTalkCalculate(int &headStandPat, int &headEndPat, int &bodyEndPa
 		case RIGHT:
 			headEndPat = PAT_DISGUSTEDRIGHT_END;
 			break;
+
+		default:
+			break;
 		}
 
 		bodyEndPat = 0;
@@ -1223,6 +1313,9 @@ bool RMTony::endTalkCalculate(int &headStandPat, int &headEndPat, int &bodyEndPa
 		case DOWN:
 		case RIGHT:
 			headEndPat = PAT_SARCASTICRIGHT_END;
+			break;
+
+		default:
 			break;
 		}
 
@@ -1252,6 +1345,9 @@ bool RMTony::endTalkCalculate(int &headStandPat, int &headEndPat, int &bodyEndPa
 			headEndPat = PAT_SCAREDLEFT_END;
 			bodyEndPat = BPAT_SCAREDLEFT_END;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1275,6 +1371,9 @@ bool RMTony::endTalkCalculate(int &headStandPat, int &headEndPat, int &bodyEndPa
 			headEndPat = PAT_SCAREDLEFT_END;
 			bodyEndPat = 0;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1290,6 +1389,9 @@ bool RMTony::endTalkCalculate(int &headStandPat, int &headEndPat, int &bodyEndPa
 		case DOWN:
 			finalPat = PAT_STANDRIGHT;
 			bodyEndPat = BPAT_WITHRABBITRIGHT_END;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -1307,6 +1409,9 @@ bool RMTony::endTalkCalculate(int &headStandPat, int &headEndPat, int &bodyEndPa
 			finalPat = PAT_STANDRIGHT;
 			bodyEndPat = BPAT_WITHRECIPERIGHT_END;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1323,6 +1428,9 @@ bool RMTony::endTalkCalculate(int &headStandPat, int &headEndPat, int &bodyEndPa
 			finalPat = PAT_STANDRIGHT;
 			bodyEndPat = BPAT_WITHCARDSRIGHT_END;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1338,6 +1446,9 @@ bool RMTony::endTalkCalculate(int &headStandPat, int &headEndPat, int &bodyEndPa
 		case DOWN:
 			finalPat = PAT_STANDRIGHT;
 			bodyEndPat = BPAT_WITHSNOWMANRIGHT_END;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -1478,7 +1589,7 @@ void RMTony::endTalk(CORO_PARAM) {
 }
 
 void RMTony::startStaticCalculate(CharacterTalkType nTalk, int &headPat, int &headLoopPat,
-                                  int &bodyStartPat, int &bodyLoopPat) {
+								  int &bodyStartPat, int &bodyLoopPat) {
 	int nPat = getCurPattern();
 
 	headLoopPat = -1;
@@ -1514,6 +1625,9 @@ void RMTony::startStaticCalculate(CharacterTalkType nTalk, int &headPat, int &he
 		_talkDirection = UP;
 		headPat = PAT_HEAD_LEFT;
 		break;
+
+	default:
+		break;
 	}
 
 	_bBodyFront = true;
@@ -1534,6 +1648,9 @@ void RMTony::startStaticCalculate(CharacterTalkType nTalk, int &headPat, int &he
 			bodyStartPat = BPAT_WITHRABBITRIGHT_START;
 			bodyLoopPat = BPAT_WITHRABBITRIGHT_LOOP;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1551,6 +1668,9 @@ void RMTony::startStaticCalculate(CharacterTalkType nTalk, int &headPat, int &he
 			_nBodyOffset.set(-4, -2);
 			bodyStartPat = BPAT_WITHCARDSRIGHT_START;
 			bodyLoopPat = BPAT_WITHCARDSRIGHT_LOOP;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -1570,6 +1690,9 @@ void RMTony::startStaticCalculate(CharacterTalkType nTalk, int &headPat, int &he
 			bodyStartPat = BPAT_WITHRECIPERIGHT_START;
 			bodyLoopPat = BPAT_WITHRECIPERIGHT_LOOP;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1587,6 +1710,9 @@ void RMTony::startStaticCalculate(CharacterTalkType nTalk, int &headPat, int &he
 			_nBodyOffset.set(-14, 2);
 			bodyStartPat = BPAT_WITHSNOWMANRIGHT_START;
 			bodyLoopPat = BPAT_WITHSNOWMANRIGHT_LOOP;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -1606,6 +1732,9 @@ void RMTony::startStaticCalculate(CharacterTalkType nTalk, int &headPat, int &he
 			bodyStartPat = BPAT_WITHNOTEBOOKRIGHT_START;
 			bodyLoopPat = BPAT_WITHNOTEBOOKRIGHT_LOOP;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1623,6 +1752,9 @@ void RMTony::startStaticCalculate(CharacterTalkType nTalk, int &headPat, int &he
 			_nBodyOffset.set(-14, -8);
 			bodyStartPat = BPAT_WITHMEGAPHONERIGHT_START;
 			bodyLoopPat = BPAT_WITHMEGAPHONERIGHT_LOOP;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -1645,6 +1777,9 @@ void RMTony::startStaticCalculate(CharacterTalkType nTalk, int &headPat, int &he
 			bodyLoopPat = BPAT_STANDRIGHT;
 			headLoopPat = PAT_TALKBEARD_RIGHT;
 			headPat = 0;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -1675,6 +1810,7 @@ void RMTony::startStaticCalculate(CharacterTalkType nTalk, int &headPat, int &he
 			_nBodyOffset.set(6, 56);
 			break;
 
+		case UP:
 		default:
 			break;
 		}
@@ -1725,6 +1861,9 @@ void RMTony::endStaticCalculate(CharacterTalkType nTalk, int &bodyEndPat, int &f
 	case DOWN:
 		finalPat = PAT_STANDRIGHT;
 		break;
+
+	default:
+		break;
 	}
 
 	switch (nTalk) {
@@ -1738,6 +1877,9 @@ void RMTony::endStaticCalculate(CharacterTalkType nTalk, int &bodyEndPat, int &f
 		case DOWN:
 		case RIGHT:
 			bodyEndPat = BPAT_WITHSNOWMANRIGHT_END;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -1753,6 +1895,9 @@ void RMTony::endStaticCalculate(CharacterTalkType nTalk, int &bodyEndPat, int &f
 		case RIGHT:
 			bodyEndPat = BPAT_WITHRECIPERIGHT_END;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1766,6 +1911,9 @@ void RMTony::endStaticCalculate(CharacterTalkType nTalk, int &bodyEndPat, int &f
 		case DOWN:
 		case RIGHT:
 			bodyEndPat = BPAT_WITHRABBITRIGHT_END;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -1781,6 +1929,9 @@ void RMTony::endStaticCalculate(CharacterTalkType nTalk, int &bodyEndPat, int &f
 		case RIGHT:
 			bodyEndPat = BPAT_WITHCARDSRIGHT_END;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1794,6 +1945,9 @@ void RMTony::endStaticCalculate(CharacterTalkType nTalk, int &bodyEndPat, int &f
 		case DOWN:
 		case RIGHT:
 			bodyEndPat = BPAT_WITHNOTEBOOKRIGHT_END;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -1809,6 +1963,9 @@ void RMTony::endStaticCalculate(CharacterTalkType nTalk, int &bodyEndPat, int &f
 		case RIGHT:
 			bodyEndPat = BPAT_WITHMEGAPHONERIGHT_END;
 			break;
+
+		default:
+			break;
 		}
 		break;
 
@@ -1822,6 +1979,9 @@ void RMTony::endStaticCalculate(CharacterTalkType nTalk, int &bodyEndPat, int &f
 		case DOWN:
 		case RIGHT:
 			bodyEndPat = BPAT_WITHBEARDRIGHT_END;
+			break;
+
+		default:
 			break;
 		}
 		break;
@@ -1840,6 +2000,7 @@ void RMTony::endStaticCalculate(CharacterTalkType nTalk, int &bodyEndPat, int &f
 			headEndPat = PAT_SCAREDRIGHT_END;
 			break;
 
+		case UP:
 		default:
 			break;
 		}

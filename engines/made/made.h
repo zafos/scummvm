@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,6 +23,7 @@
 #define MADE_MADE_H
 
 #include "made/sound.h"
+#include "made/detection.h"
 
 #include "engines/engine.h"
 
@@ -42,23 +42,7 @@
  */
 namespace Made {
 
-enum MadeGameID {
-	GID_RTZ		= 0,
-	GID_MANHOLE	= 1,
-	GID_LGOP2	= 2,
-	GID_RODNEY	= 3
-};
-
-enum MadeGameFeatures {
-	GF_DEMO				= 1 << 0,
-	GF_CD				= 1 << 1,
-	GF_CD_COMPRESSED	= 1 << 2,
-	GF_FLOPPY			= 1 << 3
-};
-
 const uint32 kTimerResolution = 40;
-
-struct MadeGameDescription;
 
 class ResourceReader;
 class PmvPlayer;
@@ -69,25 +53,17 @@ class MusicPlayer;
 class MadeConsole;
 
 class MadeEngine : public ::Engine {
-	int _gameId;
-
 protected:
 
 	// Engine APIs
-	virtual Common::Error run();
+	Common::Error run() override;
 
 public:
 	MadeEngine(OSystem *syst, const MadeGameDescription *gameDesc);
-	virtual ~MadeEngine();
+	~MadeEngine() override;
 
-	virtual bool hasFeature(EngineFeature f) const;
-	virtual void syncSoundSettings();
-
-	virtual GUI::Debugger *getDebugger();
-
-	int getGameId() {
-		return _gameId;
-	}
+	bool hasFeature(EngineFeature f) const override;
+	void syncSoundSettings() override;
 
 	Common::RandomSource *_rnd;
 	const MadeGameDescription *_gameDescription;
@@ -96,8 +72,6 @@ public:
 	uint16 getVersion() const;
 	Common::Platform getPlatform() const;
 
-private:
-	MadeConsole *_console;
 public:
 	PmvPlayer *_pmvPlayer;
 	ResourceReader *_res;
@@ -117,6 +91,7 @@ public:
 
 	uint32 _musicBeatStart;
 	uint32 _cdTimeStart;
+	bool _introMusicDigital;
 
 	int32 _timers[50];
 	int16 getTicks();
@@ -132,6 +107,8 @@ public:
 
 	void handleEvents();
 
+protected:
+	void pauseEngineIntern(bool pause) override;
 };
 
 } // End of namespace Made

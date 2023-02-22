@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,11 +15,12 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
+#include "common/md5.h"
+#include "common/memstream.h"
 
 #include "scumm/scumm_v4.h"
 #include "scumm/file.h"
@@ -89,6 +90,8 @@ void ScummEngine_v4::readIndexFile() {
 			if (_game.id == GID_INDY3 && _game.platform == Common::kPlatformFMTowns)
 				itemsize += 32;
 			break;
+		default:
+			break;
 		}
 		_fileHandle->seek(itemsize - 8, SEEK_CUR);
 	}
@@ -143,7 +146,7 @@ void ScummEngine_v4::readIndexFile() {
 			break;
 
 		default:
-			error("Bad ID %c%c found in directory", blocktype & 0xFF, blocktype >> 8);
+			error("Bad ID %04X found in index file directory", blocktype);
 		}
 	}
 	closeRoom();
@@ -158,8 +161,9 @@ void ScummEngine_v4::loadCharset(int no) {
 
 	Common::File file;
 	char buf[20];
+	byte *data;
 
-	sprintf(buf, "%03d.LFL", 900 + no);
+	Common::sprintf_s(buf, "%03d.LFL", 900 + no);
 	file.open(buf);
 
 	if (file.isOpen() == false) {
@@ -167,7 +171,28 @@ void ScummEngine_v4::loadCharset(int no) {
 	}
 
 	size = file.readUint32LE() + 11;
-	file.read(_res->createResource(rtCharset, no, size), size);
+	data = _res->createResource(rtCharset, no, size);
+	file.read(data, size);
+
+	// WORKAROUND: The French floppy EGA and VGA versions of Monkey Island 1
+	// don't properly follow CP850 for the \x85 character in the 904.LFL font.
+	// It should be the `à` letter, but it will print the `ç` letter (which is
+	// already at \x87) instead, breaking at least the "Non!  Ce n'est pas tout
+	// \x85 fait \x87a." line in the copy protection screen. The `à` character
+	// does exist, but at the invalid \x86 position.  So we replace \x85 with
+	// \x86 (and then \x86 with \x87 so that the whole charset resource keeps
+	// the same size), but only when detecting the faulty 904.LFL file.
+	if ((_game.id == GID_MONKEY_EGA || _game.id == GID_MONKEY_VGA) && no == 4 && size == 4857 && _language == Common::FR_FRA && _enableEnhancements) {
+		Common::MemoryReadStream stream(data, size);
+		Common::String md5 = Common::computeStreamMD5AsString(stream);
+
+		if (md5 == "f273c26bbcdfb9f87e42748c3e2729d8") {
+			warning("Fixing the invalid content of the 904.LFL a-grave character");
+			memmove(data + 4457,      data + 4457 + 37,      40); // replace \x85 with \x86
+			memmove(data + 4457 + 40, data + 4457 + 37 + 40, 37); // replace \x86 with \x87
+			WRITE_LE_UINT32(data + 557, READ_LE_UINT32(data + 557) + (40 - 37)); // adjust \x86 start offset
+		}
+	}
 }
 
 void ScummEngine_v4::readMAXS(int blockSize) {
@@ -179,7 +204,7 @@ void ScummEngine_v4::readMAXS(int blockSize) {
 	_numArray = 50;
 	_numVerbs = 100;
 	_numNewNames = 50;
-	_objectRoomTable = NULL;
+	_objectRoomTable = nullptr;
 	_numCharsets = 9;					// 9
 	_numInventory = 80;					// 80
 	_numGlobalScripts = 200;

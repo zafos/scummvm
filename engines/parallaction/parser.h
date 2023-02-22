@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -291,25 +290,25 @@ protected:
 	DECLARE_UNQUALIFIED_ANIM_PARSER(moveto);
 	DECLARE_UNQUALIFIED_ANIM_PARSER(endanimation);
 
-	virtual void	parseZoneTypeBlock(ZonePtr z);
+	void	parseZoneTypeBlock(ZonePtr z) override;
 public:
 	virtual void	parsePathData(ZonePtr z);
-	virtual void	parseGetData(ZonePtr z);
-	virtual void	parseDoorData(ZonePtr z);
-	virtual void	parseHearData(ZonePtr z);
-	virtual void	parseNoneData(ZonePtr z);
+	void	parseGetData(ZonePtr z) override;
+	void	parseDoorData(ZonePtr z) override;
+	void	parseHearData(ZonePtr z) override;
+	void	parseNoneData(ZonePtr z) override;
 protected:
 	void	parseAnswerCounter(Answer *answer);
-	virtual Answer *parseAnswer();
+	Answer *parseAnswer() override;
 
 public:
 	LocationParser_br(Parallaction_br *vm) : LocationParser_ns((Parallaction_ns*)vm), _vm(vm),
 		_audioCommandsNames(0), _out(0) {
 	}
 
-	virtual void init();
+	void init() override;
 
-	virtual ~LocationParser_br() {
+	~LocationParser_br() override {
 		delete _audioCommandsNames;
 	}
 
@@ -402,14 +401,14 @@ protected:
 	void beginIfStatement();
 	void endIfStatement();
 
-	virtual void parseRValue(ScriptVar &var, const char *str);
+	void parseRValue(ScriptVar &var, const char *str) override;
 
 public:
 	ProgramParser_br(Parallaction_br *vm) : ProgramParser_ns((Parallaction_ns*)vm), _vm(vm), _openIfStatement(0) {
 	}
 
-	virtual void init();
-	virtual void parse(Script *script, ProgramPtr program);
+	void init() override;
+	void parse(Script *script, ProgramPtr program) override;
 };
 
 } // End of namespace Parallaction

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -35,6 +34,15 @@
 #include "engines/wintermute/base/base_game.h"
 #include "engines/wintermute/base/base_sprite.h"
 #include "engines/wintermute/platform_osystem.h"
+
+#ifdef ENABLE_WME3D
+#include "engines/wintermute/base/base_engine.h"
+#include "engines/wintermute/base/base_surface_storage.h"
+#include "engines/wintermute/base/gfx/base_surface.h"
+#include "engines/wintermute/base/gfx/base_renderer3d.h"
+#include "engines/wintermute/base/gfx/xmodel.h"
+#include "engines/wintermute/wintermute.h"
+#endif
 
 namespace Wintermute {
 
@@ -89,6 +97,22 @@ BaseObject::BaseObject(BaseGame *inGame) : BaseScriptHolder(inGame) {
 	}
 	_saveState = true;
 
+#ifdef ENABLE_WME3D
+	_xmodel = nullptr;
+	_shadowModel = nullptr;
+	_posVector = Math::Vector3d(0.0f, 0.0f, 0.0f);
+	_angle = 0.0f;
+	_scale3D = 1.0f;
+	_worldMatrix.setToIdentity();
+
+	_shadowImage = nullptr;
+	_shadowSize = 10.0f;
+	_shadowType = SHADOW_NONE;
+	_shadowColor = 0x80000000;
+	_shadowLightPos = Math::Vector3d(-40.0f, 200.0f, -40.0f);
+	_drawBackfaces = true;
+#endif
+
 	_nonIntMouseEvents = false;
 
 	// sound FX
@@ -129,6 +153,18 @@ bool BaseObject::cleanup() {
 		_caption[i] = nullptr;
 	}
 
+#ifdef ENABLE_WME3D
+	delete _xmodel;
+	_xmodel = nullptr;
+	delete _shadowModel;
+	_shadowModel = nullptr;
+
+	if (_shadowImage) {
+		_gameRef->_surfaceStorage->removeSurface(_shadowImage);
+		_shadowImage = nullptr;
+	}
+#endif
+
 	_sFXType = SFX_NONE;
 	_sFXParam1 = _sFXParam2 = _sFXParam3 = _sFXParam4 = 0;
 
@@ -146,11 +182,10 @@ void BaseObject::setCaption(const char *caption, int caseVal) {
 	}
 
 	delete[] _caption[caseVal - 1];
-	_caption[caseVal - 1] = new char[strlen(caption) + 1];
-	if (_caption[caseVal - 1]) {
-		strcpy(_caption[caseVal - 1], caption);
-		_gameRef->expandStringByStringTable(&_caption[caseVal - 1]);
-	}
+	size_t captionSize = strlen(caption) + 1;
+	_caption[caseVal - 1] = new char[captionSize];
+	Common::strcpy_s(_caption[caseVal - 1], captionSize, caption);
+	_gameRef->expandStringByStringTable(&_caption[caseVal - 1]);
 }
 
 
@@ -479,6 +514,78 @@ bool BaseObject::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisSta
 		return STATUS_OK;
 	}
 
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// SetShadowImage
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "SetShadowImage") == 0) {
+		stack->correctParams(1);
+		ScValue *val = stack->pop();
+
+		if (_shadowImage) {
+			_gameRef->_surfaceStorage->removeSurface(_shadowImage);
+			_shadowImage = nullptr;
+		}
+
+		if (val->isString()) {
+			_shadowImage = _gameRef->_surfaceStorage->addSurface(val->getString());
+			stack->pushBool(_shadowImage != nullptr);
+		} else {
+			stack->pushBool(true);
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// GetShadowImage
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetShadowImage") == 0) {
+		stack->correctParams(0);
+
+		if (_shadowImage) {
+			stack->pushString(_shadowImage->getFileName());
+		} else {
+			stack->pushNULL();
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// SetLightPosition
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "SetLightPosition") == 0) {
+		stack->correctParams(3);
+
+		double x = stack->pop()->getFloat();
+		double y = stack->pop()->getFloat();
+		double z = stack->pop()->getFloat();
+		// invert z coordinate because of OpenGL coordinate system
+		_shadowLightPos = Math::Vector3d(x, y, -z);
+
+		stack->pushNULL();
+		return STATUS_OK;
+	}
+#endif
+
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetSoundFilename
+	// Used to save/restore ambient sounds
+	// Should contain '\\' character, because Split("\\") is called on result
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetSoundFilename") == 0) {
+		stack->correctParams(0);
+
+		if (!_sFX) {
+			stack->pushNULL();
+		} else {
+			stack->pushString(_sFX->getFilename());
+		}
+		return STATUS_OK;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// SoundFXNone
@@ -998,6 +1105,24 @@ bool BaseObject::persist(BasePersistenceManager *persistMgr) {
 	persistMgr->transferFloat(TMEMBER(_sFXParam3));
 	persistMgr->transferFloat(TMEMBER(_sFXParam4));
 
+#ifdef ENABLE_WME3D
+	if (BaseEngine::instance().getFlags() & GF_3D) {
+		persistMgr->transferAngle(TMEMBER(_angle));
+		persistMgr->transferPtr(TMEMBER(_xmodel));
+		persistMgr->transferPtr(TMEMBER(_shadowModel));
+		persistMgr->transferVector3d(TMEMBER(_posVector));
+		persistMgr->transferMatrix4(TMEMBER(_worldMatrix));
+		persistMgr->transferFloat(TMEMBER(_shadowSize));
+		persistMgr->transferSint32(TMEMBER_INT(_shadowType));
+		persistMgr->transferUint32(TMEMBER(_shadowColor));
+		persistMgr->transferFloat(TMEMBER(_scale3D));
+		persistMgr->transferVector3d(TMEMBER(_shadowLightPos));
+		persistMgr->transferBool(TMEMBER(_drawBackfaces));
+	} else {
+		_xmodel = nullptr;
+		_shadowModel = nullptr;
+	}
+#endif
 
 	persistMgr->transferSint32(TMEMBER_INT(_blendMode));
 
@@ -1057,7 +1182,7 @@ bool BaseObject::handleKeypress(Common::Event *event, bool printable) {
 
 
 //////////////////////////////////////////////////////////////////////////
-bool BaseObject::handleMouseWheel(int delta) {
+bool BaseObject::handleMouseWheel(int32 delta) {
 	return false;
 }
 
@@ -1230,10 +1355,9 @@ void BaseObject::setSoundEvent(const char *eventName) {
 	delete[] _soundEvent;
 	_soundEvent = nullptr;
 	if (eventName) {
-		_soundEvent = new char[strlen(eventName) + 1];
-		if (_soundEvent) {
-			strcpy(_soundEvent, eventName);
-		}
+		size_t soundEventSize = strlen(eventName) + 1;
+		_soundEvent = new char[soundEventSize];
+		Common::strcpy_s(_soundEvent, soundEventSize, eventName);
 	}
 }
 
@@ -1241,5 +1365,47 @@ void BaseObject::setSoundEvent(const char *eventName) {
 bool BaseObject::afterMove() {
 	return STATUS_OK;
 }
+
+#ifdef ENABLE_WME3D
+bool BaseObject::getMatrix(Math::Matrix4 *modelMatrix, Math::Vector3d *posVect) {
+	if (posVect == nullptr) {
+		posVect = &_posVector;
+	}
+
+	Math::Matrix4 scale;
+	scale.setToIdentity();
+	scale(0, 0) = _scale3D;
+	scale(1, 1) = _scale3D;
+	scale(2, 2) = _scale3D;
+
+	float sinOfAngle = _angle.getSine();
+	float cosOfAngle = _angle.getCosine();
+	Math::Matrix4 rotation;
+	rotation.setToIdentity();
+	rotation(0, 0) = cosOfAngle;
+	rotation(0, 2) = sinOfAngle;
+	rotation(2, 0) = -sinOfAngle;
+	rotation(2, 2) = cosOfAngle;
+	Math::Matrix4 translation;
+	translation.setToIdentity();
+	translation.setPosition(*posVect);
+
+	*modelMatrix = translation * rotation * scale;
+	return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+bool BaseObject::renderModel() {
+	Math::Matrix4 objectMat;
+	getMatrix(&objectMat);
+
+	_gameRef->_renderer3D->setWorldTransform(objectMat);
+
+	if (_xmodel)
+		return _xmodel->render();
+	else
+		return false;
+}
+#endif
 
 } // End of namespace Wintermute

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -49,6 +48,8 @@ bool CSTimeCase1::checkConvCondition(uint16 conditionId) {
 	case 2:
 		// Is the bag on the boat, but player hasn't taken the torch?
 		return (hotspots[5].state != 1 && !gotTorch);
+	default:
+		break;
 	}
 
 	return false;
@@ -73,6 +74,8 @@ bool CSTimeCase1::checkObjectCondition(uint16 objectId) {
 		case 3:
 			// Hide torch if it's been picked up.
 			return (hotspots[4].state == 1);
+		default:
+			break;
 		}
 		break;
 
@@ -102,6 +105,10 @@ bool CSTimeCase1::checkObjectCondition(uint16 objectId) {
 		// The third note piece.
 		if (objectId == 1)
 			return !_vm->getInterface()->getCarmenNote()->havePiece(2);
+		break;
+
+	default:
+		break;
 	}
 
 	return true;
@@ -339,6 +346,9 @@ void CSTimeCase1::handleConditionalEvent(const CSTimeEvent &event) {
 				incorrectBodySequence(6, 14562, event.param1);
 			else
 				incorrectBodySequence(3, 14562, event.param1);
+			break;
+
+		default:
 			break;
 		}
 

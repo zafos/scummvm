@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -48,7 +47,7 @@ public:
 		stream->seek(4, SEEK_CUR);
 	}
 
-	void reset() {
+	void reset() override {
 		DVI_ADPCMStream::reset();
 		_status.ima_ch[0].last = _startValue[0];
 		_status.ima_ch[1].last = _startValue[1];
@@ -60,9 +59,9 @@ private:
 
 Audio::RewindableAudioStream *makeAPCStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse) {
 	if (stream->readUint32BE() != MKTAG('C', 'R', 'Y', 'O'))
-		return 0;
+		return nullptr;
 	if (stream->readUint32BE() != MKTAG('_', 'A', 'P', 'C'))
-		return 0;
+		return nullptr;
 	stream->readUint32BE(); // version
 	stream->readUint32LE(); // out size
 	uint32 rate = stream->readUint32LE();
@@ -77,7 +76,7 @@ public:
 	TwaAudioStream(Common::String name, Common::SeekableReadStream *stream) {
 		_name = name;
 		_cueSheet.clear();
-		_cueStream = NULL;
+		_cueStream = nullptr;
 		_cue = 0;
 		_loadedCue = -1;
 
@@ -97,24 +96,24 @@ public:
 		}
 	}
 
-	~TwaAudioStream() {
+	~TwaAudioStream() override {
 		delete _cueStream;
-		_cueStream = NULL;
+		_cueStream = nullptr;
 	}
 
-	virtual bool isStereo() const {
+	bool isStereo() const override {
 		return _cueStream ? _cueStream->isStereo() : true;
 	}
 
-	virtual int getRate() const {
+	int getRate() const override {
 		return _cueStream ? _cueStream->getRate() : 22050;
 	}
 
-	virtual bool endOfData() const {
-		return _cueStream == NULL;
+	bool endOfData() const override {
+		return _cueStream == nullptr;
 	}
 
-	virtual int readBuffer(int16 *buffer, const int numSamples) {
+	int readBuffer(int16 *buffer, const int numSamples) override {
 		if (!_cueStream)
 			return 0;
 
@@ -147,7 +146,7 @@ protected:
 		}
 
 		delete _cueStream;
-		_cueStream = NULL;
+		_cueStream = nullptr;
 		_loadedCue = _cueSheet[nr];
 
 		Common::String filename = Common::String::format("%s_%02d", _name.c_str(), _cueSheet[nr]);
@@ -260,6 +259,8 @@ void SoundManager::loadAnimSound() {
 		loadWav("SOUND80.WAV", 1);
 		loadWav("SOUND82.WAV", 2);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -297,6 +298,8 @@ void SoundManager::playAnimSound(int animFrame) {
 		case 122:
 			if (_vm->getLanguage() != Common::PL_POL)
 				playSample(4);
+			break;
+		default:
 			break;
 		}
 	} else if (_specialSoundNum == 1 && animFrame == 17)
@@ -526,10 +529,10 @@ bool SoundManager::mixVoice(int voiceId, int voiceMode, bool dispTxtFl) {
 	bool fileFoundFl = false;
 	_vm->_fileIO->searchCat(filename + ".WAV", RES_VOI, fileFoundFl);
 	if (fileFoundFl) {
-		if (_vm->getPlatform() == Common::kPlatformOS2 || _vm->getPlatform() == Common::kPlatformBeOS)
+		if (_vm->getPlatform() == Common::kPlatformOS2 || _vm->getPlatform() == Common::kPlatformBeOS) {
 			filename = "ENG_VOI.RES";
-		// Win95 and Linux versions uses another set of names
-		else {
+		} else {
+			// Win95 and Linux versions uses another set of names
 			switch (_vm->_globals->_language) {
 			case LANG_FR:
 				filename = "RES_VFR.RES";
@@ -540,6 +543,8 @@ bool SoundManager::mixVoice(int voiceId, int voiceMode, bool dispTxtFl) {
 			case LANG_SP:
 				filename = "RES_VES.RES";
 				break;
+			default:
+				break;
 			}
 		}
 
@@ -548,10 +553,10 @@ bool SoundManager::mixVoice(int voiceId, int voiceMode, bool dispTxtFl) {
 	} else {
 		_vm->_fileIO->searchCat(filename + ".APC", RES_VOI, fileFoundFl);
 		if (fileFoundFl) {
-			if (_vm->getPlatform() == Common::kPlatformOS2 || _vm->getPlatform() == Common::kPlatformBeOS)
+			if (_vm->getPlatform() == Common::kPlatformOS2 || _vm->getPlatform() == Common::kPlatformBeOS) {
 				filename = "ENG_VOI.RES";
-			// Win95 and Linux versions uses another set of names
-			else {
+			} else {
+				// Win95 and Linux versions uses another set of names
 				switch (_vm->_globals->_language) {
 				case LANG_FR:
 					filename = "RES_VFR.RES";
@@ -562,6 +567,8 @@ bool SoundManager::mixVoice(int voiceId, int voiceMode, bool dispTxtFl) {
 				case LANG_SP:
 					filename = "RES_VES.RES";
 					break;
+				default:
+					break;
 				}
 			}
 
@@ -570,10 +577,10 @@ bool SoundManager::mixVoice(int voiceId, int voiceMode, bool dispTxtFl) {
 		} else {
 			_vm->_fileIO->searchCat(filename + ".RAW", RES_VOI, fileFoundFl);
 			if (fileFoundFl) {
-				if (_vm->getPlatform() == Common::kPlatformOS2 || _vm->getPlatform() == Common::kPlatformBeOS)
+				if (_vm->getPlatform() == Common::kPlatformOS2 || _vm->getPlatform() == Common::kPlatformBeOS) {
 					filename = "ENG_VOI.RES";
-				// Win95 and Linux versions uses another set of names
-				else {
+				} else {
+					// Win95 and Linux versions uses another set of names
 					switch (_vm->_globals->_language) {
 					case LANG_FR:
 						filename = "RES_VFR.RES";
@@ -583,6 +590,8 @@ bool SoundManager::mixVoice(int voiceId, int voiceMode, bool dispTxtFl) {
 						break;
 					case LANG_SP:
 						filename = "RES_VES.RES";
+						break;
+					default:
 						break;
 					}
 				}
@@ -783,7 +792,7 @@ bool SoundManager::removeWavSample(int wavIndex) {
 
 	_vm->_mixer->stopHandle(_sWav[wavIndex]._soundHandle);
 	delete _sWav[wavIndex]._audioStream;
-	_sWav[wavIndex]._audioStream = NULL;
+	_sWav[wavIndex]._audioStream = nullptr;
 	_sWav[wavIndex]._active = false;
 
 	return true;

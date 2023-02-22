@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -528,7 +527,7 @@ void Parser::cursorOff() {
  * Asks the parsekey proc in Dropdown if it knows it.
  */
 void Parser::tryDropdown() {
-    // TODO: Implement at the same time with Dropdown's keyboard handling.
+	// TODO: Implement at the same time with Dropdown's keyboard handling.
 	warning("STUB: Parser::tryDropdown()");
 }
 
@@ -689,6 +688,8 @@ bool Parser::doPronouns() {
 			displayWhat(_vm->_it, false, ambiguous);
 			_thats.setChar(_vm->_it, i);
 			break;
+		default:
+			break;
 		}
 	}
 
@@ -754,6 +755,8 @@ void Parser::storeInterrogation(byte interrogation) {
 	case 99:
 		//store_high(_inputText);
 		warning("STUB: Parser::store_interrogation()");
+		break;
+	default:
 		break;
 	}
 
@@ -979,19 +982,23 @@ void Parser::examineObject() {
 			// Vinegar
 			_vm->_dialogs->displayScrollChain('D', 7);
 			break;
+		default:
+			break;
 		}
 		break;
 	case kObjectOnion:
-		if (_vm->_rottenOnion)
+		if (_vm->_rottenOnion) {
 			// Yucky onion
 			_vm->_dialogs->displayScrollChain('Q', 21);
-		else
+		} else {
 			// Normal onion
 			_vm->_dialogs->displayScrollChain('T', 18);
+		}
 		break;
 	default:
 		// Ordinarily
 		_vm->_dialogs->displayScrollChain('T', _thing);
+		break;
 	}
 }
 
@@ -1157,6 +1164,8 @@ void Parser::swallow() {
 			// You can't drink it!
 			_vm->_dialogs->displayScrollChain('D', 8);
 			break;
+		default:
+			break;
 		}
 		break;
 	case kObjectPotion:
@@ -1272,6 +1281,8 @@ void Parser::lookAround() {
 			// Outside Geida's room.
 			_vm->_dialogs->displayScrollChain('Q', 82);
 			break;
+		default:
+			break;
 		}
 		break;
 	default:
@@ -1326,6 +1337,10 @@ void Parser::openDoor() {
 			case kMagicOpenDoor:
 				_vm->openDoor((Room)(portal->_data >> 8), portal->_data & 0x0F, i + 9);
 				break;
+			case kMagicBounce: // Not valid for portals.
+			case kMagicNothing:
+			default:
+				break;
 			}
 
 			return;
@@ -1373,8 +1388,9 @@ void Parser::putProc() {
 					_vm->_dialogs->displayScrollChain('U', 9);
 				}
 			}
-		} else
+		} else {
 			_vm->_dialogs->saySilly();
+		}
 		break;
 
 	case 54:
@@ -1415,12 +1431,14 @@ void Parser::putProc() {
 					}
 				}
 			}
-		} else
+		} else {
 			_vm->_dialogs->saySilly();
+		}
 		break;
 
 	default:
 		_vm->_dialogs->saySilly();
+		break;
 	}
 }
 
@@ -2193,6 +2211,8 @@ void Parser::doThat() {
 
 						_vm->_timer->addTimer(27, Timer::kProcBuyWine, Timer::kReasonDrinks);
 					}
+					break;
+				default:
 					break;
 				}
 			} else

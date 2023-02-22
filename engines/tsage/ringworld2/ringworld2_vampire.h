@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,11 +46,11 @@ class Scene1950 : public SceneExt {
 			bool _toggled;
 
 			KeypadButton();
-			void synchronize(Serializer &s);
+			void synchronize(Serializer &s) override;
 
 			void init(int indx);
-			virtual void process(Event &event);
-			virtual bool startAction(CursorType action, Event &event);
+			void process(Event &event) override;
+			bool startAction(CursorType action, Event &event) override;
 		};
 
 		SceneActor _areaActor;
@@ -60,29 +59,29 @@ class Scene1950 : public SceneExt {
 		int _buttonIndex;
 
 		KeypadWindow();
-		virtual void synchronize(Serializer &s);
-		virtual void remove();
-		virtual void setup2(int visage, int stripFrameNum, int frameNum, int posX, int posY);
-		virtual void setup3(int resNum, int lookLineNum, int talkLineNum, int useLineNum);
+		void synchronize(Serializer &s) override;
+		void remove() override;
+		void setup2(int visage, int stripFrameNum, int frameNum, int posX, int posY) override;
+		void setup3(int resNum, int lookLineNum, int talkLineNum, int useLineNum) override;
 	};
 
 	class Keypad : public NamedHotspot {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 
 	/* Actors */
 	class Door : public SceneActor {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 	class Scrolls : public SceneActor {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 	class Gem : public SceneActor {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 	class Vampire : public SceneActor {
 	public:
@@ -92,44 +91,44 @@ class Scene1950 : public SceneExt {
 		int _vampireMode;
 
 		Vampire();
-		void synchronize(Serializer &s);
+		void synchronize(Serializer &s) override;
 
-		virtual void signal();
-		virtual bool startAction(CursorType action, Event &event);
+		void signal() override;
+		bool startAction(CursorType action, Event &event) override;
 	};
 
 	/* Exits */
 	class NorthExit : public SceneExit {
 	public:
-		virtual void changeScene();
+		void changeScene() override;
 	};
 	class UpExit : public SceneExit {
 	public:
-		virtual void changeScene();
+		void changeScene() override;
 	};
 	class EastExit : public SceneExit {
 	public:
-		virtual void changeScene();
+		void changeScene() override;
 	};
 	class DownExit : public SceneExit {
 	public:
-		virtual void changeScene();
+		void changeScene() override;
 	};
 	class SouthExit : public SceneExit {
 	public:
-		virtual void changeScene();
+		void changeScene() override;
 	};
 	class WestExit : public SceneExit {
 	public:
-		virtual void changeScene();
+		void changeScene() override;
 	};
 	class ShaftExit : public SceneExit {
 	public:
-		virtual void changeScene();
+		void changeScene() override;
 	};
 	class DoorExit : public SceneExit {
 	public:
-		virtual void changeScene();
+		void changeScene() override;
 	};
 private:
 	void initArea();
@@ -165,12 +164,12 @@ public:
 	int _vampireIndex;
 
 	Scene1950();
-	void synchronize(Serializer &s);
+	void synchronize(Serializer &s) override;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void remove();
-	virtual void signal();
-	virtual void process(Event &event);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void remove() override;
+	void signal() override;
+	void process(Event &event) override;
 };
 
 } // End of namespace Ringworld2

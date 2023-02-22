@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -44,9 +43,22 @@ void BaseUtils::swap(int *a, int *b) {
 
 //////////////////////////////////////////////////////////////////////////
 float BaseUtils::normalizeAngle(float angle) {
-	while (angle > 360) {
+	float origAngle = angle;
+
+	// The original WME engine checked against 360 here, which is an off-by one
+	// error, as when normalizing an angle, we expect the number to be between 0
+	// and 359 (since 360 is 0). This check has been fixed in ScummVM to 359. If
+	// the resulting angle is negative, it will be corrected in the while loop
+	// below.
+	while (angle > 359) {
 		angle -= 360;
 	}
+
+	// Report cases where the above off-by-one error might occur
+	if (origAngle > 360 && angle < 0) {
+		warning("BaseUtils::normalizeAngle: off-by-one error detected while normalizing angle %f to %f", origAngle, angle);
+	}
+
 	while (angle < 0) {
 		angle += 360;
 	}
@@ -80,10 +92,9 @@ void BaseUtils::debugMessage(const char *text) {
 //////////////////////////////////////////////////////////////////////////
 char *BaseUtils::setString(char **string, const char *value) {
 	delete[] *string;
-	*string = new char[strlen(value) + 1];
-	if (*string) {
-		strcpy(*string, value);
-	}
+	size_t stringSize = strlen(value) + 1;
+	*string = new char[stringSize];
+	Common::strcpy_s(*string, stringSize, value);
 	return *string;
 }
 
@@ -105,8 +116,7 @@ char *BaseUtils::strEntry(int entry, const char *str, const char delim) {
 		if (str[i] == delim || str[i] == '\0') {
 			numEntries++;
 			if (start) {
-				char *ret = new char[len + 1];
-				memset(ret, 0, len + 1);
+				char *ret = new char[len + 1]();
 				Common::strlcpy(ret, start, len + 1);
 				return ret;
 			}

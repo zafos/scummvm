@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,7 +23,7 @@
 #define THEME_PARSER_H
 
 #include "common/scummsys.h"
-#include "common/xmlparser.h"
+#include "common/formats/xmlparser.h"
 
 namespace GUI {
 
@@ -34,7 +33,13 @@ class ThemeParser : public Common::XMLParser {
 public:
 	ThemeParser(ThemeEngine *parent);
 
-	virtual ~ThemeParser();
+	~ThemeParser() override;
+
+	void setBaseResolution(int w, int h, float s) {
+		_baseWidth = w;
+		_baseHeight = h;
+		_scaleFactor = s;
+	}
 
 	bool getPaletteColor(const Common::String &name, int &r, int &g, int &b) {
 		if (!_palette.contains(name))
@@ -63,10 +68,16 @@ protected:
 			XML_KEY(fonts)
 				XML_KEY(font)
 					XML_PROP(id, true)
-					XML_PROP(file, true)
+					XML_PROP(file, false)
 					XML_PROP(resolution, false)
 					XML_PROP(scalable_file, false)
 					XML_PROP(point_size, false)
+					XML_KEY(language)
+						XML_PROP(id, true)
+						XML_PROP(file, false)
+						XML_PROP(scalable_file, false)
+						XML_PROP(point_size, false)
+					KEY_END()
 				KEY_END()
 
 				XML_KEY(text_color)
@@ -79,10 +90,9 @@ protected:
 				XML_KEY(bitmap)
 					XML_PROP(filename, true)
 					XML_PROP(resolution, false)
-				KEY_END()
-				XML_KEY(alphabitmap)
-					XML_PROP(filename, true)
-					XML_PROP(resolution, false)
+					XML_PROP(scalable_file, false)
+					XML_PROP(width, false)
+					XML_PROP(height, false)
 				KEY_END()
 			KEY_END()
 
@@ -147,6 +157,7 @@ protected:
 					XML_PROP(orientation, false)
 					XML_PROP(file, false)
 					XML_PROP(autoscale, false)
+					XML_PROP(clip, false)
 				KEY_END()
 
 				XML_KEY(text)
@@ -167,6 +178,7 @@ protected:
 					XML_PROP(var, true)
 					XML_PROP(value, true)
 					XML_PROP(resolution, false)
+					XML_PROP(scalable, false)
 				KEY_END()
 
 				XML_KEY(widget)
@@ -176,19 +188,20 @@ protected:
 					XML_PROP(padding, false)
 					XML_PROP(resolution, false)
 					XML_PROP(textalign, false)
+					XML_PROP(rtl, false)
 				KEY_END()
 			KEY_END()
 
 			XML_KEY(dialog)
 				XML_PROP(name, true)
 				XML_PROP(overlays, true)
+				XML_PROP(size, false)
 				XML_PROP(shading, false)
-				XML_PROP(enabled, false)
 				XML_PROP(resolution, false)
 				XML_PROP(inset, false)
 				XML_KEY(layout)
 					XML_PROP(type, true)
-					XML_PROP(center, false)
+					XML_PROP(align, false)
 					XML_PROP(padding, false)
 					XML_PROP(spacing, false)
 
@@ -201,12 +214,14 @@ protected:
 						XML_PROP(width, false)
 						XML_PROP(height, false)
 						XML_PROP(type, false)
-						XML_PROP(enabled, false)
 						XML_PROP(textalign, false)
+						XML_PROP(rtl, false)
+						XML_PROP(resolution, false)
 					KEY_END()
 
 					XML_KEY(space)
 						XML_PROP(size, false)
+						XML_PROP(resolution, false)
 					KEY_END()
 
 					XML_KEY_RECURSIVE(layout)
@@ -222,6 +237,7 @@ protected:
 	bool parserCallback_font(ParserNode *node);
 	bool parserCallback_text_color(ParserNode *node);
 	bool parserCallback_fonts(ParserNode *node);
+	bool parserCallback_language(ParserNode *node);
 	bool parserCallback_text(ParserNode *node);
 	bool parserCallback_palette(ParserNode *node);
 	bool parserCallback_color(ParserNode *node);
@@ -229,7 +245,6 @@ protected:
 	bool parserCallback_drawdata(ParserNode *node);
 	bool parserCallback_bitmaps(ParserNode *node) { return true; }
 	bool parserCallback_bitmap(ParserNode *node);
-	bool parserCallback_alphabitmap(ParserNode *node);
 	bool parserCallback_cursor(ParserNode *node);
 
 
@@ -243,11 +258,11 @@ protected:
 	bool parserCallback_space(ParserNode *node);
 	bool parserCallback_import(ParserNode *node);
 
-	bool closedKeyCallback(ParserNode *node);
+	bool closedKeyCallback(ParserNode *node) override;
 
 	bool resolutionCheck(const Common::String &resolution);
 
-	void cleanup();
+	void cleanup() override;
 
 	Graphics::DrawStep *newDrawStep();
 	Graphics::DrawStep *defaultDrawStep();
@@ -256,6 +271,9 @@ protected:
 
 	Graphics::DrawStep *_defaultStepGlobal;
 	Graphics::DrawStep *_defaultStepLocal;
+
+	int16 _baseWidth, _baseHeight;
+	float _scaleFactor;
 
 	struct PaletteColor {
 		uint8 r, g, b;

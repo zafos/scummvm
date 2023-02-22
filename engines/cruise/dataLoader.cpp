@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -128,6 +127,8 @@ void decodeGfxUnified(dataFileEntry *pCurrentFileEntry, int16 format) {
 
 		break;
 	}
+	default:
+		break;
 	}
 
 	MemFree(pCurrentFileEntry->subData.ptr);
@@ -215,7 +216,7 @@ fileTypeEnum getFileType(const char *name) {
 
 	fileTypeEnum newFileType = type_UNK;
 
-	getFileExtention(name, extentionBuffer);
+	getFileExtention(name, extentionBuffer, sizeof(extentionBuffer));
 
 	if (!strcmp(extentionBuffer, ".SPL")) {
 		newFileType = type_SPL;
@@ -236,12 +237,12 @@ int getNumMaxEntiresInSet(uint8 *ptr) {
 }
 
 int loadFile(const char* name, int idx, int destIdx) {
-	uint8 *ptr = NULL;
+	uint8 *ptr = nullptr;
 	fileTypeEnum fileType;
 
 	fileType = getFileType(name);
 
-	loadFileSub1(&ptr, name, NULL);
+	loadFileSub1(&ptr, name, nullptr);
 
 	switch (fileType) {
 	case type_SET: {
@@ -278,12 +279,12 @@ int loadFile(const char* name, int idx, int destIdx) {
 }
 
 int loadFileRange(const char *name, int startIdx, int currentEntryIdx, int numIdx) {
-	uint8 *ptr = NULL;
+	uint8 *ptr = nullptr;
 	fileTypeEnum fileType;
 
 	fileType = getFileType(name);
 
-	loadFileSub1(&ptr, name, NULL);
+	loadFileSub1(&ptr, name, nullptr);
 
 	switch (fileType) {
 	case type_SET: {
@@ -318,14 +319,14 @@ int loadFileRange(const char *name, int startIdx, int currentEntryIdx, int numId
 }
 
 int loadFullBundle(const char *name, int startIdx) {
-	uint8 *ptr = NULL;
+	uint8 *ptr = nullptr;
 	fileTypeEnum fileType;
 
 	fileType = getFileType(name);
 
-	loadFileSub1(&ptr, name, NULL);
+	loadFileSub1(&ptr, name, nullptr);
 
-	if (ptr == NULL)
+	if (ptr == nullptr)
 		return 0;
 
 	switch (fileType) {
@@ -373,7 +374,7 @@ int loadFNTSub(uint8 *ptr, int destIdx) {
 
 	uint8 *destPtr = filesDatabase[fileIndex].subData.ptr;
 
-	if (destPtr != NULL) {
+	if (destPtr != nullptr) {
 		memcpy(destPtr, ptr2, loadFileVar1);
 
 		destPtr = filesDatabase[fileIndex].subData.ptr;

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -311,14 +310,15 @@ int32 ScriptFunc::sys_Cmd_Flip_Screens(EMCState *state) {
 }
 
 int32 ScriptFunc::sys_Cmd_Play_Flic(EMCState *state) {
-
+	Common::String stateText = GetText(0, state);
 	Common::String name;
 
 	// workaround for the video of the beginning
-	if (strstr(GetText(0, state), "209"))
-		name = GetText(0, state);
-	else
-		name = _vm->createRoomFilename(GetText(0, state));
+	if (stateText.contains("209")) {
+		name = stateText;
+	} else {
+		name = _vm->createRoomFilename(stateText.c_str());
+	}
 
 	int32 stopMusic = stackPos(2);
 	_vm->getMoviePlayer()->play(name, stopMusic);
@@ -713,6 +713,10 @@ int32 ScriptFunc::sys_Cmd_Query_Scene_Anim_Loaded(EMCState *state) {
 }
 
 int32 ScriptFunc::sys_Cmd_Play_Flux_Anim(EMCState *state) {
+	if (!_vm->getFlux()->getFlag()) {
+		_vm->getFlux()->playAnim(stackPos(0), 0, stackPos(1));
+		_vm->getFlux()->setFlag(_vm->getFlux()->getFlag() | 4);
+	}
 	return 0;
 }
 

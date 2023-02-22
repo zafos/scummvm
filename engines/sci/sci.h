@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -29,6 +28,7 @@
 #include "common/random.h"
 #include "sci/engine/vm_types.h"	// for Selector
 #include "sci/debug.h"	// for DebugState
+#include "sci/detection.h" // Shared code between detection and engine
 
 struct ADGameDescription;
 
@@ -44,20 +44,6 @@ struct ADGameDescription;
  * list future games, with status for each.
  */
 namespace Sci {
-
-// GUI-options, primarily used by detection_tables.h
-#define GAMEOPTION_PREFER_DIGITAL_SFX       GUIO_GAMEOPTIONS1
-#define GAMEOPTION_ORIGINAL_SAVELOAD        GUIO_GAMEOPTIONS2
-#define GAMEOPTION_FB01_MIDI                GUIO_GAMEOPTIONS3
-#define GAMEOPTION_JONES_CDAUDIO            GUIO_GAMEOPTIONS4
-#define GAMEOPTION_KQ6_WINDOWS_CURSORS      GUIO_GAMEOPTIONS5
-#define GAMEOPTION_SQ4_SILVER_CURSORS       GUIO_GAMEOPTIONS6
-#define GAMEOPTION_EGA_UNDITHER             GUIO_GAMEOPTIONS7
-// HIGH_RESOLUTION_GRAPHICS availability is checked for in SciEngine::run()
-#define GAMEOPTION_HIGH_RESOLUTION_GRAPHICS GUIO_GAMEOPTIONS8
-#define GAMEOPTION_ENABLE_BLACK_LINED_VIDEO GUIO_GAMEOPTIONS9
-#define GAMEOPTION_HQ_VIDEO                 GUIO_GAMEOPTIONS10
-#define GAMEOPTION_ENABLE_CENSORING         GUIO_GAMEOPTIONS11
 
 struct EngineState;
 class Vocabulary;
@@ -80,6 +66,7 @@ class GfxControls16;
 class GfxControls32;
 class GfxCoordAdjuster16;
 class GfxCursor;
+class GfxMacFontManager;
 class GfxMacIconBar;
 class GfxMenu;
 class GfxPaint16;
@@ -93,6 +80,7 @@ class GfxScreen;
 class GfxText16;
 class GfxText32;
 class GfxTransitions;
+class SciTTS;
 
 #ifdef ENABLE_SCI32
 class GfxFrameout;
@@ -126,113 +114,12 @@ enum kDebugLevels {
 	kDebugLevelResMan        = 1 << 19,
 	kDebugLevelOnStartup     = 1 << 20,
 	kDebugLevelDebugMode     = 1 << 21,
-	kDebugLevelScriptPatcher = 1 << 22,
+	kDebugLevelPatcher       = 1 << 22,
 	kDebugLevelWorkarounds   = 1 << 23,
 	kDebugLevelVideo         = 1 << 24,
 	kDebugLevelGame          = 1 << 25
 };
 
-enum SciGameId {
-	GID_ASTROCHICKEN,
-	GID_CAMELOT,
-	GID_CASTLEBRAIN,
-	GID_CHEST,
-	GID_CHRISTMAS1988,
-	GID_CHRISTMAS1990,
-	GID_CHRISTMAS1992,
-	GID_CNICK_KQ,
-	GID_CNICK_LAURABOW,
-	GID_CNICK_LONGBOW,
-	GID_CNICK_LSL,
-	GID_CNICK_SQ,
-	GID_ECOQUEST,
-	GID_ECOQUEST2,
-	GID_FAIRYTALES,
-	GID_FREDDYPHARKAS,
-	GID_FUNSEEKER,
-	GID_GK1DEMO,	// We have a separate ID for GK1 demo, because it's actually a completely different game (SCI1.1 vs SCI2/SCI2.1)
-	GID_GK1,
-	GID_GK2,
-	GID_HOYLE1,
-	GID_HOYLE2,
-	GID_HOYLE3,
-	GID_HOYLE4,
-	GID_HOYLE5,
-	GID_ICEMAN,
-	GID_INNDEMO,
-	GID_ISLANDBRAIN,
-	GID_JONES,
-	GID_KQ1,
-	GID_KQ4,
-	GID_KQ5,
-	GID_KQ6,
-	GID_KQ7,
-	GID_KQUESTIONS,
-	GID_LAURABOW,
-	GID_LAURABOW2,
-	GID_LIGHTHOUSE,
-	GID_LONGBOW,
-	GID_LSL1,
-	GID_LSL2,
-	GID_LSL3,
-	GID_LSL5,
-	GID_LSL6,
-	GID_LSL6HIRES, // We have a separate ID for LSL6 SCI32, because it's actually a completely different game
-	GID_LSL7,
-	GID_MOTHERGOOSE, // this one is the SCI0 version
-	GID_MOTHERGOOSE256, // this one handles SCI1 and SCI1.1 variants, at least those 2 share a bit in common
-	GID_MOTHERGOOSEHIRES, // this one is the SCI2.1 hires version, completely different from the other ones
-	GID_MSASTROCHICKEN,
-	GID_PEPPER,
-	GID_PHANTASMAGORIA,
-	GID_PHANTASMAGORIA2,
-	GID_PQ1,
-	GID_PQ2,
-	GID_PQ3,
-	GID_PQ4,
-	GID_PQ4DEMO,	// We have a separate ID for PQ4 demo, because it's actually a completely different game (SCI1.1 vs SCI2/SCI2.1)
-	GID_PQSWAT,
-	GID_QFG1,
-	GID_QFG1VGA,
-	GID_QFG2,
-	GID_QFG3,
-	GID_QFG4,
-	GID_QFG4DEMO,	// We have a separate ID for QFG4 demo, because it's actually a completely different game (SCI1.1 vs SCI2/SCI2.1)
-	GID_RAMA,
-	GID_SHIVERS,
-	//GID_SHIVERS2,	// Not SCI
-	GID_SLATER,
-	GID_SQ1,
-	GID_SQ3,
-	GID_SQ4,
-	GID_SQ5,
-	GID_SQ6,
-	GID_TORIN,
-
-	GID_FANMADE	// FIXME: Do we really need/want this?
-};
-
-/**
- * SCI versions
- * For more information, check here:
- * http://wiki.scummvm.org/index.php/Sierra_Game_Versions#SCI_Games
- */
-enum SciVersion {
-	SCI_VERSION_NONE,
-	SCI_VERSION_0_EARLY, // KQ4 early, LSL2 early, XMAS card 1988
-	SCI_VERSION_0_LATE, // KQ4, LSL2, LSL3, SQ3 etc
-	SCI_VERSION_01, // KQ1 and multilingual games (S.old.*)
-	SCI_VERSION_1_EGA_ONLY, // SCI 1 EGA with parser (i.e. QFG2 only)
-	SCI_VERSION_1_EARLY, // KQ5 floppy, SQ4 floppy, XMAS card 1990, Fairy tales, Jones floppy
-	SCI_VERSION_1_MIDDLE, // LSL1, Jones CD
-	SCI_VERSION_1_LATE, // Dr. Brain 1, EcoQuest 1, Longbow, PQ3, SQ1, LSL5, KQ5 CD
-	SCI_VERSION_1_1, // Dr. Brain 2, EcoQuest 1 CD, EcoQuest 2, KQ6, QFG3, SQ4CD, XMAS 1992 and many more
-	SCI_VERSION_2, // GK1, PQ4 floppy, QFG4 floppy
-	SCI_VERSION_2_1_EARLY, // GK2 demo, KQ7 1.4/1.51, LSL6 hires, PQ4CD, QFG4CD
-	SCI_VERSION_2_1_MIDDLE, // GK2, Hoyle 5, KQ7 2.00b, MUMG Deluxe, Phantasmagoria 1, PQ:SWAT, Shivers 1, SQ6, Torin
-	SCI_VERSION_2_1_LATE, // demos of LSL7, Lighthouse, RAMA
-	SCI_VERSION_3 // LSL7, Lighthouse, RAMA, Phantasmagoria 2
-};
 
 /** Supported languages */
 enum kLanguage {
@@ -250,27 +137,54 @@ class SciEngine : public Engine {
 	friend class Console;
 public:
 	SciEngine(OSystem *syst, const ADGameDescription *desc, SciGameId gameId);
-	~SciEngine();
+	~SciEngine() override;
 
 	// Engine APIs
-	virtual Common::Error run();
-	bool hasFeature(EngineFeature f) const;
-	void pauseEngineIntern(bool pause);
-	virtual GUI::Debugger *getDebugger();
+	Common::Error run() override;
+	bool hasFeature(EngineFeature f) const override;
+	void pauseEngineIntern(bool pause) override;
+	void severeError();
 	Console *getSciDebugger();
-	Common::Error loadGameState(int slot);
-	Common::Error saveGameState(int slot, const Common::String &desc);
-	bool canLoadGameStateCurrently();
-	bool canSaveGameStateCurrently();
-	void syncSoundSettings(); ///< from ScummVM to the game
+	Common::Error loadGameState(int slot) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	bool canLoadGameStateCurrently() override;
+	bool canSaveGameStateCurrently() override;
+	void syncSoundSettings() override; ///< from ScummVM to the game
 	void updateSoundMixerVolumes();
 	uint32 getTickCount();
 	void setTickCount(const uint32 ticks);
 
+	/**
+	 * Disable support for ScummVM autosaves.
+	 *
+	 * A lot of SCI games already have an autosaving mechanism.
+	 * Also, a lot of games have death screens when the player
+	 * does something wrong, and autosaves could kick in when the
+	 * death screen is shown, which makes them useless, since
+	 * the player can only restore or restart.
+	 *
+	 * Another place where autosaves could kick in is during
+	 * screens with internal loops, e.g. the inventory screen,
+	 * where the autosave created would be invalid, as the internal
+	 * loop isn't persisted in saved games.
+	 *
+	 * For now, we allow saving in places where the user has
+	 * control via GuestAdditions::userHasControl(), but as
+	 * mentioned above, these do not cover cases where the user
+	 * does have control, but saving would either be useless (e.g.
+	 * in death screens) or invalid saved would be created (e.g.
+	 * while the inventory screen is open).
+	 *
+	 * In the future, if we are able to detect all death screens,
+	 * all internal loops and generally all places where saving
+	 * shouldn't be allowed, we could re-enable this feature.
+	 */
+	int getAutosaveSlot() const override { return -1; }
+
 	const SciGameId &getGameId() const { return _gameId; }
 	const char *getGameIdStr() const;
-	int getResourceVersion() const;
 	Common::Language getLanguage() const;
+	bool isLanguageRTL() const;		// true if language's direction is from Right To Left
 	Common::Platform getPlatform() const;
 	bool isDemo() const;
 	bool isCD() const;
@@ -279,7 +193,20 @@ public:
 	/** Returns true if the game's original platform is big-endian. */
 	bool isBE() const;
 
+	bool hasParser() const;
+
+	/** Returns true if the game supports native Mac fonts and the fonts are available. */
+	bool hasMacFonts() const;
+	
+	/** Returns true if the game is a Mac version with an icon bar on the bottom. */
 	bool hasMacIconBar() const;
+
+	/**
+	 * Returns true if the game is a Mac version that used native Mac file dialogs
+	 * for saving and restoring. These versions do not include resources for the
+	 * normal save and restore screens, so the ScummVM UI must always be used.
+	 */
+	bool hasMacSaveRestoreDialogs() const;
 
 	inline ResourceManager *getResMan() const { return _resMan; }
 	inline ScriptPatcher *getScriptPatcher() const { return _scriptPatcher; }
@@ -310,12 +237,15 @@ public:
 	 */
 	int inQfGImportRoom() const;
 
+	/* Shows a ScummVM message box explaining how to import Qfg saved character files */
+	void showQfgImportMessageBox() const;
+
 	void sleep(uint32 msecs);
 
 	void scriptDebug();
 	bool checkExportBreakpoint(uint16 script, uint16 pubfunct);
 	bool checkSelectorBreakpoint(BreakpointType breakpointType, reg_t send_obj, int selector);
-	bool checkAddressBreakpoint(const reg32_t &address);
+	bool checkAddressBreakpoint(const reg_t &address);
 
 public:
 	bool checkKernelBreakpoint(const Common::String &name);
@@ -324,7 +254,7 @@ public:
 	 * Processes a multilanguage string based on the current language settings and
 	 * returns a string that is ready to be displayed.
 	 * @param str		the multilanguage string
-	 * @param sep		optional seperator between main language and subtitle language,
+	 * @param sep		optional separator between main language and subtitle language,
 	 *					if NULL is passed no subtitle will be added to the returned string
 	 * @return processed string
 	 */
@@ -337,7 +267,7 @@ public:
 	void setSciLanguage(kLanguage lang);
 	void setSciLanguage();
 
-	Common::String getSciLanguageString(const Common::String &str, kLanguage lang, kLanguage *lang2 = NULL, uint16 *languageSplitter = NULL) const;
+	Common::String getSciLanguageString(const Common::String &str, kLanguage requestedLanguage, kLanguage *secondaryLanguage = nullptr, uint16 *languageSplitter = nullptr) const;
 
 	// Check if vocabulary needs to get switched (in multilingual parser games)
 	void checkVocabularySwitch();
@@ -345,29 +275,36 @@ public:
 	// Initializes ports and paint16 for non-sci32 games, also sets default palette
 	void initGraphics();
 
+	// Suggest to download the GK2 subtitles patch
+	// in the future, we might refactor it to something more generic, if needed
+	void suggestDownloadGK2SubTitlesPatch();
+
 public:
 	GfxAnimate *_gfxAnimate; // Animate for 16-bit gfx
 	GfxCache *_gfxCache;
 	GfxCompare *_gfxCompare;
 	GfxControls16 *_gfxControls16; // Controls for 16-bit gfx
-	GfxControls32 *_gfxControls32; // Controls for 32-bit gfx
 	GfxCoordAdjuster16 *_gfxCoordAdjuster;
 	GfxCursor *_gfxCursor;
 	GfxMenu *_gfxMenu; // Menu for 16-bit gfx
 	GfxPalette *_gfxPalette16;
-	GfxPalette32 *_gfxPalette32; // Palette for 32-bit gfx
 	GfxRemap *_gfxRemap16;	// Remapping for the QFG4 demo
-	GfxRemap32 *_gfxRemap32; // Remapping for 32-bit gfx
 	GfxPaint16 *_gfxPaint16; // Painting in 16-bit gfx
-	GfxPaint32 *_gfxPaint32; // Painting in 32-bit gfx
-	GfxPorts *_gfxPorts; // Port managment for 16-bit gfx
+	GfxPorts *_gfxPorts; // Port management for 16-bit gfx
 	GfxScreen *_gfxScreen;
 	GfxText16 *_gfxText16;
-	GfxText32 *_gfxText32;
 	GfxTransitions *_gfxTransitions; // transitions between screens for 16-bit gfx
 	GfxMacIconBar *_gfxMacIconBar; // Mac Icon Bar manager
+	GfxMacFontManager *_gfxMacFontManager; // null when not applicable
+	SciTTS *_tts;
 
 #ifdef ENABLE_SCI32
+	GfxControls32 *_gfxControls32; // Controls for 32-bit gfx
+	GfxPalette32 *_gfxPalette32; // Palette for 32-bit gfx
+	GfxRemap32 *_gfxRemap32; // Remapping for 32-bit gfx
+	GfxPaint32 *_gfxPaint32; // Painting in 32-bit gfx
+	GfxText32 *_gfxText32;
+
 	Audio32 *_audio32;
 	Video32 *_video32;
 	GfxFrameout *_gfxFrameout; // kFrameout and the like for 32-bit gfx
@@ -384,6 +321,7 @@ public:
 	opcode_format (*_opcode_formats)[4];
 
 	DebugState _debugState;
+	uint32 _speedThrottleDelay; // kGameIsRestarting maximum delay
 
 	Common::MacResManager *getMacExecutable() { return &_macExecutable; }
 
@@ -414,9 +352,21 @@ private:
 	void exitGame();
 
 	/**
-	 * Loads the Mac executable for SCI1 games
+	 * Loads the Mac executable for SCI1/1.1 games.
+	 * This function should only be called on Mac games.
+	 * If the executable isn't used, or is missing but optional,
+	 * then this function does nothing.
 	 */
 	void loadMacExecutable();
+
+	/**
+	 * Loads Mac native fonts for SCI1/1.1 games that support them.
+	 * This function should only be called on Mac games after loadMacExecutable()
+	 * has been called. Depending on the game, fonts are loaded from either the
+	 * executable or from classicmacfonts.dat. If fonts are not present, then a
+	 * warning is logged and SCI fonts are used instead.
+	 */
+	void loadMacFonts();
 
 	void initStackBaseWithSelector(Selector selector);
 

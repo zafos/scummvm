@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -36,21 +35,22 @@ enum kFileOpenMode {
 };
 
 enum {
-	kMaxSaveNameLength = 36, ///< Maximum length of a savegame name (including optional terminator character).
+	kMaxSaveNameLength = 36, ///< Maximum length of a savegame name (excluding terminator character)
 	kMaxNumSaveGames = 20 ///< Maximum number of savegames
 };
 
-#ifdef ENABLE_SCI32
 enum {
 	kAutoSaveId = 0,  ///< The save game slot number for autosaves
 	kNewGameId = 999, ///< The save game slot number for a "new game" save
 
 	// SCI engine expects game IDs to start at 0, but slot 0 in ScummVM is
 	// reserved for autosave, so non-autosave games get their IDs shifted up
-	// when saving or restoring, and shifted down when enumerating save games
-	kSaveIdShift = 1
+	// when saving or restoring, and shifted down when enumerating save games.
+	// ScummVM slot 0 can't be shifted down as -1 is an illegal SCI save ID
+	// so it is instead wrapped around to 99 and then back to 0 when shifting up.
+	kSaveIdShift = 1,
+	kMaxShiftedSaveId = 99
 };
-#endif
 
 enum {
 	kVirtualFileHandleStart = 32000,
@@ -65,7 +65,11 @@ struct SavegameDesc {
 	int date;
 	int time;
 	int version;
-	char name[kMaxSaveNameLength];
+	// name is a null-terminated 36 character array in SCI16,
+	// but in SCI32 the 36th character can be used for text.
+	// At least Phant2 makes use of this. We add an element
+	// so that this string is always terminated internally.
+	char name[kMaxSaveNameLength + 1];
 	Common::String gameVersion;
 	uint32 script0Size;
 	uint32 gameObjectOffset;
@@ -124,13 +128,13 @@ class MemoryDynamicRWStream : public Common::MemoryWriteStreamDynamic, public Co
 public:
 	MemoryDynamicRWStream(DisposeAfterUse::Flag disposeMemory = DisposeAfterUse::NO) : MemoryWriteStreamDynamic(disposeMemory), _eos(false) { }
 
-	uint32 read(void *dataPtr, uint32 dataSize);
+	uint32 read(void *dataPtr, uint32 dataSize) override;
 
-	bool eos() const { return _eos; }
-	int32 pos() const { return _pos; }
-	int32 size() const { return _size; }
-	void clearErr() { _eos = false; Common::MemoryWriteStreamDynamic::clearErr(); }
-	bool seek(int32 offs, int whence = SEEK_SET) { return Common::MemoryWriteStreamDynamic::seek(offs, whence); }
+	bool eos() const override { return _eos; }
+	int64 pos() const override { return _pos; }
+	int64 size() const override { return _size; }
+	void clearErr() override { _eos = false; Common::MemoryWriteStreamDynamic::clearErr(); }
+	bool seek(int64 offs, int whence = SEEK_SET) override { return Common::MemoryWriteStreamDynamic::seek(offs, whence); }
 
 protected:
 	bool _eos;
@@ -146,9 +150,9 @@ public:
 	SaveFileRewriteStream(const Common::String &fileName,
 	                      Common::SeekableReadStream *inFile,
 	                      kFileOpenMode mode, bool compress);
-	virtual ~SaveFileRewriteStream();
+	~SaveFileRewriteStream() override;
 
-	virtual uint32 write(const void *dataPtr, uint32 dataSize) { _changed = true; return MemoryDynamicRWStream::write(dataPtr, dataSize); }
+	uint32 write(const void *dataPtr, uint32 dataSize) override { _changed = true; return MemoryDynamicRWStream::write(dataPtr, dataSize); }
 
 	void commit(); //< Save back to disk
 
@@ -174,6 +178,9 @@ bool fillSavegameDesc(const Common::String &filename, SavegameDesc &desc);
  * compatible with game scripts' game catalogue readers.
  */
 Common::MemoryReadStream *makeCatalogue(const uint maxNumSaves, const uint gameNameSize, const Common::String &fileNamePattern, const bool ramaFormat);
+
+int shiftSciToScummVMSaveId(int saveId);
+int shiftScummVMToSciSaveId(int saveId);
 #endif
 
 } // End of namespace Sci

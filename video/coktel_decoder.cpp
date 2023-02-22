@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -541,7 +540,7 @@ void CoktelDecoder::renderBlockSparse(Graphics::Surface &dstSurf, const byte *sr
 			if (pixCount & 0x80) { // Data
 				int16 copyCount;
 
-				pixCount  = MIN((pixCount & 0x7F) + 1, srcRect.width() - pixWritten);
+				pixCount  = MIN<int16>((pixCount & 0x7F) + 1, srcRect.width() - pixWritten);
 				copyCount = CLIP<int16>(rect.width() - pixWritten, 0, pixCount);
 				memcpy(dstRow, src, copyCount);
 
@@ -576,7 +575,7 @@ void CoktelDecoder::renderBlockSparse2Y(Graphics::Surface &dstSurf, const byte *
 			int16 pixCount = *src++;
 
 			if (pixCount & 0x80) { // Data
-				pixCount  = MIN((pixCount & 0x7F) + 1, srcRect.width() - pixWritten);
+				pixCount  = MIN<int16>((pixCount & 0x7F) + 1, srcRect.width() - pixWritten);
 				memcpy(dstRow                 , src, pixCount);
 				memcpy(dstRow + dstSurf.pitch, src, pixCount);
 
@@ -610,7 +609,7 @@ void CoktelDecoder::renderBlockRLE(Graphics::Surface &dstSurf, const byte *src, 
 			if (pixCount & 0x80) {
 				int16 copyCount;
 
-				pixCount  = MIN((pixCount & 0x7F) + 1, srcRect.width() - pixWritten);
+				pixCount  = MIN<int16>((pixCount & 0x7F) + 1, srcRect.width() - pixWritten);
 				copyCount = CLIP<int16>(rect.width() - pixWritten, 0, pixCount);
 
 				if (*src != 0xFF) { // Normal copy
@@ -650,6 +649,17 @@ uint32 CoktelDecoder::getTimeToNextFrame() const {
 		return 0;
 
 	return nextFrameStartTime - elapsedTime;
+}
+
+int32 CoktelDecoder::getExpectedFrameFromCurrentTime() const {
+	if (endOfVideo() || _curFrame < 0)
+		return -1;
+
+	int32 elapsedTime = g_system->getMillis() - _startTime;
+	if (elapsedTime < 0)
+		return -1;
+
+	return (Common::Rational(elapsedTime * getFrameRate()) / 1000).toInt();
 }
 
 uint32 CoktelDecoder::getStaticTimeToNextFrame() const {
@@ -742,9 +752,7 @@ bool PreIMDDecoder::loadStream(Common::SeekableReadStream *stream) {
 	_frameCount = _stream->readUint16LE();
 
 	_videoBufferSize = _width * _height;
-	_videoBuffer     = new byte[_videoBufferSize];
-
-	memset(_videoBuffer, 0, _videoBufferSize);
+	_videoBuffer     = new byte[_videoBufferSize]();
 
 	return true;
 }
@@ -876,6 +884,10 @@ void PreIMDDecoder::renderFrame() {
 	}
 
 	_dirtyRects.push_back(Common::Rect(_x, _y, _x + _width, _y + _height));
+}
+
+uint32 PreIMDDecoder::getFlags() const {
+	return 0;
 }
 
 Graphics::PixelFormat PreIMDDecoder::getPixelFormat() const {
@@ -1141,8 +1153,7 @@ bool IMDDecoder::assessVideoProperties() {
 	}
 
 	for (int i = 0; i < 2; i++) {
-		_videoBuffer[i] = new byte[_videoBufferSize];
-		memset(_videoBuffer[i], 0, _videoBufferSize);
+		_videoBuffer[i] = new byte[_videoBufferSize]();
 	}
 
 	return true;
@@ -1537,6 +1548,10 @@ void IMDDecoder::emptySoundSlice(bool hasNextCmd) {
 	memset(soundBuf, 0, _soundSliceSize);
 
 	_audioStream->queueBuffer(soundBuf, _soundSliceSize, DisposeAfterUse::YES, 0);
+}
+
+uint32 IMDDecoder::getFlags() const {
+	return _flags;
 }
 
 Graphics::PixelFormat IMDDecoder::getPixelFormat() const {
@@ -1958,8 +1973,7 @@ bool VMDDecoder::assessVideoProperties() {
 		}
 
 		for (int i = 0; i < 3; i++) {
-			_videoBuffer[i] = new byte[_videoBufferSize];
-			memset(_videoBuffer[i], 0, _videoBufferSize);
+			_videoBuffer[i] = new byte[_videoBufferSize]();
 
 			_8bppSurface[i].init(_width * _bytesPerPixel, _height, _width * _bytesPerPixel,
 			                     _videoBuffer[i], Graphics::PixelFormat::createFormatCLUT8());
@@ -2071,9 +2085,9 @@ bool VMDDecoder::readFrameTable(int &numFiles) {
 				_frames[i].parts[j].flags   = _stream->readByte();
 
 			} else if (_frames[i].parts[j].type == kPartTypeSubtitle) {
-				_frames[i].parts[j].id = _stream->readUint16LE();
+				_frames[i].parts[j].id = _stream->readByte();
 				// Speech text file name
-				_stream->skip(8);
+				_stream->skip(9);
 			} else if (_frames[i].parts[j].type == kPartTypeFile) {
 				if (!separator)
 					numFiles++;
@@ -2377,7 +2391,7 @@ bool VMDDecoder::renderFrame(Common::Rect &rect) {
 		if ((type == 2) && (rect.width() == _surface.w) && (_x == 0) && (_blitMode == 0)) {
 			// Directly uncompress onto the video surface
 			const int offsetX = rect.left * _surface.format.bytesPerPixel;
-			const int offsetY = (_y + rect.top) * _surface.pitch;
+			const int offsetY = rect.top * _surface.pitch;
 			const int offset  = offsetX + offsetY;
 
 			if (deLZ77((byte *)_surface.getPixels() + offset, dataPtr, dataSize,
@@ -2715,6 +2729,10 @@ private:
 
 Audio::AudioStream *VMDDecoder::create16bitADPCM(Common::SeekableReadStream *stream) {
 	return new VMD_ADPCMStream(stream, DisposeAfterUse::YES, _soundFreq, (_soundStereo == 0) ? 1 : 2);
+}
+
+uint32 VMDDecoder::getFlags() const {
+	return _flags;
 }
 
 Graphics::PixelFormat VMDDecoder::getPixelFormat() const {

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,7 +26,10 @@
 #include "sci/graphics/helpers.h"
 #include "sci/graphics/view.h"
 
+#include "graphics/font.h"
 #include "graphics/sjis.h"
+#include "graphics/korfont.h"
+#include "graphics/pixelformat.h"
 
 namespace Sci {
 
@@ -40,8 +42,7 @@ enum GfxScreenUpscaledMode {
 	GFX_SCREEN_UPSCALED_DISABLED	= 0,
 	GFX_SCREEN_UPSCALED_480x300     = 1,
 	GFX_SCREEN_UPSCALED_640x400		= 2,
-	GFX_SCREEN_UPSCALED_640x440		= 3,
-	GFX_SCREEN_UPSCALED_640x480		= 4
+	GFX_SCREEN_UPSCALED_640x440		= 3
 };
 
 enum GfxScreenMasks {
@@ -80,11 +81,18 @@ public:
 
 	void clearForRestoreGame();
 	void copyToScreen();
-	void copyFromScreen(byte *buffer);
 	void kernelSyncWithFramebuffer();
 	void copyRectToScreen(const Common::Rect &rect);
 	void copyDisplayRectToScreen(const Common::Rect &rect);
 	void copyRectToScreen(const Common::Rect &rect, int16 x, int16 y);
+
+	// functions to manipulate a backup copy of the screen (for transitions)
+	void bakCreateBackup();
+	void bakCopyRectToScreen(const Common::Rect &rect, int16 x, int16 y);
+	void bakDiscard();
+
+	// video frame displaying
+	void copyVideoFrameToScreen(const byte *buffer, int pitch, const Common::Rect &rect, bool is8bit);
 
 	// Vector drawing
 private:
@@ -110,12 +118,14 @@ public:
 	}
 	void enableUndithering(bool flag);
 
+	void putMacChar(const Graphics::Font *commonFont, int16 x, int16 y, uint16 chr, byte color);
 	void putKanjiChar(Graphics::FontSJIS *commonFont, int16 x, int16 y, uint16 chr, byte color);
+	void putHangulChar(Graphics::FontKorean *commonFont, int16 x, int16 y, uint16 chr, byte color);
 
 	int bitsGetDataSize(Common::Rect rect, byte mask);
 	void bitsSave(Common::Rect rect, byte mask, byte *memoryPtr);
-	void bitsGetRect(byte *memoryPtr, Common::Rect *destRect);
-	void bitsRestore(byte *memoryPtr);
+	void bitsGetRect(const byte *memoryPtr, Common::Rect *destRect);
+	void bitsRestore(const byte *memoryPtr);
 
 	void scale2x(const SciSpan<const byte> &src, SciSpan<byte> &dst, int16 srcWidth, int16 srcHeight, byte bytesPerPixel = 1);
 
@@ -139,6 +149,14 @@ public:
 	void setFontIsUpscaled(bool isUpscaled) { _fontIsUpscaled = isUpscaled; }
 	bool fontIsUpscaled() const { return _fontIsUpscaled; }
 
+	void grabPalette(byte *buffer, uint start, uint num) const;
+	void setPalette(const byte *buffer, uint start, uint num, bool update = true);
+
+	byte getCurPaletteMapValue() const { return _curPaletteMapValue; }
+	void setCurPaletteMapValue(byte val) { _curPaletteMapValue = val; }
+	void setPaletteMods(const PaletteMod *mods, unsigned int count);
+	bool paletteModsEnabled() const { return _paletteModsEnabled; }
+
 private:
 	uint16 _width;
 	uint16 _height;
@@ -149,15 +167,17 @@ private:
 	uint16 _displayHeight;
 	uint _displayPixels;
 
+	Graphics::PixelFormat _format;
+
 	byte _colorWhite;
 	byte _colorDefaultVectorData;
 
-	void bitsRestoreScreen(Common::Rect rect, byte *&memoryPtr, byte *screen, uint16 screenWidth);
-	void bitsRestoreDisplayScreen(Common::Rect rect, byte *&memoryPtr);
-	void bitsSaveScreen(Common::Rect rect, byte *screen, uint16 screenWidth, byte *&memoryPtr);
-	void bitsSaveDisplayScreen(Common::Rect rect, byte *&memoryPtr);
+	void bitsRestoreScreen(Common::Rect rect, const byte *&memoryPtr, byte *screen, uint16 screenWidth);
+	void bitsRestoreDisplayScreen(Common::Rect rect, const byte *&memoryPtr, byte *screen);
+	void bitsSaveScreen(Common::Rect rect, const byte *screen, uint16 screenWidth, byte *&memoryPtr);
+	void bitsSaveDisplayScreen(Common::Rect rect, const byte *screen, byte *&memoryPtr);
 
-	void setVerticalShakePos(uint16 shakePos);
+	void setShakePos(uint16 shakeXOffset, uint16 shakeYOffset);
 
 	/**
 	 * If this flag is true, undithering is enabled, otherwise disabled.
@@ -166,7 +186,7 @@ private:
 	int16 _ditheredPicColors[DITHERED_BG_COLORS_SIZE];
 
 	// These screens have the real resolution of the game engine (320x200 for
-	// SCI0/SCI1/SCI11 games, 640x480 for SCI2 games). SCI0 games will be
+	// SCI0/SCI1/SCI11 PC games, other resolutions on Mac). SCI0 games will be
 	// dithered in here at any time.
 	byte *_visualScreen;
 	byte *_priorityScreen;
@@ -178,6 +198,24 @@ private:
 	 * Only read from this buffer for Save/ShowBits usage.
 	 */
 	byte *_displayScreen;
+	Graphics::Surface _displayScreenSurface;
+
+	// Screens for RGB mode support
+	byte *_displayedScreen;
+	byte *_rgbScreen;
+
+	// For RGB per-view/pic palette mods
+	byte *_paletteMapScreen;
+	byte _curPaletteMapValue;
+	PaletteMod _paletteMods[256];
+	bool _paletteModsEnabled;
+
+	byte *_backupScreen; // for bak* functions
+
+	void convertToRGB(const Common::Rect &rect);
+	void displayRectRGB(const Common::Rect &rect, int x, int y);
+	void displayRect(const Common::Rect &rect, int x, int y);
+	byte *_palette;
 
 	ResourceManager *_resMan;
 
@@ -216,22 +254,20 @@ public:
 		}
 
 		// Set pixel for visual, priority and control map directly, those are not upscaled
-		int offset = y * _width + x;
+		const int offset = y * _width + x;
 
 		if (drawMask & GFX_SCREEN_MASK_VISUAL) {
 			_visualScreen[offset] = color;
-
-			int displayOffset = 0;
+			if (_paletteMapScreen)
+				_paletteMapScreen[offset] = _curPaletteMapValue;
 
 			switch (_upscaledHires) {
 			case GFX_SCREEN_UPSCALED_DISABLED:
-				displayOffset = offset;
-				_displayScreen[displayOffset] = color;
+				_displayScreen[offset] = color;
 				break;
 
 			case GFX_SCREEN_UPSCALED_640x400:
 			case GFX_SCREEN_UPSCALED_640x440:
-			case GFX_SCREEN_UPSCALED_640x480:
 				putScaledPixelOnDisplay(x, y, color);
 				break;
 			default:
@@ -247,7 +283,7 @@ public:
 	}
 
 	void putPixel480x300(int16 x, int16 y, byte drawMask, byte color, byte priority, byte control) {
-		int offset = ((y * 3) / 2 * _width) + ((x * 3) / 2);
+		const int offset = ((y * 3) / 2 * _width) + ((x * 3) / 2);
 
 		// All maps are upscaled
 		// TODO: figure out, what Sierra exactly did on Mac for these games
@@ -277,7 +313,6 @@ public:
 		switch (_upscaledHires) {
 		case GFX_SCREEN_UPSCALED_640x400:
 		case GFX_SCREEN_UPSCALED_640x440:
-		case GFX_SCREEN_UPSCALED_640x480:
 			// For regular upscaled modes forward to the regular putPixel
 			putPixel(x, y, drawMask, color, priority, control);
 			return;
@@ -293,6 +328,9 @@ public:
 		if (drawMask & GFX_SCREEN_MASK_VISUAL) {
 			_visualScreen[offset] = color;
 			_displayScreen[offset] = color;
+			if (_paletteMapScreen)
+				_paletteMapScreen[offset] = _curPaletteMapValue;
+
 		}
 		if (drawMask & GFX_SCREEN_MASK_PRIORITY) {
 			_priorityScreen[offset] = priority;
@@ -338,18 +376,6 @@ public:
 			}
 			break;
 		}
-		case GFX_SCREEN_UPSCALED_640x480: {
-			int16 startY = (y * 12) / 5;
-			int16 endY = ((y + 1) * 12) / 5;
-			displayOffset = (startY * _displayWidth) + x * 2;
-
-			for (int16 curY = startY; curY < endY; curY++) {
-				_displayScreen[displayOffset] = color;
-				_displayScreen[displayOffset + 1] = color;
-				displayOffset += _displayWidth;
-			}
-			break;
-		}
 		default:
 			break;
 		}
@@ -366,6 +392,11 @@ public:
 			// Do not scale ourselves, but put it on the display directly
 			putPixelOnDisplay(x, actualY, color);
 		} else {
+			if (_upscaledHires == GFX_SCREEN_UPSCALED_480x300) {
+				putPixel480x300(x, actualY, GFX_SCREEN_MASK_VISUAL, color, 0, 0);
+				return;
+			}
+
 			int offset = actualY * _width + x;
 
 			_visualScreen[offset] = color;
@@ -374,8 +405,7 @@ public:
 				_displayScreen[offset] = color;
 				break;
 			case GFX_SCREEN_UPSCALED_640x400:
-			case GFX_SCREEN_UPSCALED_640x440:
-			case GFX_SCREEN_UPSCALED_640x480: {
+			case GFX_SCREEN_UPSCALED_640x440: {
 				// to 1-> 4 pixels upscaling for all of those, so that fonts won't look weird
 				int displayOffset = (_upscaledHeightMapping[startingY] + y * 2) * _displayWidth + x * 2;
 				_displayScreen[displayOffset] = color;

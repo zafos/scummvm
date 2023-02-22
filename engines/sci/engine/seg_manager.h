@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,8 +39,8 @@ namespace Sci {
  */
 enum ScriptLoadType {
 	SCRIPT_GET_DONT_LOAD = 0, /**< Fail if not loaded */
-	SCRIPT_GET_LOAD = 1, /**< Load, if neccessary */
-	SCRIPT_GET_LOCK = 3 /**< Load, if neccessary, and lock */
+	SCRIPT_GET_LOAD = 1, /**< Load, if necessary */
+	SCRIPT_GET_LOCK = 3 /**< Load, if necessary, and lock */
 };
 
 class Script;
@@ -57,11 +56,11 @@ public:
 	/**
 	 * Deallocate all memory associated with the segment manager.
 	 */
-	~SegManager();
+	~SegManager() override;
 
 	void resetSegMan();
 
-	virtual void saveLoadWithSerializer(Common::Serializer &ser);
+	void saveLoadWithSerializer(Common::Serializer &ser) override;
 
 	// 1. Scripts
 
@@ -98,10 +97,11 @@ public:
 	 * Determines the segment occupied by a certain script. Optionally
 	 * load it, or load & lock it.
 	 * @param[in] script_nr	Number of the script to look up
-	 * @param[in] load		flag determining whether to load/lock the script
-	 * @return				The script's segment ID, or 0 on failure
+	 * @param[in] load		           Flag determining whether to load/lock the script
+	 * @param[in] applyScriptPatches   Apply patches for the script, if available
+	 * @return				           The script's segment ID, or 0 on failure
 	 */
-	SegmentId getScriptSegment(int script_nr, ScriptLoadType load);
+	SegmentId getScriptSegment(int script_nr, ScriptLoadType load, bool applyScriptPatches = true);
 
 	/**
 	 * Makes sure that a script and its superclasses get loaded to the heap.
@@ -109,10 +109,11 @@ public:
 	 * increased. All scripts containing superclasses of this script are loaded
 	 * recursively as well, unless 'recursive' is set to zero. The
 	 * complementary function is "uninstantiateScript()" below.
-	 * @param[in] script_nr		The script number to load
-	 * @return					The script's segment ID or 0 if out of heap
+	 * @param[in] script_nr		       The script number to load
+	 * @param[in] applyScriptPatches   Apply patches for the script, if available
+	 * @return					       The script's segment ID or 0 if out of heap
 	 */
-	int instantiateScript(int script_nr);
+	int instantiateScript(int script_nr, bool applyScriptPatches = true);
 
 	/**
 	 * Decreases the numer of lockers of a script and unloads it if that number
@@ -128,7 +129,7 @@ private:
 
 public:
 	// TODO: document this
-	reg_t getClassAddress(int classnr, ScriptLoadType lock, uint16 callerSegment);
+	reg_t getClassAddress(int classnr, ScriptLoadType lock, uint16 callerSegment, bool applyScriptPatches = true);
 
 	/**
 	 * Return a pointer to the specified script.
@@ -315,14 +316,14 @@ public:
 	 * src and dest can point to raw and non-raw segments.
 	 * Conversion is performed as required.
 	 */
-	void strcpy(reg_t dest, reg_t src);
+	void strcpy_(reg_t dest, reg_t src);
 
 	/**
 	 * Copies a string from src to dest.
 	 * dest can point to a raw or non-raw segment.
 	 * Conversion is performed as required.
 	 */
-	void strcpy(reg_t dest, const char *src);
+	void strcpy_(reg_t dest, const char *src);
 
 	/**
 	 * Copies a string from src to dest.
@@ -427,6 +428,11 @@ public:
 	 * @return the address of the object, or NULL_REG
 	 */
 	reg_t findObjectByName(const Common::String &name, int index = -1);
+
+	/**
+	 * Finds the addresses of all objects with the superclass of the given name.
+	 */
+	Common::Array<reg_t> findObjectsBySuperClass(const Common::String &superClassName);
 
 	uint32 classTableSize() const { return _classTable.size(); }
 	Class getClass(int index) const { return _classTable[index]; }

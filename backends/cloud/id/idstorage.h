@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef BACKENDS_CLOUD_ID_IDSTORAGE_H
 #define BACKENDS_CLOUD_ID_IDSTORAGE_H
 
-#include "backends/cloud/storage.h"
+#include "backends/cloud/basestorage.h"
 #include "backends/networking/curl/curljsonrequest.h"
 
 /*
@@ -43,7 +42,7 @@
 namespace Cloud {
 namespace Id {
 
-class IdStorage: public Cloud::Storage {
+class IdStorage: public Cloud::BaseStorage {
 protected:
 	void printFiles(FileArrayResponse response);
 	void printBool(BoolResponse response);
@@ -52,6 +51,8 @@ protected:
 	ListDirectoryCallback getPrintFilesCallback();
 
 public:
+	IdStorage();
+	IdStorage(Common::String token, Common::String refreshToken, bool enabled);
 	virtual ~IdStorage();
 
 	/** Public Cloud API comes down there. */

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,18 +40,18 @@ namespace LastExpress {
 
 Abbot::Abbot(LastExpressEngine *engine) : Entity(engine, kEntityAbbot) {
 	ADD_CALLBACK_FUNCTION(Abbot, reset);
-	ADD_CALLBACK_FUNCTION(Abbot, draw);
-	ADD_CALLBACK_FUNCTION(Abbot, enterExitCompartment);
-	ADD_CALLBACK_FUNCTION(Abbot, enterExitCompartment2);
+	ADD_CALLBACK_FUNCTION_S(Abbot, draw);
+	ADD_CALLBACK_FUNCTION_SI(Abbot, enterExitCompartment);
+	ADD_CALLBACK_FUNCTION_SI(Abbot, enterExitCompartment2);
 	ADD_CALLBACK_FUNCTION(Abbot, callbackActionOnDirection);
-	ADD_CALLBACK_FUNCTION(Abbot, draw2);
-	ADD_CALLBACK_FUNCTION(Abbot, updateFromTime);
-	ADD_CALLBACK_FUNCTION(Abbot, updateFromTicks);
-	ADD_CALLBACK_FUNCTION(Abbot, playSound);
-	ADD_CALLBACK_FUNCTION(Abbot, savegame);
-	ADD_CALLBACK_FUNCTION(Abbot, updateEntity);
-	ADD_CALLBACK_FUNCTION(Abbot, callSavepoint);
-	ADD_CALLBACK_FUNCTION(Abbot, updatePosition);
+	ADD_CALLBACK_FUNCTION_SSI(Abbot, draw2);
+	ADD_CALLBACK_FUNCTION_I(Abbot, updateFromTime);
+	ADD_CALLBACK_FUNCTION_I(Abbot, updateFromTicks);
+	ADD_CALLBACK_FUNCTION_S(Abbot, playSound);
+	ADD_CALLBACK_FUNCTION_II(Abbot, savegame);
+	ADD_CALLBACK_FUNCTION_II(Abbot, updateEntity);
+	ADD_CALLBACK_FUNCTION_SIIS(Abbot, callSavepoint);
+	ADD_CALLBACK_FUNCTION_SII(Abbot, updatePosition);
 	ADD_CALLBACK_FUNCTION(Abbot, callbackActionRestaurantOrSalon);
 	ADD_CALLBACK_FUNCTION(Abbot, chapter1);
 	ADD_CALLBACK_FUNCTION(Abbot, chapter2);
@@ -79,7 +78,7 @@ Abbot::Abbot(LastExpressEngine *engine) : Entity(engine, kEntityAbbot) {
 	ADD_CALLBACK_FUNCTION(Abbot, goCompartment4);
 	ADD_CALLBACK_FUNCTION(Abbot, inCompartment4);
 	ADD_CALLBACK_FUNCTION(Abbot, chapter4);
-	ADD_CALLBACK_FUNCTION(Abbot, doWalkSearchingForCath);
+	ADD_CALLBACK_FUNCTION_II(Abbot, doWalkSearchingForCath);
 	ADD_CALLBACK_FUNCTION(Abbot, chapter4Handler);
 	ADD_CALLBACK_FUNCTION(Abbot, leaveDinner);
 	ADD_CALLBACK_FUNCTION(Abbot, inCompartment);
@@ -616,7 +615,7 @@ IMPLEMENT_FUNCTION(26, Abbot, inSalon1)
 		break;
 
 	case kActionNone:
-		if (!Entity::updateParameter(params->param2, getState()->time, 4500))
+		if (!params->param1 || !Entity::updateParameterCheck(params->param2, getState()->time, 4500))
 			break;
 
 		if (getEntities()->isSomebodyInsideRestaurantOrSalon())
@@ -691,7 +690,7 @@ IMPLEMENT_FUNCTION(28, Abbot, openCompartment2)
 		break;
 
 	case kActionNone:
-		Entity::timeCheckCallback(kTime2052000, params->param1, 1, WRAP_SETUP_FUNCTION(Abbot, setup_goWander));
+		Entity::timeCheckCallback(kTime2052000, params->param1, 2, WRAP_SETUP_FUNCTION(Abbot, setup_goWander));
 		break;
 
 	case kActionDefault:
@@ -699,7 +698,7 @@ IMPLEMENT_FUNCTION(28, Abbot, openCompartment2)
 		getEntities()->drawSequenceLeft(kEntityAbbot, "508A");
 
 		setCallback(1);
-		setup_playSound("abb3013");
+		setup_playSound("Abb3013");
 		break;
 
 	case kActionCallback:
@@ -749,6 +748,9 @@ IMPLEMENT_FUNCTION(29, Abbot, goWander)
 			break;
 
 		case 4:
+			// compare with callback 2.
+			// This is taken from the original game as is,
+			// but do we really want real-time 30s in case 2 but simulated-time 15s (aka real-time 5s) here?
 			setCallback(5);
 			setup_updateFromTime(225);
 			break;
@@ -962,7 +964,7 @@ IMPLEMENT_FUNCTION(32, Abbot, goCompartment3)
 		case 1:
 			getObjects()->update(kObjectCompartmentC, kEntityPlayer, kObjectLocation1, kCursorKeepValue, kCursorKeepValue);
 
-			setCallback(1);
+			setCallback(2);
 			setup_enterExitCompartment("617Ac", kObjectCompartmentC);
 			break;
 
@@ -1116,7 +1118,7 @@ IMPLEMENT_FUNCTION(35, Abbot, inSalon3)
 
 		case 2:
 			getData()->location = kLocationOutsideCompartment;
-			getSound()->playSound(kEntityAbbot, "Abb3040", kFlagInvalid, 45);
+			getSound()->playSound(kEntityAbbot, "Abb3040", kSoundVolumeEntityDefault, 45);
 			getEntities()->updatePositionEnter(kEntityAbbot, kCarRestaurant, 57);
 
 			setCallback(3);
@@ -1355,7 +1357,7 @@ IMPLEMENT_FUNCTION(42, Abbot, leaveDinner)
 
 	case kActionDefault:
 		getData()->location = kLocationOutsideCompartment;
-		getEntities()->updatePositionExit(kEntityAbbot, kCarRestaurant, 67);
+		getEntities()->updatePositionEnter(kEntityAbbot, kCarRestaurant, 67);
 
 		setCallback(1);
 		setup_callSavepoint("029F", kEntityTables4, kActionDrawTablesWithChairs, "029G");
@@ -1406,8 +1408,8 @@ IMPLEMENT_FUNCTION(43, Abbot, inCompartment)
 		break;
 
 	case kActionNone:
-		if (params->param1 && params->param4 != kTimeInvalid && params->param2 < getState()->time) {
-			if (getState()->time < kTime2452500) {
+		if (params->param1 && params->param4 != kTimeInvalid) {
+			if (getState()->time > kTime2452500) {
 				params->param4 = kTimeInvalid;
 
 				setCallback(1);
@@ -1415,7 +1417,7 @@ IMPLEMENT_FUNCTION(43, Abbot, inCompartment)
 				break;
 			} else {
 				if (!getEntities()->isDistanceBetweenEntities(kEntityAbbot, kEntityPlayer, 1000) || getSoundQueue()->isBuffered(kEntityBoutarel) || !params->param4)
-					params->param4 = (uint)getState()->time + 450;
+					params->param4 = (uint)getState()->time;
 
 				if (params->param4 < getState()->time) {
 					params->param4 = kTimeInvalid;
@@ -1655,7 +1657,8 @@ IMPLEMENT_FUNCTION(48, Abbot, afterBomb)
 			getData()->inventoryItem = kItemNone;
 
 			setCallback(4);
-			setup_updatePosition("126C", kCarRedSleeping, 52);
+			setup_updatePosition("126C", kCarRestaurant, 52);
+			break;
 		}
 
 		Entity::timeCheckCallbackInventory(kTime2533500, params->param2, 5, WRAP_SETUP_FUNCTION(Abbot, setup_callbackActionRestaurantOrSalon));
@@ -1771,6 +1774,9 @@ IMPLEMENT_FUNCTION(49, Abbot, catchCath)
 		getSavePoints()->push(kEntityAbbot, kEntityTatiana, kAction238790488);
 		getObjects()->update(kObjectCompartment2, kEntityPlayer, kObjectLocationNone, kCursorHandKnock, kCursorHand);
 		getObjects()->update(kObjectHandleInsideBathroom, kEntityPlayer, kObjectLocationNone, kCursorHandKnock, kCursorHand);
+
+		setCallback(1);
+		setup_savegame(kSavegameTypeEvent, kEventAbbotWrongCompartment);
 		break;
 
 	case kActionDefault:
@@ -1791,7 +1797,7 @@ IMPLEMENT_FUNCTION(49, Abbot, catchCath)
 			break;
 
 		case 1:
-			getAction()->playAnimation(getObjects()->get(kObjectCompartment2).model < kObjectModel2 ? kEventAbbotWrongCompartmentBed : kEventAbbotWrongCompartment);
+			getAction()->playAnimation(getObjects()->get(kObjectCompartment2).model == kObjectModel1 ? kEventAbbotWrongCompartmentBed : kEventAbbotWrongCompartment);
 			getEntities()->updateEntity(kEntityAbbot, kCarRedSleeping, kPosition_6470);
 			getSound()->playSound(kEntityPlayer, "LIB015");
 			getScenes()->loadSceneFromObject(kObjectCompartment2, true);

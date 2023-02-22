@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,7 +23,7 @@
 #define BACKEND_SDL_SYS_H
 
 // The purpose of this header is to include the SDL headers in a uniform
-// fashion, even on the Symbian port.
+// fashion.
 // Moreover, it contains a workaround for the fact that SDL_rwops.h uses
 // a FILE pointer in one place, which conflicts with common/forbidden.h.
 // The SDL 1.3 headers also include strings.h
@@ -58,6 +57,31 @@
 #if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_system)
 #undef system
 #define system FAKE_system
+#endif
+
+#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_mkdir)
+#undef mkdir
+#define mkdir FAKE_mkdir
+#endif
+
+#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_strcpy)
+#undef strcpy
+#define strcpy FAKE_strcpy
+#endif
+
+#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_strcat)
+#undef strcat
+#define strcat FAKE_strcat
+#endif
+
+#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_vsprintf)
+#undef vsprintf
+#define vsprintf FAKE_vsprintf
+#endif
+
+#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_sprintf)
+#undef sprintf
+#define sprintf FAKE_sprintf
 #endif
 
 // Fix compilation with MacPorts SDL 2
@@ -111,6 +135,32 @@
 
 #endif // FORBIDDEN_SYMBOL_EXCEPTION_time_h
 
+// Fix compilation on non-x86 architectures
+// It needs various (usually forbidden) symbols from unistd.h
+#ifndef FORBIDDEN_SYMBOL_EXCEPTION_unistd_h
+
+	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_chdir)
+	#undef chdir
+	#define chdir FAKE_chdir
+	#endif
+
+	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_getcwd)
+	#undef getcwd
+	#define getcwd FAKE_getcwd
+	#endif
+
+	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_getwd)
+	#undef getwd
+	#define getwd FAKE_getwd
+	#endif
+
+	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_unlink)
+	#undef unlink
+	#define unlink FAKE_unlink
+	#endif
+
+#endif // FORBIDDEN_SYMBOL_EXCEPTION_unistd_h
+
 // HACK: SDL might include windows.h which defines its own ARRAYSIZE.
 // However, we want to use the version from common/util.h. Thus, we make sure
 // that we actually have this definition after including the SDL headers.
@@ -138,25 +188,25 @@
 
 #endif
 
-#if defined(__SYMBIAN32__)
-#include <esdl\SDL.h>
-#else
 #include <SDL.h>
-#endif
 
+// Ignore warnings from system headers pulled by SDL
+#pragma warning(push)
+#pragma warning(disable:4121) // alignment of a member was sensitive to packing
 #include <SDL_syswm.h>
+#pragma warning(pop)
 
 // Restore the forbidden exceptions from the hack above
 #if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && defined(_MSC_VER)
 
 #ifndef FORBIDDEN_SYMBOL_EXCEPTION_setjmp
 #undef setjmp
-#define setjmp(a)	FORBIDDEN_SYMBOL_REPLACEMENT
+#define setjmp(a)	FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 #endif
 
 #ifndef FORBIDDEN_SYMBOL_EXCEPTION_longjmp
 #undef longjmp
-#define longjmp(a,b)	FORBIDDEN_SYMBOL_REPLACEMENT
+#define longjmp(a,b)	FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 #endif
 
 #endif
@@ -189,35 +239,64 @@
 #undef False
 #endif
 
+#ifdef Complex
+#undef Complex
+#endif
+
 // Finally forbid FILE again (if it was forbidden to start with)
 #if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_FILE)
 #undef FILE
-#define FILE	FORBIDDEN_SYMBOL_REPLACEMENT
+#define FILE	FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 #endif
 
 #if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_strcasecmp)
 #undef strcasecmp
-#define strcasecmp     FORBIDDEN_SYMBOL_REPLACEMENT
+#define strcasecmp     FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 #endif
 
 #if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_strncasecmp)
 #undef strncasecmp
-#define strncasecmp    FORBIDDEN_SYMBOL_REPLACEMENT
+#define strncasecmp    FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 #endif
 
 #if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_exit)
 #undef exit
-#define exit(a) FORBIDDEN_SYMBOL_REPLACEMENT
+#define exit(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 #endif
 
 #if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_abort)
 #undef abort
-#define abort() FORBIDDEN_SYMBOL_REPLACEMENT
+#define abort() FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 #endif
 
 #if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_system)
 #undef system
-#define system(a) FORBIDDEN_SYMBOL_REPLACEMENT
+#define system(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
+#endif
+
+#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_mkdir)
+#undef mkdir
+#define mkdir(a,b) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
+#endif
+
+#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_strcpy)
+#undef strcpy
+#define strcpy(a,b)    FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
+#endif
+
+#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_strcat)
+#undef strcat
+#define strcat(a,b)    FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
+#endif
+
+#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_vsprintf)
+#undef vsprintf
+#define vsprintf(a,b,c)    FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
+#endif
+
+#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_sprintf)
+#undef sprintf
+#define sprintf(a,b,...)    FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 #endif
 
 // re-forbid all those time.h symbols again (if they were forbidden)
@@ -225,95 +304,74 @@
 
 	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_asctime)
 	#undef asctime
-	#define asctime(a) FORBIDDEN_SYMBOL_REPLACEMENT
+	#define asctime(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 	#endif
 
 	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_clock)
 	#undef clock
-	#define clock() FORBIDDEN_SYMBOL_REPLACEMENT
+	#define clock() FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 	#endif
 
 	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_ctime)
 	#undef ctime
-	#define ctime(a) FORBIDDEN_SYMBOL_REPLACEMENT
+	#define ctime(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 	#endif
 
 	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_difftime)
 	#undef difftime
-	#define difftime(a,b) FORBIDDEN_SYMBOL_REPLACEMENT
+	#define difftime(a,b) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 	#endif
 
 	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_getdate)
 	#undef getdate
-	#define getdate(a) FORBIDDEN_SYMBOL_REPLACEMENT
+	#define getdate(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 	#endif
 
 	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_gmtime)
 	#undef gmtime
-	#define gmtime(a) FORBIDDEN_SYMBOL_REPLACEMENT
+	#define gmtime(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 	#endif
 
 	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_localtime)
 	#undef localtime
-	#define localtime(a) FORBIDDEN_SYMBOL_REPLACEMENT
+	#define localtime(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 	#endif
 
 	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_mktime)
 	#undef mktime
-	#define mktime(a) FORBIDDEN_SYMBOL_REPLACEMENT
+	#define mktime(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 	#endif
 
 	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_time)
 	#undef time
-	#define time(a) FORBIDDEN_SYMBOL_REPLACEMENT
+	#define time(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
 	#endif
 
 #endif // FORBIDDEN_SYMBOL_EXCEPTION_time_h
 
-// SDL 2 has major API changes. We redefine constants which got renamed to
-// ease the transition. This is sometimes dangerous because the values changed
-// too!
-#if SDL_VERSION_ATLEAST(2, 0, 0)
+// re-forbid all those unistd.h symbols again (if they were forbidden)
+#ifndef FORBIDDEN_SYMBOL_EXCEPTION_unistd_h
 
-// Type names which changed between SDL 1.2 and SDL 2.
-#define SDLKey     SDL_Keycode
-#define SDLMod     SDL_Keymod
-#define SDL_keysym SDL_Keysym
+	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_chdir)
+	#undef chdir
+	#define chdir(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
+	#endif
 
-// Key code constants which got renamed.
-#define SDLK_SCROLLOCK SDLK_SCROLLLOCK
-#define SDLK_NUMLOCK   SDLK_NUMLOCKCLEAR
-#define SDLK_LSUPER    SDLK_LGUI
-#define SDLK_RSUPER    SDLK_RGUI
-#define SDLK_PRINT     SDLK_PRINTSCREEN
-#define SDLK_COMPOSE   SDLK_APPLICATION
-#define SDLK_KP0       SDLK_KP_0
-#define SDLK_KP1       SDLK_KP_1
-#define SDLK_KP2       SDLK_KP_2
-#define SDLK_KP3       SDLK_KP_3
-#define SDLK_KP4       SDLK_KP_4
-#define SDLK_KP5       SDLK_KP_5
-#define SDLK_KP6       SDLK_KP_6
-#define SDLK_KP7       SDLK_KP_7
-#define SDLK_KP8       SDLK_KP_8
-#define SDLK_KP9       SDLK_KP_9
+	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_getcwd)
+	#undef getcwd
+	#define getcwd(a,b) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
+	#endif
 
-// Meta key constants which got renamed.
-#define KMOD_META KMOD_GUI
+	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_getwd)
+	#undef getwd
+	#define getwd(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
+	#endif
 
-// SDL surface flags which got removed.
-#define SDL_SRCCOLORKEY 0
-#define SDL_SRCALPHA    0
-#define SDL_FULLSCREEN  0x40000000
+	#if !defined(FORBIDDEN_SYMBOL_ALLOW_ALL) && !defined(FORBIDDEN_SYMBOL_EXCEPTION_unlink)
+	#undef unlink
+	#define unlink(a) FORBIDDEN_look_at_common_forbidden_h_for_more_info SYMBOL !%*
+	#endif
 
-// Compatibility implementations for removed functionality.
-int SDL_SetColors(SDL_Surface *surface, SDL_Color *colors, int firstcolor, int ncolors);
-int SDL_SetAlpha(SDL_Surface *surface, Uint32 flag, Uint8 alpha);
-
-#define SDL_SetColorKey SDL_SetColorKey_replacement
-int SDL_SetColorKey_replacement(SDL_Surface *surface, Uint32 flag, Uint32 key);
-
-#endif
-
+#endif // FORBIDDEN_SYMBOL_EXCEPTION_unistd_h
 
 #endif

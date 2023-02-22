@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -36,7 +35,7 @@ protected:
 		double d0, d1;
 	} _status;
 
-	void reset() {
+	void reset() override {
 		ADPCMStream::reset();
 		memset(&_status, 0, sizeof(_status));
 	}
@@ -64,7 +63,7 @@ public:
 	Tinsel4_ADPCMStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse, uint32 size, int rate, int channels, uint32 blockAlign)
 		: Tinsel_ADPCMStream(stream, disposeAfterUse, size, rate, channels, blockAlign) {}
 
-	virtual int readBuffer(int16 *buffer, const int numSamples);
+	int readBuffer(int16 *buffer, const int numSamples) override;
 };
 
 class Tinsel6_ADPCMStream : public Tinsel_ADPCMStream {
@@ -72,7 +71,7 @@ protected:
 	uint8 _chunkPos;
 	uint16 _chunkData;
 
-	void reset() {
+	void reset() override {
 		ADPCMStream::reset();
 		_chunkPos = 0;
 		_chunkData = 0;
@@ -85,7 +84,7 @@ public:
 		_chunkData = 0;
 	}
 
-	virtual int readBuffer(int16 *buffer, const int numSamples);
+	int readBuffer(int16 *buffer, const int numSamples) override;
 };
 
 class Tinsel8_ADPCMStream : public Tinsel_ADPCMStream {
@@ -93,7 +92,7 @@ public:
 	Tinsel8_ADPCMStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse, uint32 size, int rate, int channels, uint32 blockAlign)
 		: Tinsel_ADPCMStream(stream, disposeAfterUse, size, rate, channels, blockAlign) {}
 
-	virtual int readBuffer(int16 *buffer, const int numSamples);
+	int readBuffer(int16 *buffer, const int numSamples) override;
 };
 
 

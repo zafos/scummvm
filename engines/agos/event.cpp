@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,7 +39,7 @@
 namespace AGOS {
 
 void AGOSEngine::addTimeEvent(uint16 timeout, uint16 subroutine_id) {
-	TimeEvent *te = (TimeEvent *)malloc(sizeof(TimeEvent)), *first, *last = NULL;
+	TimeEvent *te = (TimeEvent *)malloc(sizeof(TimeEvent)), *first, *last = nullptr;
 	uint32 cur_time = getTime();
 
 	if (getGameId() == GID_DIMP) {
@@ -71,10 +70,10 @@ void AGOSEngine::addTimeEvent(uint16 timeout, uint16 subroutine_id) {
 
 	if (last) {
 		last->next = te;
-		te->next = NULL;
+		te->next = nullptr;
 	} else {
 		_firstTimeStruct = te;
-		te->next = NULL;
+		te->next = nullptr;
 	}
 }
 
@@ -82,7 +81,7 @@ void AGOSEngine::delTimeEvent(TimeEvent *te) {
 	TimeEvent *cur;
 
 	if (te == _pendingDeleteTimeEvent)
-		_pendingDeleteTimeEvent = NULL;
+		_pendingDeleteTimeEvent = nullptr;
 
 	if (te == _firstTimeStruct) {
 		_firstTimeStruct = te->next;
@@ -91,11 +90,11 @@ void AGOSEngine::delTimeEvent(TimeEvent *te) {
 	}
 
 	cur = _firstTimeStruct;
-	if (cur == NULL)
+	if (cur == nullptr)
 		error("delTimeEvent: none available");
 
 	for (;;) {
-		if (cur->next == NULL)
+		if (cur->next == nullptr)
 			error("delTimeEvent: no such te");
 		if (te == cur->next) {
 			cur->next = te->next;
@@ -115,7 +114,7 @@ void AGOSEngine::invokeTimeEvent(TimeEvent *te) {
 		return;
 
 	sub = getSubroutineByID(te->subroutine_id);
-	if (sub != NULL)
+	if (sub != nullptr)
 		startSubroutineEx(sub);
 
 	_runScriptReturn1 = false;
@@ -141,12 +140,12 @@ bool AGOSEngine::kickoffTimeEvents() {
 
 	cur_time = getTime() - _gameStoppedClock;
 
-	while ((te = _firstTimeStruct) != NULL && te->time <= cur_time && !shouldQuit()) {
+	while ((te = _firstTimeStruct) != nullptr && te->time <= cur_time && !shouldQuit()) {
 		result = true;
 		_pendingDeleteTimeEvent = te;
 		invokeTimeEvent(te);
 		if (_pendingDeleteTimeEvent) {
-			_pendingDeleteTimeEvent = NULL;
+			_pendingDeleteTimeEvent = nullptr;
 			delTimeEvent(te);
 		}
 	}
@@ -322,7 +321,7 @@ void AGOSEngine::scrollEvent() {
 			}
 		}
 
-		addVgaEvent(6, SCROLL_EVENT, NULL, 0, 0);
+		addVgaEvent(6, SCROLL_EVENT, nullptr, 0, 0);
 	}
 }
 
@@ -365,7 +364,7 @@ static const byte _image4[32] = {
 void AGOSEngine::drawStuff(const byte *src, uint xoffs) {
 	const uint8 y = (getPlatform() == Common::kPlatformAtariST) ? 132 : 135;
 
-	Graphics::Surface *screen = _system->lockScreen();
+	Graphics::Surface *screen = getBackendSurface();
 	byte *dst = (byte *)screen->getBasePtr(xoffs, y);
 
 	for (uint h = 0; h < 6; h++) {
@@ -374,7 +373,8 @@ void AGOSEngine::drawStuff(const byte *src, uint xoffs) {
 		dst += screen->pitch;
 	}
 
-	_system->unlockScreen();
+	Common::Rect dirtyRect(xoffs, y, xoffs + 4, y + 6);
+	updateBackendSurface(&dirtyRect);
 }
 
 void AGOSEngine::playerDamageEvent(VgaTimerEntry * vte, uint dx) {
@@ -430,8 +430,6 @@ void AGOSEngine::delay(uint amount) {
 
 	_system->getAudioCDManager()->update();
 
-	_debugger->onFrame();
-
 	vgaPeriod = (_fastMode) ? 10 : _vgaPeriod;
 	if (getGameType() == GType_PP && getGameId() != GID_DIMP) {
 		if (vgaPeriod == 15 && _variableArray[999] == 0)
@@ -466,7 +464,7 @@ void AGOSEngine::delay(uint amount) {
 						_saveLoadSlot = 10;
 
 					memset(_saveLoadName, 0, sizeof(_saveLoadName));
-					sprintf(_saveLoadName, "Quick %d", _saveLoadSlot);
+					Common::sprintf_s(_saveLoadName, "Quick %d", _saveLoadSlot);
 					_saveLoadType = (event.kbd.hasFlags(Common::KBD_ALT)) ? 1 : 2;
 					quickLoadOrSave();
 				} else if (event.kbd.hasFlags(Common::KBD_ALT)) {
@@ -484,8 +482,6 @@ void AGOSEngine::delay(uint amount) {
 						_aboutDialog->runModal();
 					} else if (event.kbd.keycode == Common::KEYCODE_f) {
 						_fastMode = !_fastMode;
-					} else if (event.kbd.keycode == Common::KEYCODE_d) {
-						_debugger->attach();
 					}
 				}
 
@@ -522,7 +518,7 @@ void AGOSEngine::delay(uint amount) {
 			case Common::EVENT_RBUTTONUP:
 				_rightClick = true;
 				break;
-			case Common::EVENT_RTL:
+			case Common::EVENT_RETURN_TO_LAUNCHER:
 			case Common::EVENT_QUIT:
 				return;
 			case Common::EVENT_WHEELUP:
@@ -695,11 +691,13 @@ void AGOSEngine_DIMP::dimpIdle() {
 					while (z == 0) {
 						n = _rnd.getRandomNumber(2);
 						switch (n) {
+							default:
 							case(0):
 								if (_variableArray[110] > 2)
 									break;
 								n = _rnd.getRandomNumber(6);
 								switch (n) {
+									default:
 									case(0): loadSoundFile("And01.wav");break;
 									case(1): loadSoundFile("And02.wav");break;
 									case(2): loadSoundFile("And03.wav");break;
@@ -715,6 +713,7 @@ void AGOSEngine_DIMP::dimpIdle() {
 									break;
 								n = _rnd.getRandomNumber(6);
 								switch (n) {
+									default:
 									case(0): loadSoundFile("And08.wav");break;
 									case(1): loadSoundFile("And09.wav");break;
 									case(2): loadSoundFile("And0a.wav");break;
@@ -730,6 +729,7 @@ void AGOSEngine_DIMP::dimpIdle() {
 									break;
 								n = _rnd.getRandomNumber(4);
 								switch (n) {
+									default:
 									case(0): loadSoundFile("And0f.wav");break;
 									case(1): loadSoundFile("And0g.wav");break;
 									case(2): loadSoundFile("And0h.wav");break;

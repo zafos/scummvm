@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,19 +15,15 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "common/rect.h"
 
-#ifdef ENABLE_KEYMAPPER
-#include "common/events.h"
-#endif
-
 #include "gui/gui-manager.h"
 #include "gui/dialog.h"
+#include "gui/ThemeEval.h"
 #include "gui/widget.h"
 
 namespace GUI {
@@ -43,7 +39,7 @@ namespace GUI {
 
 Dialog::Dialog(int x, int y, int w, int h)
 	: GuiObject(x, y, w, h),
-	  _mouseWidget(0), _focusedWidget(0), _dragWidget(0), _tickleWidget(0), _visible(false),
+	  _mouseWidget(nullptr), _focusedWidget(nullptr), _dragWidget(nullptr), _tickleWidget(nullptr), _visible(false),
 	_backgroundType(GUI::ThemeEngine::kDialogBackgroundDefault) {
 	// Some dialogs like LauncherDialog use internally a fixed size, even though
 	// their widgets rely on the layout to be initialized correctly by the theme.
@@ -52,12 +48,13 @@ Dialog::Dialog(int x, int y, int w, int h)
 	// started a 640x480 game with a non 1x scaler.
 	g_gui.checkScreenChange();
 
+	_mouseUpdatedOnFocus = true;
 	_result = -1;
 }
 
 Dialog::Dialog(const Common::String &name)
 	: GuiObject(name),
-	  _mouseWidget(0), _focusedWidget(0), _dragWidget(0), _tickleWidget(0), _visible(false),
+	  _mouseWidget(nullptr), _focusedWidget(nullptr), _dragWidget(nullptr), _tickleWidget(nullptr), _visible(false),
 	_backgroundType(GUI::ThemeEngine::kDialogBackgroundDefault) {
 
 	// It may happen that we have 3x scaler in launcher (960xY) and then 640x480
@@ -65,10 +62,11 @@ Dialog::Dialog(const Common::String &name)
 	// resolution change, so widgets will be off screen. This forces it to
 	// recompute
 	//
-	// Fixes bug #1590596: "HE: When 3x graphics are choosen, F5 crashes game"
-	// and bug #1595627: "SCUMM: F5 crashes game (640x480)"
+	// Fixes bug #2892: "HE: When 3x graphics are choosen, F5 crashes game"
+	// and bug #2903: "SCUMM: F5 crashes game (640x480)"
 	g_gui.checkScreenChange();
 
+	_mouseUpdatedOnFocus = true;
 	_result = -1;
 }
 
@@ -96,7 +94,7 @@ void Dialog::close() {
 
 	if (_mouseWidget) {
 		_mouseWidget->handleMouseLeft(0);
-		_mouseWidget = 0;
+		_mouseWidget = nullptr;
 	}
 	releaseFocus();
 	g_gui.closeTopDialog();
@@ -106,6 +104,10 @@ void Dialog::reflowLayout() {
 	// The screen has changed. That means the screen visual may also have
 	// changed, so any cached image may be invalid. The subsequent redraw
 	// should be treated as the very first draw.
+
+	if (!_name.empty()) {
+		g_gui.xmlEval()->reflowDialogLayout(_name, _firstWidget);
+	}
 
 	GuiObject::reflowLayout();
 
@@ -117,7 +119,7 @@ void Dialog::reflowLayout() {
 }
 
 void Dialog::lostFocus() {
-	_dragWidget = NULL;
+	_dragWidget = nullptr;
 
 	if (_tickleWidget) {
 		_tickleWidget->lostFocus();
@@ -149,7 +151,7 @@ void Dialog::setDefaultFocusedWidget() {
 void Dialog::releaseFocus() {
 	if (_focusedWidget) {
 		_focusedWidget->lostFocus();
-		_focusedWidget = 0;
+		_focusedWidget = nullptr;
 	}
 }
 
@@ -166,10 +168,15 @@ void Dialog::drawDialog(DrawLayer layerToDraw) {
 	if (!isVisible())
 		return;
 
+	g_gui.theme()->disableClipRect();
 	g_gui.theme()->_layerToDraw = layerToDraw;
 	g_gui.theme()->drawDialogBackground(Common::Rect(_x, _y, _x + _w, _y + _h), _backgroundType);
 
 	markWidgetsAsDirty();
+
+#ifdef LAYOUT_DEBUG_DIALOG
+	return;
+#endif
 	drawWidgets();
 }
 
@@ -225,7 +232,7 @@ void Dialog::handleMouseUp(int x, int y, int button, int clickCount) {
 	if (w)
 		w->handleMouseUp(x - (w->getAbsX() - _x), y - (w->getAbsY() - _y), button, clickCount);
 
-	_dragWidget = 0;
+	_dragWidget = nullptr;
 }
 
 void Dialog::handleMouseWheel(int x, int y, int direction) {
@@ -249,6 +256,11 @@ void Dialog::handleKeyDown(Common::KeyState state) {
 	}
 
 	// Hotkey handling
+
+	// Convert keypad Enter to Return key
+	if (state.keycode == Common::KEYCODE_KP_ENTER) {
+		state.ascii = Common::ASCII_RETURN;
+	}
 	if (state.ascii != 0) {
 		Widget *w = _firstWidget;
 		state.ascii = toupper(state.ascii);
@@ -307,7 +319,7 @@ void Dialog::handleMouseMoved(int x, int y, int button) {
 			_mouseWidget = w;
 			w->handleMouseEntered(button);
 		} else if (!mouseInFocusedWidget && _mouseWidget == w) {
-			_mouseWidget = 0;
+			_mouseWidget = nullptr;
 			w->handleMouseLeft(button);
 		}
 
@@ -330,7 +342,7 @@ void Dialog::handleMouseMoved(int x, int y, int button) {
 		// If we have a widget in drag mode we prevent mouseEntered
 		// events from being sent to other widgets.
 		if (_dragWidget && w != _dragWidget)
-			w = 0;
+			w = nullptr;
 
 		if (w)
 			w->handleMouseEntered(button);
@@ -356,12 +368,15 @@ void Dialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data) {
 	case kCloseCmd:
 		close();
 		break;
+	case kCloseWithResultCmd:
+		setResult(data);
+		close();
+		break;
+	default:
+		break;
 	}
 }
 
-#ifdef ENABLE_KEYMAPPER
-void Dialog::handleOtherEvent(Common::Event evt) { }
-#endif
 /*
  * Determine the widget at location (x,y) if any. Assumes the coordinates are
  * in the local coordinate system, i.e. relative to the top left of the dialog.
@@ -376,11 +391,11 @@ Widget *Dialog::findWidget(const char *name) {
 
 void Dialog::removeWidget(Widget *del) {
 	if (del == _mouseWidget || del->containsWidget(_mouseWidget))
-		_mouseWidget = NULL;
+		_mouseWidget = nullptr;
 	if (del == _focusedWidget || del->containsWidget(_focusedWidget))
-		_focusedWidget = NULL;
+		_focusedWidget = nullptr;
 	if (del == _dragWidget || del->containsWidget(_dragWidget))
-		_dragWidget = NULL;
+		_dragWidget = nullptr;
 
 	GuiObject::removeWidget(del);
 }

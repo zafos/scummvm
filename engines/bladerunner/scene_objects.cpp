@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -137,16 +136,16 @@ bool SceneObjects::existsOnXZ(int exceptSceneObjectId, float x, float z, bool mo
 	int count = _count;
 
 	if (count > 0) {
-		for (int i = 0; i < count; i++) {
+		for (int i = 0; i < count; ++i) {
 			const SceneObject *sceneObject = &_sceneObjects[_sceneObjectsSortedByDistance[i]];
 			bool isObstacle = false;
 			if (sceneObject->type == kSceneObjectTypeActor) {
 				if (sceneObject->isRetired) {
 					isObstacle = false;
 				} else if (sceneObject->isMoving) {
-					isObstacle = movingActorIsObstacle != 0;
+					isObstacle = movingActorIsObstacle;
 				} else {
-					isObstacle = standingActorIsObstacle != 0;
+					isObstacle = standingActorIsObstacle;
 				}
 			} else {
 				isObstacle = sceneObject->isObstacle;
@@ -156,6 +155,21 @@ bool SceneObjects::existsOnXZ(int exceptSceneObjectId, float x, float z, bool mo
 				float x1, y1, z1, x2, y2, z2;
 				sceneObject->boundingBox.getXYZ(&x1, &y1, &z1, &x2, &y2, &z2);
 				if (z1 <= zMax && z2 >= zMin && x1 <= xMax && x2 >= xMin) {
+//					if (sceneObject->type == kSceneObjectTypeObject) {
+//						Vector3 a(x1,y1,z1);
+//						Vector3 b(x2,y2,z2);
+//						Vector3 pos = _vm->_view->calculateScreenPosition(0.5 * (a + b));
+//						debug("%d: %s (Clk: %s, Trg: %s, Prs: %s, Obs: %s, Mvg: %s), Pos(%02.2f,%02.2f,%02.2f)\n     Bbox(%02.2f,%02.2f,%02.2f) ~ (%02.2f,%02.2f,%02.2f)\n",
+//								 sceneObject->id - kSceneObjectOffsetObjects,
+//								 _vm->_scene->objectGetName(sceneObject->id - kSceneObjectOffsetObjects).c_str(),
+//								 sceneObject->isClickable? "T" : "F",
+//								 sceneObject->isTarget?    "T" : "F",
+//								 sceneObject->isPresent?   "T" : "F",
+//								 sceneObject->isObstacle?  "T" : "F",
+//								 sceneObject->isMoving?    "T" : "F",
+//								 pos.x, pos.y, pos.z,
+//								 a.x, a.y, a.z, b.x, b.y, b.z);
+//					}
 					return true;
 				}
 			}
@@ -326,12 +340,55 @@ void SceneObjects::updateObstacles() {
 	_vm->_obstacles->backup();
 }
 
+bool SceneObjects::isEmptyScreenRectangle(int sceneObjectId) {
+	int index = findById(sceneObjectId);
+	if (index != -1) {
+		const SceneObject *sceneObject = &_sceneObjects[index];
+		return sceneObject->screenRectangle.isEmpty();
+	}
+	return true;
+}
+
+int SceneObjects::compareScreenRectangle(int sceneObjectId, const Common::Rect &rectangle) {
+	int index = findById(sceneObjectId);
+	if (index != -1) {
+		const SceneObject *sceneObject = &_sceneObjects[index];
+		if (sceneObject->screenRectangle == rectangle) {
+			return 0;
+		}
+	}
+	return -1;
+}
+
+void SceneObjects::resetScreenRectangleAndBbox(int sceneObjectId) {
+	int index = findById(sceneObjectId);
+	if (index != -1) {
+		SceneObject *sceneObject = &_sceneObjects[index];
+		sceneObject->screenRectangle.left   = -1;
+		sceneObject->screenRectangle.top    = -1;
+		sceneObject->screenRectangle.right  = -1;
+		sceneObject->screenRectangle.bottom = -1;
+		sceneObject->boundingBox.setXYZ(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+	}
+}
+
+void SceneObjects::synchScreenRectangle(int sceneObjectId, const Common::Rect &targetScreenRect) {
+	int index = findById(sceneObjectId);
+	if (index != -1) {
+		SceneObject *sceneObject = &_sceneObjects[index];
+		sceneObject->screenRectangle.left   = targetScreenRect.left;
+		sceneObject->screenRectangle.top    = targetScreenRect.top;
+		sceneObject->screenRectangle.right  = targetScreenRect.right;
+		sceneObject->screenRectangle.bottom = targetScreenRect.bottom;
+	}
+}
+
 void SceneObjects::save(SaveFileWriteStream &f) {
 	f.writeInt(_count);
 	for (int i = 0; i < kSceneObjectCount; ++i) {
 		f.writeInt(_sceneObjects[i].id);
 		f.writeInt(_sceneObjects[i].type);
-		f.writeBoundingBox(_sceneObjects[i].boundingBox);
+		f.writeBoundingBox(_sceneObjects[i].boundingBox, true);
 		f.writeRect(_sceneObjects[i].screenRectangle);
 		f.writeFloat(_sceneObjects[i].distanceToCamera);
 		f.writeBool(_sceneObjects[i].isPresent);
@@ -352,7 +409,7 @@ void SceneObjects::load(SaveFileReadStream &f) {
 	for (int i = 0; i < kSceneObjectCount; ++i) {
 		_sceneObjects[i].id = f.readInt();
 		_sceneObjects[i].type = (SceneObjectType)f.readInt();
-		_sceneObjects[i].boundingBox = f.readBoundingBox();
+		_sceneObjects[i].boundingBox = f.readBoundingBox(true);
 		_sceneObjects[i].screenRectangle = f.readRect();
 		_sceneObjects[i].distanceToCamera = f.readFloat();
 		_sceneObjects[i].isPresent = f.readBool();

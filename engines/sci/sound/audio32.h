@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,7 +27,8 @@
 #include "common/array.h"          // for Array
 #include "common/mutex.h"          // for StackLock, Mutex
 #include "common/scummsys.h"       // for int16, uint8, uint32, uint16
-#include "sci/resource.h"          // for ResourceId
+#include "sci/resource/resource.h" // for ResourceId
+#include "sci/engine/state.h"      // for EngineState
 #include "sci/engine/vm_types.h"   // for reg_t, NULL_REG
 #include "sci/video/robot_decoder.h" // for RobotAudioStream
 
@@ -173,9 +173,9 @@ enum AudioChannelIndex {
 class Audio32 : public Audio::AudioStream, public Common::Serializable {
 public:
 	Audio32(ResourceManager *resMan);
-	~Audio32();
+	~Audio32() override;
 
-	virtual void saveLoadWithSerializer(Common::Serializer &s);
+	void saveLoadWithSerializer(Common::Serializer &s) override;
 
 	enum {
 		/**
@@ -195,11 +195,11 @@ private:
 #pragma mark -
 #pragma mark AudioStream implementation
 public:
-	int readBuffer(Audio::st_sample_t *buffer, const int numSamples);
-	bool isStereo() const { return true; }
-	int getRate() const { return _mixer->getOutputRate(); }
-	bool endOfData() const { return _numActiveChannels == 0; }
-	bool endOfStream() const { return false; }
+	int readBuffer(Audio::st_sample_t *buffer, const int numSamples) override;
+	bool isStereo() const override { return true; }
+	int getRate() const override { return _mixer->getOutputRate(); }
+	bool endOfData() const override { return _numActiveChannels == 0; }
+	bool endOfStream() const override { return false; }
 
 private:
 	/**
@@ -250,7 +250,7 @@ public:
 	 * @param startIndex The location of the audio resource information in the
 	 * arguments list.
 	 */
-	int16 findChannelByArgs(int argc, const reg_t *argv, const int startIndex, const reg_t soundNode) const;
+	int16 findChannelByArgs(EngineState *s, int argc, const reg_t *argv, const int startIndex, const reg_t soundNode) const;
 
 	/**
 	 * Finds a channel that is already configured for the given audio sample.
@@ -636,17 +636,17 @@ private:
 #pragma mark -
 #pragma mark Kernel
 public:
-	reg_t kernelPlay(const bool autoPlay, const int argc, const reg_t *const argv);
-	reg_t kernelStop(const int argc, const reg_t *const argv);
-	reg_t kernelPause(const int argc, const reg_t *const argv);
-	reg_t kernelResume(const int argc, const reg_t *const argv);
-	reg_t kernelPosition(const int argc, const reg_t *const argv);
-	reg_t kernelVolume(const int argc, const reg_t *const argv);
+	reg_t kernelPlay(const bool autoPlay, EngineState *s, const int argc, const reg_t *const argv);
+	reg_t kernelStop(EngineState *s, const int argc, const reg_t *const argv);
+	reg_t kernelPause(EngineState *s, const int argc, const reg_t *const argv);
+	reg_t kernelResume(EngineState *s, const int argc, const reg_t *const argv);
+	reg_t kernelPosition(EngineState *s, const int argc, const reg_t *const argv);
+	reg_t kernelVolume(EngineState *s, const int argc, const reg_t *const argv);
 	reg_t kernelMixing(const int argc, const reg_t *const argv);
-	reg_t kernelFade(const int argc, const reg_t *const argv);
-	void kernelLoop(const int argc, const reg_t *const argv);
-	void kernelPan(const int argc, const reg_t *const argv);
-	void kernelPanOff(const int argc, const reg_t *const argv);
+	reg_t kernelFade(EngineState *s, const int argc, const reg_t *const argv);
+	void kernelLoop(EngineState *s, const int argc, const reg_t *const argv);
+	void kernelPan(EngineState *s, const int argc, const reg_t *const argv);
+	void kernelPanOff(EngineState *s, const int argc, const reg_t *const argv);
 
 #pragma mark -
 #pragma mark Debugging

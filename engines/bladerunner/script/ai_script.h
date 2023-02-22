@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -50,9 +49,9 @@ public:
 	virtual void CompletedMovementTrack() = 0;
 	virtual void ReceivedClue(int clueId, int fromActorId) = 0;
 	virtual void ClickedByPlayer() = 0;
-	virtual void EnteredScene(int setId) = 0;
-	virtual void OtherAgentEnteredThisScene(int otherActorId) = 0;
-	virtual void OtherAgentExitedThisScene(int otherActorId) = 0;
+	virtual void EnteredSet(int setId) = 0;
+	virtual void OtherAgentEnteredThisSet(int otherActorId) = 0;
+	virtual void OtherAgentExitedThisSet(int otherActorId) = 0;
 	virtual void OtherAgentEnteredCombatMode(int otherActorId, int combatMode) = 0;
 	virtual void ShotAtAndMissed() = 0;
 	virtual bool ShotAtAndHit() = 0;
@@ -77,9 +76,9 @@ public: \
 	void CompletedMovementTrack(); \
 	void ReceivedClue(int clueId, int fromActorId); \
 	void ClickedByPlayer(); \
-	void EnteredScene(int setId); \
-	void OtherAgentEnteredThisScene(int otherActorId); \
-	void OtherAgentExitedThisScene(int otherActorId); \
+	void EnteredSet(int setId); \
+	void OtherAgentEnteredThisSet(int otherActorId); \
+	void OtherAgentExitedThisSet(int otherActorId); \
 	void OtherAgentEnteredCombatMode(int otherActorId, int combatMode); \
 	void ShotAtAndMissed(); \
 	bool ShotAtAndHit(); \
@@ -96,40 +95,36 @@ private:
 #define END_SCRIPT };
 
 DECLARE_SCRIPT(McCoy)
-	int dword_45A0D8;
-	int dword_45A0DC;
-	int _animationFrameDelta;
-	int dword_45A0E4;
-	float off_45A0EC;
-	int dword_45A0E8;
-	int dword_45A0F0;
-	int dword_45A0F4;
-	int dword_45A0F8;
-	int dword_45A0FC;
-	float off_45A100;
-	float flt_462710;
-	float flt_462714;
+	int _animationLoopCounter;
+	int _animationLoopLength;
+	int _animationLoopDirection;
+	int _animationLoopFrameMin;
+	int _animationLoopFrameMax;
+	int _animationStateNextSpecial;
+	int _animationNextSpecial;
+	int _nextSoundId;
+	bool _NR10SteeleShooting;
+	float _fallSpeed;
+	float _fallHeightCurrent;
+	float _fallHeightTarget;
 
-	void sub_4053E0();
-	void sub_4054F0();
-	void sub_405660();
-	void sub_405800();
-	void sub_4058B0();
-	void sub_405920();
-	void sub_405940(float a1);
-	void sub_4059D0(float a1);
+	void fallDown();
+	void UG15fall();
+	void dodge();
+	void walkStairsLeft(float stepHeight);
+	void walkStairsRight(float stepHeight);
 END_SCRIPT
 
 DECLARE_SCRIPT(Steele)
-	bool _flag;
-	int _var1;
-	int _var2;
+	bool _resumeIdleAfterFramesetCompletesFlag;
+	int _varChooseIdleAnimation;
+	int _varNumOfTimesToHoldCurrentFrame;
 
 	double comp_distance(int actorId, float a5, float a6, int a1, float a2, float a3, float a4);
 END_SCRIPT
 
 DECLARE_SCRIPT(Gordo)
-	int var_45B078;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 	int _counter;
 	int _counterTarget;
 	int _frameMin;
@@ -137,15 +132,15 @@ DECLARE_SCRIPT(Gordo)
 	int _frameMax;
 	int _state;
 
-	void sub_40FD00();
-	void sub_4103B8();
-	void sub_410590();
-	void sub_41090C();
-	void sub_41117C();
+	void talkToMcCoyInCity();
+	void talkToMcCoyAtNR02();
+	void dialogue2();
+	void dialogue1();
+	void unknown();
 END_SCRIPT
 
 DECLARE_SCRIPT(Dektora)
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 	float _x, _y, _z;
 
 	double comp_distance(int actorId, float x1, float y1, float z1);
@@ -156,58 +151,58 @@ DECLARE_SCRIPT(Guzza)
 	int _frameDelta;
 	int _counter;
 	int _state;
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Clovis)
-	int _var1;
-	int _var2;
+	int _varChooseIdleAnimation;
+	int _varNumOfTimesToHoldCurrentFrame;
 	int _var3;
 	int _var4;
 	int _var5;
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 
 	void shotAnim();
 	void someAnim();
 END_SCRIPT
 
 DECLARE_SCRIPT(Lucy)
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 
-	void voightKempTest();
+	void voightKampffTest();
 	void checkCombat();
 END_SCRIPT
 
 DECLARE_SCRIPT(Izo)
 	int _var1;
 	int _var2;
-	int _var3;
-	int _var4;
-	bool _flag;
+	int _varNumOfTimesToHoldCurrentFrame;
+	int _varChooseIdleAnimation;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 
-	void someDialog();
+	void dialogueWithIzo();
 	void modifyWaypoints();
 END_SCRIPT
 
 DECLARE_SCRIPT(Sadik)
-	int _var1;
-	int _var2;
-	int _var3;
+	int _nextSoundId;
+	int _varChooseIdleAnimation;
+	int _varNumOfTimesToHoldCurrentFrame;
 	int _var4;
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Crazylegs)
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Luther)
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Grigorian)
-	int var_45CA10;
-	int var_45CA14;
+	int _varChooseIdleAnimation;
+	int _varNumOfTimesToHoldCurrentFrame;
 END_SCRIPT
 
 DECLARE_SCRIPT(Transient)
@@ -217,22 +212,22 @@ DECLARE_SCRIPT(Lance)
 END_SCRIPT
 
 DECLARE_SCRIPT(BulletBob)
-	int _var1;
+	int _varChooseIdleAnimation;
 	int _var2;
 	int _var3;
-	int _var4;
+	int _varNumOfTimesToHoldCurrentFrame;
 END_SCRIPT
 
 DECLARE_SCRIPT(Runciter)
-	int var_45CD78;
+	int _varChooseIdleAnimation;
 	int var_45CD7C;
 	int var_45CD80;
-	int var_45CD84;
+	int _varNumOfTimesToHoldCurrentFrame;
 	int var_45CD88;
 END_SCRIPT
 
 DECLARE_SCRIPT(InsectDealer)
-	bool _flag1;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 	int _state;
 	int _frameDelta;
 	int _var2;
@@ -241,22 +236,22 @@ END_SCRIPT
 
 DECLARE_SCRIPT(TyrellGuard)
 	int _frameDelta;
-	bool _flag1;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(EarlyQ)
-	int _var1;
-	int _var2;
+	int _varNumOfTimesToHoldCurrentFrame;
+	int _varChooseIdleAnimation;
 	int _var3;
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Zuben)
-	int _var_45D258;
-	int _var_45D25C;
-	int _animationFrameTarget2;
-	int _animationFrameDelta;
-	int _animationFrameTarget1;
+	int _animationLoopCounter;
+	int _animationLoopLength;
+	int _animationLoopFrameMin;
+	int _animationLoopDirection;
+	int _animationLoopFrameMax;
 
 	void dialogue();
 END_SCRIPT
@@ -264,37 +259,34 @@ END_SCRIPT
 DECLARE_SCRIPT(Hasan)
 	int _var1;
 	int _var2;
-	int _var3;
+	int _varNumOfTimesToHoldCurrentFrame;
 	int _var4;
 	int _var5;
-	int _var6;
+	int _varChooseIdleAnimation;
 END_SCRIPT
 
 DECLARE_SCRIPT(Marcus)
 END_SCRIPT
 
 DECLARE_SCRIPT(Mia)
-	bool _flag1;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(OfficerLeary)
-	int var_45D5B8;
-	int var_45D5BC;
-
-	bool sub_431408();
-	bool sub_431420();
+	int _varChooseIdleAnimation;
+	bool _idleModeRequestedWhileInTalkingState;
 END_SCRIPT
 
 DECLARE_SCRIPT(OfficerGrayford)
-	int _var1;
-	int _var2;
-	int _var3;
+	int _varChooseIdleAnimation;
+	bool _resumeIdleAfterFramesetCompletesFlag;
+	int _varNumOfTimesToHoldCurrentFrame;
 END_SCRIPT
 
 DECLARE_SCRIPT(Hanoi)
-	int _var1;
-	int _var2;
-	int _var3;
+	bool _resumeIdleAfterFramesetCompletesFlag;
+	int _varChooseIdleAnimation;
+	int _varNumOfTimesToHoldCurrentFrame;
 	int _var4;
 END_SCRIPT
 
@@ -302,35 +294,35 @@ DECLARE_SCRIPT(Baker)
 END_SCRIPT
 
 DECLARE_SCRIPT(DeskClerk)
-	int _var1;
-	int _var2;
-	int _var3;
+	int  _varChooseIdleAnimation;
+	bool _resumeIdleAfterFramesetCompletesFlag;
+	int  _varNumOfTimesToHoldCurrentFrame;
 END_SCRIPT
 
 DECLARE_SCRIPT(HowieLee)
-	bool var_45DFB8;
+	int _varIdleStatesToggle;
 END_SCRIPT
 
 DECLARE_SCRIPT(FishDealer)
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Klein)
 END_SCRIPT
 
 DECLARE_SCRIPT(Murray)
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(HawkersBarkeep)
-	int _var1;
-	int _var2;
+	int _varChooseIdleAnimation;
+	int _varNumOfTimesToHoldCurrentFrame;
 	int _var3;
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Holloway)
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(SergeantWalls)
@@ -338,16 +330,16 @@ END_SCRIPT
 
 DECLARE_SCRIPT(Moraji)
 	int _var1;
-	int _var2;
+	int _varNumOfTimesToHoldCurrentFrame;
 END_SCRIPT
 
 DECLARE_SCRIPT(TheBard)
 END_SCRIPT
 
 DECLARE_SCRIPT(Photographer)
-	int _var1;
+	int _varNumOfTimesToHoldCurrentFrame;
 	int _var2;
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Dispatcher)
@@ -363,9 +355,9 @@ DECLARE_SCRIPT(GovernorKolvig)
 END_SCRIPT
 
 DECLARE_SCRIPT(EarlyQBartender)
-	int _var1;
+	int _varChooseIdleAnimation;
 	int _var2;
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(HawkersParrot)
@@ -394,15 +386,15 @@ DECLARE_SCRIPT(ShoeshineMan)
 END_SCRIPT
 
 DECLARE_SCRIPT(Tyrell)
-	bool _flag;
-	int _var;
+	bool _resumeIdleAfterFramesetCompletesFlag;
+	int _varChooseIdleAnimation;
 END_SCRIPT
 
 DECLARE_SCRIPT(Chew)
-	int _var1;
-	int _var2;
+	int _varNumOfTimesToHoldCurrentFrame;
+	int _varChooseIdleAnimation;
 	int _var3;
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Gaff)
@@ -415,29 +407,29 @@ DECLARE_SCRIPT(Taffy)
 END_SCRIPT
 
 DECLARE_SCRIPT(Sebastian)
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 
 	void dialogue();
 	void setMcCoyIsABladeRunner();
 END_SCRIPT
 
 DECLARE_SCRIPT(Rachael)
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 
 	void dialogue_start();
 	void dialogue_agenda1();
 	void dialogue_agenda2();
-	void dialogue_agenda3();
+	void dialogue_act4();
 END_SCRIPT
 
 DECLARE_SCRIPT(GeneralDoll)
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Isabella)
 	int _var1;
-	int _var2;
-	int _var3;
+	int _varNumOfTimesToHoldCurrentFrame;
+	int _varChooseIdleAnimation;
 	int _var4;
 END_SCRIPT
 
@@ -448,12 +440,12 @@ DECLARE_SCRIPT(Newscaster)
 END_SCRIPT
 
 DECLARE_SCRIPT(Leon)
-	int var_45EDAC;
-	float var_45EDA0_z;
-	float var_45EDA4_y;
-	float var_45EDA8_x;
+	bool _resumeIdleAfterFramesetCompletesFlag;
+	float _mcCoyPositionX;
+	float _mcCoyPositionY;
+	float _mcCoyPositionZ;
 
-	float sub_446700(int actorId, float x, float y, float z);
+	float distanceTo(int actorId, float x, float y, float z);
 END_SCRIPT
 
 DECLARE_SCRIPT(MaleAnnouncer)
@@ -462,30 +454,30 @@ END_SCRIPT
 DECLARE_SCRIPT(FreeSlotA)
 	int _var1;
 	int _var2;
-	float _var3;
-	float _var4;
-	float _var5;
+	float _fallSpeed;
+	float _fallHeightCurrent;
+	float _fallHeightTarget;
 
-	void calcHit();
-	void processGoal306();
+	void checkIfOnBridge();
+	void goToRandomUGxx();
 END_SCRIPT
 
 DECLARE_SCRIPT(FreeSlotB)
 	int _var1;
 	int _var2;
 
-	void processGoal301();
+	void goToRandomUGxx();
 END_SCRIPT
 
 DECLARE_SCRIPT(Maggie)
-	int var_45F3F8;
-	int var_45F3FC;
-	int var_45F400;
-	int var_45F404;
-	int var_45F408;
+	int _varTimesToLoopWhenHappyB;
+	int _varTimesToBarkWhenHappyA;
+	int _varMaggieSoundPan;      // Repurposed - Original: unused, only set to 0 (var_45F400)
+	int _varMaggieClickResponse; // Repurposed - Original: unused, only set to 0 (var_45F404)
+	int var_45F408;              // unused, only set to 0
 
-	int sub_44B260();
-	float sub_44B200(int actorId, float x, float y, float z);
+	int randomWaypointMA02();
+	float distanceToActor(int actorId, float x, float y, float z);
 END_SCRIPT
 
 DECLARE_SCRIPT(GenericWalkerA)
@@ -522,17 +514,17 @@ DECLARE_SCRIPT(GenericWalkerC)
 END_SCRIPT
 
 DECLARE_SCRIPT(Mutant1)
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Mutant2)
 	int _var1;
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 DECLARE_SCRIPT(Mutant3)
 	int _var1;
-	bool _flag;
+	bool _resumeIdleAfterFramesetCompletesFlag;
 END_SCRIPT
 
 #undef DECLARE_SCRIPT
@@ -555,9 +547,9 @@ public:
 	void completedMovementTrack(int actor);
 	void receivedClue(int actor, int clueId, int fromActorId);
 	void clickedByPlayer(int actor);
-	void enteredScene(int actor, int setId);
-	void otherAgentEnteredThisScene(int actor, int otherActorId);
-	void otherAgentExitedThisScene(int actor, int otherActorId);
+	void enteredSet(int actor, int setId);
+	void otherAgentEnteredThisSet(int actor, int otherActorId);
+	void otherAgentExitedThisSet(int actor, int otherActorId);
 	void otherAgentEnteredCombatMode(int actorId, int otherActorId, int combatMode);
 	void shotAtAndMissed(int actorId);
 	bool shotAtAndHit(int actorId);

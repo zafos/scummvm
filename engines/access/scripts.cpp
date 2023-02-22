@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,6 +23,7 @@
 #include "access/access.h"
 #include "access/resources.h"
 #include "access/scripts.h"
+#include "access/martian/martian_resources.h"
 
 namespace Access {
 
@@ -203,7 +203,7 @@ void Scripts::printWatch() {
 	int width = 0;
 	bool lastLine;
 	do {
-		lastLine = _vm->_fonts._font2.getLine(msg, _vm->_screen->_maxChars * 6, line, width);
+		lastLine = _vm->_fonts._font2->getLine(msg, _vm->_screen->_maxChars * 6, line, width);
 		// Draw the text
 		_vm->_bubbleBox->printString(line);
 
@@ -251,7 +251,10 @@ void Scripts::cmdObject() {
 }
 
 void Scripts::cmdEndObject() {
-	printString(GENERAL_MESSAGES[_vm->_room->_selectCommand]);
+	if (_vm->getLanguage() == Common::ES_ESP)
+		printString(ESP_GENERAL_MESSAGES[_vm->_room->_selectCommand]);
+	else
+		printString(GENERAL_MESSAGES[_vm->_room->_selectCommand]);
 }
 
 void Scripts::cmdJumpLook() {

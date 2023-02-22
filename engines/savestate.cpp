@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,24 +15,44 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "engines/savestate.h"
+#include "engines/engine.h"
+#include "engines/metaengine.h"
 #include "graphics/surface.h"
+#include "common/config-manager.h"
 #include "common/textconsole.h"
+#include "common/translation.h"
 
 SaveStateDescriptor::SaveStateDescriptor()
 	// FIXME: default to 0 (first slot) or to -1 (invalid slot) ?
 	: _slot(-1), _description(), _isDeletable(true), _isWriteProtected(false),
-	  _isLocked(false), _saveDate(), _saveTime(), _playTime(), _thumbnail() {
+	  _isLocked(false), _saveDate(), _saveTime(), _playTime(), _playTimeMSecs(0),
+	_thumbnail(), _saveType(kSaveTypeUndetermined) {
 }
 
-SaveStateDescriptor::SaveStateDescriptor(int s, const Common::String &d)
-	: _slot(s), _description(d), _isDeletable(true), _isWriteProtected(false),
-	  _isLocked(false), _saveDate(), _saveTime(), _playTime(), _thumbnail() {
+SaveStateDescriptor::SaveStateDescriptor(const MetaEngine *metaEngine, int slot, const Common::U32String &d)
+	: _slot(slot), _description(d), _isLocked(false), _playTimeMSecs(0) {
+	initSaveType(metaEngine);
+}
+
+SaveStateDescriptor::SaveStateDescriptor(const MetaEngine *metaEngine, int slot, const Common::String &d)
+	: _slot(slot), _description(Common::U32String(d)), _isLocked(false), _playTimeMSecs(0) {
+	initSaveType(metaEngine);
+}
+
+void SaveStateDescriptor::initSaveType(const MetaEngine *metaEngine) {
+	// Do not allow auto-save slot to be deleted or overwritten.
+	if (!metaEngine && g_engine)
+		metaEngine = g_engine->getMetaEngine();
+	const bool autosave =
+			metaEngine && ConfMan.getInt("autosave_period") && _slot == metaEngine->getAutosaveSlot();
+	_isWriteProtected = autosave;
+	_saveType = autosave ? kSaveTypeAutosave : kSaveTypeRegular;
+	_isDeletable = !autosave;
 }
 
 void SaveStateDescriptor::setThumbnail(Graphics::Surface *t) {
@@ -51,10 +71,39 @@ void SaveStateDescriptor::setSaveTime(int hour, int min) {
 }
 
 void SaveStateDescriptor::setPlayTime(int hours, int minutes) {
+	_playTimeMSecs = ((hours * 60 + minutes) * 60) * 1000;
 	_playTime = Common::String::format("%.2d:%.2d", hours, minutes);
 }
 
 void SaveStateDescriptor::setPlayTime(uint32 msecs) {
+	_playTimeMSecs = msecs;
 	uint minutes = msecs / 60000;
 	setPlayTime(minutes / 60, minutes % 60);
+}
+
+void SaveStateDescriptor::setAutosave(bool autosave) {
+	_saveType = autosave ? kSaveTypeAutosave : kSaveTypeRegular;
+}
+
+bool SaveStateDescriptor::isAutosave() const {
+	return hasAutosaveName() || _saveType == kSaveTypeAutosave;
+}
+
+bool SaveStateDescriptor::hasAutosaveName() const
+{
+	const Common::U32String &autosave = _("Autosave");
+
+	// if the save file name is long enough, just check if it starts with "Autosave"
+	if (_description.size() >= autosave.size())
+		return _description.substr(0, autosave.size()) == autosave;
+
+	// if the save name has been trimmed, as long as it isn't too short, use fallback logic
+	if (_description.size() < 14)
+		return false;
+	return autosave.substr(0, _description.size()) == _description;
+}
+
+bool SaveStateDescriptor::isValid() const
+{
+	return _slot >= 0 && !_description.empty();
 }

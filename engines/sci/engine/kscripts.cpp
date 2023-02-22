@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,13 +15,12 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "sci/sci.h"
-#include "sci/resource.h"
+#include "sci/resource/resource.h"
 #include "sci/engine/seg_manager.h"
 #include "sci/engine/script.h"
 #include "sci/engine/state.h"
@@ -155,6 +154,16 @@ reg_t kResCheck(EngineState *s, int argc, reg_t *argv) {
 	}
 
 #ifdef ENABLE_SCI32
+	// At least LSL6-Hires explicitly treats wave and audio resources the same
+	// in its check routine. This was removed in later interpreters. It may be
+	// in others, but LSL6 is the only game known to have scripts that rely on
+	// this behavior for anything except except kLoad/kUnload calls. Bug #13549
+	if (g_sci->getGameId() == GID_LSL6HIRES) {
+		if (restype == kResourceTypeWave && res == nullptr) {
+			res = g_sci->getResMan()->testResource(ResourceId(kResourceTypeAudio, argv[1].toUint16()));
+		}
+	}
+
 	// GK2 stores some VMDs inside of resource volumes, but usually videos are
 	// streamed from the filesystem.
 	if (res == nullptr) {
@@ -282,22 +291,12 @@ reg_t kScriptID(EngineState *s, int argc, reg_t *argv) {
 		return NULL_REG;
 	}
 
+	// WORKAROUND: Avoid referencing invalid export 0 in script 601 (Snakes & Ladders) in Hoyle 3 Amiga
+	if (g_sci->getGameId() == GID_HOYLE3 && g_sci->getPlatform() == Common::kPlatformAmiga && script == 601 && argc == 1)
+		return NULL_REG;
+
 	const uint32 address = scr->validateExportFunc(index, true) + scr->getHeapOffset();
-
-	// Bugfix for the intro speed in PQ2 version 1.002.011.
-	// This is taken from the patch by NewRisingSun(NRS) / Belzorash. Global 3
-	// is used for timing during the intro, and in the problematic version it's
-	// initialized to 0, whereas it's 6 in other versions. Thus, we assign it
-	// to 6 here, fixing the speed of the introduction. Refer to bug #3102071.
-	if (g_sci->getGameId() == GID_PQ2 && script == 200 &&
-		s->variables[VAR_GLOBAL][kGlobalVarSpeed].isNull()) {
-		s->variables[VAR_GLOBAL][kGlobalVarSpeed] = make_reg(0, 6);
-	}
-
-	reg_t addr;
-	addr.setSegment(scriptSeg);
-	addr.setOffset(address);
-	return addr;
+	return make_reg32(scriptSeg, address);
 }
 
 reg_t kDisposeScript(EngineState *s, int argc, reg_t *argv) {
@@ -330,7 +329,7 @@ reg_t kRespondsTo(EngineState *s, int argc, reg_t *argv) {
 	reg_t obj = argv[0];
 	int selector = argv[1].toUint16();
 
-	return make_reg(0, s->_segMan->isHeapObject(obj) && lookupSelector(s->_segMan, obj, selector, NULL, NULL) != kSelectorNone);
+	return make_reg(0, s->_segMan->isHeapObject(obj) && lookupSelector(s->_segMan, obj, selector, nullptr, nullptr) != kSelectorNone);
 }
 
 } // End of namespace Sci

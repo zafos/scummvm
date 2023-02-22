@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,8 +26,6 @@
 
 namespace Titanic {
 
-const double Rad2Deg = 180.0 / M_PI;
-const double Deg2Rad = 1.0 / Rad2Deg;
 enum Axis { X_AXIS, Y_AXIS, Z_AXIS };
 
 class FPose;
@@ -71,18 +68,19 @@ public:
 	 * Attempts to normalizes the vector so the length from origin equals 1.0
 	 * Return value is whether or not it was successful in normalizing
 	 * First argument is scale value that normalizes the vector
-	 * TODO: split this function into 2. One that calculates the normalization
-	 * and another that does the normalization. The 2nd would assert if a
-	 * normalization of one was requested. This is cleaner than the current
-	 * implementation.
 	 */
-	bool normalize(float &);
+	bool normalize(float &hyp);
+
+	void normalize() {
+		float hyp;
+		bool result = normalize(hyp);
+		assert(result);
+	}
 
 	/**
-	 * Adds the current vector and a passed one together, normalizes them,
-	 * and then returns the resulting vector
+	 * Calculates a vector halfway between two given vectors
 	 */
-	FVector addAndNormalize(const FVector &v) const;
+	FVector half(const FVector &v) const;
 
 	/**
 	 * Returns a vector, v, that represents a magnitude, and two angles in radians
@@ -90,7 +88,7 @@ public:
 	 * 2. X rotation angle from +y axis of this vector is put in y component of v
 	 * 3. z component output of v is the 4-quadrant angle that z makes with x (Y axis rotation)
 	 */
-	FVector getAnglesAsVect() const;
+	FVector getPolarCoord() const;
 
 	/**
 	 * Returns the distance between a specified point and this one
@@ -104,7 +102,7 @@ public:
 	FVector matProdRowVect(const FPose &pose) const;
 
 	/**
-	 * Returns a matrix that contains the frame rotation based on this vector and 
+	 * Returns a matrix that contains the frame rotation based on this vector and
 	 * a vector rotation based on input vector v
 	 */
 	FPose getFrameTransform(const FVector &v);
@@ -143,7 +141,7 @@ public:
 
 	const FVector operator*(const FVector &right) const {
 		return FVector(_x * right._x, _y * right._y, _z * right._z);
-	}	
+	}
 
 	void operator+=(const FVector &delta) {
 		_x += delta._x;

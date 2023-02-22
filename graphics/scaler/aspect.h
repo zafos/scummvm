@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,32 +42,22 @@ FORCEINLINE int aspect2Real(int y) {
 /**
  * TODO: explain
  */
-void makeRectStretchable(int &x, int &y, int &w, int &h);
+void makeRectStretchable(int &x, int &y, int &w, int &h, bool interpolate);
 
 /**
  * TODO: explain
  */
+
 int stretch200To240(uint8 *buf,
-                    uint32 pitch,
-                    int width,
-                    int height,
-                    int srcX,
-                    int srcY,
-                    int origSrcY);
+					uint32 pitch,
+					int width,
+					int height,
+					int srcX,
+					int srcY,
+					int origSrcY,
+					bool interpolate,
+					const Graphics::PixelFormat &format);
 
-
-/**
- * This filter (up)scales the source image vertically by a factor of 6/5.
- * For example, a 320x200 image is scaled to 320x240.
- *
- * The main difference to the code in graphics/scaler/aspect.cpp is the
- * out-of-place operation, omitting a straight blit step the sdl backend
- * does. Also, tests show unaligned access errors with the stock aspect scaler.
- */
-DECLARE_SCALER(Normal1xAspect);
-
-#ifdef USE_ARM_SCALER_ASM
-DECLARE_SCALER(Normal2xAspect);
-#endif
+int stretch200To240Nearest(uint8 *buf, uint32 pitch, int width, int height, int srcX, int srcY, int origSrcY, const Graphics::PixelFormat &format);
 
 #endif

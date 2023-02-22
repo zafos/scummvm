@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,7 +39,7 @@ Player_V1::Player_V1(ScummEngine *scumm, Audio::Mixer *mixer, bool pcjr)
 		clear_channel(i);
 
 	_mplex_step = (_sampleRate << FIXP_SHIFT) / 1193000;
-	_next_chunk = _repeat_chunk = 0;
+	_next_chunk = _repeat_chunk = nullptr;
 	_forced_level = 0;
 	_random_lsr = 0;
 }
@@ -93,9 +92,9 @@ void Player_V1::stopAllSounds() {
 
 	for (int i = 0; i < 4; i++)
 		clear_channel(i);
-	_repeat_chunk = _next_chunk = 0;
+	_repeat_chunk = _next_chunk = nullptr;
 	_next_nr = _current_nr = 0;
-	_next_data = _current_data = 0;
+	_next_data = _current_data = nullptr;
 }
 
 void Player_V1::stopSound(int nr) {
@@ -103,15 +102,15 @@ void Player_V1::stopSound(int nr) {
 
 	if (_next_nr == nr) {
 		_next_nr = 0;
-		_next_data = 0;
+		_next_data = nullptr;
 	}
 	if (_current_nr == nr) {
 		for (int i = 0; i < 4; i++) {
 			clear_channel(i);
 		}
-		_repeat_chunk = _next_chunk = 0;
+		_repeat_chunk = _next_chunk = nullptr;
 		_current_nr = 0;
-		_current_data = 0;
+		_current_data = nullptr;
 		chainNextSound();
 	}
 }
@@ -139,9 +138,9 @@ void Player_V1::parseSpeakerChunk() {
 	switch (_chunk_type) {
 	case 0xffff:
 		_current_nr = 0;
-		_current_data = 0;
+		_current_data = nullptr;
 		_channels[0].freq = 0;
-		_next_chunk = 0;
+		_next_chunk = nullptr;
 		chainNextSound();
 		break;
 	case 0xfffe:
@@ -192,6 +191,8 @@ void Player_V1::parseSpeakerChunk() {
 		debug(6, "chunk 3: %d -> %d step %d",
 				_start, _end, _delta);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -239,6 +240,7 @@ void Player_V1::nextSpeakerCmd() {
 		set_mplex(_start);
 		_forced_level = -_forced_level;
 		break;
+
 	case 3:
 		_start = (_start + _delta) & 0xffff;
 		if (_start == _end) {
@@ -250,6 +252,9 @@ void Player_V1::nextSpeakerCmd() {
 		_random_lsr = lsr;
 		set_mplex((_start & lsr) | 0x180);
 		_forced_level = -_forced_level;
+		break;
+
+	default:
 		break;
 	}
 }
@@ -273,8 +278,8 @@ parse_again:
 		for (i = 0; i < 4; ++i)
 			clear_channel(i);
 		_current_nr = 0;
-		_current_data = 0;
-		_repeat_chunk = _next_chunk = 0;
+		_current_data = nullptr;
+		_repeat_chunk = _next_chunk = nullptr;
 		chainNextSound();
 		break;
 
@@ -297,7 +302,7 @@ parse_again:
 			tmp = READ_LE_UINT16(_next_chunk);
 			_next_chunk += 2;
 			if (tmp == 0xffff) {
-				_channels[i].cmd_ptr = 0;
+				_channels[i].cmd_ptr = nullptr;
 				continue;
 			}
 			_channels[i].attack    = READ_LE_UINT16(_current_data + tmp);
@@ -314,7 +319,7 @@ parse_again:
 	case 1:
 		set_mplex(READ_LE_UINT16(_next_chunk));
 		tmp = READ_LE_UINT16(_next_chunk + 2);
-		_channels[0].cmd_ptr = tmp != 0xffff ? _current_data + tmp : NULL;
+		_channels[0].cmd_ptr = tmp != 0xffff ? _current_data + tmp : nullptr;
 		tmp = READ_LE_UINT16(_next_chunk + 4);
 		_start = READ_LE_UINT16(_next_chunk + 6);
 		_delta = (int16) READ_LE_UINT16(_next_chunk + 8);
@@ -365,6 +370,7 @@ parse_again:
 		debug(6, "chunk 2: %d -> %d step %d",
 			  _start, _end, _delta);
 		break;
+
 	case 3:
 		set_mplex(READ_LE_UINT16(_next_chunk));
 		tmp = READ_LE_UINT16(_next_chunk + 2);
@@ -378,6 +384,9 @@ parse_again:
 		_repeat_ctr = READ_LE_UINT16(_next_chunk + 6);
 		_delta = (int16) READ_LE_UINT16(_next_chunk + 8);
 		_next_chunk += 10;
+		break;
+
+	default:
 		break;
 	}
 }
@@ -416,7 +425,7 @@ void Player_V1::nextPCjrCmd() {
 			switch (_channels[i].hull_counter) {
 			case 1:
 				_channels[i].volume -= _channels[i].attack;
-				if ((int) _channels[i].volume <= 0) {
+				if ((int)_channels[i].volume <= 0) {
 					_channels[i].volume = 0;
 					_channels[i].hull_counter++;
 				}
@@ -432,11 +441,13 @@ void Player_V1::nextPCjrCmd() {
 				if (--_channels[i].sustctr < 0) {
 					_channels[i].sustctr = _channels[i].sustain_2;
 					_channels[i].volume += _channels[i].sustain_1;
-					if ((int) _channels[i].volume >= 15) {
+					if ((int)_channels[i].volume >= 15) {
 						_channels[i].volume = 15;
 						_channels[i].hull_counter++;
 					}
 				}
+				break;
+			default:
 				break;
 			}
 		}
@@ -485,6 +496,7 @@ void Player_V1::nextPCjrCmd() {
 		debug(7, "chunk 2: mplex %d  curve %d", _start, _forced_level);
 		_forced_level = -_forced_level;
 		break;
+
 	case 3:
 		dummy = _channels[3].volume + _delta;
 		if (dummy >= 15) {
@@ -502,6 +514,9 @@ void Player_V1::nextPCjrCmd() {
 		}
 		_delta = READ_LE_UINT16(_next_chunk);
 		_next_chunk += 2;
+		break;
+
+	default:
 		break;
 	}
 }

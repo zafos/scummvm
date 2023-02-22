@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,9 +40,9 @@ public:
 	int _buttonIndex;
 
 	RightClickButton(int buttonIndex, int xp, int yp);
-	~RightClickButton() { delete _savedButton; }
+	~RightClickButton() override { delete _savedButton; }
 
-	virtual void highlight();
+	void highlight() override;
 };
 
 class RightClickDialog : public GfxDialog {
@@ -56,10 +55,10 @@ private:
 	RightClickButton *findButton(const Common::Point &pt);
 public:
 	RightClickDialog();
-	~RightClickDialog();
+	~RightClickDialog() override;
 
-	virtual void draw();
-	virtual bool process(Event &event);
+	void draw() override;
+	bool process(Event &event) override;
 	void execute();
 };
 
@@ -71,7 +70,7 @@ private:
 	GfxMessage _gfxMessage;
 public:
 	OptionsDialog();
-	virtual ~OptionsDialog() {}
+	~OptionsDialog() override {}
 	GfxButton *execute() { return GfxDialog::execute(&_btnResume); }
 
 	static void show();
@@ -85,7 +84,7 @@ public:
 public:
 	GfxInvImage() : GfxImage(), _invObject(NULL) {}
 
-	virtual bool process(Event &event);
+	bool process(Event &event) override;
 };
 
 #define MAX_INVOBJECT_DISPLAY 20
@@ -96,7 +95,7 @@ private:
 	GfxButton _btnOk, _btnLook;
 public:
 	InventoryDialog();
-	virtual ~InventoryDialog();
+	~InventoryDialog() override;
 	void execute();
 
 	static void show();

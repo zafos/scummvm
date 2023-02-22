@@ -3,16 +3,18 @@ MODULE := engines/testbed
 MODULE_OBJS := \
 	config.o \
 	config-params.o \
-	detection.o \
 	events.o \
 	fs.o \
 	graphics.o \
+	metaengine.o \
 	midi.o \
 	misc.o \
+	networking.o \
 	savegame.o \
 	sound.o \
 	testbed.o \
-	testsuite.o
+	testsuite.o \
+	video.o
 
 ifdef USE_CLOUD
 ifdef USE_LIBCURL
@@ -26,6 +28,11 @@ MODULE_OBJS += \
 	webserver.o
 endif
 
+ifdef USE_TTS
+MODULE_OBJS += \
+	speech.o
+endif
+
 MODULE_DIRS += \
 	engines/testbed
 
@@ -36,3 +43,6 @@ endif
 
 # Include common rules
 include $(srcdir)/rules.mk
+
+# Detection objects
+DETECT_OBJS += $(MODULE)/detection.o

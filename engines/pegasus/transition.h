@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995-1997 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -37,12 +36,12 @@ namespace Pegasus {
 class ScreenFader : public Fader {
 public:
 	ScreenFader();
-	virtual ~ScreenFader();
+	~ScreenFader() override;
 
 	void doFadeOutSync(const TimeValue = kOneSecondPerThirtyTicks, const TimeScale = kThirtyTicksPerSecond, bool isBlack = true);
 	void doFadeInSync(const TimeValue = kHalfSecondPerThirtyTicks, const TimeScale = kThirtyTicksPerSecond, bool isBlack = true);
 
-	void setFaderValue(const int32);
+	void setFaderValue(const int32) override;
 
 private:
 	bool _isBlack;
@@ -61,9 +60,9 @@ static const int kTransitionRange = kTransitionTop - kTransitionBottom;
 class Transition : public FaderAnimation {
 public:
 	Transition(const DisplayElementID id);
-	virtual ~Transition() {}
+	~Transition() override {}
 
-	virtual void setBounds(const Common::Rect &);
+	void setBounds(const Common::Rect &) override;
 
 	virtual void setInAndOutElements(DisplayElement *, DisplayElement *);
 	DisplayElement *getInElement() { return _inPicture; }
@@ -79,10 +78,10 @@ protected:
 class Slide : public Transition {
 public:
 	Slide(const DisplayElementID id) : Transition(id) {}
-	virtual ~Slide() {}
+	~Slide() override {}
 
 	virtual void setSlideDirection(SlideDirection dir) { _direction = dir; }
-	virtual void draw(const Common::Rect &);
+	void draw(const Common::Rect &) override;
 
 	virtual void setDirection(const SlideDirection dir) { _direction = dir; }
 
@@ -97,10 +96,10 @@ protected:
 class Push : public Slide {
 public:
 	Push(const DisplayElementID id) : Slide(id) {}
-	virtual ~Push() {}
+	~Push() override {}
 
 protected:
-	virtual void adjustSlideRects(Common::Rect &, Common::Rect &);
+	void adjustSlideRects(Common::Rect &, Common::Rect &) override;
 };
 
 } // End of namespace Pegasus

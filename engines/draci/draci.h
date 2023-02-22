@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -56,24 +55,23 @@ class SoundArchive;
 class DraciEngine : public Engine {
 public:
 	DraciEngine(OSystem *syst, const ADGameDescription *gameDesc);
-	virtual ~DraciEngine();
+	~DraciEngine() override;
 
 	int init();
-	virtual Common::Error run();
+	Common::Error run() override;
 
-	virtual bool hasFeature(Engine::EngineFeature f) const;
-	virtual void pauseEngineIntern(bool pause);
-	virtual void syncSoundSettings();
+	bool hasFeature(Engine::EngineFeature f) const override;
+	void pauseEngineIntern(bool pause) override;
+	void syncSoundSettings() override;
 
 	void handleEvents();
 
 	static Common::String getSavegameFile(int saveGameIdx);
-	virtual Common::Error loadGameState(int slot);
-	virtual bool canLoadGameStateCurrently();
-	virtual Common::Error saveGameState(int slot, const Common::String &desc);
-	virtual bool canSaveGameStateCurrently();
-
-	GUI::Debugger *getDebugger() { return _console; }
+	Common::String getSaveStateName(int slot) const override { return getSavegameFile(slot); }
+	Common::Error loadGameState(int slot) override;
+	bool canLoadGameStateCurrently() override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	bool canSaveGameStateCurrently() override;
 
 	Screen *_screen;
 	Mouse *_mouse;
@@ -107,8 +105,6 @@ public:
 	Common::RandomSource _rnd;
 
 	int32 _pauseStartTime;
-private:
-	DraciConsole *_console;
 };
 
 enum {
@@ -120,9 +116,6 @@ enum {
 	kDraciSoundDebugLevel     = 1 << 5,
 	kDraciWalkingDebugLevel   = 1 << 6
 };
-
-// Macro to simulate lround() for non-C99 compilers
-static inline long scummvm_lround(double val) { return (long)floor(val + 0.5); }
 
 } // End of namespace Draci
 

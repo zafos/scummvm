@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -29,6 +28,7 @@
 
 #include "avalanche/avalanche.h"
 
+#include "common/math.h"
 #include "common/random.h"
 #include "common/system.h"
 #include "common/config-manager.h"
@@ -483,6 +483,8 @@ void AvalancheEngine::exitRoom(byte x) {
 	case kRoomRobins:
 		_timer->loseTimer(Timer::kReasonGettingTiedUp);
 		break;
+	default:
+		break;
 	}
 
 	_interrogation = 0; // Leaving the room cancels all the questions automatically.
@@ -737,8 +739,10 @@ void AvalancheEngine::enterRoom(Room roomId, byte ped) {
 
 	case kRoomCatacombs:
 		if ((ped == 0) || (ped == 3) || (ped == 5) || (ped == 6)) {
-
 			switch (ped) {
+			case 0:
+			default:
+				break;
 			case 3: // Enter from oubliette
 				_catacombX = 8;
 				_catacombY = 4;
@@ -1025,6 +1029,8 @@ void AvalancheEngine::useCompass(const Common::Point &cursorPos) {
 		_animation->stopWalking();
 		drawDirection();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1071,31 +1077,41 @@ void AvalancheEngine::guideAvvy(Common::Point cursorPos) {
 
 	switch (what) {
 	case 0:
+	default:
 		_animation->stopWalking();
+		_animation->setDirection(kDirStopped);
 		break; // Clicked on Avvy: no movement.
 	case 1:
 		_animation->setMoveSpeed(0, kDirLeft);
+		_animation->setDirection(kDirLeft);
 		break;
 	case 2:
 		_animation->setMoveSpeed(0, kDirRight);
+		_animation->setDirection(kDirRight);
 		break;
 	case 3:
 		_animation->setMoveSpeed(0, kDirUp);
+		_animation->setDirection(kDirUp);
 		break;
 	case 4:
 		_animation->setMoveSpeed(0, kDirUpLeft);
+		_animation->setDirection(kDirLeft);
 		break;
 	case 5:
 		_animation->setMoveSpeed(0, kDirUpRight);
+		_animation->setDirection(kDirUpRight);
 		break;
 	case 6:
 		_animation->setMoveSpeed(0, kDirDown);
+		_animation->setDirection(kDirDown);
 		break;
 	case 7:
 		_animation->setMoveSpeed(0, kDirDownLeft);
+		_animation->setDirection(kDirDownLeft);
 		break;
 	case 8:
 		_animation->setMoveSpeed(0, kDirDownRight);
+		_animation->setDirection(kDirDownRight);
 		break;
 	}    // No other values are possible.
 
@@ -1282,7 +1298,7 @@ void AvalancheEngine::gameOver() {
 void AvalancheEngine::minorRedraw() {
 	fadeOut();
 
-	enterRoom(_room, 0); // Ped unknown or non-existant.
+	enterRoom(_room, 0); // Ped unknown or non-existent.
 
 	for (int i = 0; i < 3; i++)
 		_scoreToDisplay[i] = -1; // impossible digits
@@ -1300,7 +1316,7 @@ uint16 AvalancheEngine::bearing(byte whichPed) {
 
 	int16 deltaX = avvy->_x - curPed->_x;
 	int16 deltaY = avvy->_y - curPed->_y;
-	uint16 result = (uint16)(atan((float)(deltaY / deltaX)) * 180 / M_PI);
+	uint16 result = Common::rad2deg<float,uint16>(atan((float)deltaY / (float)deltaX)); // TODO: Would atan2 be preferable?
 	if (avvy->_x < curPed->_x) {
 		return result + 90;
 	} else {
@@ -1523,6 +1539,8 @@ Common::String AvalancheEngine::getItem(byte which) {
 		case 3:
 			result = "some vinegar";
 			break;
+		default:
+			break;
 		}
 		break;
 	case kObjectOnion:
@@ -1538,6 +1556,7 @@ Common::String AvalancheEngine::getItem(byte which) {
 			result = Common::String(items[which - 1]);
 		else
 			result = "";
+		break;
 	}
 	return result;
 }
@@ -1659,6 +1678,8 @@ void AvalancheEngine::openDoor(Room whither, byte ped, byte magicnum) {
 			break;
 		case 12:
 			_sequence->startLustiesSeq3(whither, ped);
+			break;
+		default:
 			break;
 		}
 		break;

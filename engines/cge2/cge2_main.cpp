@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 /*
  * This code is based on original Sfinx source code
- * Copyright (c) 1994-1997 Janus B. Wisniewski and L.K. Avalon
+ * Copyright (c) 1994-1997 Janusz B. Wisniewski and L.K. Avalon
  */
 
 #include "sound.h"
@@ -170,10 +169,11 @@ Sprite *CGE2Engine::loadSprite(const char *fname, int ref, int scene, V3D &pos) 
 	ID id;
 
 	char tmpStr[kLineMax + 1];
+	STATIC_ASSERT(sizeof(tmpStr) >= kPathMax, mergeExt_expects_kPathMax_buffer);
 	mergeExt(tmpStr, fname, kSprExt);
 
 	if (_resman->exist(tmpStr)) { // sprite description file exist
-		EncryptedStream sprf(this, tmpStr);
+		EncryptedStream sprf(_resman, tmpStr);
 		if (sprf.err())
 			error("Bad SPR [%s]", tmpStr);
 
@@ -310,7 +310,7 @@ Sprite *CGE2Engine::loadSprite(const char *fname, int ref, int scene, V3D &pos) 
 }
 
 void CGE2Engine::loadScript(const char *fname, bool onlyToolbar) {
-	EncryptedStream scrf(this, fname);
+	EncryptedStream scrf(_resman, fname);
 
 	if (scrf.err())
 		return;
@@ -699,7 +699,7 @@ void CGE2Engine::loadPos() {
 		for (int cav = 0; cav < kSceneMax; cav++)
 			_heroTab[1]->_posTab[cav] = new V2D(this, 180, 10);
 
-		EncryptedStream file(this, "CGE.HXY");
+		EncryptedStream file(_resman, "CGE.HXY");
 
 		for (int cav = 0; cav < kSceneMax; cav++) {
 			_heroTab[0]->_posTab[cav] = new V2D(this);
@@ -721,7 +721,7 @@ void CGE2Engine::loadTab() {
 		*(_eyeTab[i]) = *_eye;
 
 	if  (_resman->exist(kTabName)) {
-		EncryptedStream f(this, kTabName);
+		EncryptedStream f(_resman, kTabName);
 
 		for (int i = 0; i < kSceneMax; i++) {
 			uint32 v = f.readUint32LE();
@@ -759,10 +759,10 @@ void CGE2Engine::cge2_main() {
 }
 
 char *CGE2Engine::mergeExt(char *buf, const char *name, const char *ext) {
-	strcpy(buf, name);
+	Common::strcpy_s(buf, kPathMax, name);
 	char *dot = strrchr(buf, '.');
 	if (!dot)
-		strcat(buf, ext);
+		Common::strcat_s(buf, kPathMax, ext);
 
 	return buf;
 }
@@ -778,8 +778,9 @@ void CGE2Engine::setEye(const V2D& e2, int z) {
 }
 
 void CGE2Engine::setEye(const char *s) {
-	char *tempStr = new char[strlen(s) + 1];
-	strcpy(tempStr, s);
+	size_t ln = strlen(s) + 1;
+	char *tempStr = new char[ln];
+	Common::strcpy_s(tempStr, ln, s);
 	_eye->_x = atoi(token(tempStr));
 	_eye->_y = atoi(token(nullptr));
 	_eye->_z = atoi(token(nullptr));

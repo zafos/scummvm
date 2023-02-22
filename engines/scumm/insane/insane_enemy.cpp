@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -50,6 +49,7 @@ int32 Insane::enemyInitializer(int num, int32 actor1, int32 actor2, int32 probab
 	case EN_TORQUE:
 		return enemy8initializer(actor1, actor2, probability);
 	case -1:
+	default:
 		// nothing
 		break;
 	}
@@ -81,6 +81,7 @@ int32 Insane::enemyHandler(int num, int32 actor1, int32 actor2, int32 probabilit
 	case EN_BEN:
 		return enemyBenHandler(actor1, actor2, probability);
 	case -1:
+	default:
 		// nothing
 		break;
 	}
@@ -175,6 +176,8 @@ int32 Insane::enemy0handler(int32 actor1, int32 actor2, int32 probability) {
 						prepareScenePropScene(52, 0, 0);
 					}
 					break;
+				default:
+					break;
 				}
 			} else {
 				switch (_vm->_rnd.getRandomNumber(14)) {
@@ -227,7 +230,7 @@ int32 Insane::enemy0handler(int32 actor1, int32 actor2, int32 probability) {
 		_actor[actor1].cursorX = -160;
 
 	// Shift+V cheat to win the battle
-	if (_vm->getKeyState('V') && !_beenCheated &&
+	if (_vm->getActionState(kScummActionInsaneCheat) && !_beenCheated &&
 		!_actor[0].lost && !_actor[1].lost) {
 		_beenCheated = 1;
 		_actor[1].damage = _actor[1].maxdamage + 10;
@@ -340,6 +343,8 @@ int32 Insane::enemy1handler(int32 actor1, int32 actor2, int32 probability) {
 						prepareScenePropScene(37, 0, 0);
 					}
 					break;
+				default:
+					break;
 				}
 			} else {
 				switch (_vm->_rnd.getRandomNumber(14)) {
@@ -375,7 +380,7 @@ int32 Insane::enemy1handler(int32 actor1, int32 actor2, int32 probability) {
 		_actor[actor1].cursorX = 0;
 
 	// Shift+V cheat to win the battle
-	if (_vm->getKeyState('V') && !_beenCheated &&
+	if (_vm->getActionState(kScummActionInsaneCheat) && !_beenCheated &&
 		!_actor[0].lost && !_actor[1].lost) {
 		_beenCheated = 1;
 		_actor[1].damage = _actor[1].maxdamage + 10;
@@ -493,6 +498,8 @@ int32 Insane::enemy2handler(int32 actor1, int32 actor2, int32 probability) {
 						prepareScenePropScene(27, 0, 0);
 					}
 					break;
+				default:
+					break;
 				}
 			} else {
 				if (_actor[actor1].kicking) {
@@ -525,7 +532,7 @@ int32 Insane::enemy2handler(int32 actor1, int32 actor2, int32 probability) {
 		_actor[actor1].cursorX = -160;
 
 	// Shift+V cheat to win the battle
-	if (_vm->getKeyState('V') && !_beenCheated &&
+	if (_vm->getActionState(kScummActionInsaneCheat) && !_beenCheated &&
 		!_actor[0].lost && !_actor[1].lost) {
 		_beenCheated = 1;
 		_actor[1].damage = _actor[1].maxdamage + 10;
@@ -664,6 +671,8 @@ int32 Insane::enemy3handler(int32 actor1, int32 actor2, int32 probability) {
 						prepareScenePropScene(8, 0, 0);
 					}
 					break;
+				default:
+					break;
 				}
 				_enHdlVar[EN_VULTF1][7] = _enHdlVar[EN_VULTF1][8];
 			}
@@ -684,7 +693,7 @@ int32 Insane::enemy3handler(int32 actor1, int32 actor2, int32 probability) {
 		_actor[actor1].cursorX = -160;
 
 	// Shift+V cheat to win the battle
-	if (_vm->getKeyState('V') && !_beenCheated &&
+	if (_vm->getActionState(kScummActionInsaneCheat) && !_beenCheated &&
 		!_actor[0].lost && !_actor[1].lost) {
 		_beenCheated = 1;
 		_actor[1].damage = _actor[1].maxdamage + 10;
@@ -796,6 +805,8 @@ int32 Insane::enemy4handler(int32 actor1, int32 actor2, int32 probability) {
 						prepareScenePropScene(47, 0, 0);
 					}
 					break;
+				default:
+					break;
 				}
 			} else {
 				if (_actor[actor1].kicking) {
@@ -805,6 +816,8 @@ int32 Insane::enemy4handler(int32 actor1, int32 actor2, int32 probability) {
 						break;
 					case 9: // Original is 10 here which never happens
 						prepareScenePropScene(45, 0, 0);
+						break;
+					default:
 						break;
 					}
 				} else {
@@ -822,6 +835,8 @@ int32 Insane::enemy4handler(int32 actor1, int32 actor2, int32 probability) {
 								prepareScenePropScene(43, 0, 0);
 							}
 							break;
+						default:
+							break;
 						}
 					} else {
 						switch (_vm->_rnd.getRandomNumber(14)) {
@@ -836,6 +851,8 @@ int32 Insane::enemy4handler(int32 actor1, int32 actor2, int32 probability) {
 								_enemyState[EN_VULTM1][1] = 1;
 								prepareScenePropScene(40, 0, 0);
 							}
+							break;
+						default:
 							break;
 						}
 					}
@@ -855,7 +872,7 @@ int32 Insane::enemy4handler(int32 actor1, int32 actor2, int32 probability) {
 		_actor[actor1].cursorX = -160;
 
 	// Shift+V cheat to win the battle
-	if (_vm->getKeyState('V') && !_beenCheated &&
+	if (_vm->getActionState(kScummActionInsaneCheat) && !_beenCheated &&
 		!_actor[0].lost && !_actor[1].lost) {
 		_beenCheated = 1;
 		_actor[1].damage = _actor[1].maxdamage + 10;
@@ -937,6 +954,8 @@ int32 Insane::enemy5handler(int32 actor1, int32 actor2, int32 probability) {
 						prepareScenePropScene(12, 0, 0);
 					}
 					break;
+				default:
+					break;
 				}
 			else {
 				if (_actor[actor1].kicking) {
@@ -955,6 +974,8 @@ int32 Insane::enemy5handler(int32 actor1, int32 actor2, int32 probability) {
 						_enemyState[EN_VULTF2][1] = 1;
 						prepareScenePropScene(10, 0, 0);
 						break;
+					default:
+						break;
 					}
 				} else {
 					switch (_vm->_rnd.getRandomNumber(14)) {
@@ -969,6 +990,8 @@ int32 Insane::enemy5handler(int32 actor1, int32 actor2, int32 probability) {
 							_enemyState[EN_VULTF2][5] = 1;
 							prepareScenePropScene(14, 0, 0);
 						}
+						break;
+					default:
 						break;
 					}
 				}
@@ -992,7 +1015,7 @@ int32 Insane::enemy5handler(int32 actor1, int32 actor2, int32 probability) {
 	_enHdlVar[EN_VULTF2][0]++;
 
 	// Shift+V cheat to win the battle
-	if (_vm->getKeyState('V') && !_beenCheated &&
+	if (_vm->getActionState(kScummActionInsaneCheat) && !_beenCheated &&
 		!_actor[0].lost && !_actor[1].lost) {
 		_beenCheated = 1;
 		_actor[1].damage = _actor[1].maxdamage + 10;
@@ -1062,6 +1085,8 @@ int32 Insane::enemy6handler(int32 actor1, int32 actor2, int32 probability) {
 							prepareScenePropScene(22, 0, 0);
 						}
 						break;
+					default:
+						break;
 					}
 					_enHdlVar[EN_VULTM2][1] = 1;
 					goto _label1;
@@ -1101,6 +1126,8 @@ int32 Insane::enemy6handler(int32 actor1, int32 actor2, int32 probability) {
 					prepareScenePropScene(24, 0, 0);
 				}
 				break;
+			default:
+				break;
 			}
 		}
 	}
@@ -1121,7 +1148,7 @@ int32 Insane::enemy6handler(int32 actor1, int32 actor2, int32 probability) {
 	_enHdlVar[EN_VULTM2][0]++;
 
 	// Shift+V cheat to win the battle
-	if (_vm->getKeyState('V') && !_beenCheated &&
+	if (_vm->getActionState(kScummActionInsaneCheat) && !_beenCheated &&
 		!_actor[0].lost && !_actor[1].lost) {
 		_beenCheated = 1;
 		_actor[0].act[2].state = 97;
@@ -1208,7 +1235,7 @@ int32 Insane::enemy7handler(int32 actor1, int32 actor2, int32 probability) {
 	_enHdlVar[EN_CAVEFISH][0] = act1damage;
 
 	// Shift+V cheat to win the battle
-	if (_vm->getKeyState('V') && !_beenCheated &&
+	if (_vm->getActionState(kScummActionInsaneCheat) && !_beenCheated &&
 		!_actor[0].lost && !_actor[1].lost) {
 		_beenCheated = 1;
 		_actor[1].damage = _actor[1].maxdamage + 10;
@@ -1288,6 +1315,9 @@ void Insane::ouchSoundEnemy() {
 		} else {
 			smlayer_startVoice(245);
 		}
+		break;
+	case EN_ROTT3:
+		smlayer_startVoice(230);
 		break;
 	case EN_VULTM2:
 		smlayer_startVoice(180);
@@ -1450,6 +1480,8 @@ void Insane::actor11Reaction(int32 buttons) {
 
 		_actor[1].x += _actor[1].cursorX / 32;
 		break;
+	default:
+		break;
 	}
 
 	tmpx = _actor[1].x;
@@ -1607,6 +1639,9 @@ void Insane::setEnemyState() {
 	case INV_DUST:
 		_actor[1].weaponClass = 2;
 		_actor[1].act[2].state = 1;
+		break;
+	default:
+		break;
 	}
 }
 
@@ -1753,6 +1788,8 @@ void Insane::actor12Reaction(int32 buttons) {
 			case INV_HAND:
 				if (calcBenDamage(1, 0))
 					smlayer_startSfx(73);
+				break;
+			default:
 				break;
 			}
 			smlayer_setActorFacing(1, 2, 21, 180);
@@ -2104,6 +2141,8 @@ void Insane::actor12Reaction(int32 buttons) {
 				break;
 			case EN_VULTF2:
 				smlayer_startVoice(276);
+				break;
+			default:
 				break;
 			}
 		}
@@ -2549,6 +2588,9 @@ void Insane::actor12Reaction(int32 buttons) {
 	}
 	tmp = _actor[1].x + _actor[1].act[2].tilt - 17;
 	tmp2 = _actor[1].y + _actor[1].y1 - 98;
+
+	if (_actor[1].lost && (_vm->_game.features & GF_DEMO))
+		tmp2 += 98;
 
 	if (_actor[1].act[2].room)
 		smlayer_putActor(1, 2, tmp, tmp2, _smlayer_room2);

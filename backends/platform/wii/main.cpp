@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -33,6 +32,7 @@
 #include "backends/plugins/wii/wii-provider.h"
 
 #include <ogc/machine/processor.h>
+#include <ogc/libversion.h>
 #include <fat.h>
 #ifndef GAMECUBE
 #include <wiiuse/wpad.h>
@@ -52,7 +52,13 @@ extern "C" {
 bool reset_btn_pressed = false;
 bool power_btn_pressed = false;
 
+#if ((_V_MAJOR_ > 1) || \
+		(_V_MAJOR_ == 1 && _V_MINOR_ > 8 ) || \
+		(_V_MAJOR_ == 1 && _V_MINOR_ == 8 && _V_PATCH_ >= 18))
+void reset_cb(u32, void *) {
+#else
 void reset_cb(void) {
+#endif
 #ifdef DEBUG_WII_GDB
 	printf("attach gdb now\n");
 	_break();
@@ -223,6 +229,9 @@ int main(int argc, char *argv[]) {
 	res = scummvm_main(argc, argv);
 	g_system->quit();
 
+	g_system->destroy();
+	g_system = nullptr;
+
 	printf("shutdown\n");
 
 	SYS_UnregisterResetFunc(&resetinfo);
@@ -242,6 +251,8 @@ int main(int argc, char *argv[]) {
 	gfx_con_deinit();
 	gfx_deinit();
 	gfx_video_deinit();
+
+	SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
 
 	return res;
 }

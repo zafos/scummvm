@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,7 +39,7 @@ namespace Cine {
 uint16 compareVars(int16 a, int16 b);
 
 
-const Opcode *FWScript::_opcodeTable = 0;
+const Opcode *FWScript::_opcodeTable = nullptr;
 unsigned int FWScript::_numOpcodes = 0;
 
 void FWScript::setupTable() {
@@ -66,9 +65,9 @@ void FWScript::setupTable() {
 		{ &FWScript::o1_compareVar, "bc" },
 		{ &FWScript::o1_modifyObjectParam2, "bbb" },
 		/* 10 */
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_loadMask0, "b" },
 		/* 14 */
 		{ &FWScript::o1_unloadMask0, "b" },
@@ -79,9 +78,9 @@ void FWScript::setupTable() {
 		{ &FWScript::o1_loadMask4, "b" },
 		{ &FWScript::o1_unloadMask4, "b" },
 		{ &FWScript::o1_addSpriteFilledToBgList, "b" },
-		{ &FWScript::o1_op1B, "" },
+		{ &FWScript::o1_clearBgIncrustList, "" },
 		/* 1C */
-		{ 0, 0 },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_label, "l" },
 		{ &FWScript::o1_goto, "b" },
 		{ &FWScript::o1_gotoIfSup, "b" },
@@ -94,56 +93,56 @@ void FWScript::setupTable() {
 		{ &FWScript::o1_gotoIfDiff, "b" },
 		{ &FWScript::o1_removeLabel, "b" },
 		{ &FWScript::o1_loop, "bb" },
-		{ 0, 0 },
+		{ nullptr, nullptr },
 		/* 28 */
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
 		/* 2C */
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
 		/* 30 */
-		{ 0, 0 },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_startGlobalScript, "b" },
 		{ &FWScript::o1_endGlobalScript, "b" },
-		{ 0, 0 },
+		{ nullptr, nullptr },
 		/* 34 */
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
 		/* 38 */
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_loadAnim, "s" },
 		/* 3C */
 		{ &FWScript::o1_loadBg, "s" },
 		{ &FWScript::o1_loadCt, "s" },
-		{ 0, 0 },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_loadPart, "s" },
 		/* 40 */
 		{ &FWScript::o1_closePart, "" },
 		{ &FWScript::o1_loadNewPrcName, "bs" },
 		{ &FWScript::o1_requestCheckPendingDataLoad, "" },
-		{ 0, 0 },
+		{ nullptr, nullptr },
 		/* 44 */
-		{ 0, 0 },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_blitAndFade, "" },
 		{ &FWScript::o1_fadeToBlack, "" },
 		{ &FWScript::o1_transformPaletteRange, "bbwww" },
 		/* 48 */
-		{ 0, 0 },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_setDefaultMenuBgColor, "b" },
 		{ &FWScript::o1_palRotate, "bbb" },
-		{ 0, 0 },
+		{ nullptr, nullptr },
 		/* 4C */
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_break, "" },
 		/* 50 */
 		{ &FWScript::o1_endScript, "x" },
@@ -151,24 +150,24 @@ void FWScript::setupTable() {
 		{ &FWScript::o1_loadGlobalVar, "bc" },
 		{ &FWScript::o1_compareGlobalVar, "bc" },
 		/* 54 */
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
 		/* 58 */
-		{ 0, 0 },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_declareFunctionName, "s" },
 		{ &FWScript::o1_freePartRange, "bb" },
 		{ &FWScript::o1_unloadAllMasks, "" },
 		/* 5C */
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
 		/* 60 */
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_setScreenDimensions, "wwww" },
 		/* 64 */
 		{ &FWScript::o1_displayBackground, "" },
@@ -181,7 +180,7 @@ void FWScript::setupTable() {
 		{ &FWScript::o1_disallowPlayerInput, "" },
 		{ &FWScript::o1_changeDataDisk, "b" },
 		/* 6C */
-		{ 0, 0 },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_loadMusic, "s" },
 		{ &FWScript::o1_playMusic, "" },
 		{ &FWScript::o1_fadeOutMusic, "" },
@@ -191,9 +190,9 @@ void FWScript::setupTable() {
 		{ &FWScript::o1_op72, "wbw" },
 		{ &FWScript::o1_op73, "wbw" },
 		/* 74 */
-		{ 0, 0 },
-		{ 0, 0 },
-		{ 0, 0 },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
+		{ nullptr, nullptr },
 		{ &FWScript::o1_playSample, "bbwbww" },
 		/* 78 */
 		{ &FWScript::o1_playSampleSwapped, "bbwbww" },
@@ -206,20 +205,16 @@ void FWScript::setupTable() {
 	FWScript::_numOpcodes = ARRAYSIZE(opcodeTable);
 }
 
-FWScriptInfo *scriptInfo; ///< Script factory
-
 /**
  * @todo replace with script subsystem
  */
-void setupOpcodes() {
-	static FWScriptInfo fw;
-	static OSScriptInfo os;
+FWScriptInfo *setupOpcodes() {
 	if (g_cine->getGameType() == Cine::GType_FW) {
 		FWScript::setupTable();
-		scriptInfo = &fw;
+		return new FWScriptInfo();
 	} else {
 		OSScript::setupTable();
-		scriptInfo = &os;
+		return new OSScriptInfo();
 	}
 }
 
@@ -362,7 +357,7 @@ void ScriptVars::reset() {
  * This constructor _MUST_ be followed by setdata() method call before the
  * instance can be used. It leaves the instance in partially invalid state.
  */
-RawScript::RawScript(uint16 s) : _size(s), _data(NULL),
+RawScript::RawScript(uint16 s) : _size(s), _data(nullptr),
 	_labels(SCRIPT_STACK_SIZE) { }
 
 /**
@@ -371,7 +366,7 @@ RawScript::RawScript(uint16 s) : _size(s), _data(NULL),
  * @param s Bytecode length
  */
 RawScript::RawScript(const FWScriptInfo &info, const byte *data, uint16 s) :
-	_size(s), _data(NULL), _labels(SCRIPT_STACK_SIZE) {
+	_size(s), _data(nullptr), _labels(SCRIPT_STACK_SIZE) {
 
 	setData(info, data);
 }
@@ -459,6 +454,8 @@ int RawScript::getNextLabel(const FWScriptInfo &info, int offset) const {
 				break;
 			case 'x': // exit script
 				return -pos - 1;
+			default:
+				break;
 			}
 		}
 	}
@@ -589,7 +586,7 @@ RawObjectScript::RawObjectScript(uint16 s, uint16 p1, uint16 p2, uint16 p3)
  * @param p3 Third object script parameter
  */
 RawObjectScript::RawObjectScript(const FWScriptInfo &info, const byte *data,
-                                 uint16 s, uint16 p1, uint16 p2, uint16 p3)
+								 uint16 s, uint16 p1, uint16 p2, uint16 p3)
 	: RawScript(info, data, s), _runCount(0), _param1(p1), _param2(p2), _param3(p3) {
 }
 
@@ -739,12 +736,12 @@ void FWScript::save(Common::OutSaveFile &fHandle) const {
  */
 const char *FWScriptInfo::opcodeInfo(byte opcode) const {
 	if (opcode == 0 || opcode > FWScript::_numOpcodes) {
-		return NULL;
+		return nullptr;
 	}
 
 	if (!FWScript::_opcodeTable[opcode - 1].args) {
 		warning("Undefined opcode 0x%02X in FWScriptInfo::opcodeInfo", opcode - 1);
-		return NULL;
+		return nullptr;
 	}
 
 	return FWScript::_opcodeTable[opcode - 1].args;
@@ -756,12 +753,12 @@ const char *FWScriptInfo::opcodeInfo(byte opcode) const {
  */
 OpFunc FWScriptInfo::opcodeHandler(byte opcode) const {
 	if (opcode == 0 || opcode > FWScript::_numOpcodes) {
-		return NULL;
+		return nullptr;
 	}
 
 	if (!FWScript::_opcodeTable[opcode - 1].proc) {
 		warning("Undefined opcode 0x%02X in FWScriptInfo::opcodeHandler", opcode - 1);
-		return NULL;
+		return nullptr;
 	}
 
 	return FWScript::_opcodeTable[opcode - 1].proc;
@@ -945,7 +942,7 @@ int FWScript::o1_loadVar() {
 			_localVars[varIdx] = _localVars[dataIdx];
 			break;
 		case 2:
-			debugC(5, kCineDebugScript, "Line: %d: var[%d] = globalVars[%d]", _line, varIdx, dataIdx);
+			debugC(5, kCineDebugScript, "Line: %d: var[%d] = globalVars[%d] (= %d)", _line, varIdx, dataIdx, _globalVars[dataIdx]);
 			_localVars[varIdx] = _globalVars[dataIdx];
 			break;
 		case 3:
@@ -1083,7 +1080,7 @@ int FWScript::o1_divVar() {
 int FWScript::o1_compareVar() {
 	// WORKAROUND: A workaround for a script bug in script file CODE2.PRC
 	// in at least some of the Amiga and Atari ST versions of Future Wars.
-	// Fixes bug #2016647 (FW: crash with italian amiga version). A local
+	// Fixes bug #3806 (FW: crash with italian amiga version). A local
 	// variable 251 is compared against value 0 although it's quite apparent
 	// from the context in the script that instead global variable 251 should
 	// be compared against value 0. So looks like someone made a typo when
@@ -1194,7 +1191,7 @@ int FWScript::o1_addSpriteFilledToBgList() {
 	return 0;
 }
 
-int FWScript::o1_op1B() {
+int FWScript::o1_clearBgIncrustList() {
 	debugC(5, kCineDebugScript, "Line: %d: freeBgIncrustList", _line);
 	g_cine->_bgIncrustList.clear();
 	return 0;
@@ -1347,6 +1344,7 @@ int FWScript::o1_startGlobalScript() {
 	}
 
 	addScriptToGlobalScripts(param);
+
 	return 0;
 }
 
@@ -1382,12 +1380,16 @@ int FWScript::o1_loadBg() {
 
 	if (g_cine->getGameType() == GType_FW && (g_cine->getFeatures() & GF_CD)) {
 		char buffer[20];
-		removeExtention(buffer, param);
+		removeExtention(buffer, param, sizeof(buffer));
 		g_sound->setBgMusic(atoi(buffer + 1));
 	}
 
 	loadBg(param);
-	g_cine->_bgIncrustList.clear();
+	if (g_cine->getGameType() == Cine::GType_OS) {
+		removeBgIncrustsWithBgIdx(0);
+	} else {
+		g_cine->_bgIncrustList.clear();
+	}
 	bgVar0 = 0;
 	return 0;
 }
@@ -1439,6 +1441,8 @@ int FWScript::o1_loadNewPrcName() {
 		debugC(5, kCineDebugScript, "Line: %d: loadMsg(\"%s\")", _line, param2);
 		Common::strlcpy(newMsgName, param2, sizeof(newMsgName));
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -1451,11 +1455,18 @@ int FWScript::o1_requestCheckPendingDataLoad() {
 
 int FWScript::o1_blitAndFade() {
 	debugC(5, kCineDebugScript, "Line: %d: request fadein", _line);
-	// TODO: use real code
 
-//	fadeFromBlack();
+	// HACK: This section is not present in disassembly
+	// but this is an attempt to prevent flashing a
+	// normally illuminated screen and then fading it in by
+	// setting the palette initially to black.
+	if (hacksEnabled) {
+		renderer->setBlackPalette(false); // Does not update _changePal
+		renderer->setPalette();
+		g_system->updateScreen();
+	}
 
-	renderer->reloadPalette();
+	gfxFadeInRequested = 1;
 	return 0;
 }
 
@@ -1507,7 +1518,7 @@ int FWScript::o1_palRotate() {
 int FWScript::o1_break() {
 	debugC(5, kCineDebugScript, "Line: %d: break", _line);
 
-	// WORKAROUND for bug #2669415 ("FW: half walking speed in a screen").
+	// WORKAROUND for bug #4213 ("FW: half walking speed in a screen").
 	// The problem was that in Amiga/Atari ST versions of Future Wars the
 	// walking speed has halved in a forest scene where a monk's robe hangs
 	// on a tree branch (Up and to the left from the medieval castle's front).
@@ -1529,13 +1540,48 @@ int FWScript::o1_break() {
 	// Thus the longer pause is eliminated by running only one BREAK when several
 	// are designated (i.e. ignoring a BREAK if there's another BREAK after it).
 	//
-	// TODO: Check whether the speed is halved in any other scenes in Amiga/Atari ST versions under ScummVM
 	// TODO: Check whether the speed is halved when running the original executable under an emulator
 	if (g_cine->getGameType() == Cine::GType_FW &&
 		(g_cine->getPlatform() == Common::kPlatformAmiga || g_cine->getPlatform() == Common::kPlatformAtariST) &&
-		_pos < _script._size && _script.getByte(_pos) == (0x4F + 1) && // Is the next opcode a BREAK too?
-		scumm_stricmp(currentPrcName, "PART02.PRC") == 0 &&
-		scumm_stricmp(renderer->getBgName(), "L11.PI1") == 0) {
+		_pos < _script._size && _script.getByte(_pos) == (0x4F + 1)) { // Is the next opcode a BREAK too?
+		// Determine whether to combine breaks into a single break based on
+		// current procedure's part number (e.g. "PART02.PRC" -> 2) and the
+		// current background's number (e.g. "L11.PI1" -> 11).
+		if ((Common::matchString(currentPrcName, "PART0#.PRC", true) || // e.g. "PART03.PRC"
+			Common::matchString(currentPrcName, "PART0#?.PRC", true)) && // e.g. "PART02C.PRC"
+			(Common::matchString(renderer->getBgName(), "L#.PI1", true) ||
+			Common::matchString(renderer->getBgName(), "L##.PI1", true))) {
+			const int partNum = (currentPrcName[5] - '0'); // The single digit after "PART0" prefix
+			if (partNum >= 2 && partNum <= 4) {
+				Common::String bgName(renderer->getBgName());
+				bgName.deleteChar(0); // Remove prefix "L"
+				bgName.erase(bgName.find('.'), Common::String::npos); // Remove suffix ".PI1"
+				const int bgNum = (int)bgName.asUint64(); // The rest is the background number
+
+				// Fall through by default on each case in this switch statement:
+				switch (bgNum) {
+				case 6: // Swamp with mosquitoes
+				case 9: // Inside the medieval tavern
+				//case 10: // The medieval castle's hall (Fix breaks scene)
+				case 11: // Tree with monks habit
+				case 14: // Room with stained glass windows in monastery (Door on left)
+				case 16: // Father superior's room in monastery (Door on right)
+				//case 18: // The medieval castle's teleport room (Fix breaks scene)
+				case 21: // Sewers in the future
+				case 25: // Bathroom at the metro station
+				case 27: // Cell in the future
+				case 35: // At door of Crughons' shuttle
+				//case 45: // Space station's computer room (Fix breaks scene)
+					return 0;
+				}
+			}
+		}
+	}
+
+	// Jump over breaks when running only until o1_freePartRange(0, 200) in AUTO00.PRC.
+	// This is used for making sound effects work with Roland MT-32 and AdLib
+	// when loading savegames.
+	if (runOnlyUntilFreePartRangeFirst200) {
 		return 0;
 	}
 
@@ -1608,7 +1654,7 @@ int FWScript::o1_compareGlobalVar() {
 
 		debugC(5, kCineDebugScript, "Line: %d: compare globalVars[%d] and %d", _line, varIdx, value);
 
-		// WORKAROUND for bug #2054882. Without this, the monks will always
+		// WORKAROUND for bug #3866. Without this, the monks will always
 		// kill you as an impostor, even if you enter the monastery in disguise.
 		//
 		// TODO: Check whether this might be worked around in some other way
@@ -1640,6 +1686,17 @@ int FWScript::o1_freePartRange() {
 
 	debugC(5, kCineDebugScript, "Line: %d: freePartRange(%d,%d)", _line, startIdx, numIdx);
 	freeAnimDataRange(startIdx, numIdx);
+
+	// Used for bailing out early from AUTO00.PRC before loading a savegame.
+	// Used for making sound effects work using Roland MT-32 and AdLib in
+	// Operation Stealth after loading a savegame. The sound effects are loaded
+	// in AUTO00.PRC using a combination of o2_loadAbs and o2_playSample(1, ...)
+	// before o1_freePartRange(0, 200).
+	if (runOnlyUntilFreePartRangeFirst200 && startIdx == 0 && numIdx == 200) {
+		runOnlyUntilFreePartRangeFirst200 = false;
+		return o1_endScript();
+	}
+
 	return 0;
 }
 
@@ -1681,10 +1738,18 @@ int FWScript::o1_initializeZoneData() {
 
 int FWScript::o1_setZoneDataEntry() {
 	byte zoneIdx = getNextByte();
-	uint16 var = getNextWord();
+	int16 var = getNextWord();
 
+	// HACK: Fix storage room's door animation on Dr. Why's island.
+	if (hacksEnabled && g_cine->getGameType() == Cine::GType_OS && zoneIdx == 2 && var == 8 &&
+		_script._size >= 10 && _script.getByte(9) == 0 &&
+		scumm_stricmp(_script.getString(0), "Z012_INIT") == 0 && _line == 34) {
+		return 0;
+	}
 	debugC(5, kCineDebugScript, "Line: %d: setZone[%d] = %d", _line, zoneIdx, var);
-	g_cine->_zoneData[zoneIdx] = var;
+	if (zoneIdx < NUM_MAX_ZONE) {
+		g_cine->_zoneData[zoneIdx] = var;
+	}
 	return 0;
 }
 
@@ -1693,6 +1758,7 @@ int FWScript::o1_getZoneDataEntry() {
 	byte var = getNextByte();
 
 	_localVars[var] = g_cine->_zoneData[zoneIdx];
+	debugC(5, kCineDebugScript, "Line: %d: SET localVars[%d] = zoneData[%d] (= %d)", _line, var, zoneIdx, g_cine->_zoneData[zoneIdx]);
 	return 0;
 }
 
@@ -1944,7 +2010,7 @@ int FWScript::o1_unloadMask5() {
 //-----------------------------------------------------------------------
 
 void addScriptToGlobalScripts(uint16 idx) {
-	ScriptPtr tmp(scriptInfo->create(*g_cine->_scriptTable[idx], idx));
+	ScriptPtr tmp(g_cine->_scriptInfo->create(*g_cine->_scriptTable[idx], idx));
 	assert(tmp);
 	g_cine->_globalScripts.push_back(tmp);
 }
@@ -1962,12 +2028,12 @@ int16 getZoneFromPosition(byte *page, int16 x, int16 y, int16 width) {
 	return zoneVar;
 }
 
-int16 getZoneFromPositionRaw(byte *page, int16 x, int16 y, int16 width) {
-	// WORKAROUND for bug #2848940 ("ScummVM crashes with Future wars"):
+byte getZoneFromPositionRaw(byte *page, int16 x, int16 y, int16 width) {
+	// WORKAROUND for bug #4581 ("ScummVM crashes with Future wars"):
 	// Vertical positions outside the 320x200 screen (e.g. in range 200-232)
 	// are accessed after teleporting Lo'Ann to the future using the pendant
 	// and walking down the slope and out of the screen (This causes a crash
-	// at least on Mac OS X). The original PC version of Future Wars doesn't
+	// at least on macOS). The original PC version of Future Wars doesn't
 	// clip its coordinates in this function or in checkCollision-function
 	// according to reverse engineering but instead just happily reads outside
 	// the 320x200 buffer. Not really knowing how to properly fix this I simply
@@ -1985,44 +2051,60 @@ int16 getZoneFromPositionRaw(byte *page, int16 x, int16 y, int16 width) {
 	return zoneVar;
 }
 
-int16 checkCollision(int16 objIdx, int16 x, int16 y, int16 numZones, int16 zoneIdx) {
-	debugC(1, kCineDebugCollision, "checkCollision(objIdx: %d x: %d y:%d numZones:%d zoneIdx: %d)", objIdx, x, y, numZones, zoneIdx);
+int16 checkCollisionFW(int16 objIdx, int16 x, int16 y, int16 numZones, int16 zoneIdx) {
 	int16 lx = g_cine->_objectTable[objIdx].x + x;
 	int16 ly = g_cine->_objectTable[objIdx].y + y;
-	int16 idx;
+
+	for (int16 i = 0; i < numZones; i++, lx++) {
+		int16 idx = getZoneFromPositionRaw(collisionPage, lx, ly, 320);
+
+		if (idx < NUM_MAX_ZONE && g_cine->_zoneData[idx] == zoneIdx) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+int16 checkCollisionOS(int16 objIdx, int16 x, int16 y, int16 numZones, int16 zoneIdx) {
+	int16 lx = g_cine->_objectTable[objIdx].x + x;
+	int16 ly = g_cine->_objectTable[objIdx].y + y;
 	int16 result = 0;
 
-	for (int16 i = 0; i < numZones; i++) {
-		// Don't try to read data in Operation Stealth if position isn't in 320x200 screen bounds.
-		if (g_cine->getGameType() == Cine::GType_OS) {
-			if ((lx + i) < 0 || (lx + i) > 319 || ly < 0 || ly > 199) {
-				continue;
-			}
+	if (ly < 0 || ly > 199) {
+		return result;
+	}
+
+	for (int16 i = 0; i < numZones; i++, lx++) {
+		if (lx < 0 || lx > 319) {
+			continue;
 		}
 
-		idx = getZoneFromPositionRaw(collisionPage, lx + i, ly, 320);
+		int16 idx = getZoneFromPositionRaw(collisionPage, lx, ly, 320);
 
-		assert(idx >= 0 && idx < NUM_MAX_ZONE);
-
-		// The zoneQuery table is updated here only in Operation Stealth
-		if (g_cine->getGameType() == Cine::GType_OS) {
-			if (g_cine->_zoneData[idx] < NUM_MAX_ZONE) {
-				g_cine->_zoneQuery[g_cine->_zoneData[idx]]++;
-			}
+		if (idx < NUM_MAX_ZONE) {
+			idx = g_cine->_zoneData[idx];
 		}
 
-		if (g_cine->_zoneData[idx] == zoneIdx) {
+		if (idx >= 0 && idx < NUM_MAX_ZONE) {
+			g_cine->_zoneQuery[idx]++;
+		}
+
+		if (idx == zoneIdx) {
 			result = 1;
-			// Future Wars breaks out early on the first match, but
-			// Operation Stealth doesn't because it needs to update
-			// the zoneQuery table for the whole loop's period.
-			if (g_cine->getGameType() == Cine::GType_FW) {
-				break;
-			}
 		}
 	}
 
 	return result;
+}
+
+int16 checkCollision(int16 objIdx, int16 x, int16 y, int16 numZones, int16 zoneIdx) {
+	debugC(1, kCineDebugCollision, "checkCollision(objIdx: %d x: %d y:%d numZones:%d zoneIdx: %d)", objIdx, x, y, numZones, zoneIdx);
+	if (g_cine->getGameType() == Cine::GType_OS) {
+		return checkCollisionOS(objIdx, x, y, numZones, zoneIdx);
+	} else {
+		return checkCollisionFW(objIdx, x, y, numZones, zoneIdx);
+	}
 }
 
 uint16 compareVars(int16 a, int16 b) {
@@ -2105,7 +2187,7 @@ const char *getObjPramName(byte paramIdx) {
 	case 6:
 		return ".costume";
 	default:
-		sprintf(bufferDec, ".param%d", paramIdx);
+		Common::sprintf_s(bufferDec, ".param%d", paramIdx);
 		return bufferDec;
 	}
 }
@@ -2120,7 +2202,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 
 	exitScript = 0;
 
-	sprintf(decompileBuffer[decompileBufferPosition++], "--------- SCRIPT %d ---------\n", scriptIdx);
+	Common::sprintf_s(decompileBuffer[decompileBufferPosition++], "--------- SCRIPT %d ---------\n", scriptIdx);
 
 	do {
 		uint16 opcode = *(localScriptPtr + position);
@@ -2130,7 +2212,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			opcode = 0;
 		}
 
-		strcpy(lineBuffer, "");
+		Common::strcpy_s(lineBuffer, "");
 
 		switch (opcode - 1) {
 		case -1: {
@@ -2150,7 +2232,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param3 = READ_BE_UINT16(localScriptPtr + position);
 			position += 2;
 
-			sprintf(lineBuffer, "obj[%d]%s = %d\n", param1, getObjPramName(param2), param3);
+			Common::sprintf_s(lineBuffer, "obj[%d]%s = %d\n", param1, getObjPramName(param2), param3);
 
 			break;
 		}
@@ -2168,7 +2250,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param3 = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "var[%d]=obj[%d]%s\n", param3, param1, getObjPramName(param2));
+			Common::sprintf_s(lineBuffer, "var[%d]=obj[%d]%s\n", param3, param1, getObjPramName(param2));
 			break;
 		}
 		case 0x2:
@@ -2190,16 +2272,16 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			position += 2;
 
 			if (opcode - 1 == 0x2) {
-				sprintf(lineBuffer, "obj[%d]%s+=%d\n", param1, getObjPramName(param2), param3);
+				Common::sprintf_s(lineBuffer, "obj[%d]%s+=%d\n", param1, getObjPramName(param2), param3);
 			} else if (opcode - 1 == 0x3) {
-				sprintf(lineBuffer, "obj[%d]%s-=%d\n", param1, getObjPramName(param2), param3);
+				Common::sprintf_s(lineBuffer, "obj[%d]%s-=%d\n", param1, getObjPramName(param2), param3);
 			} else if (opcode - 1 == 0x4) {
-				sprintf(lineBuffer, "obj[%d]%s+=obj[%d]%s\n", param1, getObjPramName(param2), param3, getObjPramName(param2));
+				Common::sprintf_s(lineBuffer, "obj[%d]%s+=obj[%d]%s\n", param1, getObjPramName(param2), param3, getObjPramName(param2));
 			} else if (opcode - 1 == 0x5) {
-				sprintf(lineBuffer, "obj[%d]%s-=obj[%d]%s\n", param1, getObjPramName(param2), param3, getObjPramName(param2));
+				Common::sprintf_s(lineBuffer, "obj[%d]%s-=obj[%d]%s\n", param1, getObjPramName(param2), param3, getObjPramName(param2));
 			} else if (opcode - 1 == 0x6) {
-				sprintf(compareString1, "obj[%d]%s", param1, getObjPramName(param2));
-				sprintf(compareString2, "%d", param3);
+				Common::sprintf_s(compareString1, "obj[%d]%s", param1, getObjPramName(param2));
+				Common::sprintf_s(compareString2, "%d", param3);
 			}
 			break;
 		}
@@ -2227,9 +2309,9 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			position += 2;
 
 			if (opcode - 1 == 0x7) {
-				sprintf(lineBuffer, "setupObject(Idx:%d,X:%d,Y:%d,mask:%d,frame:%d)\n", param1, param2, param3, param4, param5);
+				Common::sprintf_s(lineBuffer, "setupObject(Idx:%d,X:%d,Y:%d,mask:%d,frame:%d)\n", param1, param2, param3, param4, param5);
 			} else if (opcode - 1 == 0x8) {
-				sprintf(lineBuffer, "checkCollision(%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5);
+				Common::sprintf_s(lineBuffer, "checkCollision(%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5);
 			}
 			break;
 		}
@@ -2250,19 +2332,19 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 				position++;
 
 				if (param2 == 1) {
-					sprintf(lineBuffer, "var[%d]=var[%d]\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]=var[%d]\n", param1, param3);
 				} else if (param2 == 2) {
-					sprintf(lineBuffer, "var[%d]=globalVar[%d]\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]=globalVar[%d]\n", param1, param3);
 				} else if (param2 == 3) {
-					sprintf(lineBuffer, "var[%d]=mouse.X\n", param1);
+					Common::sprintf_s(lineBuffer, "var[%d]=mouse.X\n", param1);
 				} else if (param2 == 4) {
-					sprintf(lineBuffer, "var[%d]=mouse.Y\n", param1);
+					Common::sprintf_s(lineBuffer, "var[%d]=mouse.Y\n", param1);
 				} else if (param2 == 5) {
-					sprintf(lineBuffer, "var[%d]=rand() mod %d\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]=rand() mod %d\n", param1, param3);
 				} else if (param2 == 8) {
-					sprintf(lineBuffer, "var[%d]=file[%d].packedSize\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]=file[%d].packedSize\n", param1, param3);
 				} else if (param2 == 9) {
-					sprintf(lineBuffer, "var[%d]=file[%d].unpackedSize\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]=file[%d].unpackedSize\n", param1, param3);
 				} else {
 					error("decompileScript: 0x09: param2 = %d", param2);
 				}
@@ -2272,7 +2354,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 				param3 = READ_BE_UINT16(localScriptPtr + position);
 				position += 2;
 
-				sprintf(lineBuffer, "var[%d]=%d\n", param1, param3);
+				Common::sprintf_s(lineBuffer, "var[%d]=%d\n", param1, param3);
 			}
 
 			break;
@@ -2297,13 +2379,13 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 				position++;
 
 				if (opcode - 1 == 0xA) {
-					sprintf(lineBuffer, "var[%d]+=var[%d]\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]+=var[%d]\n", param1, param3);
 				} else if (opcode - 1 == 0xB) {
-					sprintf(lineBuffer, "var[%d]-=var[%d]\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]-=var[%d]\n", param1, param3);
 				} else if (opcode - 1 == 0xC) {
-					sprintf(lineBuffer, "var[%d]*=var[%d]\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]*=var[%d]\n", param1, param3);
 				} else if (opcode - 1 == 0xD) {
-					sprintf(lineBuffer, "var[%d]/=var[%d]\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]/=var[%d]\n", param1, param3);
 				}
 			} else {
 				int16 param3;
@@ -2312,13 +2394,13 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 				position += 2;
 
 				if (opcode - 1 == 0xA) {
-					sprintf(lineBuffer, "var[%d]+=%d\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]+=%d\n", param1, param3);
 				} else if (opcode - 1 == 0xB) {
-					sprintf(lineBuffer, "var[%d]-=%d\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]-=%d\n", param1, param3);
 				} else if (opcode - 1 == 0xC) {
-					sprintf(lineBuffer, "var[%d]*=%d\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]*=%d\n", param1, param3);
 				} else if (opcode - 1 == 0xD) {
-					sprintf(lineBuffer, "var[%d]/=%d\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "var[%d]/=%d\n", param1, param3);
 				}
 			}
 			break;
@@ -2340,12 +2422,12 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 				position++;
 
 				if (param2 == 1) {
-					sprintf(compareString1, "var[%d]", param1);
-					sprintf(compareString2, "var[%d]", param3);
+					Common::sprintf_s(compareString1, "var[%d]", param1);
+					Common::sprintf_s(compareString2, "var[%d]", param3);
 
 				} else if (param2 == 2) {
-					sprintf(compareString1, "var[%d]", param1);
-					sprintf(compareString2, "globalVar[%d]", param3);
+					Common::sprintf_s(compareString1, "var[%d]", param1);
+					Common::sprintf_s(compareString2, "globalVar[%d]", param3);
 				} else {
 					error("decompileScript: 0x0E: param2 = %d", param2);
 				}
@@ -2355,8 +2437,8 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 				param3 = READ_BE_UINT16(localScriptPtr + position);
 				position += 2;
 
-				sprintf(compareString1, "var[%d]", param1);
-				sprintf(compareString2, "%d", param3);
+				Common::sprintf_s(compareString1, "var[%d]", param1);
+				Common::sprintf_s(compareString2, "%d", param3);
 			}
 			break;
 		}
@@ -2374,7 +2456,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param3 = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "obj[%d]%s=var[%d]\n", param1, getObjPramName(param2), param3);
+			Common::sprintf_s(lineBuffer, "obj[%d]%s=var[%d]\n", param1, getObjPramName(param2), param3);
 
 			break;
 		}
@@ -2391,19 +2473,19 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			position++;
 
 			if (opcode - 1 == 0x13) {
-				sprintf(lineBuffer, "loadMask0(%d)\n", param);
+				Common::sprintf_s(lineBuffer, "loadMask0(%d)\n", param);
 			} else if (opcode - 1 == 0x14) {
-				sprintf(lineBuffer, "unloadMask0(%d)\n", param);
+				Common::sprintf_s(lineBuffer, "unloadMask0(%d)\n", param);
 			} else if (opcode - 1 == 0x15) {
-				sprintf(lineBuffer, "OP_15(%d)\n", param);
+				Common::sprintf_s(lineBuffer, "OP_15(%d)\n", param);
 			} else if (opcode - 1 == 0x16) {
-				sprintf(lineBuffer, "loadMask1(%d)\n", param);
+				Common::sprintf_s(lineBuffer, "loadMask1(%d)\n", param);
 			} else if (opcode - 1 == 0x17) {
-				sprintf(lineBuffer, "unloadMask0(%d)\n", param);
+				Common::sprintf_s(lineBuffer, "unloadMask0(%d)\n", param);
 			} else if (opcode - 1 == 0x18) {
-				sprintf(lineBuffer, "loadMask4(%d)\n", param);
+				Common::sprintf_s(lineBuffer, "loadMask4(%d)\n", param);
 			} else if (opcode - 1 == 0x19) {
-				sprintf(lineBuffer, "unloadMask4(%d)\n", param);
+				Common::sprintf_s(lineBuffer, "unloadMask4(%d)\n", param);
 			}
 			break;
 		}
@@ -2413,12 +2495,12 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "OP_1A(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "OP_1A(%d)\n", param);
 
 			break;
 		}
 		case 0x1B: {
-			sprintf(lineBuffer, "bgIncrustList.clear()\n");
+			Common::sprintf_s(lineBuffer, "bgIncrustList.clear()\n");
 			break;
 		}
 		case 0x1D: {
@@ -2427,7 +2509,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "label(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "label(%d)\n", param);
 
 			break;
 		}
@@ -2437,7 +2519,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "goto(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "goto(%d)\n", param);
 
 			break;
 		}
@@ -2454,17 +2536,17 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			position++;
 
 			if (opcode - 1 == 0x1F) {
-				sprintf(lineBuffer, "if(%s>%s) goto(%d)\n", compareString1, compareString2, param);
+				Common::sprintf_s(lineBuffer, "if(%s>%s) goto(%d)\n", compareString1, compareString2, param);
 			} else if (opcode - 1 == 0x20) {
-				sprintf(lineBuffer, "if(%s>=%s) goto(%d)\n", compareString1, compareString2, param);
+				Common::sprintf_s(lineBuffer, "if(%s>=%s) goto(%d)\n", compareString1, compareString2, param);
 			} else if (opcode - 1 == 0x21) {
-				sprintf(lineBuffer, "if(%s<%s) goto(%d)\n", compareString1, compareString2, param);
+				Common::sprintf_s(lineBuffer, "if(%s<%s) goto(%d)\n", compareString1, compareString2, param);
 			} else if (opcode - 1 == 0x22) {
-				sprintf(lineBuffer, "if(%s<=%s) goto(%d)\n", compareString1, compareString2, param);
+				Common::sprintf_s(lineBuffer, "if(%s<=%s) goto(%d)\n", compareString1, compareString2, param);
 			} else if (opcode - 1 == 0x23) {
-				sprintf(lineBuffer, "if(%s==%s) goto(%d)\n", compareString1, compareString2, param);
+				Common::sprintf_s(lineBuffer, "if(%s==%s) goto(%d)\n", compareString1, compareString2, param);
 			} else if (opcode - 1 == 0x24) {
-				sprintf(lineBuffer, "if(%s!=%s) goto(%d)\n", compareString1, compareString2, param);
+				Common::sprintf_s(lineBuffer, "if(%s!=%s) goto(%d)\n", compareString1, compareString2, param);
 			}
 			break;
 		}
@@ -2474,7 +2556,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "removeLabel(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "removeLabel(%d)\n", param);
 
 			break;
 		}
@@ -2487,7 +2569,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param2 = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "loop(--var[%d]) -> label(%d)\n", param1, param2);
+			Common::sprintf_s(lineBuffer, "loop(--var[%d]) -> label(%d)\n", param1, param2);
 
 			break;
 		}
@@ -2499,9 +2581,9 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			position++;
 
 			if (opcode - 1 == 0x31) {
-				sprintf(lineBuffer, "startGlobalScript(%d)\n", param);
+				Common::sprintf_s(lineBuffer, "startGlobalScript(%d)\n", param);
 			} else if (opcode - 1 == 0x32) {
-				sprintf(lineBuffer, "endGlobalScript(%d)\n", param);
+				Common::sprintf_s(lineBuffer, "endGlobalScript(%d)\n", param);
 			}
 			break;
 		}
@@ -2510,20 +2592,20 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 		case 0x3D:
 		case OP_loadPart: {
 			if (opcode - 1 == 0x3B) {
-				sprintf(lineBuffer, "loadResource(%s)\n", localScriptPtr + position);
+				Common::sprintf_s(lineBuffer, "loadResource(%s)\n", localScriptPtr + position);
 			} else if (opcode - 1 == 0x3C) {
-				sprintf(lineBuffer, "loadBg(%s)\n", localScriptPtr + position);
+				Common::sprintf_s(lineBuffer, "loadBg(%s)\n", localScriptPtr + position);
 			} else if (opcode - 1 == 0x3D) {
-				sprintf(lineBuffer, "loadCt(%s)\n", localScriptPtr + position);
+				Common::sprintf_s(lineBuffer, "loadCt(%s)\n", localScriptPtr + position);
 			} else if (opcode - 1 == OP_loadPart) {
-				sprintf(lineBuffer, "loadPart(%s)\n", localScriptPtr + position);
+				Common::sprintf_s(lineBuffer, "loadPart(%s)\n", localScriptPtr + position);
 			}
 
 			position += strlen((const char *)localScriptPtr + position) + 1;
 			break;
 		}
 		case 0x40: {
-			sprintf(lineBuffer, "closePart()\n");
+			Common::sprintf_s(lineBuffer, "closePart()\n");
 			break;
 		}
 		case OP_loadNewPrcName: {
@@ -2532,21 +2614,21 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "loadPrc(%d,%s)\n", param, localScriptPtr + position);
+			Common::sprintf_s(lineBuffer, "loadPrc(%d,%s)\n", param, localScriptPtr + position);
 
 			position += strlen((const char *)localScriptPtr + position) + 1;
 			break;
 		}
 		case OP_requestCheckPendingDataLoad: {  // nop
-			sprintf(lineBuffer, "requestCheckPendingDataLoad()\n");
+			Common::sprintf_s(lineBuffer, "requestCheckPendingDataLoad()\n");
 			break;
 		}
 		case 0x45: {
-			sprintf(lineBuffer, "blitAndFade()\n");
+			Common::sprintf_s(lineBuffer, "blitAndFade()\n");
 			break;
 		}
 		case 0x46: {
-			sprintf(lineBuffer, "fadeToBlack()\n");
+			Common::sprintf_s(lineBuffer, "fadeToBlack()\n");
 			break;
 		}
 		case 0x47: {
@@ -2571,7 +2653,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param5 = READ_BE_UINT16(localScriptPtr + position);
 			position += 2;
 
-			sprintf(lineBuffer, "transformPaletteRange(%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5);
+			Common::sprintf_s(lineBuffer, "transformPaletteRange(%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5);
 
 			break;
 		}
@@ -2581,17 +2663,34 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "setDefaultMenuBgColor(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "setDefaultMenuBgColor(%d)\n", param);
 
 			break;
 		}
+
+		case 0x4A: {
+			byte param1, param2, param3;
+
+			param1 = *(localScriptPtr + position);
+			position++;
+
+			param2 = *(localScriptPtr + position);
+			position++;
+
+			param3 = *(localScriptPtr + position);
+			position++;
+
+			Common::sprintf_s(lineBuffer, "palRotate(%d,%d,%d)\n", param1, param2, param3);
+			break;
+		}
+
 		case 0x4F: {
-			sprintf(lineBuffer, "break()\n");
+			Common::sprintf_s(lineBuffer, "break()\n");
 			exitScript = 1;
 			break;
 		}
 		case 0x50: {
-			sprintf(lineBuffer, "endScript()\n\n");
+			Common::sprintf_s(lineBuffer, "endScript()\n\n");
 			break;
 		}
 		case 0x51: {
@@ -2616,7 +2715,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param5 = READ_BE_UINT16(localScriptPtr + position);
 			position += 2;
 
-			sprintf(lineBuffer, "message(%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5);
+			Common::sprintf_s(lineBuffer, "message(%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5);
 
 			break;
 		}
@@ -2639,17 +2738,17 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 
 				if (param2 == 1) {
 					if (opcode - 1 == 0x52) {
-						sprintf(lineBuffer, "globalVar[%d] = var[%d]\n", param1, param3);
+						Common::sprintf_s(lineBuffer, "globalVar[%d] = var[%d]\n", param1, param3);
 					} else if (opcode - 1 == 0x53) {
-						sprintf(compareString1, "globalVar[%d]", param1);
-						sprintf(compareString2, "var[%d]", param3);
+						Common::sprintf_s(compareString1, "globalVar[%d]", param1);
+						Common::sprintf_s(compareString2, "var[%d]", param3);
 					}
 				} else if (param2 == 2) {
 					if (opcode - 1 == 0x52) {
-						sprintf(lineBuffer, "globalVar[%d] = globalVar[%d]\n", param1, param3);
+						Common::sprintf_s(lineBuffer, "globalVar[%d] = globalVar[%d]\n", param1, param3);
 					} else if (opcode - 1 == 0x53) {
-						sprintf(compareString1, "globalVar[%d]", param1);
-						sprintf(compareString2, "globalVar[%d]", param3);
+						Common::sprintf_s(compareString1, "globalVar[%d]", param1);
+						Common::sprintf_s(compareString2, "globalVar[%d]", param3);
 					}
 				} else {
 					if (opcode - 1 == 0x52) {
@@ -2665,16 +2764,16 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 				position += 2;
 
 				if (opcode - 1 == 0x52) {
-					sprintf(lineBuffer, "globalVar[%d] = %d\n", param1, param3);
+					Common::sprintf_s(lineBuffer, "globalVar[%d] = %d\n", param1, param3);
 				} else if (opcode - 1 == 0x53) {
-					sprintf(compareString1, "globalVar[%d]", param1);
-					sprintf(compareString2, "%d", param3);
+					Common::sprintf_s(compareString1, "globalVar[%d]", param1);
+					Common::sprintf_s(compareString2, "%d", param3);
 				}
 			}
 			break;
 		}
 		case 0x59: {
-			sprintf(lineBuffer, "comment: %s\n", localScriptPtr + position);
+			Common::sprintf_s(lineBuffer, "comment: %s\n", localScriptPtr + position);
 
 			position += strlen((const char *)localScriptPtr + position);
 			break;
@@ -2689,16 +2788,16 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param2 = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "freePartRang(%d,%d)\n", param1, param2);
+			Common::sprintf_s(lineBuffer, "freePartRang(%d,%d)\n", param1, param2);
 
 			break;
 		}
 		case 0x5B: {
-			sprintf(lineBuffer, "unloadAllMasks()\n");
+			Common::sprintf_s(lineBuffer, "unloadAllMasks()\n");
 			break;
 		}
 		case 0x65: {
-			sprintf(lineBuffer, "setupTableUnk1()\n");
+			Common::sprintf_s(lineBuffer, "setupTableUnk1()\n");
 			break;
 		}
 		case 0x66: {
@@ -2711,7 +2810,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param2 = READ_BE_UINT16(localScriptPtr + position);
 			position += 2;
 
-			sprintf(lineBuffer, "tableUnk1[%d] = %d\n", param1, param2);
+			Common::sprintf_s(lineBuffer, "tableUnk1[%d] = %d\n", param1, param2);
 
 			break;
 		}
@@ -2721,16 +2820,16 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "setPlayerCommandPosY(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "setPlayerCommandPosY(%d)\n", param);
 
 			break;
 		}
 		case 0x69: {
-			sprintf(lineBuffer, "allowPlayerInput()\n");
+			Common::sprintf_s(lineBuffer, "allowPlayerInput()\n");
 			break;
 		}
 		case 0x6A: {
-			sprintf(lineBuffer, "disallowPlayerInput()\n");
+			Common::sprintf_s(lineBuffer, "disallowPlayerInput()\n");
 			break;
 		}
 		case 0x6B: {
@@ -2739,26 +2838,26 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			newDisk = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "changeDataDisk(%d)\n", newDisk);
+			Common::sprintf_s(lineBuffer, "changeDataDisk(%d)\n", newDisk);
 
 			break;
 		}
 		case 0x6D: {
-			sprintf(lineBuffer, "loadDat(%s)\n", localScriptPtr + position);
+			Common::sprintf_s(lineBuffer, "loadDat(%s)\n", localScriptPtr + position);
 
 			position += strlen((const char *)localScriptPtr + position) + 1;
 			break;
 		}
 		case 0x6E: { // nop
-			sprintf(lineBuffer, "updateDat()\n");
+			Common::sprintf_s(lineBuffer, "updateDat()\n");
 			break;
 		}
 		case 0x6F: {
-			sprintf(lineBuffer, "OP_6F() -> dat related\n");
+			Common::sprintf_s(lineBuffer, "OP_6F() -> dat related\n");
 			break;
 		}
 		case 0x70: {
-			sprintf(lineBuffer, "stopSample()\n");
+			Common::sprintf_s(lineBuffer, "stopSample()\n");
 			break;
 		}
 		case 0x79: {
@@ -2767,7 +2866,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "disableSystemMenu(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "disableSystemMenu(%d)\n", param);
 
 			break;
 		}
@@ -2799,9 +2898,9 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			position += 2;
 
 			if (opcode - 1 == 0x77) {
-				sprintf(lineBuffer, "playSample(%d,%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5, param6);
+				Common::sprintf_s(lineBuffer, "playSample(%d,%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5, param6);
 			} else if (opcode - 1 == 0x78) {
-				sprintf(lineBuffer, "playSampleSwapped(%d,%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5, param6);
+				Common::sprintf_s(lineBuffer, "playSampleSwapped(%d,%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5, param6);
 			}
 
 			break;
@@ -2812,7 +2911,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "OP_7A(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "OP_7A(%d)\n", param);
 
 			break;
 		}
@@ -2822,7 +2921,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "OP_7B(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "OP_7B(%d)\n", param);
 
 			break;
 		}
@@ -2856,7 +2955,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param7 = READ_BE_UINT16(localScriptPtr + position);
 			position += 2;
 
-			sprintf(lineBuffer, "OP_7F(%d,%d,%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5, param6, param7);
+			Common::sprintf_s(lineBuffer, "OP_7F(%d,%d,%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5, param6, param7);
 
 			break;
 		}
@@ -2870,7 +2969,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param2 = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "OP_80(%d,%d)\n", param1, param2);
+			Common::sprintf_s(lineBuffer, "OP_80(%d,%d)\n", param1, param2);
 
 			break;
 		}
@@ -2896,7 +2995,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param5 = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "OP_82(%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5);
+			Common::sprintf_s(lineBuffer, "OP_82(%d,%d,%d,%d,%d)\n", param1, param2, param3, param4, param5);
 
 			break;
 		}
@@ -2910,7 +3009,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param2 = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "OP_83(%d,%d)\n", param1, param2);
+			Common::sprintf_s(lineBuffer, "OP_83(%d,%d)\n", param1, param2);
 
 			break;
 		}
@@ -2920,7 +3019,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "if(%s!=%s) goto next label(%d)\n", compareString1, compareString2, param);
+			Common::sprintf_s(lineBuffer, "if(%s!=%s) goto next label(%d)\n", compareString1, compareString2, param);
 
 			break;
 		}
@@ -2930,7 +3029,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "OP_8B(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "OP_8B(%d)\n", param);
 
 			break;
 		}
@@ -2940,7 +3039,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "OP_8C(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "OP_8C(%d)\n", param);
 
 			break;
 		}
@@ -2978,8 +3077,8 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param8 = READ_BE_UINT16(localScriptPtr + position);
 			position += 2;
 
-			sprintf(compareString1, "obj[%d]", param1);
-			sprintf(compareString2, "{%d,%d,%d,%d,%d,%d,%d}", param2, param3, param4, param5, param6, param7, param8);
+			Common::sprintf_s(compareString1, "obj[%d]", param1);
+			Common::sprintf_s(compareString2, "{%d,%d,%d,%d,%d,%d,%d}", param2, param3, param4, param5, param6, param7, param8);
 
 			break;
 		}
@@ -2989,7 +3088,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param1 = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "ADDBG(%d,%s)\n", param1, localScriptPtr + position);
+			Common::sprintf_s(lineBuffer, "ADDBG(%d,%s)\n", param1, localScriptPtr + position);
 
 			position += strlen((const char *)localScriptPtr + position);
 
@@ -3001,7 +3100,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "OP_8F(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "OP_8F(%d)\n", param);
 
 			break;
 		}
@@ -3011,7 +3110,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param1 = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "loadABS(%d,%s)\n", param1, localScriptPtr + position);
+			Common::sprintf_s(lineBuffer, "loadABS(%d,%s)\n", param1, localScriptPtr + position);
 
 			position += strlen((const char *)localScriptPtr + position);
 
@@ -3023,7 +3122,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "OP_91(%d)\n", param);
+			Common::sprintf_s(lineBuffer, "OP_91(%d)\n", param);
 
 			break;
 		}
@@ -3033,7 +3132,7 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 			param = *(localScriptPtr + position);
 			position++;
 
-			sprintf(lineBuffer, "OP_9D(%d) -> flip img idx\n", param);
+			Common::sprintf_s(lineBuffer, "OP_9D(%d) -> flip img idx\n", param);
 
 			break;
 		}
@@ -3049,55 +3148,81 @@ void decompileScript(const byte *scriptPtr, uint16 scriptSize, uint16 scriptIdx)
 				param2 = *(localScriptPtr + position);
 				position++;
 
-				sprintf(lineBuffer, "OP_9E(%d,%d)\n", param, param2);
+				Common::sprintf_s(lineBuffer, "OP_9E(%d,%d)\n", param, param2);
 			} else {
 				int16 param2;
 
 				param2 = READ_BE_UINT16(localScriptPtr + position);
 				position += 2;
 
-				sprintf(lineBuffer, "OP_9E(%d,%d)\n", param, param2);
+				Common::sprintf_s(lineBuffer, "OP_9E(%d,%d)\n", param, param2);
 			}
 
 			break;
 		}
 		case 0xA0: { // OS only
-			byte param1;
-			byte param2;
+			uint16 param1;
+			uint16 param2;
 
-			param1 = *(localScriptPtr + position);
-			position++;
+			param1 = READ_BE_UINT16(localScriptPtr + position);
+			position += 2;
 
-			param2 = *(localScriptPtr + position);
-			position++;
+			param2 = READ_BE_UINT16(localScriptPtr + position);
+			position += 2;
 
-			sprintf(lineBuffer, "OP_A0(%d,%d)\n", param1, param2);
+			Common::sprintf_s(lineBuffer, "OP_A0(%d,%d)\n", param1, param2);
 
 			break;
 		}
 		case 0xA1: { // OS only
+			uint16 param1;
+			uint16 param2;
+
+			param1 = READ_BE_UINT16(localScriptPtr + position);
+			position += 2;
+
+			param2 = READ_BE_UINT16(localScriptPtr + position);
+			position += 2;
+
+			Common::sprintf_s(lineBuffer, "OP_A1(%d,%d)\n", param1, param2);
+
+			break;
+		}
+		case 0xA2: { // OS only
+			uint16 param1;
+			uint16 param2;
+
+			param1 = READ_BE_UINT16(localScriptPtr + position);
+			position += 2;
+
+			param2 = READ_BE_UINT16(localScriptPtr + position);
+			position += 2;
+
+			Common::sprintf_s(lineBuffer, "OP_A2(%d,%d)\n", param1, param2);
+
+			break;
+		}
+
+		case 0x9A: { // OS only
 			byte param1;
-			byte param2;
 
 			param1 = *(localScriptPtr + position);
 			position++;
 
-			param2 = *(localScriptPtr + position);
-			position++;
-
-			sprintf(lineBuffer, "OP_A1(%d,%d)\n", param1, param2);
+			Common::sprintf_s(lineBuffer, "o2_wasZoneChecked(%d)\n", param1);
 
 			break;
 		}
+
 		default: {
-			sprintf(lineBuffer, "Unsupported opcode %X in decompileScript\n\n", opcode - 1);
+			Common::sprintf_s(lineBuffer, "Unsupported opcode %X in decompileScript\n\n", opcode - 1);
 			position = scriptSize;
 			break;
 		}
 		}
 
 		//printf(lineBuffer);
-		strcpy(decompileBuffer[decompileBufferPosition++], lineBuffer);
+		Common::strcpy_s(decompileBuffer[decompileBufferPosition++], lineBuffer);
 
 		exitScript = 0;
 		if (position >= scriptSize) {

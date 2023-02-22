@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -33,27 +32,27 @@ namespace ZVision {
 class RLFDecoder : public Video::VideoDecoder {
 public:
 	RLFDecoder() {}
-	~RLFDecoder();
+	~RLFDecoder() override;
 
-	bool loadStream(Common::SeekableReadStream *stream);
+	bool loadStream(Common::SeekableReadStream *stream) override;
 
 private:
 	class RLFVideoTrack : public FixedRateVideoTrack {
 	public:
 		RLFVideoTrack(Common::SeekableReadStream *stream);
-		~RLFVideoTrack();
+		~RLFVideoTrack() override;
 
-		uint16 getWidth() const { return _width; }
-		uint16 getHeight() const { return _height; }
-		Graphics::PixelFormat getPixelFormat() const { return Graphics::PixelFormat(2, 5, 5, 5, 0, 10, 5, 0, 0); /* RGB 555 */ }
-		int getCurFrame() const { return _displayedFrame; }
-		int getFrameCount() const { return _frameCount; }
-		const Graphics::Surface *decodeNextFrame();
-		bool isSeekable() const { return true; }
-		bool seek(const Audio::Timestamp &time);
+		uint16 getWidth() const override { return _width; }
+		uint16 getHeight() const override { return _height; }
+		Graphics::PixelFormat getPixelFormat() const override { return Graphics::PixelFormat(2, 5, 5, 5, 0, 10, 5, 0, 0); /* RGB 555 */ }
+		int getCurFrame() const override { return _displayedFrame; }
+		int getFrameCount() const override { return _frameCount; }
+		const Graphics::Surface *decodeNextFrame() override;
+		bool isSeekable() const override { return true; }
+		bool seek(const Audio::Timestamp &time) override;
 
 	protected:
-		Common::Rational getFrameRate() const { return Common::Rational(1000, _frameTime); }
+		Common::Rational getFrameRate() const override { return Common::Rational(1000, _frameTime); }
 
 	private:
 		enum EncodingType {

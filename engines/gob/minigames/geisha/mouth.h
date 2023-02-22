@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,10 +33,10 @@ class Mouth : public ANIObject {
 public:
 	Mouth(const ANIFile &ani, const CMPFile &cmp,
 	      uint16 mouthAnim, uint16 mouthSprite, uint16 floorSprite);
-	~Mouth();
+	~Mouth() override;
 
 	/** Advance the animation to the next frame. */
-	void advance();
+	void advance() override;
 
 	/** Active the mouth's animation. */
 	void activate();
@@ -46,12 +45,12 @@ public:
 	bool isDeactivated() const;
 
 	/** Set the current position. */
-	void setPosition(int16 x, int16 y);
+	void setPosition(int16 x, int16 y) override;
 
 	/** Draw the current frame onto the surface and return the affected rectangle. */
-	bool draw(Surface &dest, int16 &left, int16 &top, int16 &right, int16 &bottom);
+	bool draw(Surface &dest, int16 &left, int16 &top, int16 &right, int16 &bottom) override;
 	/** Draw the current frame from the surface and return the affected rectangle. */
-	bool clear(Surface &dest, int16 &left, int16 &top, int16 &right, int16 &bottom);
+	bool clear(Surface &dest, int16 &left, int16 &top, int16 &right, int16 &bottom) override;
 
 private:
 	static const int kFloorCount = 2;

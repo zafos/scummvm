@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -46,33 +45,33 @@ class Kernel;
 class LuaScriptEngine : public ScriptEngine {
 public:
 	LuaScriptEngine(Kernel *KernelPtr);
-	virtual ~LuaScriptEngine();
+	~LuaScriptEngine() override;
 
 	/**
 	 * Initializes the scripting engine
 	 * @return              Returns true if successful, otherwise false.
 	*/
-	virtual bool init();
+	bool init() override;
 
 	/**
 	 * Loads a script file and executes it
 	 * @param FileName      The filename of the script
 	 * @return              Returns true if successful, otherwise false.
 	 */
-	virtual bool executeFile(const Common::String &fileName);
+	bool executeFile(const Common::String &fileName) override;
 
 	/**
 	 * Execute a string of script code
 	 * @param Code          A string of script code
 	 * @return              Returns true if successful, otherwise false.
 	 */
-	virtual bool executeString(const Common::String &code);
+	bool executeString(const Common::String &code) override;
 
 	/**
 	 * Returns a pointer to the main object of the scripting language
 	 * @remark              Using this method breaks the encapsulation of the language
 	 */
-	virtual void *getScriptObject() {
+	void *getScriptObject() override {
 		return _state;
 	}
 
@@ -82,16 +81,16 @@ public:
 	 * @remark              How the command line parameters will be used by scripts is
 	 * dependant on the particular implementation.
 	 */
-	virtual void setCommandLine(const Common::StringArray &commandLineParameters);
+	void setCommandLine(const Common::StringArray &commandLineParameters) override;
 
 	/**
 	 * @remark              The Lua stack is cleared by this method
 	 */
-	virtual bool persist(OutputPersistenceBlock &writer);
+	bool persist(OutputPersistenceBlock &writer) override;
 	/**
 	 * @remark              The Lua stack is cleared by this method
 	 */
-	virtual bool unpersist(InputPersistenceBlock &reader);
+	bool unpersist(InputPersistenceBlock &reader) override;
 
 private:
 	lua_State *_state;

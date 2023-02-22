@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1994-1998 Revolution Software Ltd.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef	SWORD2_SWORD2_H
@@ -39,6 +38,7 @@
 #include "common/events.h"
 #include "common/util.h"
 #include "common/random.h"
+#include "sword2/detection.h"
 
 #define	MAX_starts	100
 #define	MAX_description	100
@@ -54,10 +54,6 @@ class OSystem;
  * - Broken Sword II: The Smoking Mirror
  */
 namespace Sword2 {
-
-enum {
-	GF_DEMO	= 1 << 0
-};
 
 class MemoryManager;
 class ResourceManager;
@@ -140,17 +136,18 @@ private:
 	// Original game platform (PC/PSX)
 	static Common::Platform _platform;
 
+	PauseToken _gamePauseToken;
+
 protected:
 	// Engine APIs
-	virtual Common::Error run();
-	virtual GUI::Debugger *getDebugger();
-	virtual bool hasFeature(EngineFeature f) const;
-	virtual void syncSoundSettings();
-	virtual void pauseEngineIntern(bool pause);
+	Common::Error run() override;
+	bool hasFeature(EngineFeature f) const override;
+	void syncSoundSettings() override;
+	void pauseEngineIntern(bool pause) override;
 
 public:
-	Sword2Engine(OSystem *syst);
-	~Sword2Engine();
+	Sword2Engine(OSystem *syst, const ADGameDescription *gameDesc);
+	~Sword2Engine() override;
 
 	int getFramesPerSecond();
 
@@ -164,10 +161,10 @@ public:
 	void setSubtitles(bool b) { _useSubtitles = b; }
 
 	// GMM Loading/Saving
-	Common::Error saveGameState(int slot, const Common::String &desc);
-	bool canSaveGameStateCurrently();
-	Common::Error loadGameState(int slot);
-	bool canLoadGameStateCurrently();
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	bool canSaveGameStateCurrently() override;
+	Common::Error loadGameState(int slot) override;
+	bool canLoadGameStateCurrently() override;
 
 	uint32 _features;
 
@@ -178,6 +175,8 @@ public:
 	Mouse *_mouse;
 	Logic *_logic;
 	FontRenderer *_fontRenderer;
+
+	bool _isRTL;
 
 	Debugger *_debugger;
 
@@ -224,7 +223,7 @@ public:
 	bool saveExists();
 	bool saveExists(uint16 slotNo);
 	uint32 restoreFromBuffer(byte *buffer, uint32 size);
-	Common::String getSaveFileName(uint16 slotNo);
+	Common::String getSaveStateName(int slot) const override;
 	uint32 findBufferSize();
 
 	void startGame();
@@ -249,7 +248,7 @@ public:
 	// This is a bit hackish, of course :-).
 	uint32 getMillis();
 
-	//Used to check wether we are running PSX version
+	// Used to check whether we are running PSX version
 	static bool isPsx() { return _platform == Common::kPlatformPSX; }
 };
 

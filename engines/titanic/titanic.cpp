@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -46,7 +45,6 @@
 #include "common/debug-channels.h"
 #include "common/events.h"
 #include "common/scummsys.h"
-#include "common/translation.h"
 #include "engines/util.h"
 #include "graphics/scaler.h"
 #include "graphics/screen.h"
@@ -61,7 +59,6 @@ TitanicEngine::TitanicEngine(OSystem *syst, const TitanicGameDescription *gameDe
 		: _gameDescription(gameDesc), Engine(syst), _randomSource("Titanic") {
 	g_vm = this;
 	g_language = getLanguage();
-	_debugger = nullptr;
 	_events = nullptr;
 	_filesManager = nullptr;
 	_window = nullptr;
@@ -71,12 +68,6 @@ TitanicEngine::TitanicEngine(OSystem *syst, const TitanicGameDescription *gameDe
 	_script = nullptr;
 	CMusicRoom::_musicHandler = nullptr;
 	_loadSaveSlot = -1;
-
-	// Set up debug channels
-	DebugMan.addDebugChannel(kDebugCore, "core", "Core engine debug level");
-	DebugMan.addDebugChannel(kDebugScripts, "scripts", "Game scripts");
-	DebugMan.addDebugChannel(kDebugGraphics, "graphics", "Graphics handling");
-	DebugMan.addDebugChannel(kDebugStarfield, "starfield", "Starfield logic");
 }
 
 TitanicEngine::~TitanicEngine() {
@@ -94,7 +85,7 @@ bool TitanicEngine::initialize() {
 		return false;
 	}
 
-	_debugger = new Debugger(this);
+	setDebugger(new Debugger(this));
 
 	CSaveableObject::initClassList();
 	CEnterExitFirstClassState::init();
@@ -123,12 +114,10 @@ bool TitanicEngine::initialize() {
 
 	syncSoundSettings();
 
-	_window->applicationStarting();
-	return true;
+	return _window->applicationStarting();
 }
 
 void TitanicEngine::deinitialize() {
-	delete _debugger;
 	delete _events;
 	delete _window;
 	delete _screenManager;
@@ -190,7 +179,7 @@ void TitanicEngine::setRoomNames() {
 bool TitanicEngine::canLoadGameStateCurrently() {
 	CGameManager *gameManager = _window->_gameManager;
 	CScreenManager *screenMan = CScreenManager::_screenManagerPtr;
-	
+
 	if (!gameManager)
 		// Allow loading from copyright screen and continue dialogs
 		return true;
@@ -234,19 +223,15 @@ Common::Error TitanicEngine::loadGameState(int slot) {
 	return Common::kNoError;
 }
 
-Common::Error TitanicEngine::saveGameState(int slot, const Common::String &desc) {
+Common::Error TitanicEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	_window->_project->saveGame(slot, desc);
 	return Common::kNoError;
-}
-
-CString TitanicEngine::generateSaveName(int slot) {
-	return CString::format("%s.%03d", _targetName.c_str(), slot);
 }
 
 CString TitanicEngine::getSavegameName(int slot) {
 	// Try and open up the savegame for access
 	Common::InSaveFile *in = g_system->getSavefileManager()->openForLoading(
-		generateSaveName(slot));
+		getSaveStateName(slot));
 
 	if (in) {
 		// Read in the savegame header data
@@ -274,61 +259,6 @@ void TitanicEngine::syncSoundSettings() {
 			pet->syncSoundSettings();
 		}
 	}
-}
-
-void TitanicEngine::GUIError(const char *msg, ...) {
-	char buffer[STRINGBUFLEN];
-	va_list va;
-
-	// Generate the full error message
-	va_start(va, msg);
-	vsnprintf(buffer, STRINGBUFLEN, msg, va);
-	va_end(va);
-
-	GUIErrorMessage(buffer);
-}
-
-
-void TitanicEngine::showScummVMSaveDialog() {
-	if (!canSaveGameStateCurrently())
-		return;
-
-	GUI::SaveLoadChooser *dialog = new GUI::SaveLoadChooser(_("Save game:"), _("Save"), true);
-
-	pauseEngine(true);
-	int slot = dialog->runModalWithCurrentTarget();
-	pauseEngine(false);
-
-	if (slot >= 0) {
-		Common::String desc = dialog->getResultString();
-
-		if (desc.empty()) {
-			// create our own description for the saved game, the user didn't enter it
-			desc = dialog->createDefaultSaveDescription(slot);
-		}
-
-		// Save the game
-		saveGameState(slot, desc);
-	}
-
-	delete dialog;
-}
-
-void TitanicEngine::showScummVMRestoreDialog() {
-	if (!canLoadGameStateCurrently())
-		return;
-
-	GUI::SaveLoadChooser *dialog = new GUI::SaveLoadChooser(_("Restore game:"), _("Restore"), false);
-
-	pauseEngine(true);
-	int slot = dialog->runModalWithCurrentTarget();
-	pauseEngine(false);
-
-	if (slot >= 0) {
-		loadGameState(slot);
-	}
-
-	delete dialog;
 }
 
 } // End of namespace Titanic

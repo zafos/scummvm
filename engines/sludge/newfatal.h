@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,27 +15,54 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 #ifndef SLUDGE_NEWFATAL_H
 #define SLUDGE_NEWFATAL_H
 
 #include "common/str.h"
-
-#include "sludge/errors.h"
+#include "common/singleton.h"
 
 namespace Sludge {
 
-bool hasFatal();
+class FatalMsgManager : public Common::Singleton<Sludge::FatalMsgManager>{
+public:
+	FatalMsgManager();
+	~FatalMsgManager() override;
 
-int fatal(const Common::String &str);
-int fatal(const Common::String &str1, const Common::String &str2);
+	void reset();
+
+	bool hasFatal();
+	int fatal(const Common::String &str);
+	void setFatalInfo(const Common::String &userFunc, const Common::String &BIF);
+	void setResourceForFatal(int n);
+
+private:
+	Common::String _fatalMessage;
+	Common::String _fatalInfo;
+
+	int _resourceForFatal;
+};
+
+inline bool hasFatal() {
+	return FatalMsgManager::instance().hasFatal();
+}
+
+inline int fatal(const Common::String &str) {
+	return FatalMsgManager::instance().fatal(str);
+}
+
+inline void setFatalInfo(const Common::String &userFunc, const Common::String &BIF) {
+	FatalMsgManager::instance().setFatalInfo(userFunc, BIF);
+}
+
+inline void setResourceForFatal(int n) {
+	FatalMsgManager::instance().setResourceForFatal(n);
+}
+
 int checkNew(const void *mem);
-void setFatalInfo(const Common::String &userFunc, const Common::String &BIF);
-void setResourceForFatal(int n);
-const Common::String resourceNameFromNum(int i);
+int fatal(const Common::String &str1, const Common::String &str2);
 
 } // End of namespace Sludge
 

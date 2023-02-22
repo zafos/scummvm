@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,7 +30,6 @@ Lights::Lights(BladeRunnerEngine *vm) {
 	_ambientLightColor.g = 0.0;
 	_ambientLightColor.b = 0.0;
 
-	_lights.clear();
 	_frame = 0;
 }
 
@@ -45,7 +43,7 @@ void Lights::read(Common::ReadStream *stream, int frameCount) {
 	_ambientLightColor.b = stream->readFloatLE();
 
 	uint _lightCount = stream->readUint32LE();
-	for (uint i = 0; i < _lightCount; i++) {
+	for (uint i = 0; i < _lightCount; ++i) {
 		Light *light;
 		int type = stream->readUint32LE();
 		switch (type) {
@@ -74,7 +72,7 @@ void Lights::read(Common::ReadStream *stream, int frameCount) {
 }
 
 void Lights::removeAnimated() {
-	for (int i = (int)(_lights.size() - 1); i >= 0; i--) {
+	for (int i = (int)(_lights.size() - 1); i >= 0; --i) {
 		if (_lights[i]->_animated) {
 			delete _lights.remove_at(i);
 		}
@@ -83,12 +81,13 @@ void Lights::removeAnimated() {
 
 void Lights::readVqa(Common::ReadStream *stream) {
 	removeAnimated();
-	if (stream->eos())
+	if (stream->eos()) {
 		return;
+	}
 
 	int frameCount = stream->readUint32LE();
 	int count = stream->readUint32LE();
-	for (int i = 0; i < count; i++) {
+	for (int i = 0; i < count; ++i) {
 		int lightType = stream->readUint32LE();
 		Light *light;
 		switch (lightType) {
@@ -120,13 +119,13 @@ void Lights::setupFrame(int frame) {
 		return;
 	}
 
-	for (uint i = 0; i < _lights.size(); i++) {
+	for (uint i = 0; i < _lights.size(); ++i) {
 		_lights[i]->setupFrame(frame);
 	}
 }
 
 void Lights::reset() {
-	for (int i = (int)(_lights.size() - 1); i >= 0; i--) {
+	for (int i = (int)(_lights.size() - 1); i >= 0; --i) {
 		delete _lights.remove_at(i);
 	}
 	_lights.clear();

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,12 +42,18 @@ TextResource::~TextResource() {
 	delete[] _strings;
 }
 
-bool TextResource::open(const Common::String &name) {
+bool TextResource::open(const Common::String &name, bool localized) {
 	assert(name.size() <= 8);
 
-	Common::String resName = Common::String::format("%s.TR%s", name.c_str(), _vm->_languageCode.c_str());
+	Common::String resName;
+	if (localized) {
+		resName = Common::String::format("%s.TR%s", name.c_str(), _vm->_languageCode.c_str());
+	} else {
+		resName = Common::String::format("%s.TRE", name.c_str());
+	}
 	Common::ScopedPtr<Common::SeekableReadStream> s(_vm->getResourceStream(resName));
 	if (!s) {
+		warning("TextResource::open(): Can not open %s", resName.c_str());
 		return false;
 	}
 
@@ -79,9 +84,9 @@ bool TextResource::open(const Common::String &name) {
 	s->read(_strings, remain);
 
 #if BLADERUNNER_DEBUG_CONSOLE
-	debug("\n%s\n----------------", resName);
+	debug("\n%s\n----------------", resName.c_str());
 	for (uint32 i = 0; i != (uint32)_count; ++i) {
-		debug("%3d: %s", i, getText(i));
+		debug("%3d: %s", _ids[i], getText(_ids[i]));
 	}
 #endif
 
@@ -95,6 +100,18 @@ const char *TextResource::getText(uint32 id) const {
 		}
 	}
 
+	return "";
+}
+
+const char *TextResource::getOuttakeTextByFrame(uint32 frame) const {
+	for (uint32 i = 0; i != _count; ++i) {
+		//debug("Checking %d - so within: %d , %d", _ids[i], (0x0000FFFF & _ids[i]), ((_ids[i] >> 16) & 0x0000FFFF ) );
+		if ((frame >= (0x0000FFFF & _ids[i]) )   && (frame <  ((_ids[i] >> 16) & 0x0000FFFF ) )) {
+			// we found an id with lower 16bits smaller or equal to our frame key
+			// and with higher 16 bits higher than the frame key
+			return _strings + _offsets[i];
+		}
+	}
 	return "";
 }
 

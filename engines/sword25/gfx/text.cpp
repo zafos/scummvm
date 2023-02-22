@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,6 +27,7 @@
  * Licensed under GNU GPL v2
  *
  */
+#include "common/unicode-bidi.h"
 
 #include "sword25/kernel/kernel.h"
 #include "sword25/kernel/outputpersistenceblock.h"
@@ -46,7 +46,7 @@ const uint32 AUTO_WRAP_THRESHOLD_DEFAULT = 300;
 
 Text::Text(RenderObjectPtr<RenderObject> parentPtr) :
 	RenderObject(parentPtr, RenderObject::TYPE_TEXT),
-	_modulationColor(0xffffffff),
+	_modulationColor(BS_ARGBMASK),
 	_autoWrap(false),
 	_autoWrapThreshold(AUTO_WRAP_THRESHOLD_DEFAULT) {
 
@@ -55,7 +55,7 @@ Text::Text(RenderObjectPtr<RenderObject> parentPtr) :
 Text::Text(InputPersistenceBlock &reader, RenderObjectPtr<RenderObject> parentPtr, uint handle) :
 		RenderObject(parentPtr, TYPE_TEXT, handle),
 		// Temporarily set fields prior to unpersisting actual values
-		_modulationColor(0xffffffff),
+		_modulationColor(BS_ARGBMASK),
 		_autoWrap(false),
 		_autoWrapThreshold(AUTO_WRAP_THRESHOLD_DEFAULT) {
 
@@ -96,7 +96,7 @@ void Text::setText(const Common::String &text) {
 }
 
 void Text::setColor(uint32 modulationColor) {
-	uint32 newModulationColor = (modulationColor & 0x00ffffff) | (_modulationColor & 0xff000000);
+	uint32 newModulationColor = (modulationColor & BS_RGBMASK) | (_modulationColor & BS_AMASK);
 	if (newModulationColor != _modulationColor) {
 		_modulationColor = newModulationColor;
 		forceRefresh();
@@ -105,7 +105,7 @@ void Text::setColor(uint32 modulationColor) {
 
 void Text::setAlpha(int alpha) {
 	assert(alpha >= 0 && alpha < 256);
-	uint32 newModulationColor = (_modulationColor & 0xffffff) | (alpha << 24);
+	uint32 newModulationColor = (_modulationColor & BS_RGBMASK) | (alpha << BS_ASHIFT);
 	if (newModulationColor != _modulationColor) {
 		_modulationColor = newModulationColor;
 		forceRefresh();
@@ -218,6 +218,7 @@ void Text::updateFormat() {
 	FontResource *fontPtr = lockFontResource();
 	assert(fontPtr);
 
+	bool isRTL = Kernel::getInstance()->getGfx()->isRTL();
 	updateMetrics(*fontPtr);
 
 	_lines.resize(1);
@@ -260,6 +261,10 @@ void Text::updateFormat() {
 					curLineHeight = curCharRect.height();
 			}
 
+            if (isRTL) {
+                _lines[curLine].text = Common::convertBiDiString(_lines[curLine].text, Common::kWindows1255);
+            }
+
 			_lines[curLine].bbox.right = curLineWidth;
 			_lines[curLine].bbox.bottom = curLineHeight;
 			if ((uint)_width < curLineWidth)
@@ -287,10 +292,14 @@ void Text::updateFormat() {
 			_height += bbox.height();
 		}
 	} else {
-		// No auto format, so all the text is copied to a single line.
-		_lines[0].text = _text;
-		_lines[0].bbox = Common::Rect(0, 0, _width, _height);
-	}
+        if (isRTL) {
+            _lines[0].text = Common::convertBiDiString(_text, Common::kWindows1255);
+        } else {
+            // No auto format, so all the text is copied to a single line.
+            _lines[0].text = _text;
+        }
+        _lines[0].bbox = Common::Rect(0, 0, _width, _height);
+    }
 
 	fontPtr->release();
 }

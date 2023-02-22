@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,13 +15,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "bladerunner/adpcm_decoder.h"
 
+#include "common/endian.h"
 #include "common/util.h"
 
 namespace BladeRunner {
@@ -122,7 +122,7 @@ uint16 imaStepTable[712] = {
  0x0fff,0x2ffe,0x4ffe,0x6ffd,0x8ffe,0xaffd,0xcffd,0xeffc
 };
 
-void ADPCMWestwoodDecoder::decode(uint8 *in, size_t size, int16 *out) {
+void ADPCMWestwoodDecoder::decode(uint8 *in, size_t size, int16 *out, bool forceLittleEndianOut) {
 	uint8 *end = in + size;
 
 	int16 stepIndex = _stepIndex;
@@ -149,8 +149,18 @@ void ADPCMWestwoodDecoder::decode(uint8 *in, size_t size, int16 *out) {
 
 			predictor = CLIP<int32>(predictor, -32768, 32767);
 
-			*out++ = (int16)predictor;
-
+			if (out) {
+				if (forceLittleEndianOut) {
+					// Bugfix:
+					// enforce "little-endian" type of output for VQA audio stream
+					// This is needed for Big Endian platforms to behave correctly in raw audio streams in VQA videos
+					// because in VQADecoder::VQAAudioTrack::decodeAudioFrame() a raw stream is created for the audio
+					// with the explicit flag: FLAG_LITTLE_ENDIAN
+					WRITE_LE_INT16(out++, (int16)predictor);
+				} else {
+					*out++ = (int16)predictor;
+				}
+			}
 			stepIndex = imaIndexTable[code] + stepIndex;
 			stepIndex = CLIP<int16>(stepIndex, 0, 88);
 		}

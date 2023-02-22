@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,36 +15,35 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#include <curl/curl.h>
 #include "backends/networking/curl/curlrequest.h"
 #include "backends/networking/curl/connectionmanager.h"
 #include "backends/networking/curl/networkreadstream.h"
 #include "common/textconsole.h"
-#include <curl/curl.h>
 
 namespace Networking {
 
 CurlRequest::CurlRequest(DataCallback cb, ErrorCallback ecb, Common::String url):
 	Request(cb, ecb), _url(url), _stream(nullptr), _headersList(nullptr), _bytesBuffer(nullptr),
-	_bytesBufferSize(0), _uploading(false), _usingPatch(false) {}
+	_bytesBufferSize(0), _uploading(false), _usingPatch(false), _keepAlive(false), _keepAliveIdle(120), _keepAliveInterval(60) {}
 
 CurlRequest::~CurlRequest() {
 	delete _stream;
-	delete _bytesBuffer;
+	delete[] _bytesBuffer;
 }
 
 NetworkReadStream *CurlRequest::makeStream() {
 	if (_bytesBuffer)
-		return new NetworkReadStream(_url.c_str(), _headersList, _bytesBuffer, _bytesBufferSize, _uploading, _usingPatch, true);
+		return new NetworkReadStream(_url.c_str(), _headersList, _bytesBuffer, _bytesBufferSize, _uploading, _usingPatch, true, _keepAlive, _keepAliveIdle, _keepAliveInterval);
 	if (!_formFields.empty() || !_formFiles.empty())
-		return new NetworkReadStream(_url.c_str(), _headersList, _formFields, _formFiles);
-	return new NetworkReadStream(_url.c_str(), _headersList, _postFields, _uploading, _usingPatch);
+		return new NetworkReadStream(_url.c_str(), _headersList, _formFields, _formFiles, _keepAlive, _keepAliveIdle, _keepAliveInterval);
+	return new NetworkReadStream(_url.c_str(), _headersList, _postFields, _uploading, _usingPatch, _keepAlive, _keepAliveIdle, _keepAliveInterval);
 }
 
 void CurlRequest::handle() {
@@ -53,7 +52,7 @@ void CurlRequest::handle() {
 	if (_stream && _stream->eos()) {
 		if (_stream->httpResponseCode() != 200) {
 			warning("CurlRequest: HTTP response code is not 200 OK (it's %ld)", _stream->httpResponseCode());
-			ErrorResponse error(this, false, true, "", _stream->httpResponseCode());
+			ErrorResponse error(this, false, true, "HTTP response code is not 200 OK", _stream->httpResponseCode());
 			finishError(error);
 			return;
 		}
@@ -71,20 +70,9 @@ void CurlRequest::restart() {
 
 Common::String CurlRequest::date() const {
 	if (_stream) {
-		Common::String headers = _stream->responseHeaders();
-		const char *cstr = headers.c_str();
-		const char *position = strstr(cstr, "Date: ");
-
-		if (position) {
-			Common::String result = "";
-			char c;
-			for (const char *i = position + 6; c = *i, c != 0; ++i) {
-				if (c == '\n' || c == '\r')
-					break;
-				result += c;
-			}
-			return result;
-		}
+		Common::HashMap<Common::String, Common::String> headers = _stream->responseHeadersMap();
+		if (headers.contains("date"))
+			return headers["date"];
 	}
 	return "";
 }
@@ -138,7 +126,7 @@ void CurlRequest::setBuffer(byte *buffer, uint32 size) {
 		warning("CurlRequest: added POST fields would be ignored, because buffer added");
 
 	if (_bytesBuffer)
-		delete _bytesBuffer;
+		delete[] _bytesBuffer;
 
 	_bytesBuffer = buffer;
 	_bytesBufferSize = size;
@@ -147,6 +135,16 @@ void CurlRequest::setBuffer(byte *buffer, uint32 size) {
 void CurlRequest::usePut() { _uploading = true; }
 
 void CurlRequest::usePatch() { _usingPatch = true; }
+
+void CurlRequest::connectionKeepAlive(long idle, long interval) {
+	_keepAlive = true;
+	_keepAliveIdle = idle;
+	_keepAliveInterval = interval;
+}
+
+void CurlRequest::connectionClose() {
+	_keepAlive = false;
+}
 
 NetworkReadStreamResponse CurlRequest::execute() {
 	if (!_stream) {
@@ -158,5 +156,11 @@ NetworkReadStreamResponse CurlRequest::execute() {
 }
 
 const NetworkReadStream *CurlRequest::getNetworkReadStream() const { return _stream; }
+
+void CurlRequest::wait(int spinlockDelay) {
+	while (state() == Networking::PROCESSING) {
+		g_system->delayMillis(spinlockDelay);
+	}
+}
 
 } // End of namespace Networking

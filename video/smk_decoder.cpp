@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,20 +15,20 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 // Based on http://wiki.multimedia.cx/index.php?title=Smacker
 // and the FFmpeg Smacker decoder (libavcodec/smacker.c), revision 16143
-// http://git.ffmpeg.org/?p=ffmpeg;a=blob;f=libavcodec/smacker.c;hb=b8437a00a2f14d4a437346455d624241d726128e
+// https://git.ffmpeg.org/gitweb/ffmpeg.git/commit/40a19c443430de520d86bbd644033c8e2ca87e9b
 
 #include "video/smk_decoder.h"
 
 #include "common/endian.h"
 #include "common/util.h"
 #include "common/stream.h"
+#include "common/bitarray.h"
 #include "common/bitstream.h"
 #include "common/system.h"
 #include "common/textconsole.h"
@@ -53,9 +53,9 @@ enum SmkBlockTypes {
 
 class SmallHuffmanTree {
 public:
-	SmallHuffmanTree(Common::BitStreamMemory8LSB &bs);
+	SmallHuffmanTree(SmackerBitStream &bs);
 
-	uint16 getCode(Common::BitStreamMemory8LSB &bs);
+	uint16 getCode(SmackerBitStream &bs);
 private:
 	enum {
 		SMK_NODE = 0x8000
@@ -69,26 +69,31 @@ private:
 	uint16 _prefixtree[256];
 	byte _prefixlength[256];
 
-	Common::BitStreamMemory8LSB &_bs;
+	SmackerBitStream &_bs;
+	bool _empty;
 };
 
-SmallHuffmanTree::SmallHuffmanTree(Common::BitStreamMemory8LSB &bs)
-	: _treeSize(0), _bs(bs) {
-	uint32 bit = _bs.getBit();
-	assert(bit);
+SmallHuffmanTree::SmallHuffmanTree(SmackerBitStream &bs)
+	: _treeSize(0), _bs(bs), _empty(false) {
+	if (!_bs.getBit()) {
+		_empty = true;
+		return;
+	}
 
 	for (uint16 i = 0; i < 256; ++i)
 		_prefixtree[i] = _prefixlength[i] = 0;
 
 	decodeTree(0, 0);
 
-	bit = _bs.getBit();
-	assert(!bit);
+	(void)_bs.getBit();
 }
 
 uint16 SmallHuffmanTree::decodeTree(uint32 prefix, int length) {
+	if (_empty)
+		return 0;
+
 	if (!_bs.getBit()) { // Leaf
-		_tree[_treeSize] = _bs.getBits(8);
+		_tree[_treeSize] = _bs.getBits<8>();
 
 		if (length <= 8) {
 			for (int i = 0; i < 256; i += (1 << length)) {
@@ -117,8 +122,14 @@ uint16 SmallHuffmanTree::decodeTree(uint32 prefix, int length) {
 	return r1+r2+1;
 }
 
-uint16 SmallHuffmanTree::getCode(Common::BitStreamMemory8LSB &bs) {
-	byte peek = bs.peekBits(MIN<uint32>(bs.size() - bs.pos(), 8));
+uint16 SmallHuffmanTree::getCode(SmackerBitStream &bs) {
+	if (_empty)
+		return 0;
+
+	// Peeking data out of bounds is well-defined and returns 0 bits.
+	// This is for convenience when using speed-up techniques reading
+	// more bits than actually available.
+	byte peek = bs.peekBits<8>();
 	uint16 *p = &_tree[_prefixtree[peek]];
 	bs.skip(_prefixlength[peek]);
 
@@ -138,11 +149,11 @@ uint16 SmallHuffmanTree::getCode(Common::BitStreamMemory8LSB &bs) {
 
 class BigHuffmanTree {
 public:
-	BigHuffmanTree(Common::BitStreamMemory8LSB &bs, int allocSize);
+	BigHuffmanTree(SmackerBitStream &bs, int allocSize);
 	~BigHuffmanTree();
 
 	void reset();
-	uint32 getCode(Common::BitStreamMemory8LSB &bs);
+	uint32 getCode(SmackerBitStream &bs);
 private:
 	enum {
 		SMK_NODE = 0x80000000
@@ -158,13 +169,13 @@ private:
 	byte _prefixlength[256];
 
 	/* Used during construction */
-	Common::BitStreamMemory8LSB &_bs;
+	SmackerBitStream &_bs;
 	uint32 _markers[3];
 	SmallHuffmanTree *_loBytes;
 	SmallHuffmanTree *_hiBytes;
 };
 
-BigHuffmanTree::BigHuffmanTree(Common::BitStreamMemory8LSB &bs, int allocSize)
+BigHuffmanTree::BigHuffmanTree(SmackerBitStream &bs, int allocSize)
 	: _bs(bs) {
 	uint32 bit = _bs.getBit();
 	if (!bit) {
@@ -180,17 +191,16 @@ BigHuffmanTree::BigHuffmanTree(Common::BitStreamMemory8LSB &bs, int allocSize)
 	_loBytes = new SmallHuffmanTree(_bs);
 	_hiBytes = new SmallHuffmanTree(_bs);
 
-	_markers[0] = _bs.getBits(16);
-	_markers[1] = _bs.getBits(16);
-	_markers[2] = _bs.getBits(16);
+	_markers[0] = _bs.getBits<16>();
+	_markers[1] = _bs.getBits<16>();
+	_markers[2] = _bs.getBits<16>();
 
 	_last[0] = _last[1] = _last[2] = 0xffffffff;
 
 	_treeSize = 0;
 	_tree = new uint32[allocSize / 4];
 	decodeTree(0, 0);
-	bit = _bs.getBit();
-	assert(!bit);
+	(void)_bs.getBit();
 
 	for (uint32 i = 0; i < 3; ++i) {
 		if (_last[i] == 0xffffffff) {
@@ -255,8 +265,11 @@ uint32 BigHuffmanTree::decodeTree(uint32 prefix, int length) {
 	return r1+r2+1;
 }
 
-uint32 BigHuffmanTree::getCode(Common::BitStreamMemory8LSB &bs) {
-	byte peek = bs.peekBits(MIN<uint32>(bs.size() - bs.pos(), 8));
+uint32 BigHuffmanTree::getCode(SmackerBitStream &bs) {
+	// Peeking data out of bounds is well-defined and returns 0 bits.
+	// This is for convenience when using speed-up techniques reading
+	// more bits than actually available.
+	byte peek = bs.peekBits<8>();
 	uint32 *p = &_tree[_prefixtree[peek]];
 	bs.skip(_prefixlength[peek]);
 
@@ -287,6 +300,16 @@ SmackerDecoder::~SmackerDecoder() {
 	close();
 }
 
+uint32 SmackerDecoder::getSignatureVersion(uint32 signature) const {
+	if (signature == MKTAG('S', 'M', 'K', '2')) {
+		return 2;
+	} else if (signature == MKTAG('S', 'M', 'K', '4')) {
+		return 4;
+	} else {
+		return 0;
+	}
+}
+
 bool SmackerDecoder::loadStream(Common::SeekableReadStream *stream) {
 	close();
 
@@ -295,7 +318,8 @@ bool SmackerDecoder::loadStream(Common::SeekableReadStream *stream) {
 	// Read in the Smacker header
 	_header.signature = _fileStream->readUint32BE();
 
-	if (_header.signature != MKTAG('S', 'M', 'K', '2') && _header.signature != MKTAG('S', 'M', 'K', '4'))
+	uint32 version = getSignatureVersion(_header.signature);
+	if (version == 0)
 		return false;
 
 	uint32 width = _fileStream->readUint32LE();
@@ -319,8 +343,10 @@ bool SmackerDecoder::loadStream(Common::SeekableReadStream *stream) {
 	// If bits 1 or 2 are set, the frame should be scaled to twice its height
 	// before it is displayed.
 	_header.flags = _fileStream->readUint32LE();
+	if (_header.flags & 1)
+		frameCount++;
 
-	SmackerVideoTrack *videoTrack = createVideoTrack(width, height, frameCount, frameRate, _header.flags, _header.signature);
+	SmackerVideoTrack *videoTrack = createVideoTrack(width, height, frameCount, frameRate, _header.flags, version);
 	addTrack(videoTrack);
 
 	// TODO: should we do any extra processing for Smacker files with ring frames?
@@ -369,6 +395,8 @@ bool SmackerDecoder::loadStream(Common::SeekableReadStream *stream) {
 				warning("Unhandled Smacker v2 audio compression");
 
 			addTrack(new SmackerAudioTrack(_header.audioInfo[i], getSoundType()));
+		} else {
+			addTrack(new SmackerEmptyTrack());
 		}
 	}
 
@@ -385,7 +413,7 @@ bool SmackerDecoder::loadStream(Common::SeekableReadStream *stream) {
 	byte *huffmanTrees = (byte *) malloc(_header.treesSize);
 	_fileStream->read(huffmanTrees, _header.treesSize);
 
-	Common::BitStreamMemory8LSB bs(new Common::BitStreamMemoryStream(huffmanTrees, _header.treesSize, DisposeAfterUse::YES), DisposeAfterUse::YES);
+	SmackerBitStream bs(new Common::BitStreamMemoryStream(huffmanTrees, _header.treesSize, DisposeAfterUse::YES), DisposeAfterUse::YES);
 	videoTrack->readTrees(bs, _header.mMapSize, _header.mClrSize, _header.fullSize, _header.typeSize);
 
 	_firstFrameStart = _fileStream->pos();
@@ -414,6 +442,49 @@ bool SmackerDecoder::rewind() {
 	// And seek back to where the first frame begins
 	_fileStream->seek(_firstFrameStart);
 	return true;
+}
+
+void SmackerDecoder::forceSeekToFrame(uint frame) {
+	uint seekFrame;
+	if (frame >= 10)
+		seekFrame = MAX<uint>(frame - 10, 0);
+	else
+		seekFrame = 0;
+
+	if (!isVideoLoaded())
+		return;
+
+	if (seekFrame >= getFrameCount())
+		return;
+
+	if (!rewind())
+		return;
+
+	stopAudio();
+	SmackerVideoTrack *videoTrack = (SmackerVideoTrack *)getTrack(0);
+	uint32 startPos = _fileStream->pos();
+	uint32 offset = 0;
+	for (uint32 i = 0; i < seekFrame; i++) {
+		videoTrack->increaseCurFrame();
+		// Frames with palette data contain palette entries which use
+		// the previous palette as their base. Therefore, we need to
+		// parse all palette entries up to the requested frame
+		if (_frameTypes[videoTrack->getCurFrame()] & 1) {
+			_fileStream->seek(startPos + offset, SEEK_SET);
+			videoTrack->unpackPalette(_fileStream);
+		}
+		offset += _frameSizes[i] & ~3;
+	}
+
+	if (!_fileStream->seek(startPos + offset, SEEK_SET))
+		return;
+
+	while (getCurFrame() < (int)frame) {
+		decodeNextFrame();
+	}
+
+	_lastTimeChange = videoTrack->getFrameTime(frame);
+	_startTime = g_system->getMillis() - (_lastTimeChange.msecs() / getRate()).toInt();
 }
 
 void SmackerDecoder::readNextPacket() {
@@ -468,7 +539,7 @@ void SmackerDecoder::readNextPacket() {
 
 	_fileStream->read(frameData, frameDataSize);
 
-	Common::BitStreamMemory8LSB bs(new Common::BitStreamMemoryStream(frameData, frameDataSize + 1, DisposeAfterUse::YES), DisposeAfterUse::YES);
+	SmackerBitStream bs(new Common::BitStreamMemoryStream(frameData, frameDataSize + 1, DisposeAfterUse::YES), DisposeAfterUse::YES);
 	videoTrack->decodeFrame(bs);
 
 	_fileStream->seek(startPos + frameSize);
@@ -517,13 +588,14 @@ VideoDecoder::AudioTrack *SmackerDecoder::getAudioTrack(int index) {
 	return (AudioTrack *)track;
 }
 
-SmackerDecoder::SmackerVideoTrack::SmackerVideoTrack(uint32 width, uint32 height, uint32 frameCount, const Common::Rational &frameRate, uint32 flags, uint32 signature) {
+SmackerDecoder::SmackerVideoTrack::SmackerVideoTrack(uint32 width, uint32 height, uint32 frameCount, const Common::Rational &frameRate, uint32 flags, uint32 version) {
 	_surface = new Graphics::Surface();
-	_surface->create(width, height * (flags ? 2 : 1), Graphics::PixelFormat::createFormatCLUT8());
+	_surface->create(width, height * ((flags & 6) ? 2 : 1), Graphics::PixelFormat::createFormatCLUT8());
+	_dirtyBlocks.set_size(width * height / 16);
 	_frameCount = frameCount;
 	_frameRate = frameRate;
 	_flags = flags;
-	_signature = signature;
+	_version = version;
 	_curFrame = -1;
 	_dirtyPalette = false;
 	_MMapTree = _MClrTree = _FullTree = _TypeTree = 0;
@@ -552,21 +624,22 @@ Graphics::PixelFormat SmackerDecoder::SmackerVideoTrack::getPixelFormat() const 
 	return _surface->format;
 }
 
-void SmackerDecoder::SmackerVideoTrack::readTrees(Common::BitStreamMemory8LSB &bs, uint32 mMapSize, uint32 mClrSize, uint32 fullSize, uint32 typeSize) {
+void SmackerDecoder::SmackerVideoTrack::readTrees(SmackerBitStream &bs, uint32 mMapSize, uint32 mClrSize, uint32 fullSize, uint32 typeSize) {
 	_MMapTree = new BigHuffmanTree(bs, mMapSize);
 	_MClrTree = new BigHuffmanTree(bs, mClrSize);
 	_FullTree = new BigHuffmanTree(bs, fullSize);
 	_TypeTree = new BigHuffmanTree(bs, typeSize);
 }
 
-void SmackerDecoder::SmackerVideoTrack::decodeFrame(Common::BitStreamMemory8LSB &bs) {
+void SmackerDecoder::SmackerVideoTrack::decodeFrame(SmackerBitStream &bs) {
 	_MMapTree->reset();
 	_MClrTree->reset();
 	_FullTree->reset();
 	_TypeTree->reset();
+	_dirtyBlocks.clear();
 
 	// Height needs to be doubled if we have flags (Y-interlaced or Y-doubled)
-	uint doubleY = _flags ? 2 : 1;
+	uint doubleY = (_flags & 6) ? 2 : 1;
 
 	uint bw = getWidth() / 4;
 	uint bh = getHeight() / doubleY / 4;
@@ -601,12 +674,13 @@ void SmackerDecoder::SmackerVideoTrack::decodeFrame(Common::BitStreamMemory8LSB 
 					}
 					map >>= 4;
 				}
+				_dirtyBlocks.set(block);
 				++block;
 			}
 			break;
 		case SMK_BLOCK_FULL:
 			// Smacker v2 has one mode, Smacker v4 has three
-			if (_signature == MKTAG('S','M','K','2')) {
+			if (_version == 2) {
 				mode = 0;
 			} else {
 				// 00 - mode 0
@@ -656,7 +730,7 @@ void SmackerDecoder::SmackerVideoTrack::decodeFrame(Common::BitStreamMemory8LSB 
 						for (i = 0; i < 2; i++) {
 							// We first get p2 and then p1
 							// Check ffmpeg thread "[PATCH] Smacker video decoder bug fix"
-							// http://article.gmane.org/gmane.comp.video.ffmpeg.devel/78768
+							// https://ffmpeg.org/pipermail/ffmpeg-devel/2008-December/044246.html
 							p2 = _FullTree->getCode(bs);
 							p1 = _FullTree->getCode(bs);
 							for (j = 0; j < doubleY; ++j) {
@@ -675,7 +749,10 @@ void SmackerDecoder::SmackerVideoTrack::decodeFrame(Common::BitStreamMemory8LSB 
 							}
 						}
 						break;
+					default:
+						break;
 				}
+				_dirtyBlocks.set(block);
 				++block;
 			}
 			break;
@@ -693,8 +770,11 @@ void SmackerDecoder::SmackerVideoTrack::decodeFrame(Common::BitStreamMemory8LSB 
 					out[0] = out[1] = out[2] = out[3] = col;
 					out += stride;
 				}
+				_dirtyBlocks.set(block);
 				++block;
 			}
+			break;
+		default:
 			break;
 		}
 	}
@@ -773,7 +853,7 @@ Audio::AudioStream *SmackerDecoder::SmackerAudioTrack::getAudioStream() const {
 }
 
 void SmackerDecoder::SmackerAudioTrack::queueCompressedBuffer(byte *buffer, uint32 bufferSize, uint32 unpackedSize) {
-	Common::BitStreamMemory8LSB audioBS(new Common::BitStreamMemoryStream(buffer, bufferSize), DisposeAfterUse::YES);
+	SmackerBitStream audioBS(new Common::BitStreamMemoryStream(buffer, bufferSize), DisposeAfterUse::YES);
 	bool dataPresent = audioBS.getBit();
 
 	if (!dataPresent)
@@ -800,16 +880,16 @@ void SmackerDecoder::SmackerAudioTrack::queueCompressedBuffer(byte *buffer, uint
 
 	if (isStereo) {
 		if (is16Bits) {
-			bases[1] = SWAP_BYTES_16(audioBS.getBits(16));
+			bases[1] = SWAP_BYTES_16(audioBS.getBits<16>());
 		} else {
-			bases[1] = audioBS.getBits(8);
+			bases[1] = audioBS.getBits<8>();
 		}
 	}
 
 	if (is16Bits) {
-		bases[0] = SWAP_BYTES_16(audioBS.getBits(16));
+		bases[0] = SWAP_BYTES_16(audioBS.getBits<16>());
 	} else {
-		bases[0] = audioBS.getBits(8);
+		bases[0] = audioBS.getBits<8>();
 	}
 
 	// The bases are the first samples, too
@@ -864,8 +944,88 @@ void SmackerDecoder::SmackerAudioTrack::queuePCM(byte *buffer, uint32 bufferSize
 	_audioStream->queueBuffer(buffer, bufferSize, DisposeAfterUse::YES, flags);
 }
 
-SmackerDecoder::SmackerVideoTrack *SmackerDecoder::createVideoTrack(uint32 width, uint32 height, uint32 frameCount, const Common::Rational &frameRate, uint32 flags, uint32 signature) const {
-	return new SmackerVideoTrack(width, height, frameCount, frameRate, flags, signature);
+SmackerDecoder::SmackerVideoTrack *SmackerDecoder::createVideoTrack(uint32 width, uint32 height, uint32 frameCount, const Common::Rational &frameRate, uint32 flags, uint32 version) const {
+	return new SmackerVideoTrack(width, height, frameCount, frameRate, flags, version);
+}
+
+Common::Rational SmackerDecoder::getFrameRate() const {
+	const SmackerVideoTrack *videoTrack = (const SmackerVideoTrack *)getTrack(0);
+
+	return videoTrack->getFrameRate();
+}
+
+const Common::Rect *SmackerDecoder::getNextDirtyRect() {
+	SmackerVideoTrack *videoTrack = (SmackerVideoTrack *)getTrack(0);
+
+	return videoTrack->getNextDirtyRect();
+}
+
+const Common::Rect *SmackerDecoder::SmackerVideoTrack::getNextDirtyRect() {
+	uint doubleY = (_flags & 6) ? 2 : 1;
+
+	uint bw = getWidth() / 4;
+	uint bh = getHeight() / 4;
+	uint blocks = bw*bh;
+
+	// Scan forward in dirty blocks bitarray for next dirty rect
+	uint block_idx = (_lastDirtyRect.left) / 4 + (_lastDirtyRect.top / 4 / doubleY) * bw;
+	while (block_idx < blocks && !_dirtyBlocks.get(block_idx)) {
+		++block_idx;
+	}
+	if (block_idx == blocks) {
+		_lastDirtyRect = Common::Rect();
+		return nullptr;
+	}
+
+	uint block_x0 = block_idx % bw;
+	uint block_y0 = block_idx / bw;
+
+	// Find the width of the dirty rect
+	uint block_x1 = block_x0 + 1;
+	while (block_x1 < bw && _dirtyBlocks.get(block_x1 + block_y0 * bw)) {
+		++block_x1;
+	}
+
+	// Find the height of the dirty rect
+	uint block_y1 = block_y0 + 1;
+	while (block_y1 < bh) {
+		// Check that the rect to the left of the next line isn't dirty
+		if (block_x0 != 0 && _dirtyBlocks.get(block_x0 - 1 + block_y1 * bw)) {
+			break;
+		}
+
+		// Check that all the rects on this line are dirty
+		uint bx;
+		for (bx = block_x0; bx != block_x1; ++bx) {
+			if (!_dirtyBlocks.get(bx + block_y1 * bw)) {
+				break;
+			}
+		}
+		if (bx != block_x1) {
+			break;
+		}
+
+		// Check that the rect to the right of this line isn't dirty
+		if (bx != bw && _dirtyBlocks.get(bx + block_y1 * bw)) {
+			break;
+		}
+		++block_y1;
+	}
+
+	// Undirty all the rects that we're returning
+	for (uint y = block_y0; y != block_y1; ++y) {
+		for (uint x = block_x0; x != block_x1; ++x) {
+			_dirtyBlocks.unset(x + y * bw);
+		}
+	}
+
+	_lastDirtyRect = Common::Rect(
+		int16(4 * block_x0),
+		int16(4 * block_y0 * doubleY),
+		int16(4 * block_x1),
+		int16(4 * block_y1 * doubleY)
+	);
+	return &_lastDirtyRect;
 }
 
 } // End of namespace Video

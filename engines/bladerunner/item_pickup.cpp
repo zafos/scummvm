@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,7 +26,9 @@
 #include "bladerunner/game_info.h"
 #include "bladerunner/slice_animations.h"
 #include "bladerunner/slice_renderer.h"
+#include "bladerunner/time.h"
 #include "bladerunner/zbuffer.h"
+#include "bladerunner/game_constants.h"
 
 namespace BladeRunner {
 
@@ -44,19 +45,20 @@ void ItemPickup::setup(int animationId, int screenX, int screenY) {
 	_animationId = animationId;
 	_animationFrame = 0;
 	_facing = 0.0;
-	_timeLeft = 3000;
+	_timeLeft = 3000u;
 	_scale = 0;
-	_screenX = CLIP(screenX, 40, 600);
-	_screenY = CLIP(screenY, 40, 440);
+	_screenX = CLIP(screenX, 40, BladeRunnerEngine::kOriginalGameWidth  - 40);
+	_screenY = CLIP(screenY, 40, BladeRunnerEngine::kOriginalGameHeight - 40);
 	_screenRect.left = _screenX - 40;
 	_screenRect.right = _screenX + 40;
 	_screenRect.top = _screenY - 40;
 	_screenRect.bottom = _screenY + 40;
 
-	int pan = (150 * _screenX - 48000) / 640;
-	_vm->_audioPlayer->playAud(_vm->_gameInfo->getSfxTrack(335), 80, pan, pan, 50, 0);
+	// map [0..640] to [-75..75]
+	int pan = (75 * (2 * _screenX - BladeRunnerEngine::kOriginalGameWidth)) / BladeRunnerEngine::kOriginalGameWidth;
+	_vm->_audioPlayer->playAud(_vm->_gameInfo->getSfxTrack(kSfxGETITEM1), 80, pan, pan, 50, 0);
 
-	_timeLast = _vm->getTotalPlayTime();
+	_timeLast = _vm->_time->currentSystem();
 }
 
 void ItemPickup::reset() {
@@ -66,24 +68,25 @@ void ItemPickup::reset() {
 	_facing = 0.0f;
 	_scale = 1.0f;
 	_animationFrame = 0;
-	_timeLeft = 0;
-	_timeLast = 0;
+	_timeLeft = 0u;
+	_timeLast = 0u;
 }
 
 void ItemPickup::tick() {
-	if (_timeLeft == 0) {
+	if (_timeLeft == 0u) {
 		return;
 	}
 
-	int timeNow = _vm->getTotalPlayTime();
-	int timeDiff = timeNow - _timeLast;
+	uint32 timeNow = _vm->_time->currentSystem();
+	// unsigned difference is intentional
+	uint32 timeDiff = timeNow - _timeLast;
 	_timeLast = timeNow;
-	timeDiff = MIN(MIN(timeDiff, 67), _timeLeft);
-	_timeLeft -= timeDiff;
+	timeDiff = MIN(MIN<uint32>(timeDiff, 67u), _timeLeft);
+	_timeLeft = (_timeLeft < timeDiff) ? 0 : (_timeLeft - timeDiff);
 
-	if (_timeLeft >= 2000) {
+	if (_timeLeft >= 2000u) {
 		_scale = 1.0f - (((2000.0f - _timeLeft) / 1000.0f) * ((2000.0f - _timeLeft) / 1000.0f));
-	} else if (_timeLeft < 1000) {
+	} else if (_timeLeft < 1000u) {
 		_scale = 1.0f - (((1000.0f - _timeLeft) / 1000.0f) * ((1000.0f - _timeLeft) / 1000.0f));
 	} else {
 		_scale = 1.0f;
@@ -99,7 +102,7 @@ void ItemPickup::tick() {
 }
 
 void ItemPickup::draw() {
-	if (_timeLeft == 0) {
+	if (_timeLeft == 0u) {
 		return;
 	}
 

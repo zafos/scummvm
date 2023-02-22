@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,6 +23,7 @@
 #include "mohawk/myst.h"
 #include "mohawk/graphics.h"
 #include "mohawk/myst_areas.h"
+#include "mohawk/myst_card.h"
 #include "mohawk/myst_state.h"
 #include "mohawk/myst_sound.h"
 #include "mohawk/video.h"
@@ -36,7 +36,7 @@ namespace Mohawk {
 namespace MystStacks {
 
 Selenitic::Selenitic(MohawkEngine_Myst *vm) :
-		MystScriptParser(vm),
+		MystScriptParser(vm, kSeleniticStack),
 		_state(vm->_gameState->_selenitic) {
 	setupOpcodes();
 
@@ -510,6 +510,8 @@ void Selenitic::mazeRunnerPlayVideo(uint16 video, uint16 pos) {
 		else
 			videoName = "backl0";
 		break;
+	default:
+		break;
 	}
 
 	if (!videoName.empty()) {
@@ -614,6 +616,7 @@ void Selenitic::o_soundReceiverSigma(uint16 var, const ArgumentsArray &args) {
 			source = 3;
 			break;
 		case 1:
+		default:
 			source = 0;
 			break;
 		case 2:
@@ -670,7 +673,7 @@ void Selenitic::soundReceiverLeftRight(uint direction) {
 
 	_soundReceiverDirection = direction;
 	_soundReceiverSpeed = kSoundReceiverSpeedSlow;
-	_soundReceiverStartTime = _vm->_system->getMillis();
+	_soundReceiverStartTime = _vm->getTotalPlayTime();
 
 	soundReceiverUpdate();
 }
@@ -798,6 +801,8 @@ MystAreaSlider *Selenitic::soundLockSliderFromVar(uint16 var) {
 		return _soundLockSlider4;
 	case 24:
 		return _soundLockSlider5;
+	default:
+		break;
 	}
 
 	return nullptr;
@@ -949,7 +954,7 @@ void Selenitic::o_mazeRunnerLight_init(uint16 var, const ArgumentsArray &args) {
 void Selenitic::soundReceiver_run() {
 	if (_soundReceiverStartTime) {
 		if (_soundReceiverDirection) {
-			uint32 currentTime = _vm->_system->getMillis();
+			uint32 currentTime = _vm->getTotalPlayTime();
 
 			if (_soundReceiverSpeed == kSoundReceiverSpeedFast && currentTime > _soundReceiverStartTime + 500) {
 				soundReceiverIncreaseSpeed();
@@ -984,6 +989,8 @@ void Selenitic::soundReceiverIncreaseSpeed() {
 		break;
 	case kSoundReceiverSpeedFaster:
 		// Can't go faster
+		break;
+	default:
 		break;
 	}
 }
@@ -1079,6 +1086,8 @@ void Selenitic::soundReceiverSolution(uint16 source, uint16 &solution, bool &ena
 		enabled = _state.emitterEnabledWind;
 		solution = 2122;
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1086,19 +1095,19 @@ void Selenitic::o_soundReceiver_init(uint16 var, const ArgumentsArray &args) {
 	// Used for Card 1245 (Sound Receiver)
 	_soundReceiverRunning = true;
 
-	_soundReceiverRightButton = _vm->getViewResource<MystAreaImageSwitch>(0);
-	_soundReceiverLeftButton = _vm->getViewResource<MystAreaImageSwitch>(1);
-	_soundReceiverSigmaButton = _vm->getViewResource<MystAreaImageSwitch>(2);
-	_soundReceiverSources[4] = _vm->getViewResource<MystAreaImageSwitch>(3);
-	_soundReceiverSources[3] = _vm->getViewResource<MystAreaImageSwitch>(4);
-	_soundReceiverSources[2] = _vm->getViewResource<MystAreaImageSwitch>(5);
-	_soundReceiverSources[1] = _vm->getViewResource<MystAreaImageSwitch>(6);
-	_soundReceiverSources[0] = _vm->getViewResource<MystAreaImageSwitch>(7);
-	_soundReceiverViewer = _vm->getViewResource<MystAreaImageSwitch>(8);
-	_soundReceiverAngle1 = _vm->getViewResource<MystAreaImageSwitch>(10);
-	_soundReceiverAngle2 = _vm->getViewResource<MystAreaImageSwitch>(11);
-	_soundReceiverAngle3 = _vm->getViewResource<MystAreaImageSwitch>(12);
-	_soundReceiverAngle4 = _vm->getViewResource<MystAreaImageSwitch>(13);
+	_soundReceiverRightButton = _vm->getCard()->getResource<MystAreaImageSwitch>(0);
+	_soundReceiverLeftButton = _vm->getCard()->getResource<MystAreaImageSwitch>(1);
+	_soundReceiverSigmaButton = _vm->getCard()->getResource<MystAreaImageSwitch>(2);
+	_soundReceiverSources[4] = _vm->getCard()->getResource<MystAreaImageSwitch>(3);
+	_soundReceiverSources[3] = _vm->getCard()->getResource<MystAreaImageSwitch>(4);
+	_soundReceiverSources[2] = _vm->getCard()->getResource<MystAreaImageSwitch>(5);
+	_soundReceiverSources[1] = _vm->getCard()->getResource<MystAreaImageSwitch>(6);
+	_soundReceiverSources[0] = _vm->getCard()->getResource<MystAreaImageSwitch>(7);
+	_soundReceiverViewer = _vm->getCard()->getResource<MystAreaImageSwitch>(8);
+	_soundReceiverAngle1 = _vm->getCard()->getResource<MystAreaImageSwitch>(10);
+	_soundReceiverAngle2 = _vm->getCard()->getResource<MystAreaImageSwitch>(11);
+	_soundReceiverAngle3 = _vm->getCard()->getResource<MystAreaImageSwitch>(12);
+	_soundReceiverAngle4 = _vm->getCard()->getResource<MystAreaImageSwitch>(13);
 
 	uint16 currentSource = _state.soundReceiverCurrentSource;
 	_soundReceiverPosition = &_state.soundReceiverPositions[currentSource];
@@ -1111,32 +1120,35 @@ void Selenitic::o_soundReceiver_init(uint16 var, const ArgumentsArray &args) {
 }
 
 void Selenitic::o_soundLock_init(uint16 var, const ArgumentsArray &args) {
-	for (uint i = 0; i < _vm->_resources.size(); i++) {
-		if (_vm->_resources[i]->hasType(kMystAreaSlider)) {
-			switch (_vm->_resources[i]->getImageSwitchVar()) {
+	for (uint i = 0; i < _vm->getCard()->_resources.size(); i++) {
+		if (_vm->getCard()->_resources[i]->hasType(kMystAreaSlider)) {
+			switch (_vm->getCard()->_resources[i]->getImageSwitchVar()) {
 			case 20:
-				_soundLockSlider1 = _vm->getViewResource<MystAreaSlider>(i);
+				_soundLockSlider1 = _vm->getCard()->getResource<MystAreaSlider>(i);
 				_soundLockSlider1->setStep(_state.soundLockSliderPositions[0]);
 				break;
 			case 21:
-				_soundLockSlider2 = _vm->getViewResource<MystAreaSlider>(i);
+				_soundLockSlider2 = _vm->getCard()->getResource<MystAreaSlider>(i);
 				_soundLockSlider2->setStep(_state.soundLockSliderPositions[1]);
 				break;
 			case 22:
-				_soundLockSlider3 = _vm->getViewResource<MystAreaSlider>(i);
+				_soundLockSlider3 = _vm->getCard()->getResource<MystAreaSlider>(i);
 				_soundLockSlider3->setStep(_state.soundLockSliderPositions[2]);
 				break;
 			case 23:
-				_soundLockSlider4 = _vm->getViewResource<MystAreaSlider>(i);
+				_soundLockSlider4 = _vm->getCard()->getResource<MystAreaSlider>(i);
 				_soundLockSlider4->setStep(_state.soundLockSliderPositions[3]);
 				break;
 			case 24:
-				_soundLockSlider5 = _vm->getViewResource<MystAreaSlider>(i);
+				_soundLockSlider5 = _vm->getCard()->getResource<MystAreaSlider>(i);
 				_soundLockSlider5->setStep(_state.soundLockSliderPositions[4]);
 				break;
+			default:
+				break;
 			}
-		} else if (_vm->_resources[i]->hasType(kMystAreaImageSwitch) && _vm->_resources[i]->getImageSwitchVar() == 28) {
-			_soundLockButton = _vm->getViewResource<MystAreaImageSwitch>(i);
+		} else if (_vm->getCard()->_resources[i]->hasType(kMystAreaImageSwitch)
+		           && _vm->getCard()->_resources[i]->getImageSwitchVar() == 28) {
+			_soundLockButton = _vm->getCard()->getResource<MystAreaImageSwitch>(i);
 		}
 	}
 

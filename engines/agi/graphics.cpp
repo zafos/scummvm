@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -65,10 +64,10 @@ GfxMgr::GfxMgr(AgiBase *vm, GfxFont *font) : _vm(vm), _font(font) {
 	_pixels = 0;
 	_displayPixels = 0;
 
-	_activeScreen = NULL;
-	_gameScreen = NULL;
-	_priorityScreen = NULL;
-	_displayScreen = NULL;
+	_activeScreen = nullptr;
+	_gameScreen = nullptr;
+	_priorityScreen = nullptr;
+	_displayScreen = nullptr;
 }
 
 /**
@@ -316,6 +315,13 @@ uint32 GfxMgr::getDisplayOffsetToVisualScreenPos(int16 x, int16 y) {
 
 // Attention: uses display screen coordinates!
 void GfxMgr::copyDisplayRectToScreen(int16 x, int16 y, int16 width, int16 height) {
+	// Clamp to sane values to prevent off screen blits causing exceptions in backend
+	// FIXME: Add warnings / debug of clamping?
+	width = CLIP<int16>(width, 0, _displayScreenWidth);
+	height = CLIP<int16>(height, 0, _displayScreenHeight);
+	x = CLIP<int16>(x, 0, _displayScreenWidth-width);
+	y = CLIP<int16>(y, 0, _displayScreenHeight-height);
+
 	g_system->copyRectToScreen(_displayScreen + y * _displayScreenWidth + x, _displayScreenWidth, x, y, width, height);
 }
 void GfxMgr::copyDisplayRectToScreen(int16 x, int16 adjX, int16 y, int16 adjY, int16 width, int16 adjWidth, int16 height, int16 adjHeight) {
@@ -1196,7 +1202,7 @@ void GfxMgr::shakeScreen(int16 repeatCount) {
 	int16 shakeHorizontalPixels = SHAKE_HORIZONTAL_PIXELS * (2 + _displayWidthMulAdjust);
 	int16 shakeVerticalPixels = SHAKE_VERTICAL_PIXELS * (1 + _displayHeightMulAdjust);
 
-	if ((blackSpace = (uint8 *)calloc(shakeHorizontalPixels * _displayScreenWidth, 1)) == NULL)
+	if ((blackSpace = (uint8 *)calloc(shakeHorizontalPixels * _displayScreenWidth, 1)) == nullptr)
 		return;
 
 	shakeCount = repeatCount * 8; // effectively 4 shakes per repeat
@@ -1306,7 +1312,7 @@ int16 GfxMgr::priorityToY(int16 priority) {
 	//  Dwarf is screen object 13 (view 152), gets fixed priority of 8, which would normally
 	//  result in a Y of 101. Ego is priority (non-fixed) 8, which would mean that dwarf is
 	//  drawn first, followed by ego, which would then draw ego over the dwarf.
-	//  For more information see bug #1712585 (dwarf sprite priority)
+	//  For more information see bug #3182 (dwarf sprite priority)
 	//
 	// This glitch is definitely present in 2.425, 2.936 and 3.002.086.
 	//
@@ -1378,7 +1384,7 @@ void GfxMgr::setAGIPal(int p0) {
 		return;
 
 	char filename[15];
-	sprintf(filename, "pal.%d", p0);
+	Common::sprintf_s(filename, "pal.%d", p0);
 
 	Common::File agipal;
 	if (!agipal.open(filename)) {

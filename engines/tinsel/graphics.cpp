@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Low level graphics interface.
  */
@@ -27,7 +26,6 @@
 #include "tinsel/palette.h"
 #include "tinsel/scene.h"
 #include "tinsel/tinsel.h"
-#include "tinsel/scn.h"
 
 #include "common/textconsole.h"
 
@@ -35,21 +33,27 @@ namespace Tinsel {
 
 //----------------- LOCAL DEFINES --------------------
 
-// Defines used in graphic drawing
-#define CHARPTR_OFFSET 16
-#define CHAR_WIDTH 4
-#define CHAR_HEIGHT 4
-
 extern uint8 g_transPalette[MAX_COLORS];
 
 //----------------- SUPPORT FUNCTIONS ---------------------
 
+// using ScummVM pixel format functions is too slow on some ports because of runtime overhead, let the compiler do the optimizations instead
+static inline void t3getRGB(uint16 color, uint8 &r, uint8 &g, uint8 &b) {
+	r = (color >> 11) & 0x1F;
+	g = (color >>  5) & 0x3F;
+	b = (color      ) & 0x1F;
+}
+
+static inline uint16 t3getColor(uint8 r, uint8 g, uint8 b) {
+	return ((r & 0x1F) << 11) | ((g & 0x3F) << 5) | (b & 0x1F);
+}
+
 /**
- * PSX Block list unwinder.
+ * PSX/Saturn Block list unwinder.
  * Chunk type 0x0003 (CHUNK_CHARPTR) in PSX version of DW 1 & 2 is compressed (original code
  * calls the compression PJCRLE), thus we need to decompress it before passing data to drawing functions
  */
-uint8* psxPJCRLEUnwinder(uint16 imageWidth, uint16 imageHeight, uint8 *srcIdx) {
+uint8* psxSaturnPJCRLEUnwinder(uint16 imageWidth, uint16 imageHeight, uint8 *srcIdx) {
 	uint32 remainingBlocks = 0;
 
 	uint16 compressionType = 0; // Kind of decompression to apply
@@ -58,8 +62,8 @@ uint8* psxPJCRLEUnwinder(uint16 imageWidth, uint16 imageHeight, uint8 *srcIdx) {
 
 	uint16 controlData;
 
-	uint8* dstIdx = NULL;
-	uint8* destinationBuffer = NULL;
+	uint8* dstIdx = nullptr;
+	uint8* destinationBuffer = nullptr;
 
 	if (!imageWidth || !imageHeight)
 		return NULL;
@@ -73,7 +77,7 @@ uint8* psxPJCRLEUnwinder(uint16 imageWidth, uint16 imageHeight, uint8 *srcIdx) {
 
 	while (remainingBlocks) { // Repeat until all blocks are decompressed
 		if (!controlBits) {
-			controlData = READ_16(srcIdx);
+			controlData = READ_LE_UINT16(srcIdx);
 			srcIdx += 2;
 
 			// If bit 15 of controlData is enabled, compression data is type 1.
@@ -92,7 +96,7 @@ uint8* psxPJCRLEUnwinder(uint16 imageWidth, uint16 imageHeight, uint8 *srcIdx) {
 			// If there is compression, we need to fetch an index
 			// to be treated as "base" for compression.
 			if (compressionType != 0) {
-				controlData = READ_16(srcIdx);
+				controlData = READ_LE_UINT16(srcIdx);
 				srcIdx += 2;
 				baseIndex = controlData;
 			}
@@ -114,7 +118,7 @@ uint8* psxPJCRLEUnwinder(uint16 imageWidth, uint16 imageHeight, uint8 *srcIdx) {
 		switch (compressionType) {
 			case 0: // No compression, plain copy of indexes
 				while (decremTiles) {
-					WRITE_LE_UINT16(dstIdx, READ_16(srcIdx));
+					WRITE_LE_UINT16(dstIdx, READ_LE_UINT16(srcIdx));
 					srcIdx += 2;
 					dstIdx += 2;
 					decremTiles--;
@@ -134,6 +138,8 @@ uint8* psxPJCRLEUnwinder(uint16 imageWidth, uint16 imageHeight, uint8 *srcIdx) {
 					dstIdx += 2;
 					decremTiles--;
 				}
+				break;
+			default:
 				break;
 		}
 	}
@@ -288,9 +294,9 @@ static void MacDrawTiles(DRAWOBJECT *pObj, uint8 *srcP, uint8 *destP, bool apply
 
 
 /**
- * Straight rendering with transparency support, PSX variant supporting also 4-BIT clut data
+ * Straight rendering with transparency support, PSX/Saturn variant supporting also 4-BIT clut data for PSX
  */
-static void PsxDrawTiles(DRAWOBJECT *pObj, uint8 *srcP, uint8 *destP, bool applyClipping, bool fourBitClut, uint32 psxSkipBytes, byte *psxMapperTable, bool transparency) {
+static void psxSaturnDrawTiles(DRAWOBJECT *pObj, uint8 *srcP, uint8 *destP, bool applyClipping, bool fourBitClut, uint32 psxSkipBytes, byte *psxMapperTable, bool transparency) {
 	// Set up the offset between destination blocks
 	int rightClip = applyClipping ? pObj->rightClip : 0;
 	Common::Rect boxBounds;
@@ -595,6 +601,134 @@ static void t2WrtNonZero(DRAWOBJECT *pObj, uint8 *srcP, uint8 *destP, bool apply
 	}
 }
 
+
+static void t3WrtNonZero(DRAWOBJECT *pObj, uint8 *srcP, uint8 *destP) {
+	bool applyClipping = (pObj->flags & DMA_CLIP) != 0;
+	bool horizFlipped = (pObj->flags & DMA_FLIPH) != 0;
+
+	if (pObj->isRLE)
+	{
+		int yClip = applyClipping ? pObj->topClip : 0;
+		if (applyClipping) {
+			pObj->height -= pObj->botClip;
+		}
+
+		for (int y = 0; y < pObj->height; ++y) {
+			uint8 *tempP = destP;
+			int leftClip = applyClipping ? pObj->leftClip : 0;
+			int rightClip = applyClipping ? pObj->rightClip : 0;
+
+			if (horizFlipped) {
+				SWAP(leftClip, rightClip);
+			}
+
+			int x = 0;
+			while (x < pObj->width) {
+				int numPixels = READ_LE_UINT16(srcP);
+				srcP += 2;
+
+				if (numPixels & 0x8000) {
+					numPixels &= 0x7FFF;
+
+					int clipAmount = MIN(numPixels, leftClip);
+					leftClip -= clipAmount;
+					x += clipAmount;
+
+					int runLength = numPixels - clipAmount;
+
+					uint16 color = READ_LE_UINT16(srcP);
+					srcP += 2;
+
+					if ((yClip == 0) && (runLength > 0)) {
+						runLength = MIN(runLength, pObj->width - rightClip - x);
+
+						for (int xp = 0; xp < runLength; ++xp) {
+							if (color != 0xF81F) { // "zero" for Tinsel 3 - magenta in 565
+								WRITE_UINT16(tempP, color);
+							}
+							tempP += (horizFlipped ? -2 : 2);
+						}
+					}
+
+					x += numPixels - clipAmount;
+				} else {
+					int clipAmount = MIN(numPixels, leftClip);
+					leftClip -= clipAmount;
+					srcP += clipAmount * 2;
+					int runLength = numPixels - clipAmount;
+					x += numPixels - runLength;
+
+					for (int xp = 0; xp < runLength; ++xp) {
+						if ((yClip == 0) && (x < (pObj->width - rightClip))) {
+							uint16 color = READ_LE_UINT16(srcP);
+
+							if (color != 0xF81F) { // "zero" for Tinsel 3 - magenta in 565
+								WRITE_UINT16(tempP, color);
+							}
+
+							tempP += (horizFlipped ? -2 : 2);
+						}
+						srcP += 2;
+						++x;
+					}
+				}
+			}
+			// assert(x == pObj->width);
+
+			if (yClip > 0) {
+				--yClip;
+			} else {
+				destP += SCREEN_WIDTH * 2;
+			}
+		}
+		return;
+	}
+
+	if (applyClipping) {
+		srcP += (pObj->topClip * pObj->width * 2);
+
+		pObj->height -= pObj->topClip + pObj->botClip;
+		pObj->width -= pObj->leftClip + pObj->rightClip;
+	}
+
+	for (int y = 0; y < pObj->height; ++y) {
+		uint8 *tempP = destP;
+		srcP += pObj->leftClip * 2;
+		for (int x = 0; x < pObj->width; ++x) {
+			uint16 color = READ_LE_UINT16(srcP);
+			srcP += 2;
+
+			if (color != 0xF81F) { // "zero" for Tinsel 3 - magenta in 565
+				WRITE_UINT16(tempP, color);
+			}
+
+			tempP += 2;
+		}
+		srcP += pObj->rightClip * 2;
+		destP += SCREEN_WIDTH * 2;
+	}
+}
+
+/**
+ * Fill the destination area with a constant color (Noir)
+ */
+static void t3WrtConst(DRAWOBJECT *pObj, bool applyClipping) {
+	if (applyClipping) {
+		pObj->height -= pObj->topClip + pObj->botClip;
+		pObj->width -= pObj->leftClip + pObj->rightClip;
+
+		if (pObj->width <= 0)
+			return;
+	}
+
+	Common::Rect rect;
+	rect.top = pObj->yPos;
+	rect.bottom = pObj->yPos + pObj->height;
+	rect.left = pObj->xPos;
+	rect.right = pObj->xPos + pObj->width;
+	_vm->screen().fillRect(rect, pObj->constant);
+}
+
 /**
  * Fill the destination area with a constant color
  */
@@ -614,6 +748,100 @@ static void WrtConst(DRAWOBJECT *pObj, uint8 *destP, bool applyClipping) {
 		--pObj->height;
 		destP += SCREEN_WIDTH;
 	}
+}
+
+/**
+ * Tinsel 3 Rendering with transparency support, run-length is not supported
+ */
+static void t3TransWNZ(DRAWOBJECT *pObj, uint8 *srcP, uint8 *destP) {
+	bool applyClipping = (pObj->flags & DMA_CLIP) != 0;
+
+	if (applyClipping) {
+		srcP += (pObj->topClip * pObj->width * 2);
+
+		pObj->height -= pObj->topClip + pObj->botClip;
+		pObj->width -= pObj->leftClip + pObj->rightClip;
+	}
+
+	for (int y = 0; y < pObj->height; ++y) {
+		// Get the position to start writing out from
+		uint8 *tempP = destP;
+		srcP += pObj->leftClip * 2;
+		for (int x = 0; x < pObj->width; ++x) {
+			uint32 color = READ_LE_UINT16(srcP); //uint32 for checking overflow in blending
+			if (color != 0xF81F) { // "zero" for Tinsel 3 - magenta in 565
+				uint8 srcR, srcG, srcB;
+				t3getRGB(color, srcR, srcG, srcB);
+
+				uint16 dstColor = READ_LE_UINT16(tempP);
+				uint8 dstR, dstG, dstB;
+				t3getRGB(dstColor, dstR, dstG, dstB);
+
+				if ((pObj->colorFlags & 4) != 0) { // additive blending
+					// original algo:
+					// color &= 0b1111011111011111;
+					// color += dstColor & 0b1111011111011111;
+					// if (color > 0xFFFF) {
+					// 	color |= 0b1111000000000000;
+					// }
+					// if (color &  0b0000100000000000) {
+					// 	color |= 0b0000011111000000;
+					// }
+					// if (color &  0b0000000000100000) {
+					// 	color |= 0b0000000000011111;
+					// }
+					// color     &= 0b1111011111011111;
+					color = t3getColor(
+						MIN(srcR + dstR, 0x1F),
+						MIN(srcG + dstG, 0x3F),
+						MIN(srcB + dstB, 0x1F)
+					);
+				} else {
+					// original algo looks simple but does not check for overflow
+					// color += (dstColor & 0b1111011111011111) >> 1;
+					color = t3getColor(
+						MIN(srcR + (dstR / 2), 0x1F),
+						MIN(srcG + (dstG / 2), 0x3F),
+						MIN(srcB + (dstB / 2), 0x1F)
+					);
+				}
+				WRITE_UINT16(tempP, color);
+			}
+			tempP += 2;
+			srcP += 2;
+		}
+		srcP += pObj->rightClip * 2;
+		destP += SCREEN_WIDTH * 2;
+	}
+}
+
+/**
+ * Translates the destination surface within the object's bounds giving it a slightly
+ * green tint (Noir)
+ */
+static void t3WrtTrans(DRAWOBJECT *pObj, bool applyClipping) {
+	if (applyClipping) {
+		pObj->height -= pObj->topClip + pObj->botClip;
+		pObj->width -= pObj->leftClip + pObj->rightClip;
+
+		if (pObj->width <= 0)
+			return;
+	}
+
+	auto &surface = _vm->screen();
+	for (int yOffset = 0; yOffset < pObj->height; ++yOffset) {
+		for (int xOffset = 0; xOffset < pObj->width; ++xOffset) {
+			int x = pObj->xPos + xOffset;
+			int y = pObj->yPos + yOffset;
+			uint8 r,g,b;
+			surface.format.colorToRGB(surface.getPixel(x, y), r, g, b);
+			r >>= 2;
+			g >>= 1;
+			b >>= 2;
+			surface.setPixel(x, y, surface.format.RGBToColor(r,g,b));
+		}
+	}
+
 }
 
 /**
@@ -666,12 +894,37 @@ static void WrtAll(DRAWOBJECT *pObj, uint8 *srcP, uint8 *destP, bool applyClippi
 }
 
 /**
+ * Copies an uncompressed block of data straight to the screen, Tinsel 3 is using 16bpp, hence "* 2"
+ */
+static void t3WrtAll(DRAWOBJECT *pObj, uint8 *srcP, uint8 *destP) {
+	bool applyClipping = (pObj->flags & DMA_CLIP) != 0;
+	int objWidth = pObj->width;
+
+	if (applyClipping) {
+		srcP += (pObj->topClip * pObj->width * 2) + (pObj->leftClip * 2);
+
+		pObj->height -= pObj->topClip + pObj->botClip;
+		pObj->width -= pObj->leftClip + pObj->rightClip;
+
+		if (pObj->width <= 0)
+			return;
+	}
+
+	for (int y = 0; y < pObj->height; ++y) {
+		Common::copy(srcP, srcP + (pObj->width * 2), destP);
+		srcP += objWidth * 2;
+		destP += SCREEN_WIDTH * 2;
+	}
+}
+
+
+/**
  * Renders a packed data stream with a variable sized palette
  */
 static void PackedWrtNonZero(DRAWOBJECT *pObj, uint8 *srcP, uint8 *destP,
 							 bool applyClipping, bool horizFlipped, int packingType) {
 	uint8 numColors = 0;
-	uint8 *colorTable = NULL;
+	uint8 *colorTable = nullptr;
 	int topClip = 0;
 	int xOffset = 0;
 	int numBytes, color;
@@ -791,6 +1044,38 @@ static void PackedWrtNonZero(DRAWOBJECT *pObj, uint8 *srcP, uint8 *destP,
 	}
 }
 
+static void t3WrtText(DRAWOBJECT *pObj, uint8 *srcP, uint8 *destP) {
+	bool applyClipping = (pObj->flags & DMA_CLIP) != 0;
+
+	if (applyClipping) {
+		srcP += (pObj->topClip * pObj->width * 2);
+
+		pObj->height -= pObj->topClip + pObj->botClip;
+		pObj->width -= pObj->leftClip + pObj->rightClip;
+	}
+
+	uint32 baseColor = t3GetBaseColor();
+
+	for (int y = 0; y < pObj->height; ++y) {
+		// Get the position to start writing out from
+		uint8 *tempP = destP;
+		srcP += pObj->leftClip * 2;
+		for (int x = 0; x < pObj->width; ++x) {
+			uint32 color = READ_LE_UINT16(srcP);
+			if (color != 0xF81F) { // "zero" for Tinsel 3 - magenta in 565
+				if (color == baseColor) {
+					color = pObj->constant;
+				}
+				WRITE_UINT16(tempP, color);
+			}
+			tempP += 2;
+			srcP += 2;
+		}
+		srcP += pObj->rightClip * 2;
+		destP += SCREEN_WIDTH * 2;
+	}
+}
+
 //----------------- MAIN FUNCTIONS ---------------------
 
 /**
@@ -808,7 +1093,7 @@ void ClearScreen() {
  * Updates the screen surface within the following rectangle
  */
 void UpdateScreenRect(const Common::Rect &pClip) {
-	int yOffset = TinselV2 ? (g_system->getHeight() - SCREEN_HEIGHT) / 2 : 0;
+	int yOffset = (TinselVersion >= 2) ? (g_system->getHeight() - SCREEN_HEIGHT) / 2 : 0;
 	byte *pSrc = (byte *)_vm->screen().getBasePtr(pClip.left, pClip.top);
 	g_system->copyRectToScreen(pSrc, _vm->screen().pitch, pClip.left, pClip.top + yOffset,
 		pClip.width(), pClip.height());
@@ -818,12 +1103,12 @@ void UpdateScreenRect(const Common::Rect &pClip) {
  * Draws the specified object onto the screen surface buffer
  */
 void DrawObject(DRAWOBJECT *pObj) {
-	uint8 *srcPtr = NULL;
+	uint8 *srcPtr = nullptr;
 	uint8 *destPtr;
 	byte psxMapperTable[16];
 
 	bool psxFourBitClut = false; // Used by Tinsel PSX, true if an image using a 4bit CLUT is rendered
-	bool psxRLEindex = false; // Used by Tinsel PSX, true if an image is using PJCRLE compressed indexes
+	bool psxSaturnRLEindex = false; // Used by Tinsel PSX/Saturn, true if an image is using PJCRLE compressed indexes
 	uint32 psxSkipBytes = 0; // Used by Tinsel PSX, number of bytes to skip before counting indexes for image tiles
 
 	if ((pObj->width <= 0) || (pObj->height <= 0))
@@ -831,38 +1116,39 @@ void DrawObject(DRAWOBJECT *pObj) {
 		return;
 
 	// If writing constant data, don't bother locking the data pointer and reading src details
-	if ((pObj->flags & DMA_CONST) == 0) {
-		if (TinselV2) {
-			srcPtr  = (byte *)LockMem(pObj->hBits);
-			pObj->charBase = NULL;
+	if (((pObj->flags & DMA_CONST) == 0) || ((TinselVersion == 3) && ((pObj->flags & 0x05) == 0x05))) {
+		if (TinselVersion >= 2) {
+			srcPtr = (byte *)_vm->_handle->LockMem(pObj->hBits);
+			pObj->charBase = nullptr;
 			pObj->transOffset = 0;
 		} else {
-			byte *p = (byte *)LockMem(pObj->hBits & HANDLEMASK);
+			byte *p = (byte *)_vm->_handle->LockMem(pObj->hBits & HANDLEMASK);
 
 			srcPtr = p + (pObj->hBits & OFFSETMASK);
-			pObj->charBase = (char *)p + READ_LE_UINT32(p + 0x10);
-			pObj->transOffset = READ_LE_UINT32(p + 0x14);
+			pObj->charBase = (char *)p + READ_32(p + 0x10);
+			pObj->transOffset = READ_32(p + 0x14);
 
-			// Decompress block indexes for Discworld PSX
-			if (TinselV1PSX) {
-				uint8 paletteType = *(srcPtr); // if 0x88 we are using an 8bit palette type, if 0x44 we are using a 4 bit PSX CLUT
-				uint8 indexType = *(srcPtr + 1); // if 0xCC indexes for this image are compressed with PCJRLE, if 0xDD indexes are not compressed
+			// Decompress block indexes for Discworld PSX/Saturn
+			if (TinselV1PSX || TinselV1Saturn) {
+				uint8 paletteType = TinselV1PSX ? *(srcPtr) : *(srcPtr + 1); // if 0x88 we are using an 8bit palette type, if 0x44 we are using a 4 bit PSX CLUT
+				uint8 indexType = TinselV1PSX ? *(srcPtr + 1) : *(srcPtr); // if 0xCC indexes for this image are compressed with PCJRLE, if 0xDD indexes are not compressed
 
 				switch (paletteType) {
-					case 0x88: // Normal 8-bit palette
+					case 0x00: // Normal 8-bit palette (Saturn)
+					case 0x88: // Normal 8-bit palette (PSX)
 						psxFourBitClut = false;
 						psxSkipBytes = 0;
 						switch (indexType) {
 							case 0xDD: // Normal uncompressed indexes
-								psxRLEindex = false;
+								psxSaturnRLEindex = false;
 								srcPtr += sizeof(uint16); // Get to the beginning of index data
 								break;
 							case 0xCC: // PJCRLE compressed indexes
-								psxRLEindex = true;
-								srcPtr = psxPJCRLEUnwinder(pObj->width, pObj->height, srcPtr + sizeof(uint16));
+								psxSaturnRLEindex = true;
+								srcPtr = psxSaturnPJCRLEUnwinder(pObj->width, pObj->height, srcPtr + sizeof(uint16));
 								break;
 							default:
-								error("Unknown PSX index type 0x%.2X", indexType);
+								error("Unknown PSX/Saturn index type 0x%.2X", indexType);
 								break;
 						}
 						break;
@@ -870,15 +1156,15 @@ void DrawObject(DRAWOBJECT *pObj) {
 						psxPaletteMapper(pObj->pPal, srcPtr + sizeof(uint16), psxMapperTable);
 
 						psxFourBitClut = true;
-						psxSkipBytes = READ_LE_UINT32(p + sizeof(uint32) * 5) << 4; // Fetch number of bytes we have to skip
+						psxSkipBytes = READ_32(p + sizeof(uint32) * 5) << 4; // Fetch number of bytes we have to skip
 						switch (indexType) {
 							case 0xDD: // Normal uncompressed indexes
-								psxRLEindex = false;
+								psxSaturnRLEindex = false;
 								srcPtr += sizeof(uint16) * 17; // Skip image type and clut, and get to beginning of index data
 								break;
 							case 0xCC: // PJCRLE compressed indexes
-								psxRLEindex = true;
-								srcPtr = psxPJCRLEUnwinder(pObj->width, pObj->height, srcPtr + sizeof(uint16) * 17);
+								psxSaturnRLEindex = true;
+								srcPtr = psxSaturnPJCRLEUnwinder(pObj->width, pObj->height, srcPtr + sizeof(uint16) * 17);
 								break;
 							default:
 								error("Unknown PSX index type 0x%.2X", indexType);
@@ -886,7 +1172,7 @@ void DrawObject(DRAWOBJECT *pObj) {
 						}
 						break;
 					default:
-						error("Unknown PSX palette type 0x%.2X", paletteType);
+						error("Unknown PSX/Saturn palette type 0x%.2X", paletteType);
 						break;
 				}
 			}
@@ -899,10 +1185,10 @@ void DrawObject(DRAWOBJECT *pObj) {
 
 	// Handle various draw types
 	uint8 typeId = pObj->flags & 0xff;
-	int packType = pObj->flags >> 14;	// TinselV2
+	int packType = pObj->flags >> 14;	// TinselVersion >= 2
 
-	if (TinselV2 && packType != 0) {
-		// Color packing for TinselV2
+	if ((TinselVersion >= 2) && packType != 0) {
+		// Color packing for TinselVersion >= 2
 
 		if (packType == 1)
 			pObj->baseCol = 0xF0;	// 16 from 240
@@ -916,50 +1202,70 @@ void DrawObject(DRAWOBJECT *pObj) {
 		switch (typeId) {
 		case 0x01:	// all versions, draw sprite without clipping
 		case 0x41:	// all versions, draw sprite with clipping
-		case 0x02:	// TinselV2, draw sprite without clipping
-		case 0x11:	// TinselV2, draw sprite without clipping, flipped horizontally
-		case 0x42:	// TinselV2, draw sprite with clipping
-		case 0x51:	// TinselV2, draw sprite with clipping, flipped horizontally
-		case 0x81:	// TinselV2, draw sprite with clipping
-		case 0xC1:	// TinselV2, draw sprite with clipping
-			assert(TinselV2 || (typeId == 0x01 || typeId == 0x41));
+		case 0x02:	// TinselV2 and above, draw sprite without clipping
+		case 0x11:	// TinselV2 and above, draw sprite without clipping, flipped horizontally
+		case 0x42:	// TinselV2 and above, draw sprite with clipping
+		case 0x51:	// TinselV2 and above, draw sprite with clipping, flipped horizontally
+			assert((TinselVersion >= 2) || (typeId == 0x01 || typeId == 0x41));
 
-			if (TinselV2)
-				t2WrtNonZero(pObj, srcPtr, destPtr, typeId >= 0x40, (typeId & 0x10) != 0);
-			else if (TinselV1PSX)
-				PsxDrawTiles(pObj, srcPtr, destPtr, typeId == 0x41, psxFourBitClut, psxSkipBytes, psxMapperTable, true);
+			if (TinselVersion == 3)
+				t3WrtNonZero(pObj, srcPtr, destPtr);
+			else if (TinselVersion >= 2)
+				t2WrtNonZero(pObj, srcPtr, destPtr, (typeId & DMA_CLIP) != 0, (typeId & DMA_FLIPH) != 0);
+			else if (TinselV1PSX || TinselV1Saturn)
+				psxSaturnDrawTiles(pObj, srcPtr, destPtr, typeId == 0x41, psxFourBitClut, psxSkipBytes, psxMapperTable, true);
 			else if (TinselV1Mac)
 				MacDrawTiles(pObj, srcPtr, destPtr, typeId == 0x41);
-			else if (TinselV1)
+			else if (TinselVersion == 1)
 				WrtNonZero(pObj, srcPtr, destPtr, typeId == 0x41);
-			else if (TinselV0)
+			else if (TinselVersion == 0)
 				t0WrtNonZero(pObj, srcPtr, destPtr, typeId == 0x41);
 			break;
 		case 0x08:	// draw background without clipping
 		case 0x48:	// draw background with clipping
-			if (TinselV2 || TinselV1Mac || TinselV0)
+			if (TinselVersion == 3)
+				t3WrtAll(pObj, srcPtr, destPtr);
+			else if ((TinselVersion == 2) || TinselV1Mac || (TinselVersion == 0))
 				WrtAll(pObj, srcPtr, destPtr, typeId == 0x48);
-			else if (TinselV1PSX)
-				PsxDrawTiles(pObj, srcPtr, destPtr, typeId == 0x48, psxFourBitClut, psxSkipBytes, psxMapperTable, false);
-			else if (TinselV1)
+			else if (TinselV1PSX || TinselV1Saturn)
+				psxSaturnDrawTiles(pObj, srcPtr, destPtr, typeId == 0x48, psxFourBitClut, psxSkipBytes, psxMapperTable, false);
+			else if (TinselVersion == 1)
 				WrtNonZero(pObj, srcPtr, destPtr, typeId == 0x48);
 			break;
 		case 0x04:	// fill with constant color without clipping
 		case 0x44:	// fill with constant color with clipping
-			WrtConst(pObj, destPtr, typeId == 0x44);
+			if (TinselVersion == 3)
+				t3WrtConst(pObj, typeId == 0x44);
+			else
+				WrtConst(pObj, destPtr, typeId == 0x44);
+			break;
+		case 0x81:	// TinselV3, draw sprite with transparency
+		case 0xC1:	// TinselV3, draw sprite with transparency & clipping
+			if (TinselVersion == 3)
+				t3TransWNZ(pObj, srcPtr, destPtr);
+			else if (TinselVersion == 2)
+				t2WrtNonZero(pObj, srcPtr, destPtr, (typeId & DMA_CLIP) != 0, (typeId & DMA_FLIPH) != 0);
 			break;
 		case 0x84:	// draw transparent surface without clipping
 		case 0xC4:	// draw transparent surface with clipping
-			WrtTrans(pObj, destPtr, typeId == 0xC4);
+			if (TinselVersion == 3)
+				t3WrtTrans(pObj, typeId == 0xC4);
+			else
+				WrtTrans(pObj, destPtr, typeId == 0xC4);
+			break;
+		case 0x05:	// TinselV3, draw text with color replacement without clipping
+		case 0x45:	// TinselV3, draw text with color replacement with clipping
+			assert(TinselVersion == 3);
+			t3WrtText(pObj, srcPtr, destPtr);
 			break;
 		default:
 			error("Unknown drawing type %d", typeId);
 		}
 	}
 
-	// If we were using Discworld PSX, free the memory allocated
+	// If we were using Discworld PSX/Saturn, free the memory allocated
 	// for decompressed block indexes.
-	if (TinselV1PSX && psxRLEindex)
+	if ((TinselV1PSX || TinselV1Saturn) && psxSaturnRLEindex)
 		free(srcPtr);
 }
 

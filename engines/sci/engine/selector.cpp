@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "sci/sci.h"
 #include "sci/engine/features.h"
 #include "sci/engine/kernel.h"
+#include "sci/engine/scriptdebug.h"
 #include "sci/engine/state.h"
 #include "sci/engine/selector.h"
 
@@ -169,6 +169,12 @@ void Kernel::mapSelectors() {
 	FIND_SELECTOR(setStep);
 	FIND_SELECTOR(setMotion);
 	FIND_SELECTOR(cycleSpeed);
+	FIND_SELECTOR(owner);
+	FIND_SELECTOR(curPos);
+	FIND_SELECTOR(update);
+	FIND_SELECTOR(canInput);
+	FIND_SELECTOR(input);
+	FIND_SELECTOR(controls);
 
 #ifdef ENABLE_SCI32
 	FIND_SELECTOR(data);
@@ -211,8 +217,6 @@ void Kernel::mapSelectors() {
 	FIND_SELECTOR(reSyncVol);
 	FIND_SELECTOR(set);
 	FIND_SELECTOR(clear);
-	FIND_SELECTOR(curPos);
-	FIND_SELECTOR(update);
 	FIND_SELECTOR(show);
 	FIND_SELECTOR(position);
 	FIND_SELECTOR(musicVolume);
@@ -236,16 +240,23 @@ void Kernel::mapSelectors() {
 	FIND_SELECTOR(dispose);
 	FIND_SELECTOR(masterVolume);
 	FIND_SELECTOR(setCel);
+	FIND_SELECTOR(value);
 #endif
 }
 
 reg_t readSelector(SegManager *segMan, reg_t object, Selector selectorId) {
 	ObjVarRef address;
 
-	if (lookupSelector(segMan, object, selectorId, &address, NULL) != kSelectorVariable)
+	if (lookupSelector(segMan, object, selectorId, &address, nullptr) != kSelectorVariable)
 		return NULL_REG;
-	else
-		return *address.getPointer(segMan);
+
+	if (g_sci->_debugState._activeBreakpointTypes & BREAK_SELECTORREAD) {
+		reg_t curValue = *address.getPointer(segMan);
+		debugPropertyAccess(segMan->getObject(object), object, 0, selectorId,
+			                curValue, NULL_REG, segMan, BREAK_SELECTORREAD);
+	}
+
+	return *address.getPointer(segMan);
 }
 
 #ifdef ENABLE_SCI32
@@ -264,9 +275,15 @@ void writeSelector(SegManager *segMan, reg_t object, Selector selectorId, reg_t 
 		error("Attempt to write to invalid selector %d. Address %04x:%04x, %s", selectorId, PRINT_REG(object), origin.toString().c_str());
 	}
 
-	if (lookupSelector(segMan, object, selectorId, &address, NULL) != kSelectorVariable) {
+	if (lookupSelector(segMan, object, selectorId, &address, nullptr) != kSelectorVariable) {
 		const SciCallOrigin origin = g_sci->getEngineState()->getCurrentCallOrigin();
 		error("Selector '%s' of object could not be written to. Address %04x:%04x, %s", g_sci->getKernel()->getSelectorName(selectorId).c_str(), PRINT_REG(object), origin.toString().c_str());
+	}
+
+	if (g_sci->_debugState._activeBreakpointTypes & BREAK_SELECTORWRITE) {
+		reg_t curValue = *address.getPointer(segMan);
+		debugPropertyAccess(segMan->getObject(object), object, 0, selectorId,
+			                curValue, value, segMan, BREAK_SELECTORWRITE);
 	}
 
 	*address.getPointer(segMan) = value;
@@ -285,7 +302,7 @@ void invokeSelector(EngineState *s, reg_t object, int selectorId,
 	stackframe[0] = make_reg(0, selectorId);  // The selector we want to call
 	stackframe[1] = make_reg(0, argc); // Argument count
 
-	slc_type = lookupSelector(s->_segMan, object, selectorId, NULL, NULL);
+	slc_type = lookupSelector(s->_segMan, object, selectorId, nullptr, nullptr);
 
 	if (slc_type == kSelectorNone) {
 		const SciCallOrigin origin = g_sci->getEngineState()->getCurrentCallOrigin();

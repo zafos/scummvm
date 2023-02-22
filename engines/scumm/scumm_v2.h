@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,39 +46,43 @@ protected:
 public:
 	ScummEngine_v2(OSystem *syst, const DetectorResult &dr);
 
-	virtual void resetScumm();
+	void resetScumm() override;
 
 	void checkV2MouseOver(Common::Point pos);
 	int checkV2Inventory(int x, int y);
 	void redrawV2Inventory();
 
 protected:
-	virtual void setupOpcodes();
+	byte _hiLiteColorVerbArrow = 0x0E;
+	byte _hiLiteColorInvSentence = 0x0E;
 
-	virtual void setupScummVars();
-	virtual void resetScummVars();
-	virtual void decodeParseString();
+protected:
+	void setupOpcodes() override;
 
-	virtual void saveLoadWithSerializer(Common::Serializer &s);
+	void setupScummVars() override;
+	void resetScummVars() override;
+	void decodeParseString() override;
 
-	virtual void processKeyboard(Common::KeyState lastKeyHit);
+	void saveLoadWithSerializer(Common::Serializer &s) override;
 
-	virtual void readIndexFile();
+	void processKeyboard(Common::KeyState lastKeyHit) override;
+
+	void readIndexFile() override;
 	void readClassicIndexFile();	// V1
 	void readEnhancedIndexFile();	// V2
-	virtual void readGlobalObjects();
-	virtual void loadCharset(int no);
+	void readGlobalObjects() override;
+	void loadCharset(int no) override;
 
-	virtual void runInputScript(int clickArea, int val, int mode);
-	virtual void runInventoryScript(int i);
+	void runInputScript(int clickArea, int val, int mode) override;
+	void runInventoryScript(int i) override;
 
-	virtual int getVar();
+	int getVar() override;
 
 	void getResultPosIndirect();
-	virtual void getResultPos();
+	void getResultPos() override;
 
-	virtual int readVar(uint var);
-	virtual void writeVar(uint var, int value);
+	int readVar(uint var) override;
+	void writeVar(uint var, int value) override;
 
 protected:
 	virtual int getActiveObject();
@@ -89,15 +92,20 @@ protected:
 	void clearStateCommon(byte type);
 	void stopScriptCommon(int script);
 
-	void resetSentence();
+	void drawSentence() override;
+	void resetSentence() override;
 	void setUserState(byte state);
 
-	virtual void handleMouseOver(bool updateInventory);
-	virtual void checkExecVerbs();
+	void beginCutscene(int *args) override { o2_cutscene(); }
+	void endCutscene() override { o2_endCutscene(); }
+
+	void handleMouseOver(bool updateInventory) override;
+	void checkExecVerbs() override;
 	void initV2MouseOver();
 	void initNESMouseOver();
 
-	virtual void setBuiltinCursor(int index);
+	void setBuiltinCursor(int index) override;
+	void setSnailCursor() override;
 
 	void drawPreposition(int index);
 

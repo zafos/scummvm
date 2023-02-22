@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,7 +40,7 @@ struct Sprite {
 
 	byte *packedData;
 
-	Sprite() : size(0), x(0), y(0), w(0), h(0), packedData(0) {
+	Sprite() : size(0), x(0), y(0), w(0), h(0), packedData(nullptr) {
 	}
 
 	~Sprite() {
@@ -53,35 +52,35 @@ struct Sprites : public Frames {
 	uint16		_num;
 	Sprite*		_sprites;
 
-	Sprites(uint num) : _num(0), _sprites(0) {
+	Sprites(uint num) : _num(0), _sprites(nullptr) {
 		_num = num;
 		_sprites = new Sprite[_num];
 	}
 
-	~Sprites() {
+	~Sprites() override {
 		delete[] _sprites;
 	}
 
-	uint16 getNum() {
+	uint16 getNum() override {
 		return _num;
 	}
 
-	byte* getData(uint16 index) {
+	byte* getData(uint16 index) override {
 		assert(index < _num);
 		return _sprites[index].packedData;
 	}
 
-	void getRect(uint16 index, Common::Rect &r) {
+	void getRect(uint16 index, Common::Rect &r) override {
 		assert(index < _num);
 		r.setWidth(_sprites[index].w);
 		r.setHeight(_sprites[index].h);
 		r.moveTo(_sprites[index].x, _sprites[index].y);
 	}
-	uint	getRawSize(uint16 index) {
+	uint	getRawSize(uint16 index) override {
 		assert(index < _num);
 		return _sprites[index].size;
 	}
-	uint	getSize(uint16 index) {
+	uint	getSize(uint16 index) override {
 		assert(index < _num);
 		return _sprites[index].w * _sprites[index].h;
 	}
@@ -208,7 +207,7 @@ Script* DosDisk_br::loadScript(const char* name) {
 //	there are no Head resources in Big Red Adventure
 GfxObj* DosDisk_br::loadHead(const char* name) {
 	debugC(5, kDebugDisk, "DosDisk_br::loadHead");
-	return 0;
+	return nullptr;
 }
 
 void DosDisk_br::loadBitmap(Common::SeekableReadStream &stream, Graphics::Surface &surf, byte *palette) {
@@ -232,7 +231,7 @@ Frames* DosDisk_br::loadPointer(const char *name) {
 	debugC(5, kDebugDisk, "DosDisk_br::loadPointer");
 	Common::SeekableReadStream *stream = openFile(Common::String(name), ".ras");
 	Graphics::Surface *surf = new Graphics::Surface;
-	loadBitmap(*stream, *surf, 0);
+	loadBitmap(*stream, *surf, nullptr);
 	delete stream;
 	return new SurfaceToFrames(surf);
 }
@@ -255,15 +254,11 @@ GfxObj* DosDisk_br::loadObjects(const char *name, uint8 part) {
 	return obj;
 }
 
-void genSlidePath(char *path, const char* name) {
-	sprintf(path, "%s.bmp", name);
-}
-
 GfxObj* DosDisk_br::loadStatic(const char* name) {
 	debugC(5, kDebugDisk, "DosDisk_br::loadStatic");
 	Common::SeekableReadStream *stream = openFile("ras/" + Common::String(name), ".ras");
 	Graphics::Surface *surf = new Graphics::Surface;
-	loadBitmap(*stream, *surf, 0);
+	loadBitmap(*stream, *surf, nullptr);
 	delete stream;
 	return new GfxObj(0, new SurfaceToFrames(surf), name);
 }
@@ -291,7 +286,7 @@ Sprites* DosDisk_br::createSprites(Common::ReadStream *stream) {
 }
 
 Frames* DosDisk_br::loadFrames(const char* name) {
-	Common::SeekableReadStream *stream = 0;
+	Common::SeekableReadStream *stream = nullptr;
 
 	debugC(5, kDebugDisk, "DosDisk_br::loadFrames");
 
@@ -330,7 +325,7 @@ void DosDisk_br::loadSlide(BackgroundInfo& info, const char *name) {
 
 MaskBuffer *DosDisk_br::loadMask(const char *name, uint32 w, uint32 h) {
 	if (!name) {
-		return 0;
+		return nullptr;
 	}
 
 	Common::SeekableReadStream *stream = openFile("msk/" + Common::String(name), ".msk");
@@ -348,7 +343,7 @@ MaskBuffer *DosDisk_br::loadMask(const char *name, uint32 w, uint32 h) {
 
 PathBuffer *DosDisk_br::loadPath(const char *name, uint32 w, uint32 h) {
 	if (!name) {
-		return 0;
+		return nullptr;
 	}
 
 	Common::SeekableReadStream *stream = openFile("pth/" + Common::String(name), ".pth");
@@ -535,13 +530,13 @@ void finalpass(byte *buffer, uint32 size) {
 
 MaskBuffer *AmigaDisk_br::loadMask(const char *name, uint32 w, uint32 h) {
 	if (!name) {
-		return 0;
+		return nullptr;
 	}
 	debugC(1, kDebugDisk, "AmigaDisk_br::loadMask '%s'", name);
 
 	Common::SeekableReadStream *stream = tryOpenFile("msk/" + Common::String(name), ".msk");
 	if (!stream) {
-		return 0;
+		return nullptr;
 	}
 
 	Image::IFFDecoder decoder;
@@ -650,7 +645,7 @@ Sprites* AmigaDisk_br::createSprites(Common::ReadStream *stream) {
 }
 
 Frames* AmigaDisk_br::loadFrames(const char* name) {
-	Common::SeekableReadStream *stream = 0;
+	Common::SeekableReadStream *stream = nullptr;
 
 	debugC(5, kDebugDisk, "AmigaDisk_br::loadFrames");
 
@@ -762,7 +757,7 @@ Common::String AmigaDisk_br::selectArchive(const Common::String& name) {
 }
 
 
-Disk_br::Disk_br(Parallaction *vm) : _vm(vm), _baseDir(0), _language(0) {
+Disk_br::Disk_br(Parallaction *vm) : _vm(vm), _baseDir(nullptr), _language(0) {
 }
 
 Disk_br::~Disk_br() {

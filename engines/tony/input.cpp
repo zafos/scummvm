@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -64,15 +63,8 @@ void RMInput::poll() {
 			return;
 
 		case Common::EVENT_KEYDOWN:
-			// Check for debugger
-			if ((_event.kbd.keycode == Common::KEYCODE_d) && (_event.kbd.flags & Common::KBD_CTRL)) {
-				// Attach to the debugger
-				g_vm->_debugger->attach();
-				g_vm->_debugger->onFrame();
-			} else {
-				// Flag the given key as being down
-				_keyDown.push_back(_event.kbd.keycode);
-			}
+			// Flag the given key as being down
+			_keyDown.push_back(_event.kbd.keycode);
 			return;
 
 		case Common::EVENT_KEYUP:

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,51 +42,51 @@ public:
 	/**
 	 * Sets up the section
 	 */
-	virtual bool setup(CPetControl *petControl);
+	bool setup(CPetControl *petControl) override;
 
 	/**
 	 * Reset the section
 	 */
-	virtual bool reset() { return true; }
+	bool reset() override { return true; }
 
 	/**
 	 * Draw the section
 	 */
-	virtual void draw(CScreenManager *screenManager);
+	void draw(CScreenManager *screenManager) override;
 
 	/**
 	 * Following are handlers for the various messages that the PET can
 	 * pass onto the currently active section/area
 	 */
-	virtual bool MouseButtonDownMsg(CMouseButtonDownMsg *msg) { return false; }
-	virtual bool MouseButtonUpMsg(CMouseButtonUpMsg *msg) { return false; }
+	bool MouseButtonDownMsg(CMouseButtonDownMsg *msg) override { return false; }
+	bool MouseButtonUpMsg(CMouseButtonUpMsg *msg) override { return false; }
 
 	/**
 	 * Returns true if the object is in a valid state
 	 */
-	virtual bool isValid(CPetControl *petControl) {
+	bool isValid(CPetControl *petControl) override {
 		return setupControl(petControl);
 	}
 
 	/**
 	 * Load the data for the class from file
 	 */
-	virtual void load(SimpleFile *file, int param) {}
+	void load(SimpleFile *file, int param) override {}
 
 	/**
 	 * Called after a game has been loaded
 	 */
-	virtual void postLoad() { reset(); }
+	void postLoad() override { reset(); }
 
 	/**
 	 * Save the data for the class to file
 	 */
-	virtual void save(SimpleFile *file, int indent) {}
+	void save(SimpleFile *file, int indent) override {}
 
 	/**
 	 * Get a reference to the tooltip text associated with the section
 	 */
-	virtual CTextControl *getText() { return &_tooltip; }
+	CTextControl *getText() override { return &_tooltip; }
 
 	/**
 	 * Clear any current translation text

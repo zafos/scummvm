@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -29,12 +28,21 @@
 #include "engines/wintermute/base/scriptables/script_value.h"
 #include "engines/wintermute/base/scriptables/script.h"
 #include "engines/wintermute/base/base_game.h"
+#include "engines/wintermute/base/base_engine.h"
 #include "engines/wintermute/base/scriptables/script_engine.h"
 #include "engines/wintermute/base/scriptables/script_stack.h"
+#include "engines/wintermute/base/gfx/base_renderer.h"
+#include "engines/wintermute/ext/externals.h"
 #include "common/memstream.h"
+
+#ifdef ENABLE_FOXTAIL
+#include "engines/wintermute/base/scriptables/script_opcodes.h"
+#endif
+
 #if EXTENDED_DEBUGGER_ENABLED
 #include "engines/wintermute/base/scriptables/debuggable/debuggable_script.h"
 #endif
+
 namespace Wintermute {
 
 IMPLEMENT_PERSISTENT(ScScript, false)
@@ -95,6 +103,10 @@ ScScript::ScScript(BaseGame *inGame, ScEngine *engine) : BaseClass(inGame) {
 	_parentScript = nullptr;
 
 	_tracingMode = false;
+
+#ifdef ENABLE_FOXTAIL
+	initOpcodesType();
+#endif
 }
 
 
@@ -246,10 +258,9 @@ bool ScScript::create(const char *filename, byte *buffer, uint32 size, BaseScrip
 	delete[] _threadEvent;
 	_threadEvent = nullptr;
 
-	_filename = new char[strlen(filename) + 1];
-	if (_filename) {
-		strcpy(_filename, filename);
-	}
+	size_t filenameSize = strlen(filename) + 1;
+	_filename = new char[filenameSize];
+	Common::strcpy_s(_filename, filenameSize, filename);
 
 	_buffer = new byte [size];
 	if (!_buffer) {
@@ -281,21 +292,15 @@ bool ScScript::createThread(ScScript *original, uint32 initIP, const Common::Str
 	_thread = true;
 	_methodThread = false;
 	_threadEvent = new char[eventName.size() + 1];
-	if (_threadEvent) {
-		strcpy(_threadEvent, eventName.c_str());
-	}
+	Common::strcpy_s(_threadEvent, eventName.size() + 1, eventName.c_str());
 
 	// copy filename
-	_filename = new char[strlen(original->_filename) + 1];
-	if (_filename) {
-		strcpy(_filename, original->_filename);
-	}
+	size_t filenameSize = strlen(original->_filename) + 1;
+	_filename = new char[filenameSize];
+	Common::strcpy_s(_filename, filenameSize, original->_filename);
 
 	// copy buffer
 	_buffer = new byte [original->_bufferSize];
-	if (!_buffer) {
-		return STATUS_FAILED;
-	}
 
 	memcpy(_buffer, original->_buffer, original->_bufferSize);
 	_bufferSize = original->_bufferSize;
@@ -338,21 +343,15 @@ bool ScScript::createMethodThread(ScScript *original, const Common::String &meth
 	_thread = true;
 	_methodThread = true;
 	_threadEvent = new char[methodName.size() + 1];
-	if (_threadEvent) {
-		strcpy(_threadEvent, methodName.c_str());
-	}
+	Common::strcpy_s(_threadEvent, methodName.size() + 1, methodName.c_str());
 
 	// copy filename
-	_filename = new char[strlen(original->_filename) + 1];
-	if (_filename) {
-		strcpy(_filename, original->_filename);
-	}
+	size_t filenameSize = strlen(original->_filename) + 1;
+	_filename = new char[filenameSize];
+	Common::strcpy_s(_filename, filenameSize, original->_filename);
 
 	// copy buffer
 	_buffer = new byte [original->_bufferSize];
-	if (!_buffer) {
-		return STATUS_FAILED;
-	}
 
 	memcpy(_buffer, original->_buffer, original->_bufferSize);
 	_bufferSize = original->_bufferSize;
@@ -509,6 +508,39 @@ char *ScScript::getString() {
 	return ret;
 }
 
+#ifdef ENABLE_FOXTAIL
+//////////////////////////////////////////////////////////////////////////
+void ScScript::initOpcodesType() {
+	_opcodesType = BaseEngine::instance().isFoxTail(FOXTAIL_1_2_896, FOXTAIL_1_2_896) ? OPCODES_FOXTAIL_1_2_896 :
+	               BaseEngine::instance().isFoxTail(FOXTAIL_1_2_902, FOXTAIL_LATEST_VERSION) ? OPCODES_FOXTAIL_1_2_902 :
+	               OPCODES_UNCHANGED;
+}
+
+
+//////////////////////////////////////////////////////////////////////////
+// FoxTail 1.2.896+ is using unusual opcodes tables, let's map them here
+// NOTE: Those opcodes are never used at FoxTail 1.2.896 and 1.2.902:
+//   II_CMP_STRICT_EQ
+//   II_CMP_STRICT_NE
+//   II_DEF_CONST_VAR
+//   II_DBG_LINE
+//   II_PUSH_VAR_THIS
+//////////////////////////////////////////////////////////////////////////
+uint32 ScScript::decodeAltOpcodes(uint32 inst) {
+	if (inst > 46) {
+		return (uint32)(-1);
+	}
+
+	switch (_opcodesType) {
+	case OPCODES_FOXTAIL_1_2_896:
+		return foxtail_1_2_896_mapping[inst];
+	case OPCODES_FOXTAIL_1_2_902:
+		return foxtail_1_2_902_mapping[inst];
+	default:
+		return inst;
+	}
+}
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 bool ScScript::executeInstruction() {
@@ -524,6 +556,12 @@ bool ScScript::executeInstruction() {
 	ScValue *op2;
 
 	uint32 inst = getDWORD();
+
+#ifdef ENABLE_FOXTAIL
+	if (_opcodesType) {
+		inst = decodeAltOpcodes(inst);
+	}
+#endif
 
 	preInstHook(inst);
 
@@ -589,8 +627,9 @@ bool ScScript::executeInstruction() {
 		// push var
 		// push string
 		str = _stack->pop()->getString();
-		char *methodName = new char[strlen(str) + 1];
-		strcpy(methodName, str);
+		size_t methodNameSize = strlen(str) + 1;
+		char *methodName = new char[methodNameSize];
+		Common::strcpy_s(methodName, methodNameSize, str);
 
 		ScValue *var = _stack->pop();
 		if (var->_type == VAL_VARIABLE_REF) {
@@ -618,8 +657,14 @@ bool ScScript::executeInstruction() {
 						_state = SCRIPT_WAITING_SCRIPT;
 						_waitScript->copyParameters(_stack);
 					}
+#ifdef ENABLE_FOXTAIL
+				} else if (BaseEngine::instance().isFoxTail() && strcmp(methodName, "LoadItems") == 0 && strcmp(_threadEvent,"AfterLoad") == 0) {
+					_stack->correctParams(0);
+					_gameRef->LOG(0, "Method '%s' is called in unbreakable mode of '%s' event and was ignored", methodName, _threadEvent);
+					_stack->pushNULL();
+#endif
 				} else {
-					// can call methods in unbreakable mode
+					// cannot call methods in unbreakable mode
 					_stack->correctParams(0);
 					runtimeError("Cannot call method '%s'. Ignored.", methodName);
 					_stack->pushNULL();
@@ -698,12 +743,13 @@ bool ScScript::executeInstruction() {
 
 	case II_PUSH_VAR: {
 		ScValue *var = getVar(_symbols[getDWORD()]);
-		if (false && /*var->_type==VAL_OBJECT ||*/ var->_type == VAL_NATIVE) {
+		// Disabled in original code
+		/*if (false && var->_type==VAL_OBJECT || var->_type == VAL_NATIVE) {
 			_operand->setReference(var);
 			_stack->push(_operand);
-		} else {
+		} else {*/
 			_stack->push(var);
-		}
+		//}
 		break;
 	}
 
@@ -749,10 +795,8 @@ bool ScScript::executeInstruction() {
 		_stack->pushFloat(getFloat());
 		break;
 
-
 	case II_PUSH_BOOL:
 		_stack->pushBool(getDWORD() != 0);
-
 		break;
 
 	case II_PUSH_STRING:
@@ -837,9 +881,10 @@ bool ScScript::executeInstruction() {
 		if (op1->isNULL() || op2->isNULL()) {
 			_operand->setNULL();
 		} else if (op1->getType() == VAL_STRING || op2->getType() == VAL_STRING) {
-			char *tempStr = new char [strlen(op1->getString()) + strlen(op2->getString()) + 1];
-			strcpy(tempStr, op1->getString());
-			strcat(tempStr, op2->getString());
+			size_t tempStrSize = strlen(op1->getString()) + strlen(op2->getString()) + 1;
+			char *tempStr = new char [tempStrSize];
+			Common::strcpy_s(tempStr, tempStrSize, op1->getString());
+			Common::strcat_s(tempStr, tempStrSize, op2->getString());
 			_operand->setString(tempStr);
 			delete[] tempStr;
 		} else if (op1->getType() == VAL_INT && op2->getType() == VAL_INT) {
@@ -1092,7 +1137,7 @@ bool ScScript::executeInstruction() {
 
 	}
 	default:
-		_gameRef->LOG(0, "Fatal: Invalid instruction %d ('%s', line %d, IP:0x%x)\n", inst, _filename, _currentLine, _iP - sizeof(uint32));
+		_gameRef->LOG(0, "Fatal: Invalid instruction %d ('%s', line %d, IP:0x%lx)\n", inst, _filename, _currentLine, _iP - sizeof(uint32));
 		_state = SCRIPT_FINISHED;
 		ret = STATUS_FAILED;
 	} // switch(instruction)
@@ -1236,11 +1281,11 @@ void ScScript::runtimeError(const char *fmt, ...) {
 	va_list va;
 
 	va_start(va, fmt);
-	vsprintf(buff, fmt, va);
+	vsnprintf(buff, 256, fmt, va);
 	va_end(va);
 
-	_gameRef->LOG(0, "Runtime error. Script '%s', line %d", _filename, _currentLine);
-	_gameRef->LOG(0, "  %s", buff);
+	warning("Runtime error. Script '%s', line %d", _filename, _currentLine);
+	warning("  %s", buff);
 
 	if (!_gameRef->_suppressScriptErrors) {
 		_gameRef->quickMessage("Script runtime error. View log for details.");
@@ -1306,9 +1351,33 @@ bool ScScript::persist(BasePersistenceManager *persistMgr) {
 
 	if (!persistMgr->getIsSaving()) {
 		_tracingMode = false;
+#ifdef ENABLE_FOXTAIL
+		initOpcodesType();
+#endif
 	}
 
 	return STATUS_OK;
+}
+
+
+//////////////////////////////////////////////////////////////////////////
+void ScScript::afterLoad() {
+	if (_buffer == nullptr) {
+		byte *buffer = _engine->getCompiledScript(_filename, &_bufferSize);
+		if (!buffer) {
+			_gameRef->LOG(0, "Error reinitializing script '%s' after load. Script will be terminated.", _filename);
+			_state = SCRIPT_ERROR;
+			return;
+		}
+
+		_buffer = new byte [_bufferSize];
+		memcpy(_buffer, buffer, _bufferSize);
+
+		delete _scriptStream;
+		_scriptStream = new Common::MemoryReadStream(_buffer, _bufferSize);
+
+		initTables();
+	}
 }
 
 
@@ -1411,8 +1480,13 @@ ScScript::TExternalFunction *ScScript::getExternal(char *name) {
 
 //////////////////////////////////////////////////////////////////////////
 bool ScScript::externalCall(ScStack *stack, ScStack *thisStack, ScScript::TExternalFunction *function) {
+	//////////////////////////////////////////////////////////////////////////
+	// Externals: emulate external functions used in known games
+	//////////////////////////////////////////////////////////////////////////
+	if (!DID_FAIL(EmulateExternalCall(_gameRef, stack, thisStack, function))) {
+		return STATUS_OK;
+	}
 
-	_gameRef->LOG(0, "External functions are not supported on this platform.");
 	stack->correctParams(0);
 	stack->pushNULL();
 	return STATUS_FAILED;
@@ -1447,25 +1521,6 @@ bool ScScript::finishThreads() {
 	return STATUS_OK;
 }
 
-//////////////////////////////////////////////////////////////////////////
-void ScScript::afterLoad() {
-	if (_buffer == nullptr) {
-		byte *buffer = _engine->getCompiledScript(_filename, &_bufferSize);
-		if (!buffer) {
-			_gameRef->LOG(0, "Error reinitializing script '%s' after load. Script will be terminated.", _filename);
-			_state = SCRIPT_ERROR;
-			return;
-		}
-
-		_buffer = new byte [_bufferSize];
-		memcpy(_buffer, buffer, _bufferSize);
-
-		delete _scriptStream;
-		_scriptStream = new Common::MemoryReadStream(_buffer, _bufferSize);
-
-		initTables();
-	}
-}
 
 void ScScript::preInstHook(uint32 inst) {}
 

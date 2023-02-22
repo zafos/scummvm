@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -187,11 +186,11 @@ protected:
 class NeverhoodAudioStream : public Audio::AudioStream {
 public:
 	NeverhoodAudioStream(int rate, byte shiftValue, bool isLooping, DisposeAfterUse::Flag disposeStream, Common::SeekableReadStream *stream);
-	~NeverhoodAudioStream();
-	int readBuffer(int16 *buffer, const int numSamples);
-	bool isStereo() const  { return _isStereo; }
-	bool endOfData() const { return _endOfData; }
-	int getRate() const { return _rate; }
+	~NeverhoodAudioStream() override;
+	int readBuffer(int16 *buffer, const int numSamples) override;
+	bool isStereo() const override  { return _isStereo; }
+	bool endOfData() const override { return _endOfData; }
+	int getRate() const override { return _rate; }
 private:
 	const int _rate;
 	const bool _isLooping;

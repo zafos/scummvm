@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,13 +26,13 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#undef ARRAYSIZE // winnt.h defines ARRAYSIZE, but we want our own one...
 #include <shellapi.h>
 #if defined(__GNUC__) && defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR)
 // required for SHGFP_TYPE_CURRENT in shlobj.h
 #define _WIN32_IE 0x500
 #endif
 #include <shlobj.h>
+#include <tchar.h>
 
 #include "common/scummsys.h"
 #include "common/config-manager.h"
@@ -43,34 +42,69 @@
 #include "backends/audiocd/win32/win32-audiocd.h"
 #include "backends/platform/sdl/win32/win32.h"
 #include "backends/platform/sdl/win32/win32-window.h"
+#include "backends/platform/sdl/win32/win32_wrapper.h"
 #include "backends/saves/windows/windows-saves.h"
 #include "backends/fs/windows/windows-fs-factory.h"
 #include "backends/taskbar/win32/win32-taskbar.h"
 #include "backends/updates/win32/win32-updates.h"
+#include "backends/dialogs/win32/win32-dialogs.h"
 
 #include "common/memstream.h"
+#include "common/ustr.h"
+
+#if defined(USE_TTS)
+#include "backends/text-to-speech/windows/windows-text-to-speech.h"
+#endif
 
 #define DEFAULT_CONFIG_FILE "scummvm.ini"
+
+OSystem_Win32::OSystem_Win32() :
+	_isPortable(false) {
+}
 
 void OSystem_Win32::init() {
 	// Initialize File System Factory
 	_fsFactory = new WindowsFilesystemFactory();
 
 	// Create Win32 specific window
+	initSDL();
 	_window = new SdlWindow_Win32();
 
 #if defined(USE_TASKBAR)
 	// Initialize taskbar manager
-	_taskbarManager = new Win32TaskbarManager(_window);
+	_taskbarManager = new Win32TaskbarManager((SdlWindow_Win32*)_window);
+#endif
+
+#if defined(USE_SYSDIALOGS)
+	// Initialize dialog manager
+	_dialogManager = new Win32DialogManager((SdlWindow_Win32*)_window);
+#endif
+
+#if defined(USE_JPEG)
+	initializeJpegLibraryForWin95();
 #endif
 
 	// Invoke parent implementation of this method
 	OSystem_SDL::init();
 }
 
+WORD GetCurrentSubsystem() {
+	// HMODULE is the module base address. And the PIMAGE_DOS_HEADER is located at the beginning.
+	PIMAGE_DOS_HEADER EXEHeader = (PIMAGE_DOS_HEADER)GetModuleHandle(nullptr);
+	assert(EXEHeader->e_magic == IMAGE_DOS_SIGNATURE);
+	// PIMAGE_NT_HEADERS is bitness dependant.
+	// Conveniently, since it's for our own process, it's always the correct bitness.
+	// IMAGE_NT_HEADERS has to be found using a byte offset from the EXEHeader,
+	// which requires the ugly cast.
+	PIMAGE_NT_HEADERS PEHeader = (PIMAGE_NT_HEADERS)(((char*)EXEHeader) + EXEHeader->e_lfanew);
+	assert(PEHeader->Signature == IMAGE_NT_SIGNATURE);
+	return PEHeader->OptionalHeader.Subsystem;
+}
+
 void OSystem_Win32::initBackend() {
-	// Console window is enabled by default on Windows
-	ConfMan.registerDefault("console", true);
+	// The console window is enabled for the console subsystem,
+	// since Windows already creates the console window for us
+	ConfMan.registerDefault("console", GetCurrentSubsystem() == IMAGE_SUBSYSTEM_WINDOWS_CUI);
 
 	// Enable or disable the window console window
 	if (ConfMan.getBool("console")) {
@@ -79,28 +113,45 @@ void OSystem_Win32::initBackend() {
 			freopen("CONOUT$","w",stdout);
 			freopen("CONOUT$","w",stderr);
 		}
-		SetConsoleTitle("ScummVM Status Window");
+		SetConsoleTitle(TEXT("ScummVM Status Window"));
 	} else {
 		FreeConsole();
 	}
 
 	// Create the savefile manager
-	if (_savefileManager == 0)
-		_savefileManager = new WindowsSaveFileManager();
+	if (_savefileManager == nullptr)
+		_savefileManager = new WindowsSaveFileManager(_isPortable);
 
 #if defined(USE_SPARKLE)
 	// Initialize updates manager
-	_updateManager = new Win32UpdateManager();
+	if (!_isPortable) {
+		_updateManager = new Win32UpdateManager((SdlWindow_Win32*)_window);
+	}
+#endif
+
+	// Initialize text to speech
+#ifdef USE_TTS
+	_textToSpeechManager = new WindowsTextToSpeechManager();
 #endif
 
 	// Invoke parent implementation of this method
 	OSystem_SDL::initBackend();
 }
 
+#ifdef USE_OPENGL
+OSystem_SDL::GraphicsManagerType OSystem_Win32::getDefaultGraphicsManager() const {
+	return GraphicsManagerOpenGL;
+}
+#endif
 
 bool OSystem_Win32::hasFeature(Feature f) {
 	if (f == kFeatureDisplayLogFile || f == kFeatureOpenUrl)
 		return true;
+
+#ifdef USE_SYSDIALOGS
+	if (f == kFeatureSystemBrowserDialog)
+		return true;
+#endif
 
 	return OSystem_SDL::hasFeature(f);
 }
@@ -111,9 +162,19 @@ bool OSystem_Win32::displayLogFile() {
 
 	// Try opening the log file with the default text editor
 	// log files should be registered as "txtfile" by default and thus open in the default text editor
-	HINSTANCE shellExec = ShellExecute(NULL, NULL, _logFilePath.c_str(), NULL, NULL, SW_SHOWNORMAL);
-	if ((intptr_t)shellExec > 32)
+	TCHAR *tLogFilePath = Win32::stringToTchar(_logFilePath);
+	SHELLEXECUTEINFO sei;
+
+	memset(&sei, 0, sizeof(sei));
+	sei.fMask  = SEE_MASK_FLAG_NO_UI;
+	sei.hwnd   = getHwnd();
+	sei.lpFile = tLogFilePath;
+	sei.nShow  = SW_SHOWNORMAL;
+
+	if (ShellExecuteEx(&sei)) {
+		free(tLogFilePath);
 		return true;
+	}
 
 	// ShellExecute with the default verb failed, try the "Open with..." dialog
 	PROCESS_INFORMATION processInformation;
@@ -122,35 +183,100 @@ bool OSystem_Win32::displayLogFile() {
 	memset(&startupInfo, 0, sizeof(startupInfo));
 	startupInfo.cb = sizeof(startupInfo);
 
-	char cmdLine[MAX_PATH * 2];  // CreateProcess may change the contents of cmdLine
-	sprintf(cmdLine, "rundll32 shell32.dll,OpenAs_RunDLL %s", _logFilePath.c_str());
-	BOOL result = CreateProcess(NULL,
+	TCHAR cmdLine[MAX_PATH * 2];  // CreateProcess may change the contents of cmdLine
+	_stprintf(cmdLine, TEXT("rundll32 shell32.dll,OpenAs_RunDLL %s"), tLogFilePath);
+	BOOL result = CreateProcess(nullptr,
 	                            cmdLine,
-	                            NULL,
-	                            NULL,
+	                            nullptr,
+	                            nullptr,
 	                            FALSE,
 	                            NORMAL_PRIORITY_CLASS,
-	                            NULL,
-	                            NULL,
+	                            nullptr,
+	                            nullptr,
 	                            &startupInfo,
 	                            &processInformation);
-	if (result)
+	free(tLogFilePath);
+	if (result) {
+		CloseHandle(processInformation.hProcess);
+		CloseHandle(processInformation.hThread);
 		return true;
+	}
 
 	return false;
 }
 
 bool OSystem_Win32::openUrl(const Common::String &url) {
-	const uint64 result = (uint64)ShellExecute(0, 0, /*(wchar_t*)nativeFilePath.utf16()*/url.c_str(), 0, 0, SW_SHOWNORMAL);
-	// ShellExecute returns a value greater than 32 if successful
-	if (result <= 32) {
-		warning("ShellExecute failed: error = %u", result);
+	TCHAR *tUrl = Win32::stringToTchar(url);
+	SHELLEXECUTEINFO sei;
+
+	memset(&sei, 0, sizeof(sei));
+	sei.cbSize = sizeof(sei);
+	sei.fMask  = SEE_MASK_FLAG_NO_UI;
+	sei.hwnd   = getHwnd();
+	sei.lpFile = tUrl;
+	sei.nShow  = SW_SHOWNORMAL;
+
+	BOOL success = ShellExecuteEx(&sei);
+
+	free(tUrl);
+	if (!success) {
+		warning("ShellExecuteEx failed: error = %08lX", GetLastError());
 		return false;
 	}
 	return true;
 }
 
+void OSystem_Win32::logMessage(LogMessageType::Type type, const char *message) {
+	OSystem_SDL::logMessage(type, message);
+
+#if defined( USE_WINDBG )
+	TCHAR *tMessage = Win32::stringToTchar(message);
+	OutputDebugString(tMessage);
+	free(tMessage);
+#endif
+}
+
+Common::String OSystem_Win32::getSystemLanguage() const {
+#if defined(USE_DETECTLANG) && defined(USE_TRANSLATION)
+	// We can not use "setlocale" (at least not for MSVC builds), since it
+	// will return locales like: "English_USA.1252", thus we need a special
+	// way to determine the locale string for Win32.
+	TCHAR langName[9];
+	TCHAR ctryName[9];
+
+	if (GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_SISO639LANGNAME, langName, ARRAYSIZE(langName)) != 0 &&
+		GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_SISO3166CTRYNAME, ctryName, ARRAYSIZE(ctryName)) != 0) {
+		Common::String localeName = Win32::tcharToString(langName);
+		localeName += "_";
+		localeName += Win32::tcharToString(ctryName);
+
+		return localeName;
+	}
+#endif // USE_DETECTLANG
+	// Falback to SDL implementation
+	return OSystem_SDL::getSystemLanguage();
+}
+
+Common::String OSystem_Win32::getDefaultIconsPath() {
+	TCHAR iconsPath[MAX_PATH];
+
+	if (_isPortable) {
+		Win32::getProcessDirectory(iconsPath, MAX_PATH);
+		_tcscat(iconsPath, TEXT("\\Icons\\"));
+	} else {
+		// Use the Application Data directory of the user profile
+		if (!Win32::getApplicationDataDirectory(iconsPath)) {
+			return Common::String();
+		}
+		_tcscat(iconsPath, TEXT("\\Icons\\"));
+		CreateDirectory(iconsPath, nullptr);
+	}
+
+	return Win32::tcharToString(iconsPath);
+}
+
 Common::String OSystem_Win32::getScreenshotsPath() {
+	// If the user has configured a screenshots path, use it
 	Common::String screenshotsPath = ConfMan.get("screenshotpath");
 	if (!screenshotsPath.empty()) {
 		if (!screenshotsPath.hasSuffix("\\") && !screenshotsPath.hasSuffix("/"))
@@ -158,143 +284,144 @@ Common::String OSystem_Win32::getScreenshotsPath() {
 		return screenshotsPath;
 	}
 
-	char picturesPath[MAXPATHLEN];
-
-	// Use the My Pictures folder.
-	if (SHGetFolderPath(NULL, CSIDL_MYPICTURES, NULL, SHGFP_TYPE_CURRENT, picturesPath) != S_OK) {
-		warning("Unable to access My Pictures directory");
-		return Common::String();
+	TCHAR picturesPath[MAX_PATH];
+	if (_isPortable) {
+		Win32::getProcessDirectory(picturesPath, MAX_PATH);
+		_tcscat(picturesPath, TEXT("\\Screenshots\\"));
+	} else {
+		// Use the My Pictures folder
+		HRESULT hr = SHGetFolderPathFunc(nullptr, CSIDL_MYPICTURES, nullptr, SHGFP_TYPE_CURRENT, picturesPath);
+		if (hr != S_OK) {
+			if (hr != E_NOTIMPL) {
+				warning("Unable to locate My Pictures directory");
+			}
+			return Common::String();
+		}
+		_tcscat(picturesPath, TEXT("\\ScummVM Screenshots\\"));
 	}
-
-	screenshotsPath = Common::String(picturesPath) + "\\ScummVM Screenshots\\";
 
 	// If the directory already exists (as it should in most cases),
 	// we don't want to fail, but we need to stop on other errors (such as ERROR_PATH_NOT_FOUND)
-	if (!CreateDirectory(screenshotsPath.c_str(), NULL)) {
+	if (!CreateDirectory(picturesPath, nullptr)) {
 		if (GetLastError() != ERROR_ALREADY_EXISTS)
 			error("Cannot create ScummVM Screenshots folder");
 	}
 
-	return screenshotsPath;
+	return Win32::tcharToString(picturesPath);
 }
 
 Common::String OSystem_Win32::getDefaultConfigFileName() {
-	char configFile[MAXPATHLEN];
+	TCHAR configFile[MAX_PATH];
 
-	OSVERSIONINFO win32OsVersion;
-	ZeroMemory(&win32OsVersion, sizeof(OSVERSIONINFO));
-	win32OsVersion.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-	GetVersionEx(&win32OsVersion);
-	// Check for non-9X version of Windows.
-	if (win32OsVersion.dwPlatformId != VER_PLATFORM_WIN32_WINDOWS) {
-		// Use the Application Data directory of the user profile.
-		if (win32OsVersion.dwMajorVersion >= 5) {
-			if (!GetEnvironmentVariable("APPDATA", configFile, sizeof(configFile)))
-				error("Unable to access application data directory");
-		} else {
-			if (!GetEnvironmentVariable("USERPROFILE", configFile, sizeof(configFile)))
-				error("Unable to access user profile directory");
+	// if this is the first time the default config file name is requested
+	// then we need detect if we should run in portable mode. (and if it's
+	// never requested before the backend is initialized then a config file
+	// was provided on the command line and portable mode doesn't apply.)
+	if (!backendInitialized()) {
+		_isPortable = detectPortableConfigFile();
+	}
 
-			strcat(configFile, "\\Application Data");
+	if (_isPortable) {
+		// Use the current process directory in portable mode
+		Win32::getProcessDirectory(configFile, MAX_PATH);
+		_tcscat(configFile, TEXT("\\" DEFAULT_CONFIG_FILE));
+	} else {
+		// Use the Application Data directory of the user profile
+		if (Win32::getApplicationDataDirectory(configFile)) {
+			_tcscat(configFile, TEXT("\\" DEFAULT_CONFIG_FILE));
 
-			// If the directory already exists (as it should in most cases),
-			// we don't want to fail, but we need to stop on other errors (such as ERROR_PATH_NOT_FOUND)
-			if (!CreateDirectory(configFile, NULL)) {
-				if (GetLastError() != ERROR_ALREADY_EXISTS)
-					error("Cannot create Application data folder");
-			}
-		}
+			FILE *tmp = nullptr;
+			if ((tmp = _tfopen(configFile, TEXT("r"))) == nullptr) {
+				// Check windows directory
+				TCHAR oldConfigFile[MAX_PATH];
+				uint ret = GetWindowsDirectory(oldConfigFile, MAX_PATH);
+				if (ret == 0 || ret > MAX_PATH)
+					error("Cannot retrieve the path of the Windows directory");
 
-		strcat(configFile, "\\ScummVM");
-		if (!CreateDirectory(configFile, NULL)) {
-			if (GetLastError() != ERROR_ALREADY_EXISTS)
-				error("Cannot create ScummVM application data folder");
-		}
+				_tcscat(oldConfigFile, TEXT("\\" DEFAULT_CONFIG_FILE));
+				if ((tmp = _tfopen(oldConfigFile, TEXT("r")))) {
+					_tcscpy(configFile, oldConfigFile);
 
-		strcat(configFile, "\\" DEFAULT_CONFIG_FILE);
-
-		FILE *tmp = NULL;
-		if ((tmp = fopen(configFile, "r")) == NULL) {
-			// Check windows directory
-			char oldConfigFile[MAXPATHLEN];
-			uint ret = GetWindowsDirectory(oldConfigFile, MAXPATHLEN);
-			if (ret == 0 || ret > MAXPATHLEN)
-				error("Cannot retrieve the path of the Windows directory");
-
-			strcat(oldConfigFile, "\\" DEFAULT_CONFIG_FILE);
-			if ((tmp = fopen(oldConfigFile, "r"))) {
-				strcpy(configFile, oldConfigFile);
-
+					fclose(tmp);
+				}
+			} else {
 				fclose(tmp);
 			}
 		} else {
-			fclose(tmp);
-		}
-	} else {
-		// Check windows directory
-		uint ret = GetWindowsDirectory(configFile, MAXPATHLEN);
-		if (ret == 0 || ret > MAXPATHLEN)
-			error("Cannot retrieve the path of the Windows directory");
+			// Check windows directory
+			uint ret = GetWindowsDirectory(configFile, MAX_PATH);
+			if (ret == 0 || ret > MAX_PATH)
+				error("Cannot retrieve the path of the Windows directory");
 
-		strcat(configFile, "\\" DEFAULT_CONFIG_FILE);
+			_tcscat(configFile, TEXT("\\" DEFAULT_CONFIG_FILE));
+		}
 	}
 
-	return configFile;
+	return Win32::tcharToString(configFile);
 }
 
-Common::WriteStream *OSystem_Win32::createLogFile() {
-	// Start out by resetting _logFilePath, so that in case
-	// of a failure, we know that no log file is open.
-	_logFilePath.clear();
+Common::String OSystem_Win32::getDefaultLogFileName() {
+	TCHAR logFile[MAX_PATH];
 
-	char logFile[MAXPATHLEN];
-
-	OSVERSIONINFO win32OsVersion;
-	ZeroMemory(&win32OsVersion, sizeof(OSVERSIONINFO));
-	win32OsVersion.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-	GetVersionEx(&win32OsVersion);
-	// Check for non-9X version of Windows.
-	if (win32OsVersion.dwPlatformId != VER_PLATFORM_WIN32_WINDOWS) {
-		// Use the Application Data directory of the user profile.
-		if (win32OsVersion.dwMajorVersion >= 5) {
-			if (!GetEnvironmentVariable("APPDATA", logFile, sizeof(logFile)))
-				error("Unable to access application data directory");
-		} else {
-			if (!GetEnvironmentVariable("USERPROFILE", logFile, sizeof(logFile)))
-				error("Unable to access user profile directory");
-
-			strcat(logFile, "\\Application Data");
-			CreateDirectory(logFile, NULL);
-		}
-
-		strcat(logFile, "\\ScummVM");
-		CreateDirectory(logFile, NULL);
-		strcat(logFile, "\\Logs");
-		CreateDirectory(logFile, NULL);
-		strcat(logFile, "\\scummvm.log");
-
-		Common::FSNode file(logFile);
-		Common::WriteStream *stream = file.createWriteStream();
-		if (stream)
-			_logFilePath= logFile;
-
-		return stream;
+	if (_isPortable) {
+		Win32::getProcessDirectory(logFile, MAX_PATH);
 	} else {
-		return 0;
+		// Use the Application Data directory of the user profile
+		if (!Win32::getApplicationDataDirectory(logFile)) {
+			return Common::String();
+		}
+		_tcscat(logFile, TEXT("\\Logs"));
+		CreateDirectory(logFile, nullptr);
 	}
+
+	_tcscat(logFile, TEXT("\\scummvm.log"));
+
+	return Win32::tcharToString(logFile);
+}
+
+bool OSystem_Win32::detectPortableConfigFile() {
+	// ScummVM operates in a "portable mode" if there is a config file in the
+	// same directory as the executable. In this mode, the executable's
+	// directory is used instead of the user's profile for application files.
+	// This approach is modeled off of the portable mode in Notepad++.
+
+	// Check if there is a config file in the same directory as the executable.
+	TCHAR portableConfigFile[MAX_PATH];
+	Win32::getProcessDirectory(portableConfigFile, MAX_PATH);
+	_tcscat(portableConfigFile, TEXT("\\" DEFAULT_CONFIG_FILE));
+	FILE *file = _tfopen(portableConfigFile, TEXT("r"));
+	if (file == nullptr) {
+		return false;
+	}
+	fclose(file);
+
+	// Check if we're running from Program Files on Vista+.
+	// If so then don't attempt to use local files due to UAC.
+	// (Notepad++ does this too.)
+	if (Win32::confirmWindowsVersion(6, 0)) {
+		TCHAR programFiles[MAX_PATH];
+		if (SHGetFolderPathFunc(nullptr, CSIDL_PROGRAM_FILES, nullptr, SHGFP_TYPE_CURRENT, programFiles) == S_OK) {
+			_tcscat(portableConfigFile, TEXT("\\"));
+			if (_tcsstr(portableConfigFile, programFiles) == portableConfigFile) {
+				return false;
+			}
+		}
+	}
+
+	return true;
 }
 
 namespace {
 
-class Win32ResourceArchive : public Common::Archive {
+class Win32ResourceArchive final : public Common::Archive {
 	friend BOOL CALLBACK EnumResNameProc(HMODULE hModule, LPCTSTR lpszType, LPTSTR lpszName, LONG_PTR lParam);
 public:
 	Win32ResourceArchive();
 
-	virtual bool hasFile(const Common::String &name) const;
-	virtual int listMembers(Common::ArchiveMemberList &list) const;
-	virtual const Common::ArchiveMemberPtr getMember(const Common::String &name) const;
-	virtual Common::SeekableReadStream *createReadStreamForMember(const Common::String &name) const;
+	bool hasFile(const Common::Path &path) const override;
+	int listMembers(Common::ArchiveMemberList &list) const override;
+	const Common::ArchiveMemberPtr getMember(const Common::Path &path) const override;
+	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override;
 private:
 	typedef Common::List<Common::String> FilenameList;
 
@@ -306,15 +433,17 @@ BOOL CALLBACK EnumResNameProc(HMODULE hModule, LPCTSTR lpszType, LPTSTR lpszName
 		return TRUE;
 
 	Win32ResourceArchive *arch = (Win32ResourceArchive *)lParam;
-	arch->_files.push_back(lpszName);
+	Common::String filename = Win32::tcharToString(lpszName);
+	arch->_files.push_back(filename);
 	return TRUE;
 }
 
 Win32ResourceArchive::Win32ResourceArchive() {
-	EnumResourceNames(NULL, MAKEINTRESOURCE(256), &EnumResNameProc, (LONG_PTR)this);
+	EnumResourceNames(nullptr, MAKEINTRESOURCE(256), &EnumResNameProc, (LONG_PTR)this);
 }
 
-bool Win32ResourceArchive::hasFile(const Common::String &name) const {
+bool Win32ResourceArchive::hasFile(const Common::Path &path) const {
+	Common::String name = path.toString();
 	for (FilenameList::const_iterator i = _files.begin(); i != _files.end(); ++i) {
 		if (i->equalsIgnoreCase(name))
 			return true;
@@ -332,30 +461,34 @@ int Win32ResourceArchive::listMembers(Common::ArchiveMemberList &list) const {
 	return count;
 }
 
-const Common::ArchiveMemberPtr Win32ResourceArchive::getMember(const Common::String &name) const {
+const Common::ArchiveMemberPtr Win32ResourceArchive::getMember(const Common::Path &path) const {
+	Common::String name = path.toString();
 	return Common::ArchiveMemberPtr(new Common::GenericArchiveMember(name, this));
 }
 
-Common::SeekableReadStream *Win32ResourceArchive::createReadStreamForMember(const Common::String &name) const {
-	HRSRC resource = FindResource(NULL, name.c_str(), MAKEINTRESOURCE(256));
+Common::SeekableReadStream *Win32ResourceArchive::createReadStreamForMember(const Common::Path &path) const {
+	Common::String name = path.toString();
+	TCHAR *tName = Win32::stringToTchar(name);
+	HRSRC resource = FindResource(nullptr, tName, MAKEINTRESOURCE(256));
+	free(tName);
 
-	if (resource == NULL)
-		return 0;
+	if (resource == nullptr)
+		return nullptr;
 
-	HGLOBAL handle = LoadResource(NULL, resource);
+	HGLOBAL handle = LoadResource(nullptr, resource);
 
-	if (handle == NULL)
-		return 0;
+	if (handle == nullptr)
+		return nullptr;
 
 	const byte *data = (const byte *)LockResource(handle);
 
-	if (data == NULL)
-		return 0;
+	if (data == nullptr)
+		return nullptr;
 
-	uint32 size = SizeofResource(NULL, resource);
+	uint32 size = SizeofResource(nullptr, resource);
 
 	if (size == 0)
-		return 0;
+		return nullptr;
 
 	return new Common::MemoryReadStream(data, size);
 }
@@ -371,5 +504,23 @@ void OSystem_Win32::addSysArchivesToSearchSet(Common::SearchSet &s, int priority
 AudioCDManager *OSystem_Win32::createAudioCDManager() {
 	return createWin32AudioCDManager();
 }
+
+// libjpeg-turbo uses SSE instructions that error on at least some Win95 machines.
+// These can be disabled with an environment variable. Fixes bug #13643
+#if defined(USE_JPEG)
+void OSystem_Win32::initializeJpegLibraryForWin95() {
+	OSVERSIONINFO versionInfo;
+	ZeroMemory(&versionInfo, sizeof(versionInfo));
+	versionInfo.dwOSVersionInfoSize = sizeof(versionInfo);
+	GetVersionEx(&versionInfo);
+
+	// Is Win95?
+	if (versionInfo.dwMajorVersion == 4 && versionInfo.dwMinorVersion == 0) {
+		// Disable SSE instructions in libjpeg-turbo.
+		// This limits detected extensions to 3DNOW and MMX.
+		_tputenv(TEXT("JSIMD_FORCE3DNOW=1"));
+	}
+}
+#endif
 
 #endif

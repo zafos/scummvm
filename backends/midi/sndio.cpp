@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -44,11 +43,11 @@
 class MidiDriver_Sndio : public MidiDriver_MPU401 {
 public:
 	MidiDriver_Sndio();
-	int open();
-	bool isOpen() const { return hdl != NULL; }
-	void close();
-	void send(uint32 b);
-	void sysEx(const byte *msg, uint16 length);
+	int open() override;
+	bool isOpen() const override { return hdl != NULL; }
+	void close() override;
+	void send(uint32 b) override;
+	void sysEx(const byte *msg, uint16 length) override;
 
 private:
 	struct mio_hdl *hdl;
@@ -80,6 +79,8 @@ void MidiDriver_Sndio::send(uint32 b) {
 	unsigned char buf[4];
 	unsigned int len;
 
+	midiDriverCommonSend(b);
+
 	if (!hdl)
 		return;
 	buf[0] = b & 0xff;
@@ -106,6 +107,8 @@ void MidiDriver_Sndio::sysEx(const byte *msg, uint16 length) {
 	unsigned char buf[266];
 
 	assert(length + 2 <= ARRAYSIZE(buf));
+
+	midiDriverCommonSysEx(msg, length);
 
 	// Add SysEx frame
 	buf[0] = 0xF0;

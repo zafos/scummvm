@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 /*
  * Raw output support by Michael Pearce
  * Alsa support by Nicolas Noble <nicolas@nobis-crew.org> copied from
- *    both the QuickTime support and (vkeybd http://www.alsa-project.org/~iwai/alsa.html)
+ * both the QuickTime support and (vkeybd https://web.archive.org/web/20070629122111/http://www.alsa-project.org/~iwai/alsa.html)
  */
 
 // Disable symbol overrides so that we can use system headers.
@@ -54,11 +53,11 @@
 class MidiDriver_SEQ : public MidiDriver_MPU401 {
 public:
 	MidiDriver_SEQ();
-	int open();
-	bool isOpen() const { return _isOpen; }
-	void close();
-	void send(uint32 b);
-	void sysEx(const byte *msg, uint16 length);
+	int open() override;
+	bool isOpen() const override { return _isOpen; }
+	void close() override;
+	void send(uint32 b) override;
+	void sysEx(const byte *msg, uint16 length) override;
 
 private:
 	bool _isOpen;
@@ -109,6 +108,8 @@ void MidiDriver_SEQ::close() {
 }
 
 void MidiDriver_SEQ::send(uint32 b) {
+	midiDriverCommonSend(b);
+
 	unsigned char buf[256];
 	int position = 0;
 
@@ -156,6 +157,8 @@ void MidiDriver_SEQ::sysEx(const byte *msg, uint16 length) {
 	const byte *chr = msg;
 
 	assert(length + 2 <= 266);
+
+	midiDriverCommonSysEx(msg, length);
 
 	buf[position++] = SEQ_MIDIPUTC;
 	buf[position++] = 0xF0;

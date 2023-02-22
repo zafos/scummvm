@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef SCI_MIDIPARSER_H
 #define SCI_MIDIPARSER_H
 
-#include "sci/resource.h"
+#include "sci/resource/resource.h"
 #include "sci/sound/music.h"
 #include "audio/midiparser.h"
 
@@ -51,17 +50,18 @@ namespace Sci {
 class MidiParser_SCI : public MidiParser {
 public:
 	MidiParser_SCI(SciVersion soundVersion, SciMusic *music);
-	~MidiParser_SCI();
+	~MidiParser_SCI() override;
 
 	void mainThreadBegin();
 	void mainThreadEnd();
 
 	bool loadMusic(SoundResource::Track *track, MusicEntry *psnd, int channelFilterMask, SciVersion soundVersion);
-	bool loadMusic(byte *, uint32) {
+	bool loadMusic(byte *, uint32) override {
 		return false;
 	}
+	void initTrack();
 	void sendInitCommands();
-	void unloadMusic();
+	void unloadMusic() override;
 	void setMasterVolume(byte masterVolume);
 	void setVolume(byte volume);
 	void stop() {
@@ -74,13 +74,13 @@ public:
 			jumpToTick(0);
 	}
 
-	void allNotesOff();
+	void allNotesOff() override;
 
 	const SciSpan<const byte> &getMixedData() const { return *_mixedData; }
 	byte getSongReverb();
 
 	void sendFromScriptToDriver(uint32 midi);
-	void sendToDriver(uint32 midi);
+	void sendToDriver(uint32 midi) override;
 	void sendToDriver(byte status, byte firstOp, byte secondOp) {
 		sendToDriver(status | ((uint32)firstOp << 8) | ((uint32)secondOp << 16));
 	}
@@ -88,8 +88,8 @@ public:
 	void remapChannel(int channel, int devChannel);
 
 protected:
-	void parseNextEvent(EventInfo &info);
-	bool processEvent(const EventInfo &info, bool fireEvents = true);
+	void parseNextEvent(EventInfo &info) override;
+	bool processEvent(const EventInfo &info, bool fireEvents = true) override;
 	void midiMixChannels();
 	void midiFilterChannels(int channelMask);
 	byte midiGetNextChannel(long ticker);
@@ -114,7 +114,6 @@ protected:
 
 	bool _channelUsed[16];
 	int16 _channelRemap[16];
-	bool _channelMuted[16];
 	byte _channelVolume[16];
 
 	struct ChannelState {

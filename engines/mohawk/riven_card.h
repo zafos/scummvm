@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -129,7 +128,7 @@ public:
 	RivenScriptPtr onMouseMove(const Common::Point &mouse);
 
 	/** Handle a keyboard action */
-	RivenScriptPtr onKeyAction(RivenKeyAction keyAction);
+	RivenScriptPtr onKeyAction(RivenAction keyAction);
 
 	/** General frame update handler */
 	RivenScriptPtr onFrame();
@@ -152,10 +151,17 @@ private:
 	void loadCardHotspotEnableList(uint16 id);
 	void loadCardWaterEffectList(uint16 id);
 	void applyPatches(uint16 id);
-	void applyPropertiesPatch8EB7(uint32 globalId);
+	void applyPropertiesPatchE2E(uint32 globalId);
+	void applyPropertiesPatch1518D(uint32 globalId);
+	void applyPropertiesPatch8EB7(uint32 globalId, const Common::String &var, uint16 hotspotId);
 	void applyPropertiesPatch2E76(uint32 globalId);
 	void applyPropertiesPatch22118(uint32 globalId);
+	void applyPropertiesPatch2B414(uint32 globalId);
 	void setCurrentCardVariable();
+
+	void moveHotspot(uint16 blstId, const Common::Rect &position);
+	void addMenuHotspot(uint16 blstId, const Common::Rect &position, uint16 index,
+	                    uint16 externalCommandNameId, const char *externalCommandName);
 
 	RivenScriptPtr getScript(uint16 scriptType) const;
 	void defaultLoadScript();

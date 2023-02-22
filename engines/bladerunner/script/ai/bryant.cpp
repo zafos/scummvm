@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -45,17 +44,26 @@ void AIScriptBryant::Initialize() {
 	World_Waypoint_Set(333, kSetBB12,       -34.0f,    0.0f,     33.0f);
 	World_Waypoint_Set(334, kSetBB05,         3.0f, -60.30f,   -144.0f);
 	World_Waypoint_Set(335, kSetBB12,       -50.0f,    0.0f,    212.0f);
+
 	Actor_Put_In_Set(kActorBryant, kSetBB05);
+
 	Actor_Set_Goal_Number(kActorBryant, 100);
 }
 
 bool AIScriptBryant::Update() {
-	if (Global_Variable_Query(kVariableChapter) == 2 && Actor_Query_Goal_Number(kActorBryant) <= 101 && Player_Query_Current_Scene() == kSceneBB05) {
+	if (Global_Variable_Query(kVariableChapter) == 2
+	 && Actor_Query_Goal_Number(kActorBryant) <= 101
+	 && Player_Query_Current_Scene() == kSceneBB05
+	) {
 		Actor_Set_Goal_Number(kActorBryant, 101);
 		return true;
 	}
-	if (Global_Variable_Query(kVariableChapter) == 3 && Player_Query_Current_Scene() == kSceneBB05 && !Game_Flag_Query(686)) {
-		Game_Flag_Set(686);
+
+	if ( Global_Variable_Query(kVariableChapter) == 3
+	 &&  Player_Query_Current_Scene() == kSceneBB05
+	 && !Game_Flag_Query(kFlagNotUsed686)
+	) {
+		Game_Flag_Set(kFlagNotUsed686);
 		return true;
 	}
 	return false;
@@ -86,15 +94,15 @@ void AIScriptBryant::ClickedByPlayer() {
 	Actor_Voice_Over(40, kActorVoiceOver);
 }
 
-void AIScriptBryant::EnteredScene(int sceneId) {
+void AIScriptBryant::EnteredSet(int setId) {
 	// return false;
 }
 
-void AIScriptBryant::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptBryant::OtherAgentEnteredThisSet(int otherActorId) {
 	// return false;
 }
 
-void AIScriptBryant::OtherAgentExitedThisScene(int otherActorId) {
+void AIScriptBryant::OtherAgentExitedThisSet(int otherActorId) {
 	// return false;
 }
 
@@ -108,7 +116,7 @@ void AIScriptBryant::ShotAtAndMissed() {
 
 bool AIScriptBryant::ShotAtAndHit() {
 	AI_Movement_Track_Flush(kActorBryant);
-	Sound_Play(3, 100, 0, 0, 50);
+	Sound_Play(kSfxFEMHURT1, 100, 0, 0, 50);  // a bug?
 
 	return false;
 }
@@ -136,6 +144,7 @@ bool AIScriptBryant::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 			AI_Movement_Track_Append(kActorBryant, 139, 0);
 			AI_Movement_Track_Repeat(kActorBryant);
 			break;
+
 		case 1:
 			AI_Movement_Track_Append(kActorBryant, 139, 0);
 			AI_Movement_Track_Append(kActorBryant, 138, 0);
@@ -145,59 +154,73 @@ bool AIScriptBryant::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 			AI_Movement_Track_Append(kActorBryant, 134, 0);
 			AI_Movement_Track_Repeat(kActorBryant);
 			break;
+
 		case 2:
 			AI_Movement_Track_Append(kActorBryant, 196, 0);
 			AI_Movement_Track_Append(kActorBryant, 197, 0);
 			AI_Movement_Track_Append(kActorBryant, 198, 0);
 			AI_Movement_Track_Repeat(kActorBryant);
 			break;
+
 		case 3:
 			AI_Movement_Track_Append(kActorBryant, 198, 0);
 			AI_Movement_Track_Append(kActorBryant, 197, 0);
 			AI_Movement_Track_Append(kActorBryant, 196, 0);
 			AI_Movement_Track_Repeat(kActorBryant);
 			break;
+
 		case 4:
 			AI_Movement_Track_Append(kActorBryant, 326, 0);
 			AI_Movement_Track_Append(kActorBryant, 332, 0);
 			AI_Movement_Track_Append(kActorBryant, 327, 0);
 			AI_Movement_Track_Repeat(kActorBryant);
 			break;
+
 		case 5:
 			AI_Movement_Track_Append(kActorBryant, 327, 0);
 			AI_Movement_Track_Append(kActorBryant, 332, 0);
 			AI_Movement_Track_Append(kActorBryant, 326, 0);
 			AI_Movement_Track_Repeat(kActorBryant);
 			break;
+
 		case 6:
 			AI_Movement_Track_Append(kActorBryant, 329, 0);
 			AI_Movement_Track_Append(kActorBryant, 328, 0);
 			AI_Movement_Track_Append(kActorBryant, 330, 0);
 			AI_Movement_Track_Repeat(kActorBryant);
 			break;
+
 		case 7:
 			AI_Movement_Track_Append(kActorBryant, 330, 0);
 			AI_Movement_Track_Append(kActorBryant, 328, 0);
 			AI_Movement_Track_Append(kActorBryant, 329, 0);
 			AI_Movement_Track_Repeat(kActorBryant);
 			break;
+
 		case 8:
 			AI_Movement_Track_Append(kActorBryant, 331, 0);
 			AI_Movement_Track_Append(kActorBryant, 333, 0);
 			AI_Movement_Track_Append(kActorBryant, 335, 0);
 			AI_Movement_Track_Repeat(kActorBryant);
 			break;
+
 		case 9:
 			AI_Movement_Track_Append(kActorBryant, 335, 0);
 			AI_Movement_Track_Append(kActorBryant, 333, 0);
 			AI_Movement_Track_Append(kActorBryant, 331, 0);
 			AI_Movement_Track_Repeat(kActorBryant);
 			break;
+
+		default:
+			break;
 		}
 		// fallthrough
 	case 102:
 		AI_Movement_Track_Append(kActorBryant, 39, 0);
 		AI_Movement_Track_Repeat(kActorBryant);
+		break;
+
+	default:
 		break;
 	}
 
@@ -207,32 +230,38 @@ bool AIScriptBryant::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 bool AIScriptBryant::UpdateAnimation(int *animation, int *frame) {
 	switch (_animationState) {
 	case 0:
-		*animation = 806;
-		_animationFrame++;
+		*animation = kModelAnimationBearToyOscillatingIdle;
+		++_animationFrame;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(806)) {
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationBearToyOscillatingIdle)) {
 			_animationFrame = 0;
 		}
 		break;
+
 	case 1:
-		*animation = 805;
-		_animationFrame++;
+		*animation = kModelAnimationBearToyWalking;
+		++_animationFrame;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(805)) {
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationBearToyWalking)) {
 			_animationFrame = 0;
 		}
 		break;
-	case 2:
-		*animation = 808;
-		_animationFrame++;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(808) - 1) {
+	case 2:
+		*animation = kModelAnimationBearToyShotDead;
+		++_animationFrame;
+
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationBearToyShotDead) - 1) {
 			_animationState = 3;
 		}
 		break;
+
 	case 3:
-		*animation = 808;
-		_animationFrame = Slice_Animation_Query_Number_Of_Frames(808) - 1;
+		*animation = kModelAnimationBearToyShotDead;
+		_animationFrame = Slice_Animation_Query_Number_Of_Frames(kModelAnimationBearToyShotDead) - 1;
+		break;
+
+	default:
 		break;
 	}
 
@@ -246,14 +275,19 @@ bool AIScriptBryant::ChangeAnimationMode(int mode) {
 		_animationState = 0;
 		_animationFrame = 0;
 		break;
+
 	case kAnimationModeWalk:
 		_animationState = 1;
 		_animationFrame = 0;
 		break;
-	case 48:
+
+	case kAnimationModeDie:
 		_animationState = 2;
 		_animationFrame = 0;
 		Actor_Set_Goal_Number(kActorBryant, 0);
+		break;
+
+	default:
 		break;
 	}
 	return true;

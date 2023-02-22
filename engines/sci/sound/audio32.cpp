@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,13 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "sci/sound/audio32.h"
 #include "audio/audiostream.h"      // for SeekableAudioStream
+#include "audio/decoders/aiff.h"    // for makeAIFFStream
+#include "audio/decoders/mac_snd.h" // for makeMacSndStream
 #include "audio/decoders/raw.h"     // for makeRawStream, RawFlags::FLAG_16BITS
 #include "audio/decoders/wave.h"    // for makeWAVStream
 #include "audio/rate.h"             // for RateConverter, makeRateConverter
@@ -34,13 +35,12 @@
 #include "common/system.h"          // for OSystem, g_system
 #include "common/textconsole.h"     // for warning
 #include "common/types.h"           // for Flag::NO
-#include "engine.h"                 // for Engine, g_engine
+#include "engines/engine.h"         // for Engine, g_engine
 #include "sci/console.h"            // for Console
 #include "sci/engine/features.h"    // for GameFeatures
 #include "sci/engine/guest_additions.h" // for GuestAdditions
-#include "sci/engine/state.h"       // for EngineState
 #include "sci/engine/vm_types.h"    // for reg_t, make_reg, NULL_REG
-#include "sci/resource.h"           // for ResourceId, ResourceType::kResour...
+#include "sci/resource/resource.h"  // for ResourceId, ResourceType::kResour...
 #include "sci/sci.h"                // for SciEngine, g_sci, getSciVersion
 #include "sci/sound/decoders/sol.h" // for makeSOLStream
 
@@ -83,6 +83,42 @@ bool detectWaveAudio(Common::SeekableReadStream &stream) {
 	return true;
 }
 
+bool detectAIFFAudio(Common::SeekableReadStream &stream) {
+	const size_t initialPosition = stream.pos();
+
+	byte blockHeader[8];
+	if (stream.read(blockHeader, sizeof(blockHeader)) != sizeof(blockHeader)) {
+		stream.seek(initialPosition);
+		return false;
+	}
+
+	stream.seek(initialPosition);
+	const uint32 headerType = READ_BE_UINT32(blockHeader);
+
+	if (headerType != MKTAG('F', 'O', 'R', 'M')) {
+		return false;
+	}
+
+	return true;
+}
+
+bool detectMacSndAudio(Common::SeekableReadStream &stream) {
+	const size_t initialPosition = stream.pos();
+
+	byte header[14];
+	if (stream.read(header, sizeof(header)) != sizeof(header)) {
+		stream.seek(initialPosition);
+		return false;
+	}
+
+	stream.seek(initialPosition);
+
+	return (READ_BE_UINT16(header) == 1 &&
+		READ_BE_UINT16(header + 2) == 1 &&
+		READ_BE_UINT16(header + 4) == 5 &&
+		READ_BE_UINT32(header + 10) == 0x00018051);
+}
+
 #pragma mark -
 #pragma mark MutableLoopAudioStream
 
@@ -92,7 +128,7 @@ public:
 		_stream(stream, dispose),
 		_loop(loop_) {}
 
-	virtual int readBuffer(int16 *buffer, int numSamples) override {
+	int readBuffer(int16 *buffer, int numSamples) override {
 		int totalSamplesRead = 0;
 		int samplesRead;
 		do {
@@ -108,19 +144,19 @@ public:
 		return totalSamplesRead;
 	}
 
-	virtual bool isStereo() const override {
+	bool isStereo() const override {
 		return _stream->isStereo();
 	}
 
-	virtual int getRate() const override {
+	int getRate() const override {
 		return _stream->getRate();
 	}
 
-	virtual bool endOfData() const override {
+	bool endOfData() const override {
 		return !_loop && _stream->endOfData();
 	}
 
-	virtual bool endOfStream() const override {
+	bool endOfStream() const override {
 		return !_loop && _stream->endOfStream();
 	}
 
@@ -430,7 +466,7 @@ uint8 Audio32::getNumUnlockedChannels() const {
 	return numChannels;
 }
 
-int16 Audio32::findChannelByArgs(int argc, const reg_t *argv, const int startIndex, const reg_t soundNode) const {
+int16 Audio32::findChannelByArgs(EngineState *s, int argc, const reg_t *argv, const int startIndex, const reg_t soundNode) const {
 	// SSCI takes extra steps to skip the subop argument here, but argc/argv are
 	// already reduced by one in our engine by the kernel since these calls are
 	// always subops so we do not need to do anything extra
@@ -450,6 +486,17 @@ int16 Audio32::findChannelByArgs(int argc, const reg_t *argv, const int startInd
 
 	if (argc < 5) {
 		searchId = ResourceId(kResourceTypeAudio, argv[startIndex].toUint16());
+	} else if (argc == 6 && argv[startIndex + 5].isPointer()) {
+		// LSL6 hires Mac plays external AIFF files by passing filenames as strings.
+		//  All other parameters are ignored.
+		const Common::String audioName = s->_segMan->getString(argv[startIndex + 5]);
+		uint16 audioNumber = atoi(audioName.c_str());
+		if (audioNumber == 0) {
+			// script passed a dummy value such as "XXXX" to indicate
+			//  that all sounds should be stopped
+			return kAllChannels;
+		}
+		searchId = ResourceId(kResourceTypeAudio, audioNumber);
 	} else {
 		searchId = ResourceId(
 			kResourceTypeAudio36,
@@ -647,7 +694,8 @@ bool Audio32::playRobotAudio(const RobotAudioStream::RobotAudioPacket &packet) {
 		channel.soundNode = NULL_REG;
 		channel.volume = kMaxVolume;
 		channel.pan = -1;
-		channel.converter.reset(Audio::makeRateConverter(RobotAudioStream::kRobotSampleRate, getRate(), false));
+		// TODO: Avoid unnecessary channel conversion
+		channel.converter.reset(Audio::makeRateConverter(RobotAudioStream::kRobotSampleRate, getRate(), false, true, false));
 		// The RobotAudioStream buffer size is
 		// ((bytesPerSample * channels * sampleRate * 2000ms) / 1000ms) & ~3
 		// where bytesPerSample = 2, channels = 1, and sampleRate = 22050
@@ -793,6 +841,10 @@ uint16 Audio32::play(int16 channelIndex, const ResourceId resourceId, const bool
 		audioStream = makeSOLStream(dataStream, DisposeAfterUse::YES);
 	} else if (detectWaveAudio(*dataStream)) {
 		audioStream = Audio::makeWAVStream(dataStream, DisposeAfterUse::YES);
+	} else if (detectAIFFAudio(*dataStream)) {
+		audioStream = Audio::makeAIFFStream(dataStream, DisposeAfterUse::YES);
+	} else if (detectMacSndAudio(*dataStream)) {
+		audioStream = Audio::makeMacSndStream(dataStream, DisposeAfterUse::YES);
 	} else {
 		byte flags = Audio::FLAG_LITTLE_ENDIAN;
 		if (_globalBitDepth == 16) {
@@ -809,7 +861,8 @@ uint16 Audio32::play(int16 channelIndex, const ResourceId resourceId, const bool
 	}
 
 	channel.stream.reset(new MutableLoopAudioStream(audioStream, loop));
-	channel.converter.reset(Audio::makeRateConverter(channel.stream->getRate(), getRate(), channel.stream->isStereo(), false));
+	// TODO: Avoid unnecessary channel conversion
+	channel.converter.reset(Audio::makeRateConverter(channel.stream->getRate(), getRate(), channel.stream->isStereo(), true, false));
 
 	// SSCI sets up a decompression buffer here for the audio stream, plus
 	// writes information about the sample to the channel to convert to the
@@ -1070,8 +1123,30 @@ bool Audio32::fadeChannel(const int16 channelIndex, const int16 targetVolume, co
 
 	AudioChannel &channel = getChannel(channelIndex);
 
-	if (channel.id.getType() != kResourceTypeAudio || channel.volume == targetVolume) {
+	if (channel.id.getType() != kResourceTypeAudio) {
 		return false;
+	}
+
+	// Do nothing when volume is already at the target
+	if (channel.volume == targetVolume) {
+		// WORKAROUND: GK2 has a script bug that locks up the game in many places
+		// when the music volume slider is set to lowest. This also occurs in
+		// the original. Instead of using kDoSoundMasterVolume, the slider sets
+		// the volume of every sound object along with a global that limits the
+		// maximum volume that any sound object can be set to. At the lowest
+		// setting, all sound object volumes are zero and can only be set or
+		// faded to zero. GK2 also fades many sounds and waits for them to
+		// complete in HandsOff mode. But the interpreter ignores attempts to
+		// fade a sound whose volume is already at the target, turning every
+		// fade wait into a lockup. We work around this by allowing GK2 fades
+		// to proceed if the current and target volume are both zero.
+		// Ideally this would be a script patch, but it's unclear how to do that
+		// and keep the expected delays that fading provides. 
+		// Example: Start of chapter 1, exit the farm interior and re-enter.
+		bool allowFadeToCurrent = (g_sci->getGameId() == GID_GK2 && targetVolume == 0);
+		if (!allowFadeToCurrent) {
+			return false;
+		}
 	}
 
 	if (steps && speed) {
@@ -1144,17 +1219,32 @@ bool Audio32::hasSignal() const {
 #pragma mark -
 #pragma mark Kernel
 
-reg_t Audio32::kernelPlay(const bool autoPlay, const int argc, const reg_t *const argv) {
+reg_t Audio32::kernelPlay(const bool autoPlay, EngineState *s, const int argc, const reg_t *const argv) {
 	Common::StackLock lock(_mutex);
 
-	const int16 channelIndex = findChannelByArgs(argc, argv, 0, NULL_REG);
+	int16 channelIndex = findChannelByArgs(s, argc, argv, 0, NULL_REG);
 	ResourceId resourceId;
 	bool loop;
 	int16 volume;
 	bool monitor = false;
 	reg_t soundNode = NULL_REG;
 
-	if (argc >= 5) {
+	if (argc == 6 && argv[5].isPointer()) {
+		// LSL6 hires Mac plays external AIFF files by passing filenames as strings.
+		//  All other parameters are ignored.
+		const Common::String audioName = s->_segMan->getString(argv[5]);
+		uint16 audioNumber = atoi(audioName.c_str());
+		resourceId = ResourceId(kResourceTypeAudio, audioNumber);
+		loop = false;
+		volume = Audio32::kMaxVolume;
+
+		// SSCI only plays one AIFF file at a time using this method. The game scripts
+		//  rely on this and don't stop the previous AIFF before playing another.
+		//  This entire scheme is only used in two rooms, so rather than track the
+		//  AIFF channel, just stop all channels when an AIFF is played.
+		stop(kAllChannels);
+		channelIndex = kNoExistingChannel;
+	} else if (argc >= 5) {
 		resourceId = ResourceId(kResourceTypeAudio36, argv[0].toUint16(), argv[1].toUint16(), argv[2].toUint16(), argv[3].toUint16(), argv[4].toUint16());
 
 		if (argc < 6 || argv[5].toSint16() == 1) {
@@ -1218,31 +1308,31 @@ reg_t Audio32::kernelPlay(const bool autoPlay, const int argc, const reg_t *cons
 	return make_reg(0, play(channelIndex, resourceId, autoPlay, loop, volume, soundNode, monitor));
 }
 
-reg_t Audio32::kernelStop(const int argc, const reg_t *const argv) {
+reg_t Audio32::kernelStop(EngineState *s, const int argc, const reg_t *const argv) {
 	Common::StackLock lock(_mutex);
-	const int16 channelIndex = findChannelByArgs(argc, argv, 0, argc > 1 ? argv[1] : NULL_REG);
+	const int16 channelIndex = findChannelByArgs(s, argc, argv, 0, argc > 1 ? argv[1] : NULL_REG);
 	return make_reg(0, stop(channelIndex));
 }
 
-reg_t Audio32::kernelPause(const int argc, const reg_t *const argv) {
+reg_t Audio32::kernelPause(EngineState *s, const int argc, const reg_t *const argv) {
 	Common::StackLock lock(_mutex);
-	const int16 channelIndex = findChannelByArgs(argc, argv, 0, argc > 1 ? argv[1] : NULL_REG);
+	const int16 channelIndex = findChannelByArgs(s, argc, argv, 0, argc > 1 ? argv[1] : NULL_REG);
 	return make_reg(0, pause(channelIndex));
 }
 
-reg_t Audio32::kernelResume(const int argc, const reg_t *const argv) {
+reg_t Audio32::kernelResume(EngineState *s, const int argc, const reg_t *const argv) {
 	Common::StackLock lock(_mutex);
-	const int16 channelIndex = findChannelByArgs(argc, argv, 0, argc > 1 ? argv[1] : NULL_REG);
+	const int16 channelIndex = findChannelByArgs(s, argc, argv, 0, argc > 1 ? argv[1] : NULL_REG);
 	return make_reg(0, resume(channelIndex));
 }
 
-reg_t Audio32::kernelPosition(const int argc, const reg_t *const argv) {
+reg_t Audio32::kernelPosition(EngineState *s, const int argc, const reg_t *const argv) {
 	Common::StackLock lock(_mutex);
-	const int16 channelIndex = findChannelByArgs(argc, argv, 0, argc > 1 ? argv[1] : NULL_REG);
+	const int16 channelIndex = findChannelByArgs(s, argc, argv, 0, argc > 1 ? argv[1] : NULL_REG);
 	return make_reg(0, getPosition(channelIndex));
 }
 
-reg_t Audio32::kernelVolume(const int argc, const reg_t *const argv) {
+reg_t Audio32::kernelVolume(EngineState *s, const int argc, const reg_t *const argv) {
 	Common::StackLock lock(_mutex);
 
 	const int16 volume = argc > 0 ? argv[0].toSint16() : -1;
@@ -1251,7 +1341,7 @@ reg_t Audio32::kernelVolume(const int argc, const reg_t *const argv) {
 	if (getSciVersion() == SCI_VERSION_3 && argc < 2) {
 		channelIndex = kAllChannels;
 	} else {
-		channelIndex = findChannelByArgs(argc, argv, 1, argc > 2 ? argv[2] : NULL_REG);
+		channelIndex = findChannelByArgs(s, argc, argv, 1, argc > 2 ? argv[2] : NULL_REG);
 	}
 
 	if (volume != -1) {
@@ -1271,7 +1361,7 @@ reg_t Audio32::kernelMixing(const int argc, const reg_t *const argv) {
 	return make_reg(0, getAttenuatedMixing());
 }
 
-reg_t Audio32::kernelFade(const int argc, const reg_t *const argv) {
+reg_t Audio32::kernelFade(EngineState *s, const int argc, const reg_t *const argv) {
 	if (argc < 4) {
 		return make_reg(0, 0);
 	}
@@ -1282,7 +1372,7 @@ reg_t Audio32::kernelFade(const int argc, const reg_t *const argv) {
 	// before the call, and then restored after the call. We just implemented
 	// findChannelByArgs in a manner that allows us to pass this information
 	// without messing with argc/argv instead
-	const int16 channelIndex = findChannelByArgs(2, argv, 0, argc > 5 ? argv[5] : NULL_REG);
+	const int16 channelIndex = findChannelByArgs(s, 2, argv, 0, argc > 5 ? argv[5] : NULL_REG);
 	const int16 volume = argv[1].toSint16();
 	const int16 speed = argv[2].toSint16();
 	const int16 steps = argv[3].toSint16();
@@ -1291,19 +1381,19 @@ reg_t Audio32::kernelFade(const int argc, const reg_t *const argv) {
 	return make_reg(0, fadeChannel(channelIndex, volume, speed, steps, stopAfterFade));
 }
 
-void Audio32::kernelLoop(const int argc, const reg_t *const argv) {
+void Audio32::kernelLoop(EngineState *s, const int argc, const reg_t *const argv) {
 	Common::StackLock lock(_mutex);
 
-	const int16 channelIndex = findChannelByArgs(argc, argv, 0, argc == 3 ? argv[2] : NULL_REG);
+	const int16 channelIndex = findChannelByArgs(s, argc, argv, 0, argc == 3 ? argv[2] : NULL_REG);
 	const bool loop = argv[0].toSint16() != 0 && argv[0].toSint16() != 1;
 
 	setLoop(channelIndex, loop);
 }
 
-void Audio32::kernelPan(const int argc, const reg_t *const argv) {
+void Audio32::kernelPan(EngineState *s, const int argc, const reg_t *const argv) {
 	Common::StackLock lock(_mutex);
 
-	const int16 channelIndex = findChannelByArgs(argc, argv, 1, argc == 3 ? argv[2] : NULL_REG);
+	const int16 channelIndex = findChannelByArgs(s, argc, argv, 1, argc == 3 ? argv[2] : NULL_REG);
 	const int16 pan = argv[0].toSint16();
 	if (channelIndex != kNoExistingChannel) {
 		setPan(channelIndex, pan);
@@ -1312,10 +1402,10 @@ void Audio32::kernelPan(const int argc, const reg_t *const argv) {
 	}
 }
 
-void Audio32::kernelPanOff(const int argc, const reg_t *const argv) {
+void Audio32::kernelPanOff(EngineState *s, const int argc, const reg_t *const argv) {
 	Common::StackLock lock(_mutex);
 
-	const int16 channelIndex = findChannelByArgs(argc, argv, 0, argc == 2 ? argv[1] : NULL_REG);
+	const int16 channelIndex = findChannelByArgs(s, argc, argv, 0, argc == 2 ? argv[1] : NULL_REG);
 	if (channelIndex != kNoExistingChannel) {
 		setPan(channelIndex, -1);
 	}

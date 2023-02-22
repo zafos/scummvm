@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -57,6 +56,13 @@ private:
 	void fortressRotation_run();
 	void fortressSimulation_run();
 
+	enum Direction {
+		kSouth = 0, // Starting Island with Myst linking book
+		kEast  = 1, // Island with right half of code
+		kNorth = 2, // Island with left half of code
+		kWest  = 3  // No island, just water
+	};
+
 	DECLARE_OPCODE(o_throneEnablePassage);
 	DECLARE_OPCODE(o_birdCrankStart);
 	DECLARE_OPCODE(o_birdCrankStop);
@@ -80,7 +86,7 @@ private:
 	DECLARE_OPCODE(o_elevatorWindowMovie);
 	DECLARE_OPCODE(o_elevatorGoMiddle);
 	DECLARE_OPCODE(o_elevatorTopMovie);
-	DECLARE_OPCODE(o_fortressRotationSetPosition);
+	DECLARE_OPCODE(o_fortressRotationSetPosition); // Rotator control button (above elevator) has been pressed
 	DECLARE_OPCODE(o_mystStaircaseMovie);
 	DECLARE_OPCODE(o_elevatorWaitTimeout);
 	DECLARE_OPCODE(o_crystalEnterYellow);
@@ -107,7 +113,7 @@ private:
 	bool _gearsWereRunning;
 	uint16 _fortressRotationSpeed; // 78
 	uint16 _fortressRotationBrake; // 80
-	uint16 _fortressPosition; // 82
+	uint16 _fortressDirection; // 82
 	uint16 _fortressRotationSounds[4]; // 86 to 92
 	MystAreaVideo *_fortressRotationGears; // 172
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,7 +33,7 @@ namespace Titanic {
 
 class CStarField;
 class CStarMarkers;
-class CStarCamera;
+class CCamera;
 class SimpleFile;
 
 class CStarCrosshairs {
@@ -78,14 +77,18 @@ public:
 
 	void draw(CSurfaceArea *surfaceArea);
 
-	bool fn1(CStarField *starField, CSurfaceArea *surfaceArea, CStarCamera *camera);
-	void fn2(CVideoSurface *surface, CStarField *starField, CStarMarkers *markers);
-	
+	bool fn1(CStarField *starField, CSurfaceArea *surfaceArea, CCamera *camera);
+
 	/**
-	 * Increments the index for the number of matches
+	 * Increments the number of matches
 	 */
 	void incMatches();
-	
+
+	/**
+	 * Decrements the number of matches
+	 */
+	void decMatches(CVideoSurface *surface, CStarField *starField, CStarMarkers *markers);
+
 	/**
 	 * Draw the crosshairs for a given star
 	 */
@@ -101,12 +104,12 @@ public:
 	 * Erase crosshairs for the most recently selected star
 	 */
 	void eraseCurrent(CSurfaceArea *surfaceArea);
-	
+
 	/**
 	 * Draw crosshairs at the given position
 	 */
 	void drawAt(const FPoint &pt, CSurfaceArea *surfaceArea);
-	
+
 	/**
 	 * Returns the position of the most recently selected star
 	 */

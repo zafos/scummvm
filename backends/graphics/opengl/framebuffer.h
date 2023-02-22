@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,28 +15,64 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef BACKENDS_GRAPHICS_OPENGL_FRAMEBUFFER_H
 #define BACKENDS_GRAPHICS_OPENGL_FRAMEBUFFER_H
 
-#include "backends/graphics/opengl/opengl-sys.h"
+#include "graphics/opengl/system_headers.h"
+
+#include "math/matrix4.h"
 
 namespace OpenGL {
+
+class Pipeline;
 
 /**
  * Object describing a framebuffer OpenGL can render to.
  */
 class Framebuffer {
-	friend class Pipeline;
 public:
 	Framebuffer();
 	virtual ~Framebuffer() {};
 
 public:
+	enum BlendMode {
+		/**
+		 * Newly drawn pixels overwrite the existing contents of the framebuffer
+		 * without mixing with them
+		 */
+		kBlendModeDisabled,
+
+		/**
+		 * Newly drawn pixels mix with the framebuffer based on their alpha value
+		 * for transparency.
+		 */
+		kBlendModeTraditionalTransparency,
+
+		/**
+		 * Newly drawn pixels mix with the framebuffer based on their alpha value
+		 * for transparency.
+		 *
+		 * Requires the image data being drawn to have its color values pre-multipled
+		 * with the alpha value.
+		 */
+		kBlendModePremultipliedTransparency,
+
+		/**
+		 * Newly drawn pixels add to the destination value.
+		 */
+		kBlendModeAdditive,
+
+		/**
+		 * Newly drawn pixels mask out existing pixels based on the alpha value and
+		 * add inversions of the pixels based on the color.
+		 */
+		kBlendModeMaskAlphaAndInvertByColor,
+	};
+
 	/**
 	 * Set the clear color of the framebuffer.
 	 */
@@ -45,7 +81,7 @@ public:
 	/**
 	 * Enable/disable GL_BLEND.
 	 */
-	void enableBlend(bool enable);
+	void enableBlend(BlendMode mode);
 
 	/**
 	 * Enable/disable GL_SCISSOR_TEST.
@@ -60,14 +96,30 @@ public:
 	/**
 	 * Obtain projection matrix of the framebuffer.
 	 */
-	const GLfloat *getProjectionMatrix() const { return _projectionMatrix; }
+	const Math::Matrix4 &getProjectionMatrix() const { return _projectionMatrix; }
+
+	enum CopyMask {
+		kCopyMaskClearColor   = (1 << 0),
+		kCopyMaskBlendState   = (1 << 1),
+		kCopyMaskScissorState = (1 << 2),
+		kCopyMaskScissorBox   = (1 << 4),
+
+		kCopyMaskAll          = kCopyMaskClearColor | kCopyMaskBlendState |
+		                        kCopyMaskScissorState | kCopyMaskScissorBox,
+	};
+
+	/**
+	 * Copy rendering state from another framebuffer
+	 */
+	void copyRenderStateFrom(const Framebuffer &other, uint copyMask);
+
 protected:
-	bool isActive() const { return _isActive; }
+	bool isActive() const { return _pipeline != nullptr; }
 
 	GLint _viewport[4];
 	void applyViewport();
 
-	GLfloat _projectionMatrix[4*4];
+	Math::Matrix4 _projectionMatrix;
 	void applyProjectionMatrix();
 
 	/**
@@ -85,11 +137,11 @@ protected:
 	 */
 	virtual void deactivateInternal() {}
 
-private:
+public:
 	/**
 	 * Accessor to activate framebuffer for pipeline.
 	 */
-	void activate();
+	void activate(Pipeline *pipeline);
 
 	/**
 	 * Accessor to deactivate framebuffer from pipeline.
@@ -97,12 +149,12 @@ private:
 	void deactivate();
 
 private:
-	bool _isActive;
+	Pipeline *_pipeline;
 
 	GLfloat _clearColor[4];
 	void applyClearColor();
 
-	bool _blendState;
+	BlendMode _blendState;
 	void applyBlendState();
 
 	bool _scissorTestState;
@@ -123,7 +175,7 @@ public:
 	void setDimensions(uint width, uint height);
 
 protected:
-	virtual void activateInternal();
+	void activateInternal() override;
 };
 
 #if !USE_FORCED_GLES
@@ -138,7 +190,7 @@ class GLTexture;
 class TextureTarget : public Framebuffer {
 public:
 	TextureTarget();
-	virtual ~TextureTarget();
+	~TextureTarget() override;
 
 	/**
 	 * Notify that the GL context is about to be destroyed.
@@ -153,7 +205,7 @@ public:
 	/**
 	 * Set size of the texture target.
 	 */
-	void setSize(uint width, uint height);
+	bool setSize(uint width, uint height);
 
 	/**
 	 * Query pointer to underlying GL texture.
@@ -161,7 +213,7 @@ public:
 	GLTexture *getTexture() const { return _texture; }
 
 protected:
-	virtual void activateInternal();
+	void activateInternal() override;
 
 private:
 	GLTexture *_texture;

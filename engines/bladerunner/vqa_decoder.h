@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,7 +33,8 @@
 
 #include "graphics/surface.h"
 
-#include "video/video_decoder.h"
+#include "common/array.h"
+#include "common/rational.h"
 
 namespace BladeRunner {
 
@@ -54,6 +54,10 @@ enum VQADecoderSkipFlags {
 
 class VQADecoder {
 	friend class Debugger;
+
+	struct VQPPalette {
+		uint8 interpol2D[256][256];
+	};
 
 public:
 	VQADecoder();
@@ -80,10 +84,12 @@ public:
 	uint16 frequency() const { return _header.freq; }
 
 	bool getLoopBeginAndEndFrame(int loop, int *begin, int *end);
+	int  getLoopIdFromFrame(int frame);
 
-protected:
+	void allocatePaletteVQPTable(const uint32 numOfPalettes);
+	void updatePaletteVQPTable(uint32 palId, uint16 j, uint16 k, uint8 colorByte);
+	void deleteVQPTable();
 
-private:
 	struct Header {
 		uint16 version;     // 0x00
 		uint16 flags;       // 0x02
@@ -141,13 +147,22 @@ private:
 	class VQAAudioTrack;
 
 	Common::SeekableReadStream *_s;
-	// Graphics::Surface *_surface;
 
 	Header   _header;
 	int      _readingFrame;
 	int      _decodingFrame;
 	LoopInfo _loopInfo;
 
+	VQPPalette *_vqpPalsArr;
+	uint16      _numOfVQPPalettes;
+
+	bool        _oldV2VQA;
+	// TODO Maybe add public methods for setting these member vars (essentially flags)?
+	bool        _allowHorizontalScanlines;
+	bool        _allowVerticalScanlines;
+	bool        _scaleVideoTo2xRequested;
+	bool        _scale2xPossible;
+	bool        _centerVideoRequested;
 	Common::Array<CodebookInfo> _codebooks;
 
 	uint32  *_frameInfo;
@@ -173,6 +188,7 @@ private:
 	CodebookInfo &codebookInfoForFrame(int frame);
 
 	class VQAVideoTrack {
+		static const uint     kSizeInBytesOfCPL0Chunk = 768; // 3 * 256
 	public:
 		VQAVideoTrack(VQADecoder *vqaDecoder);
 		~VQAVideoTrack();
@@ -189,13 +205,16 @@ private:
 		void decodeLights(Lights *lights);
 
 		bool readVQFR(Common::SeekableReadStream *s, uint32 size, uint readFlags);
+		bool readVPTZ(Common::SeekableReadStream* s, uint32 size); // (for old type v2 VQA, eg. SIZZLE.VQAs)
 		bool readVPTR(Common::SeekableReadStream *s, uint32 size);
 		bool readVQFL(Common::SeekableReadStream *s, uint32 size, uint readFlags);
 		bool readCBFZ(Common::SeekableReadStream *s, uint32 size);
+		bool readCBPZ(Common::SeekableReadStream* s, uint32 size); // (for old type v2 VQA, eg. SIZZLE.VQAs)
 		bool readZBUF(Common::SeekableReadStream *s, uint32 size);
 		bool readVIEW(Common::SeekableReadStream *s, uint32 size);
 		bool readAESC(Common::SeekableReadStream *s, uint32 size);
 		bool readLITE(Common::SeekableReadStream *s, uint32 size);
+		bool readCPL0(Common::SeekableReadStream *s, uint32 size); // (for old type v2 VQA, eg. SIZZLE.VQAs)
 
 	protected:
 		Common::Rational getFrameRate() const;
@@ -211,6 +230,7 @@ private:
 		uint16 _width, _height;
 		uint8  _blockW, _blockH;
 		uint8  _frameRate;
+		uint8  _cbParts;
 		uint16 _maxBlocks;
 		uint16 _offsetX, _offsetY;
 
@@ -235,11 +255,27 @@ private:
 		uint8   *_screenEffectsData;
 		uint32   _screenEffectsDataSize;
 
+		int32          _currentPaletteId;
+		uint8         *_cpalPointer;
+		uint8         *_cpalPointerNext;
+		uint32	       _cpalPointerSize;
+		uint32	       _cpalPointerSizeNext;
+		uint8         *_vptz;
+		uint8         *_cbfzNext;         // Used to store of compressed parts of a codebook data
+		uint8          _countOfCBPsToCBF;
+		uint32         _accumulatedCBPZsizeToCBF;
+
+		CodebookInfo  *_codebookInfoNext; // Used to store the decompressed codebook data and swap with the active codebook
+
 		void VPTRWriteBlock(Graphics::Surface *surface, unsigned int dstBlock, unsigned int srcBlock, int count, bool alpha = false);
 		bool decodeFrame(Graphics::Surface *surface);
 	};
 
 	class VQAAudioTrack {
+		static const uint     kSizeInShortsAllocatedToAudioFrame = 2940; // 4 * 735
+		static const uint     kSizeInBytesOfCompressedAudioFrame = 735;
+		static const uint     kSizeInShortsAllocatedToAudioFrameMax = 22048; // 4 * 5512 (for old type v2 VQA, eg. SIZZLE.VQAs)
+		static const uint     kSizeInBytesOfCompressedAudioFrameMax = 5512; // (for old type v2 VQA, eg. SIZZLE.VQAs)
 	public:
 		VQAAudioTrack(VQADecoder *vqaDecoder);
 		~VQAAudioTrack();
@@ -253,7 +289,9 @@ private:
 	private:
 		uint16               _frequency;
 		ADPCMWestwoodDecoder _adpcmDecoder;
-		uint8                _compressedAudioFrame[735];
+		bool                 _bigCompressedAudioFrame;
+		uint8                _compressedAudioFrame[kSizeInBytesOfCompressedAudioFrameMax];
+//		uint8                _compressedAudioFrame[kSizeInBytesOfCompressedAudioFrame + 1]; // +1 because we use roundup for read-in and 735 is odd
 	};
 };
 

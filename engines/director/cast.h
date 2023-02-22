@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,172 +15,159 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef DIRECTOR_CAST_H
 #define DIRECTOR_CAST_H
 
-#include "common/rect.h"
-#include "common/substream.h"
-#include "director/archive.h"
-#include "graphics/surface.h"
+#include "common/hash-str.h"
+
+namespace Common {
+	class ReadStreamEndian;
+	struct Rect;
+	class SeekableReadStreamEndian;
+}
 
 namespace Director {
 
+class Archive;
+struct CastMemberInfo;
+class CastMember;
+class DirectorEngine;
+class Lingo;
+struct LingoArchive;
+struct Resource;
 class Stxt;
-class CachedMacText;
+class BitmapCastMember;
+class FilmLoopCastMember;
+class ScriptCastMember;
+class ShapeCastMember;
+class TextCastMember;
+class PaletteCastMember;
+class SoundCastMember;
 
-enum CastType {
-	kCastTypeNull = 0,
-	kCastBitmap = 1,
-	kCastFilmLoop = 2,
-	kCastText = 3,
-	kCastPalette = 4,
-	kCastPicture = 5,
-	kCastSound = 6,
-	kCastButton = 7,
-	kCastShape = 8,
-	kCastMovie = 9,
-	kCastDigitalVideo = 10,
-	kCastLingoScript = 11,
-	kCastRTE = 12
+typedef Common::HashMap<byte, byte> CharMap;
+typedef Common::HashMap<uint16, uint16> FontSizeMap;
+struct FontXPlatformInfo {
+	Common::String toFont;
+	bool remapChars;
+	FontSizeMap sizeMap;
+
+	FontXPlatformInfo() : remapChars(false) {}
+};
+typedef Common::HashMap<Common::String, FontXPlatformInfo *> FontXPlatformMap;
+
+struct FontMapEntry {
+	uint16 toFont;
+	bool remapChars;
+	FontSizeMap sizeMap;
+
+	FontMapEntry() : toFont(0), remapChars(false) {}
+};
+typedef Common::HashMap<uint16, FontMapEntry *> FontMap;
+
+#define NUMTILEPATTERNS 8
+struct TilePatternEntry {
+	CastMemberID bitmapId;
+	Common::Rect rect;
 };
 
 class Cast {
 public:
-	CastType type;
-	Common::Rect initialRect;
-	Common::Rect boundingRect;
-	Common::Array<Resource> children;
+	Cast(Movie *movie, uint16 castLibID, bool shared = false);
+	~Cast();
 
-	const Graphics::Surface *surface;
+	void loadArchive();
+	void setArchive(Archive *archive);
+	Archive *getArchive() const { return _castArchive; };
+	Common::String getMacName() const { return _macName; }
 
-	byte modified;
-};
+	bool loadConfig();
+	void loadCast();
+	void loadCastDataVWCR(Common::SeekableReadStreamEndian &stream);
+	void loadCastData(Common::SeekableReadStreamEndian &stream, uint16 id, Resource *res);
+	void loadCastInfo(Common::SeekableReadStreamEndian &stream, uint16 id);
+	void loadLingoContext(Common::SeekableReadStreamEndian &stream);
+	void loadExternalSound(Common::SeekableReadStreamEndian &stream);
+	void loadSord(Common::SeekableReadStreamEndian &stream);
 
-class BitmapCast : public Cast {
+	void loadCastMemberData();
+	void loadStxtData(int key, TextCastMember *member);
+	void loadPaletteData(PaletteCastMember *member, Common::HashMap<int, PaletteV4>::iterator &p);
+	void loadFilmLoopData(FilmLoopCastMember *member);
+	void loadBitmapData(int key, BitmapCastMember *bitmapCast);
+	void loadSoundData(int key, SoundCastMember *soundCast);
+
+	int getCastSize();
+	Common::Rect getCastMemberInitialRect(int castId);
+	void setCastMemberModified(int castId);
+	CastMember *setCastMember(CastMemberID castId, CastMember *cast);
+	bool eraseCastMember(CastMemberID castId);
+	CastMember *getCastMember(int castId);
+	CastMember *getCastMemberByNameAndType(const Common::String &name, CastType type);
+	CastMember *getCastMemberByScriptId(int scriptId);
+	CastMemberInfo *getCastMemberInfo(int castId);
+	const Stxt *getStxt(int castId);
+	Common::String getVideoPath(int castId);
+
+	// release all castmember's widget, should be called when we are changing movie.
+	// because widget is handled by channel, thus we should clear all of those run-time info when we are switching the movie. (because we will create new widgets for cast)
+	void releaseCastMemberWidget();
+
+	void dumpScript(const char *script, ScriptType type, uint16 id);
+	PaletteV4 loadPalette(Common::SeekableReadStreamEndian &stream);
+
+	Common::CodePage getFileEncoding();
+	Common::U32String decodeString(const Common::String &str);
+
+	Common::String formatCastSummary(int castId);
+
+private:
+	void loadScriptV2(Common::SeekableReadStreamEndian &stream, uint16 id);
+	void loadFontMap(Common::SeekableReadStreamEndian &stream);
+	void loadFontMapV4(Common::SeekableReadStreamEndian &stream);
+	void loadFXmp(Common::SeekableReadStreamEndian &stream);
+	bool readFXmpLine(Common::SeekableReadStreamEndian &stream);
+	void loadVWTL(Common::SeekableReadStreamEndian &stream);
+
 public:
-	BitmapCast(Common::ReadStreamEndian &stream, uint32 castTag, uint16 version = 2);
+	Archive *_castArchive;
+	uint16 _version;
+	Common::Platform _platform;
+	uint16 _castLibID;
 
-	uint16 regX;
-	uint16 regY;
-	uint8 flags;
-	uint16 someFlaggyThing;
-	uint16 unk1, unk2;
+	CharMap _macCharsToWin;
+	CharMap _winCharsToMac;
+	FontXPlatformMap _fontXPlatformMap;
+	FontMap _fontMap;
 
-	uint16 bitsPerPixel;
+	Common::HashMap<int, CastMember *> *_loadedCast;
+	Common::HashMap<int, const Stxt *> *_loadedStxts;
+	uint16 _castIDoffset;
+	uint16 _castArrayStart;
+	uint16 _castArrayEnd;
 
-	uint32 tag;
-};
+	Common::Rect _movieRect;
+	uint16 _stageColor;
+	int _defaultPalette;
+	TilePatternEntry _tiles[kNumBuiltinTiles];
 
-enum ShapeType {
-	kShapeRectangle,
-	kShapeRoundRect,
-	kShapeOval,
-	kShapeLine
-};
+	LingoArchive *_lingoArchive;
 
-class ShapeCast : public Cast {
-public:
-	ShapeCast(Common::ReadStreamEndian &stream, uint16 version = 2);
+private:
+	DirectorEngine *_vm;
+	Lingo *_lingo;
+	Movie *_movie;
 
-	ShapeType shapeType;
-	uint16 pattern;
-	byte fgCol;
-	byte bgCol;
-	byte fillType;
-	byte lineThickness;
-	byte lineDirection;
-};
+	bool _isShared;
 
-enum TextType {
-	kTextTypeAdjustToFit,
-	kTextTypeScrolling,
-	kTextTypeFixed
-};
+	Common::String _macName;
 
-enum TextAlignType {
-	kTextAlignRight = -1,
-	kTextAlignLeft,
-	kTextAlignCenter
-};
-
-enum TextFlag {
-	kTextFlagEditable,
-	kTextFlagAutoTab,
-	kTextFlagDoNotWrap
-};
-
-enum SizeType {
-	kSizeNone,
-	kSizeSmallest,
-	kSizeSmall,
-	kSizeMedium,
-	kSizeLarge,
-	kSizeLargest
-};
-
-class TextCast : public Cast {
-public:
-	TextCast(Common::ReadStreamEndian &stream, uint16 version = 2);
-
-	SizeType borderSize;
-	SizeType gutterSize;
-	SizeType boxShadow;
-
-	byte flags1;
-	uint32 fontId;
-	uint16 fontSize;
-	TextType textType;
-	TextAlignType textAlign;
-	SizeType textShadow;
-	byte textSlant;
-	Common::Array<TextFlag> textFlags;
-	uint16 palinfo1, palinfo2, palinfo3;
-
-	Common::String _ftext;
-	void importStxt(const Stxt *stxt);
-	void importRTE(byte* text);
-	CachedMacText *cachedMacText;
-};
-
-enum ButtonType {
-	kTypeButton,
-	kTypeCheckBox,
-	kTypeRadio
-};
-
-class ButtonCast : public TextCast {
-public:
-	ButtonCast(Common::ReadStreamEndian &stream, uint16 version = 2);
-
-	ButtonType buttonType;
-};
-
-class ScriptCast : public Cast {
-public:
-	ScriptCast(Common::ReadStreamEndian &stream, uint16 version = 2);
-
-	uint32 id;
-};
-
-
-
-struct CastInfo {
-	Common::String script;
-	Common::String name;
-	Common::String directory;
-	Common::String fileName;
-	Common::String type;
-};
-
-struct Label {
-	Common::String name;
-	uint16 number;
-	Label(Common::String name1, uint16 number1) { name = name1; number = number1; }
+	Common::HashMap<uint16, CastMemberInfo *> _castsInfo;
+	Common::HashMap<Common::String, int, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> _castsNames;
+	Common::HashMap<uint16, int> _castsScriptIds;
 };
 
 } // End of namespace Director

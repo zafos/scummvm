@@ -1,29 +1,28 @@
 /* ScummVM - Graphic Adventure Engine
-*
-* ScummVM is the legal property of its developers, whose names
-* are too numerous to list here. Please refer to the COPYRIGHT
-* file distributed with this source distribution.
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-*
-*/
+ *
+ * ScummVM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 /*
-* Based on the Reverse Engineering work of Christophe Fontanel,
-* maintainer of the Dungeon Master Encyclopaedia (http://dmweb.free.fr/)
-*/
+ * Based on the Reverse Engineering work of Christophe Fontanel,
+ * maintainer of the Dungeon Master Encyclopaedia (http://dmweb.free.fr/)
+ */
 
 #include "dm/menus.h"
 #include "dm/gfx.h"
@@ -694,6 +693,9 @@ int16 MenuMan::getChampionSpellCastResult(uint16 champIndex) {
 			break;
 		}
 		}
+		break;
+	default:
+		break;
 	}
 	championMan.addSkillExperience(champIndex, curSpell->_skillIndex, experience);
 	championMan.disableAction(champIndex, curSpell->getDuration());
@@ -1352,6 +1354,8 @@ bool MenuMan::isActionPerformed(uint16 champIndex, int16 actionIndex) {
 		if (actionPerformed)
 			_vm->_timeline->_events[curChampion->_enableActionEventIndex]._Bu._slotOrdinal = _vm->indexToOrdinal(kDMSlotActionHand);
 		break;
+	default:
+		break;
 	}
 
 	if (setDirectionFl) {
@@ -1522,12 +1526,16 @@ bool MenuMan::isMeleeActionPerformed(int16 champIndex, Champion *champ, int16 ac
 		switch (viewCell) {
 		case kDMViewCellBackRight: /* Champion is on the back right of the square and tries to attack a creature in the front right of its square */
 		case kDMViewCellBackLeft: /* Champion is on the back left of the square and tries to attack a creature in the front left of its square */
-			uint16 cellDelta = (viewCell == kDMViewCellBackRight) ? 3 : 1;
-			/* Check if there is another champion in front */
-			if (_vm->_championMan->getIndexInCell(_vm->normalizeModulo4(championCell + cellDelta)) != kDMChampionNone) {
-				_actionDamage = kDMDamageCantReach;
-				return false;
+			{
+				uint16 cellDelta = (viewCell == kDMViewCellBackRight) ? 3 : 1;
+				/* Check if there is another champion in front */
+				if (_vm->_championMan->getIndexInCell(_vm->normalizeModulo4(championCell + cellDelta)) != kDMChampionNone) {
+					_actionDamage = kDMDamageCantReach;
+					return false;
+				}
 			}
+			break;
+		default:
 			break;
 		}
 
@@ -1578,6 +1586,8 @@ bool MenuMan::isGroupFrightenedByAction(int16 champIndex, uint16 actionIndex, in
 		frightAmount = 12;
 		experience = 45;
 		break;
+	default:
+		break;
 	}
 
 	frightAmount += championMan.getSkillLevel(champIndex, kDMSkillInfluence);
@@ -1618,8 +1628,11 @@ void MenuMan::printMessageAfterReplacements(const char *str) {
 				replacementString = championMan._champions[_vm->ordinalToIndex(championMan._actingChampionOrdinal)]._name;
 
 			*curCharacter = '\0';
-			strcat(outputString, replacementString);
-			curCharacter += strlen(replacementString);
+			size_t ln = Common::strlcat(outputString, replacementString, sizeof(outputString));
+			if (ln >= sizeof(outputString)) {
+				error("Not enough space in outputString");
+			}
+			curCharacter = outputString + ln;
 			*curCharacter++ = ' ';
 		} else {
 			*curCharacter++ = *str;

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,6 +23,7 @@
 #define SKY_SKY_H
 
 
+#include "common/array.h"
 #include "common/error.h"
 #include "common/keyboard.h"
 #include "engines/engine.h"
@@ -61,8 +61,20 @@ class MusicBase;
 class Debugger;
 class SkyCompact;
 
+enum SkyAction {
+	kSkyActionNone,
+	kSkyActionToggleFastMode,
+	kSkyActionToggleReallyFastMode,
+	kSkyActionOpenControlPanel,
+	kSkyActionConfirm,
+	kSkyActionSkip,
+	kSkyActionSkipLine,
+	kSkyActionPause
+};
+
 class SkyEngine : public Engine {
 protected:
+	SkyAction _action;
 	Common::KeyState _keyPressed;
 
 	Sound *_skySound;
@@ -79,43 +91,58 @@ protected:
 
 public:
 	SkyEngine(OSystem *syst);
-	virtual ~SkyEngine();
+	~SkyEngine() override;
 
-	virtual void syncSoundSettings();
+	void syncSoundSettings() override;
 
 	static bool isDemo();
 	static bool isCDVersion();
 
-	Common::Error loadGameState(int slot);
-	Common::Error saveGameState(int slot, const Common::String &desc);
-	bool canLoadGameStateCurrently();
-	bool canSaveGameStateCurrently();
+	Common::Error loadGameState(int slot) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	bool canLoadGameStateCurrently() override;
+	bool canSaveGameStateCurrently() override;
+	Common::String getSaveStateName(int slot) const override {
+		return Common::String::format("SKY-VM.%03d", slot);
+	}
 
 	static void *fetchItem(uint32 num);
 	static void *_itemList[300];
+	static SystemVars *_systemVars;
+	static const char *shortcutsKeymapId;
+	static const int kChineseTraditionalWidth = 16;
+	static const int kChineseTraditionalHeight = 15;
+	struct ChineseTraditionalGlyph {
+		byte bitmap[kChineseTraditionalHeight][kChineseTraditionalWidth / 8];
+		byte outline[kChineseTraditionalHeight][kChineseTraditionalWidth / 8];
 
-	static SystemVars _systemVars;
+		void makeOutline();
+	};
+
+  	uint32 _chineseTraditionalOffsets[8];
+	char *_chineseTraditionalBlock;
+	Common::Array<ChineseTraditionalGlyph> _chineseTraditionalFont;
+	Common::Array<int> _chineseTraditionalIndex;
 
 protected:
 	// Engine APIs
 	Common::Error init();
+	bool loadChineseTraditional();
 	Common::Error go();
-	virtual Common::Error run() {
+	Common::Error run() override {
 		Common::Error err;
 		err = init();
 		if (err.getCode() != Common::kNoError)
 			return err;
 		return go();
 	}
-	virtual GUI::Debugger *getDebugger();
-	virtual bool hasFeature(EngineFeature f) const;
+
+	bool hasFeature(EngineFeature f) const override;
 
 	byte _fastMode;
 
 	void delay(int32 amount);
 	void handleKey();
-
-	uint32 _lastSaveTime;
 
 	void initItemList();
 

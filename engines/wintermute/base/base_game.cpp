@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -36,6 +35,9 @@
 #include "engines/wintermute/base/font/base_font.h"
 #include "engines/wintermute/base/font/base_font_storage.h"
 #include "engines/wintermute/base/gfx/base_renderer.h"
+#ifdef ENABLE_WME3D
+#include "engines/wintermute/base/gfx/base_renderer3d.h"
+#endif
 #include "engines/wintermute/base/base_keyboard_state.h"
 #include "engines/wintermute/base/base_parser.h"
 #include "engines/wintermute/base/base_quick_msg.h"
@@ -48,11 +50,13 @@
 #include "engines/wintermute/base/base_surface_storage.h"
 #include "engines/wintermute/base/saveload.h"
 #include "engines/wintermute/base/save_thumb_helper.h"
+#include "engines/wintermute/base/scriptables/script_ext_array.h"
 #include "engines/wintermute/base/scriptables/script_value.h"
 #include "engines/wintermute/base/scriptables/script_engine.h"
 #include "engines/wintermute/base/scriptables/script_stack.h"
 #include "engines/wintermute/base/scriptables/script.h"
 #include "engines/wintermute/base/sound/base_sound.h"
+#include "engines/wintermute/ext/plugins.h"
 #include "engines/wintermute/video/video_player.h"
 #include "engines/wintermute/video/video_theora_player.h"
 #include "engines/wintermute/utils/utils.h"
@@ -74,6 +78,14 @@
 
 #if EXTENDED_DEBUGGER_ENABLED
 #include "engines/wintermute/base/scriptables/debuggable/debuggable_script_engine.h"
+#endif
+
+#ifdef ENABLE_WME3D
+#include "graphics/renderer.h"
+#include "engines/util.h"
+#if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
+#include "graphics/opengl/context.h"
+#endif
 #endif
 
 namespace Wintermute {
@@ -99,12 +111,16 @@ BaseGame::BaseGame(const Common::String &targetName) : BaseObject(this), _target
 	_surfaceStorage = nullptr;
 	_fontStorage = nullptr;
 	_renderer = nullptr;
+#ifdef ENABLE_WME3D
+	_renderer3D = nullptr;
+#endif
 	_soundMgr = nullptr;
 	_transMgr = nullptr;
 	_scEngine = nullptr;
 	_keyboardState = nullptr;
 
 	_mathClass = nullptr;
+	_directoryClass = nullptr;
 
 	_debugLogFile = nullptr;
 	_debugDebugMode = false;
@@ -138,7 +154,12 @@ BaseGame::BaseGame(const Common::String &targetName) : BaseObject(this), _target
 
 	_cursorNoninteractive = nullptr;
 
+#ifdef ENABLE_WME3D
+	_useD3D = true;
+	_playing3DGame = false;
+#else
 	_useD3D = false;
+#endif
 
 	_musicSystem = new BaseGameMusic(this);
 
@@ -178,6 +199,14 @@ BaseGame::BaseGame(const Common::String &targetName) : BaseObject(this), _target
 	// sized for the GMM (expecting 4:3 ratio)
 	_thumbnailWidth = kThumbnailWidth;
 	_thumbnailHeight = kThumbnailHeight2;
+
+#ifdef ENABLE_WME3D
+	_maxShadowType = SHADOW_STENCIL;
+	_supportsRealTimeShadows = false;
+
+	_editorResolutionWidth = 0;
+	_editorResolutionHeight = 0;
+#endif
 
 	_localSaveDir = "saves";
 
@@ -224,8 +253,10 @@ BaseGame::BaseGame(const Common::String &targetName) : BaseObject(this), _target
 	_constrainedMemory = false;
 
 	_settings = new BaseGameSettings(this);
-//#endif
 
+#ifdef ENABLE_HEROCRAFT
+	_rndHc = new Common::RandomSource("HeroCraft");
+#endif
 }
 
 
@@ -237,12 +268,12 @@ BaseGame::~BaseGame() {
 	LOG(0, "Shutting down...");
 
 	ConfMan.setBool("last_run", true);
+	ConfMan.flushToDisk();
 
 	cleanup();
 
-	delete _cachedThumbnail;
-
 	delete _mathClass;
+	delete _directoryClass;
 
 	delete _transMgr;
 	delete _scEngine;
@@ -257,9 +288,8 @@ BaseGame::~BaseGame() {
 	delete _musicSystem;
 	delete _settings;
 
-	_cachedThumbnail = nullptr;
-
 	_mathClass = nullptr;
+	_directoryClass = nullptr;
 
 	_transMgr = nullptr;
 	_scEngine = nullptr;
@@ -273,6 +303,11 @@ BaseGame::~BaseGame() {
 	_musicSystem = nullptr;
 	_settings = nullptr;
 
+#ifdef ENABLE_HEROCRAFT
+	delete _rndHc;
+	_rndHc = nullptr;
+#endif
+
 	DEBUG_DebugDisable();
 	debugC(kWintermuteDebugLog, "--- shutting down normally ---\n");
 }
@@ -282,6 +317,8 @@ BaseGame::~BaseGame() {
 bool BaseGame::cleanup() {
 	delete _loadingIcon;
 	_loadingIcon = nullptr;
+
+	deleteSaveThumbnail();
 
 	_engineLogCallback = nullptr;
 	_engineLogCallbackData = nullptr;
@@ -323,6 +360,13 @@ bool BaseGame::cleanup() {
 
 	_fontStorage->removeFont(_videoFont);
 	_videoFont = nullptr;
+
+#ifdef ENABLE_WME3D
+	if (_shadowImage) {
+		_surfaceStorage->removeSurface(_shadowImage);
+		_shadowImage = nullptr;
+	}
+#endif
 
 	for (uint32 i = 0; i < _quickMessages.size(); i++) {
 		delete _quickMessages[i];
@@ -373,6 +417,14 @@ bool BaseGame::initConfManSettings() {
 		_smartCache = true;
 	}
 
+#ifdef ENABLE_WME3D
+	if (ConfMan.hasKey("force_2d_renderer")) {
+		_force2dRenderer = ConfMan.getBool("force_2d_renderer");
+	} else {
+		_force2dRenderer = false;
+	}
+#endif
+
 	if (!_smartCache) {
 		LOG(0, "Smart cache is DISABLED");
 	}
@@ -414,6 +466,11 @@ bool BaseGame::initialize1() {
 			break;
 		}
 
+		_directoryClass = makeSXDirectory(this);
+		if (_directoryClass == nullptr) {
+			break;
+		}
+
 #if EXTENDED_DEBUGGER_ENABLED
 		_scEngine = new DebuggableScEngine(this);
 #else
@@ -450,6 +507,7 @@ bool BaseGame::initialize1() {
 		return STATUS_OK;
 	} else {
 		delete _mathClass;
+		delete _directoryClass;
 		delete _keyboardState;
 		delete _transMgr;
 		delete _surfaceStorage;
@@ -464,12 +522,66 @@ bool BaseGame::initialize1() {
 
 //////////////////////////////////////////////////////////////////////
 bool BaseGame::initialize2() { // we know whether we are going to be accelerated
+#ifdef ENABLE_WME3D
+	Common::String rendererConfig = ConfMan.get("renderer");
+	Graphics::RendererType desiredRendererType = Graphics::Renderer::parseTypeCode(rendererConfig);
+	uint32 availableRendererTypes = Graphics::Renderer::getAvailableTypes();
+
+	availableRendererTypes &=
+#if defined(USE_OPENGL_GAME)
+			Graphics::kRendererTypeOpenGL |
+#endif
+#if defined(USE_OPENGL_SHADERS)
+			Graphics::kRendererTypeOpenGLShaders |
+#endif
+#if defined(USE_TINYGL)
+			Graphics::kRendererTypeTinyGL |
+#endif
+			0;
+
+#if defined(USE_TINYGL)
+	// When playing 2D, TinyGL is not really TinyGL but software and is always available
+	if (!_playing3DGame) {
+		availableRendererTypes |= Graphics::kRendererTypeTinyGL;
+	}
+#endif
+
+	Graphics::RendererType matchingRendererType = Graphics::Renderer::getBestMatchingType(desiredRendererType, availableRendererTypes);
+
+	bool force2dRenderer = _force2dRenderer && !_playing3DGame;
+#if defined(USE_OPENGL_SHADERS)
+	if (!force2dRenderer && matchingRendererType == Graphics::kRendererTypeOpenGLShaders) {
+		initGraphics3d(_settings->getResWidth(), _settings->getResHeight());
+		_renderer3D = makeOpenGL3DShaderRenderer(this);
+	}
+#endif // defined(USE_OPENGL_SHADERS)
+#if defined(USE_OPENGL_GAME)
+	if (!force2dRenderer && matchingRendererType == Graphics::kRendererTypeOpenGL) {
+		initGraphics3d(_settings->getResWidth(), _settings->getResHeight());
+		_renderer3D = makeOpenGL3DRenderer(this);
+	}
+#endif // defined(USE_OPENGL)
+	if (!force2dRenderer && matchingRendererType == Graphics::kRendererTypeTinyGL) {
+		if (_playing3DGame) {
+			_renderer3D = nullptr;// TODO: makeTinyGL3DRenderer(this);
+			warning("3D software renderer is not supported yet");
+		}
+	}
+	_useD3D = _renderer3D != nullptr;
+	_renderer = _renderer3D;
+
+	if (!_renderer && !_playing3DGame) {
+		_renderer = makeOSystemRenderer(this);
+	}
+#else
 	_renderer = makeOSystemRenderer(this);
+#endif
+
 	if (_renderer == nullptr) {
 		return STATUS_FAILED;
+	} else {
+		return STATUS_OK;
 	}
-
-	return STATUS_OK;
 }
 
 
@@ -529,7 +641,7 @@ void BaseGame::LOG(bool res, const char *fmt, ...) {
 	va_list va;
 
 	va_start(va, fmt);
-	vsprintf(buff, fmt, va);
+	Common::vsprintf_s(buff, fmt, va);
 	va_end(va);
 
 	// redirect to an engine's own callback
@@ -544,7 +656,6 @@ void BaseGame::LOG(bool res, const char *fmt, ...) {
 
 	//QuickMessage(buff);
 }
-
 
 //////////////////////////////////////////////////////////////////////////
 void BaseGame::setEngineLogCallback(ENGINE_LOG_CALLBACK callback, void *data) {
@@ -703,6 +814,9 @@ TOKEN_DEF(SAVE_IMAGE)
 TOKEN_DEF(LOAD_IMAGE_X)
 TOKEN_DEF(LOAD_IMAGE_Y)
 TOKEN_DEF(LOAD_IMAGE)
+#ifdef ENABLE_WME3D
+TOKEN_DEF(SHADOW_IMAGE)
+#endif
 TOKEN_DEF(LOCAL_SAVE_DIR)
 TOKEN_DEF(RICH_SAVED_GAMES)
 TOKEN_DEF(SAVED_GAME_EXT)
@@ -742,6 +856,9 @@ bool BaseGame::loadBuffer(char *buffer, bool complete) {
 	TOKEN_TABLE(LOAD_IMAGE_X)
 	TOKEN_TABLE(LOAD_IMAGE_Y)
 	TOKEN_TABLE(LOAD_IMAGE)
+#ifdef ENABLE_WME3D
+	TOKEN_TABLE(SHADOW_IMAGE)
+#endif
 	TOKEN_TABLE(LOCAL_SAVE_DIR)
 	TOKEN_TABLE(COMPAT_KILL_METHOD_THREADS)
 	TOKEN_TABLE_END
@@ -806,6 +923,17 @@ bool BaseGame::loadBuffer(char *buffer, bool complete) {
 			_videoFont = _gameRef->_fontStorage->addFont(params);
 			break;
 
+
+#ifdef ENABLE_WME3D
+		case TOKEN_SHADOW_IMAGE:
+			if (_shadowImage) {
+				_surfaceStorage->removeSurface(_shadowImage);
+			}
+			_shadowImage = nullptr;
+
+			_shadowImage = _gameRef->_surfaceStorage->addSurface(params);
+			break;
+#endif
 
 		case TOKEN_CURSOR:
 			delete _cursor;
@@ -928,6 +1056,9 @@ bool BaseGame::loadBuffer(char *buffer, bool complete) {
 		case TOKEN_COMPAT_KILL_METHOD_THREADS:
 			parser.scanStr(params, "%b", &_compatKillMethodThreads);
 			break;
+
+		default:
+			break;
 		}
 	}
 
@@ -939,7 +1070,11 @@ bool BaseGame::loadBuffer(char *buffer, bool complete) {
 	if (!_systemFont) {
 		_systemFont = _gameRef->_fontStorage->addFont("system_font.fnt");
 	}
-
+#ifdef ENABLE_WME3D
+	if (!_shadowImage) {
+		_shadowImage = _gameRef->_surfaceStorage->addSurface("shadow.png");
+	}
+#endif
 
 	if (cmd == PARSERR_TOKENNOTFOUND) {
 		_gameRef->LOG(0, "Syntax error in GAME definition");
@@ -1093,8 +1228,9 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 	else if (strcmp(name, "ExpandString") == 0) {
 		stack->correctParams(1);
 		ScValue *val = stack->pop();
-		char *str = new char[strlen(val->getString()) + 1];
-		strcpy(str, val->getString());
+		size_t strSize = strlen(val->getString()) + 1;
+		char *str = new char[strSize];
+		Common::strcpy_s(str, strSize, val->getString());
 		expandStringByStringTable(&str);
 		stack->pushString(str);
 		delete[] str;
@@ -1246,6 +1382,21 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 		return STATUS_OK;
 	}
 
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] RegistryFlush
+	// Return value is never used
+	// Used at SaveGameSettings() and Game.RegistryFlush()
+	// Called after a series of RegWriteNumber calls
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "RegistryFlush") == 0) {
+		stack->correctParams(0);
+		ConfMan.flushToDisk();
+		stack->pushNULL();
+		return STATUS_OK;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// RegWriteNumber
 	//////////////////////////////////////////////////////////////////////////
@@ -1310,8 +1461,9 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 		const char *xdesc = stack->pop()->getString();
 		bool quick = stack->pop()->getBool(false);
 
-		char *desc = new char[strlen(xdesc) + 1];
-		strcpy(desc, xdesc);
+		size_t descSize = strlen(xdesc) + 1;
+		char *desc = new char[descSize];
+		Common::strcpy_s(desc, descSize, xdesc);
 		stack->pushBool(true);
 		if (DID_FAIL(saveGame(slot, desc, quick))) {
 			stack->pop();
@@ -1349,12 +1501,66 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 	else if (strcmp(name, "GetSaveSlotDescription") == 0) {
 		stack->correctParams(1);
 		int slot = stack->pop()->getInt();
-		char desc[512];
-		desc[0] = '\0';
-		SaveLoad::getSaveSlotDescription(slot, desc);
-		stack->pushString(desc);
+		Common::String desc = SaveLoad::getSaveSlotDescription(slot);
+		stack->pushString(desc.c_str());
 		return STATUS_OK;
 	}
+
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetSaveSlotDescriptionTimestamp
+	// Return struct with "Description" and "Timestamp" fields in 1.2.362-
+	// Return array  with "Description" and "Timestamp" items  in 1.2.527+
+	// Timestamps should be comparable types
+	// Used to sort saved games by timestamps at save.script & load.script
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetSaveSlotDescriptionTimestamp") == 0) {
+		stack->correctParams(1);
+		int slot = stack->pop()->getInt();
+
+		TimeDate time;
+		SaveLoad::getSaveSlotTimestamp(slot, &time);
+		stack->pushInt(time.tm_sec);
+		stack->pushInt(time.tm_min);
+		stack->pushInt(time.tm_hour);
+		stack->pushInt(time.tm_mday);
+		stack->pushInt(time.tm_mon + 1);
+		stack->pushInt(time.tm_year + 1900);
+		stack->pushInt(6);
+		BaseScriptable *date = makeSXDate(_gameRef, stack);
+		stack->pushNative(date, false);
+
+		Common::String desc = SaveLoad::getSaveSlotDescription(slot);
+		stack->pushString(desc.c_str());
+
+		BaseScriptable *obj;
+		if (BaseEngine::instance().isFoxTail(FOXTAIL_1_2_527, FOXTAIL_LATEST_VERSION)) {
+			stack->pushInt(2);
+			obj = makeSXArray(_gameRef, stack);
+		} else {
+			stack->pushInt(0);
+			obj = makeSXObject(_gameRef, stack);
+			obj->scSetProperty("Description", stack->pop());
+			obj->scSetProperty("Timestamp", stack->pop());
+		}
+		stack->pushNative(obj, false);
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] ValidSaveSlotVersion
+	// Checks if given slot stores game state of compatible game version
+	// This version always returs true
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "ValidSaveSlotVersion") == 0) {
+		stack->correctParams(1);
+		/* int slot = */ stack->pop()->getInt();
+		// do nothing
+		stack->pushBool(true);
+		return STATUS_OK;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// EmptySaveSlot
@@ -1535,6 +1741,13 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 		byte blue = stack->pop()->getInt(0);
 		byte alpha = stack->pop()->getInt(0xFF);
 
+		// HACK: Corrosion fades screen to black while opening main menu
+		// Thus, we get black screenshots when saving game from in-game menus
+		// Let's take & keep screenshot before entering main menu
+		if (duration == 750 && BaseEngine::instance().getGameId() == "corrosion") {
+			storeSaveThumbnail();
+		}
+
 		bool system = (strcmp(name, "SystemFadeOut") == 0 || strcmp(name, "SystemFadeOutAsync") == 0);
 
 		_fader->fadeOut(BYTETORGBA(red, green, blue, alpha), duration, system);
@@ -1590,7 +1803,7 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 		int fileNum = 0;
 
 		while (true) {
-			sprintf(filename, "%s%03d.bmp", val->isNULL() ? getName() : val->getString(), fileNum);
+			Common::sprintf_s(filename, "%s%03d.bmp", val->isNULL() ? getName() : val->getString(), fileNum);
 			if (!Common::File::exists(filename)) {
 				break;
 			}
@@ -1656,7 +1869,8 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 	// OpenDocument
 	//////////////////////////////////////////////////////////////////////////
 	else if (strcmp(name, "OpenDocument") == 0) {
-		stack->correctParams(0);
+		stack->correctParams(1);
+		g_system->openUrl(stack->pop()->getString());
 		stack->pushNULL();
 		return STATUS_OK;
 	}
@@ -1701,7 +1915,7 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 		if (val->isNULL()) {
 			_renderer->setSaveImage(NULL, saveImageX, saveImageY);
 		} else {
-			_renderer->setSaveImage(NULL, saveImageX, saveImageY);
+			_renderer->setSaveImage(val->getString(), saveImageX, saveImageY);
 		}
 		stack->pushNULL();
 		return STATUS_OK;
@@ -1834,21 +2048,43 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 		return STATUS_OK;
 	}
 
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// IsShadowTypeSupported
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "IsShadowTypeSupported") == 0) {
+		stack->correctParams(1);
+		TShadowType type = static_cast<TShadowType>(stack->pop()->getInt());
+
+		switch (type) {
+		case SHADOW_NONE:
+		case SHADOW_SIMPLE:
+			stack->pushBool(true);
+			break;
+
+		case SHADOW_FLAT:
+			_renderer3D->enableShadows();
+			stack->pushBool(_supportsRealTimeShadows);
+			break;
+
+		case SHADOW_STENCIL:
+			stack->pushBool(_gameRef->_renderer3D->stencilSupported());
+			break;
+
+		default:
+			stack->pushBool(false);
+		}
+
+		return STATUS_OK;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// StoreSaveThumbnail
 	//////////////////////////////////////////////////////////////////////////
 	else if (strcmp(name, "StoreSaveThumbnail") == 0) {
 		stack->correctParams(0);
-		delete _cachedThumbnail;
-		_cachedThumbnail = new SaveThumbHelper(this);
-		if (DID_FAIL(_cachedThumbnail->storeThumbnail())) {
-			delete _cachedThumbnail;
-			_cachedThumbnail = nullptr;
-			stack->pushBool(false);
-		} else {
-			stack->pushBool(true);
-		}
-
+		stack->pushBool(storeSaveThumbnail());
 		return STATUS_OK;
 	}
 
@@ -1857,10 +2093,8 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 	//////////////////////////////////////////////////////////////////////////
 	else if (strcmp(name, "DeleteSaveThumbnail") == 0) {
 		stack->correctParams(0);
-		delete _cachedThumbnail;
-		_cachedThumbnail = nullptr;
+		deleteSaveThumbnail();
 		stack->pushNULL();
-
 		return STATUS_OK;
 	}
 
@@ -1890,7 +2124,7 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 
 			if (asHex) {
 				char hex[100];
-				sprintf(hex, "%x", checksum);
+				Common::sprintf_s(hex, "%x", checksum);
 				stack->pushString(hex);
 			} else {
 				stack->pushInt(checksum);
@@ -1904,6 +2138,94 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 
 		return STATUS_OK;
 	}
+
+#ifdef ENABLE_HEROCRAFT
+	//////////////////////////////////////////////////////////////////////////
+	// [HeroCraft] GetSpriteControl
+	// Returns some internal state
+	// Known return values are:
+	// * 44332211: MUST be returned at "game.script" to allow game start
+	// * 77885566: may be returned at "mainMenu.script" to force open registration window
+	// * 90123679: may be returned at "mainMenu.script" to make "Buy Game" button visible
+	// Used at "Pole Chudes" only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetSpriteControl") == 0) {
+		stack->correctParams(0);
+		stack->pushInt(44332211L);
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [HeroCraft] RandomInitSeed
+	// Additional method to be called before RandomSeed()
+	// Used at "Pole Chudes" only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "RandomInitSeed") == 0) {
+		stack->correctParams(1);
+		int seed = stack->pop()->getInt();
+
+		_rndHc->setSeed(seed);
+
+		stack->pushNULL();
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [HeroCraft] RandomSeed
+	// Similar to usual Random() function, but using seed provided earlier
+	// Used at "Pole Chudes" only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "RandomSeed") == 0) {
+		stack->correctParams(2);
+
+		int from = stack->pop()->getInt();
+		int to   = stack->pop()->getInt();
+		int rnd  = _rndHc->getRandomNumberRng(from, to);
+
+		stack->pushInt(rnd);
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [HeroCraft] GetImageInfo
+	// Returns image size in "<width>;<height>" format, e.g. "800;600"
+	// Known params: "fsdata\\splash1.jpg"
+	// Game script turn off scaling if returned value is "1024;768"
+	// Used at "Papa's Daughters 1" only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetImageInfo") == 0) {
+		stack->correctParams(1);
+		/*const char *filename =*/ stack->pop()->getString();
+		stack->pushString("1024;768");
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [HeroCraft] A lot of functions used for self-check
+	// Used at "Papa's Daughters 2" only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "DeleteItems") == 0 || strcmp(name, "CreateActorItems") == 0 || strcmp(name, "DeleteActorItems") == 0 || strcmp(name, "PrepareItems") == 0 || strcmp(name, "CreateEntityItems") == 0 || strcmp(name, "DeleteEntityItems") == 0 || strcmp(name, "PrepareItemsWin") == 0 || strcmp(name, "CreateItems") == 0) {
+		stack->correctParams(3);
+		uint32 a = (uint32)stack->pop()->getInt();
+		uint32 b = (uint32)stack->pop()->getInt();
+		uint32 c = (uint32)stack->pop()->getInt();
+
+		uint32 result = 0;
+		const char* fname = "PapasDaughters2.wrp.exe";
+		if (strcmp(name, "PrepareItems") == 0 || strcmp(name, "CreateEntityItems") == 0 || strcmp(name, "DeleteEntityItems") == 0) {
+			result = getFilePartChecksumHc(fname, b, a);
+		} else if (strcmp(name, "PrepareItemsWin") == 0) {
+			result = getFilePartChecksumHc(fname, b, c);
+		} else if (strcmp(name, "CreateItems") == 0) {
+			result = getFilePartChecksumHc(fname, a, c);
+		} else {
+			result = getFilePartChecksumHc(fname, a, b);
+		}
+
+		stack->pushInt(result);
+		return STATUS_OK;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// EnableScriptProfiling
@@ -1926,6 +2248,121 @@ bool BaseGame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack
 
 		return STATUS_OK;
 	}
+
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetScreenType
+	// Returns 0 on fullscreen and 1 on window
+	// Used to init and update controls at options.script and methods.script
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetScreenType") == 0) {
+		stack->correctParams(0);
+		int type = _renderer->isWindowed() ? 1 : 0;
+		stack->pushInt(type);
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetScreenMode
+	// Returns integer to be used as a pixelization mode multiplier
+	// (e.g. it returns 2 for 640x360, 3 for 960x540, etc...)
+	// Used to init and update controls at options.script and methods.script
+	// This implementation always return 2 to fake window size of 2*320 x 2*180
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetScreenMode") == 0) {
+		stack->correctParams(0);
+		stack->pushInt(2);
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetDesktopDisplayMode
+	// Return struct with "w" and "h" fields in 1.2.362-
+	// Return array  with "w" and "h" items  in 1.2.527+
+	// Used to init and update controls at options.script and methods.script
+	// w,h of actual desktop size expected to calcucate maximum available size
+	// Available screen modes are calcucated as 2...N, N*320<w and N*180<h
+	// This implementation fakes available size as 2*320 x 2*180 only
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetDesktopDisplayMode") == 0) {
+		stack->correctParams(0);
+		stack->pushInt(2 * 180 + 1);
+		stack->pushInt(2 * 320 + 1);
+
+		BaseScriptable *obj;
+		if (BaseEngine::instance().isFoxTail(FOXTAIL_1_2_527, FOXTAIL_LATEST_VERSION)) {
+			stack->pushInt(2);
+			obj = makeSXArray(_gameRef, stack);
+		} else {
+			stack->pushInt(0);
+			obj = makeSXObject(_gameRef, stack);
+			obj->scSetProperty("w", stack->pop());
+			obj->scSetProperty("h", stack->pop());
+		}
+		stack->pushNative(obj, false);
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] SetScreenTypeMode
+	// This implementation ignores mode, toggles screen type only
+	// Used to change screen type&mode at options.script and methods.script
+	// Return value is never used
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "SetScreenTypeMode") == 0) {
+		stack->correctParams(2);
+		int type = stack->pop()->getInt();
+		stack->pop()->getInt(); //mode is unused
+
+		_renderer->setWindowed(type);
+		stack->pushNULL();
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] ChangeWindowGrab
+	// Used at game.script on "Keypress" event on F11
+	// Readme of FoxTail says: "F11 - free the mouse pointer from the window"
+	// This implementation does nothing
+	// Return value is never used
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "ChangeWindowGrab") == 0) {
+		stack->correctParams(0);
+		stack->pushNULL();
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetFiles
+	// Used at kalimba.script on F9 keypress to reload list of available music
+	// Known params: "*.mb"
+	// Original implementation does not seem to look up at DCP packages
+	// This implementation looks up at savegame storage and for actual files
+	// Return value expected to be an Array of Strings
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetFiles") == 0) {
+		stack->correctParams(1);
+		const char *pattern = stack->pop()->getString();
+
+		Common::StringArray fnames;
+		BaseFileManager::getEngineInstance()->listMatchingFiles(fnames, pattern);
+
+		stack->pushInt(0);
+		BaseScriptable *arr = makeSXArray(_gameRef, stack);
+		for (uint32 i = 0; i < fnames.size(); i++) {
+			stack->pushString(fnames[i].c_str());
+			((SXArray *)arr)->push(stack->pop());
+		}
+
+ 		stack->pushNative(arr, false);
+ 		return STATUS_OK;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// ShowStatusLine
@@ -2161,6 +2598,41 @@ ScValue *BaseGame::scGetProperty(const Common::String &name) {
 		return _scValue;
 	}
 
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// Shadows (obsolete)
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "Shadows") {
+		_scValue->setBool(_maxShadowType > SHADOW_NONE);
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// SimpleShadows (obsolete)
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "SimpleShadows") {
+		_scValue->setBool(_maxShadowType == SHADOW_SIMPLE);
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// SupportsRealTimeShadows (obsolete)
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "SupportsRealTimeShadows") {
+		_renderer3D->enableShadows();
+		_scValue->setBool(_supportsRealTimeShadows);
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// MaxShadowType
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "MaxShadowType") {
+		_scValue->setInt(_maxShadowType);
+		return _scValue;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// AcceleratedMode / Accelerated (RO)
 	//////////////////////////////////////////////////////////////////////////
@@ -2218,6 +2690,28 @@ ScValue *BaseGame::scGetProperty(const Common::String &name) {
 		return _scValue;
 	}
 
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// Direct3DDevice
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "Direct3DDevice") {
+		warning("BaseGame::scGetProperty Direct3D device is not available");
+		_scValue->setNULL();
+
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// DirectDrawInterface
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "DirectDrawInterface") {
+		warning("BaseGame::scGetProperty DirectDraw interface is not available");
+		_scValue->setNULL();
+
+		return _scValue;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// AccTTSEnabled
 	//////////////////////////////////////////////////////////////////////////
@@ -2274,6 +2768,40 @@ ScValue *BaseGame::scGetProperty(const Common::String &name) {
 		return _scValue;
 	}
 
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// UsedMemory
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "UsedMemory") {
+		// wme only returns a non-zero value in debug mode
+		_scValue->setInt(0);
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// MaxActiveLights
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "MaxActiveLights") {
+		if (_useD3D) {
+			_scValue->setInt(_renderer3D->maximumLightsCount());
+		} else {
+			_scValue->setInt(0);
+		}
+
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// HardwareTL
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "HardwareTL") {
+		// TODO: Once we have a TinyGL renderer, we could potentially return false here
+		// otherwise, as long as WME3D is enabled, vertex processing is done by the hardware
+		_scValue->setBool(true);
+		return _scValue;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// AutorunDisabled
 	//////////////////////////////////////////////////////////////////////////
@@ -2286,7 +2814,7 @@ ScValue *BaseGame::scGetProperty(const Common::String &name) {
 	// SaveDirectory (RO)
 	//////////////////////////////////////////////////////////////////////////
 	else if (name == "SaveDirectory") {
-		AnsiString dataDir = "saves/";	// TODO: This is just to avoid telling the engine actual paths.
+		AnsiString dataDir = "saves"; // See also: SXDirectory::scGetProperty("TempDirectory")
 		_scValue->setString(dataDir.c_str());
 		return _scValue;
 	}
@@ -2314,6 +2842,127 @@ ScValue *BaseGame::scGetProperty(const Common::String &name) {
 		_scValue->setBool(_cursorHidden);
 		return _scValue;
 	}
+
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] SystemLanguage (RO)
+	// Returns Steam API language name string
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "SystemLanguage") {
+		switch (Common::parseLanguage(ConfMan.get("language"))) {
+		case Common::CS_CZE:
+			_scValue->setString("czech");
+			break;
+		case Common::DA_DNK:
+			_scValue->setString("danish");
+			break;
+		case Common::DE_DEU:
+			_scValue->setString("german");
+			break;
+		case Common::ES_ESP:
+			_scValue->setString("spanish");
+			break;
+		case Common::FI_FIN:
+			_scValue->setString("finnish");
+			break;
+		case Common::FR_FRA:
+			_scValue->setString("french");
+			break;
+		case Common::EL_GRC:
+			_scValue->setString("greek");
+			break;
+		case Common::HU_HUN:
+			_scValue->setString("hungarian");
+			break;
+		case Common::IT_ITA:
+			_scValue->setString("italian");
+			break;
+		case Common::JA_JPN:
+			_scValue->setString("japanese");
+			break;
+		case Common::KO_KOR:
+			_scValue->setString("koreana");
+			break;
+		case Common::NB_NOR:
+			_scValue->setString("norwegian");
+			break;
+		case Common::NL_NLD:
+			_scValue->setString("dutch");
+			break;
+		case Common::PT_BRA:
+			_scValue->setString("brazilian");
+			break;
+		case Common::PT_PRT:
+			_scValue->setString("portuguese");
+			break;
+		case Common::PL_POL:
+			_scValue->setString("polish");
+			break;
+		case Common::RU_RUS:
+			_scValue->setString("russian");
+			break;
+		case Common::SE_SWE:
+			_scValue->setString("swedish");
+			break;
+		case Common::UA_UKR:
+			_scValue->setString("ukrainian");
+			break;
+		case Common::ZH_CHN:
+			_scValue->setString("schinese");
+			break;
+		case Common::ZH_TWN:
+			_scValue->setString("tchinese");
+			break;
+		default:
+			_scValue->setString("english");
+			break;
+		}
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] BuildVersion (RO)
+	// Used to display full game version at options.script in UpdateControls()
+	// Returns FoxTail engine version number as a dotted string
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "BuildVersion") {
+		if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_227) {
+			_scValue->setString("1.2.227");
+		} else if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_230) {
+			_scValue->setString("1.2.230");
+		} else if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_304) {
+			_scValue->setString("1.2.304");
+		} else if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_362) {
+			_scValue->setString("1.2.362");
+		} else if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_527) {
+			_scValue->setString("1.2.527");
+		} else if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_896) {
+			_scValue->setString("1.2.896");
+		} else if (BaseEngine::instance().getTargetExecutable() == FOXTAIL_1_2_902) {
+			_scValue->setString("1.2.902");
+		} else {
+			_scValue->setString("UNKNOWN");
+		}
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GameVersion (RO)
+	// Used to display full game version at options.script in UpdateControls()
+	// Returns FoxTail version number as a string
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "GameVersion") {
+		uint32 gameVersion = 0;
+		BaseFileManager *fileManager = BaseEngine::instance().getFileManager();
+		if (fileManager) {
+			gameVersion = fileManager->getPackageVersion("data.dcp");
+		}
+		char tmp[16];
+		Common::sprintf_s(tmp,"%u",gameVersion);
+		_scValue->setString(tmp);
+		return _scValue;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// Platform (RO)
@@ -2474,6 +3123,42 @@ bool BaseGame::scSetProperty(const char *name, ScValue *value) {
 		return STATUS_OK;
 	}
 
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// Shadows (obsolete)
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "Shadows") == 0) {
+		if (value->getBool()) {
+			setMaxShadowType(SHADOW_STENCIL);
+		} else {
+			setMaxShadowType(SHADOW_NONE);
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// SimpleShadows (obsolete)
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "SimpleShadows") == 0) {
+		if (value->getBool()) {
+			setMaxShadowType(SHADOW_SIMPLE);
+		} else {
+			setMaxShadowType(SHADOW_STENCIL);
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// MaxShadowType
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "MaxShadowType") == 0) {
+		setMaxShadowType(static_cast<TShadowType>(value->getInt()));
+		return STATUS_OK;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// TextEncoding
 	//////////////////////////////////////////////////////////////////////////
@@ -2609,7 +3294,7 @@ void BaseGame::quickMessageForm(char *fmt, ...) {
 	va_list va;
 
 	va_start(va, fmt);
-	vsprintf(buff, fmt, va);
+	Common::vsprintf_s(buff, fmt, va);
 	va_end(va);
 
 	quickMessage(buff);
@@ -2741,6 +3426,16 @@ bool BaseGame::externalCall(ScScript *script, ScStack *stack, ScStack *thisStack
 		thisObj = thisStack->getTop();
 
 		thisObj->setNative(makeSXFile(_gameRef,  stack));
+		stack->pushNULL();
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// Directory
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "Directory") == 0) {
+		thisObj = thisStack->getTop();
+
+		thisObj->setNative(makeSXDirectory(_gameRef));
 		stack->pushNULL();
 	}
 
@@ -2940,8 +3635,9 @@ bool BaseGame::externalCall(ScScript *script, ScStack *stack, ScStack *thisStack
 	else if (strcmp(name, "ToString") == 0) {
 		stack->correctParams(1);
 		const char *str = stack->pop()->getString();
-		char *str2 = new char[strlen(str) + 1];
-		strcpy(str2, str);
+		size_t strSize = strlen(str) + 1;
+		char *str2 = new char[strSize];
+		Common::strcpy_s(str2, strSize, str);
 		stack->pushString(str2);
 		delete[] str2;
 	}
@@ -2971,6 +3667,102 @@ bool BaseGame::externalCall(ScScript *script, ScStack *stack, ScStack *thisStack
 		stack->correctParams(1);
 		bool val = stack->pop()->getBool();
 		stack->pushBool(val);
+	}
+
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] IsNumber
+	// Used at kalimba.script to check if string token is a number
+	// If true is returned, then ToInt() is called for same parameter
+	// ToInt(string) implementation is using atoi(), so let's use it here too
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "IsNumber") == 0) {
+		stack->correctParams(1);
+		ScValue *val = stack->pop();
+
+		bool result = false;
+		if (val->isInt() || val->isFloat()) {
+			result = true;
+		} else if (val->isString()) {
+			const char *str = val->getString();
+			result = (atoi(str) != 0) || (strcmp(str, "0") == 0);
+		}
+
+		stack->pushBool(result);
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] Split
+	// Returns array of words of a string, using another as a delimeter
+	// Used to split strings by 1-2 characters delimeter in various scripts
+	// All the delimeters ever used in FoxTail are:
+	//   " ", "@", "#", "$", "&", ",", "\\", "@h", "@i", "@p", "@s"
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "Split") == 0) {
+		stack->correctParams(2);
+		const char *str = stack->pop()->getString();
+		Common::String sep = stack->pop()->getString();
+		uint32 size = strlen(str) + 1;
+
+		// Let's make copies before modifying stack
+		char *copy = new char[size];
+		Common::strcpy_s(copy, size, str);
+
+		// There is no way to makeSXArray() with exactly 1 given element
+		// That's why we are creating empty Array and SXArray::push() later
+		stack->pushInt(0);
+		BaseScriptable *arr = makeSXArray(_gameRef, stack);
+
+		// Iterating string copy, replacing delimeter with '\0' and pushing matches
+		// Only non-empty matches should be pushed
+		char *begin = copy;
+		for (char *it = copy; it < copy + size; it++) {
+			if (strncmp(it, sep.c_str(), sep.size()) == 0 || *it == '\0') {
+				*it = '\0';
+				if (it != begin) {
+					stack->pushString(begin);
+					((SXArray *)arr)->push(stack->pop());
+				}
+				begin = it + sep.size();
+				it = begin - 1;
+			}
+		}
+
+		stack->pushNative(arr, false);
+
+		delete[] copy;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] Trim / lTrim / rTrim
+	// Removes whitespaces from a string from the left & right
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "Trim") == 0 || strcmp(name, "lTrim") == 0 || strcmp(name, "rTrim") == 0) {
+		stack->correctParams(1);
+		const char *str = stack->pop()->getString();
+		size_t copySize = strlen(str) + 1;
+		char *copy = new char[copySize];
+		Common::strcpy_s(copy, copySize, str);
+
+		char *ptr = copy;
+		if (strcmp(name, "rTrim") != 0) {
+			ptr = Common::ltrim(ptr);
+		}
+		if (strcmp(name, "lTrim") != 0) {
+			ptr = Common::rtrim(ptr);
+		}
+
+		stack->pushString(ptr);
+
+		delete[] copy;
+	}
+#endif
+
+	//////////////////////////////////////////////////////////////////////////
+	// Plugins: emulate object constructors from known "wme_*.dll" plugins
+	//////////////////////////////////////////////////////////////////////////
+	else if(!DID_FAIL(EmulatePluginCall(_gameRef, stack, thisStack, name))) {
+		return STATUS_OK;
 	}
 
 	//////////////////////////////////////////////////////////////////////////
@@ -3112,6 +3904,16 @@ bool BaseGame::persist(BasePersistenceManager *persistMgr) {
 	_timerLive.persist(persistMgr);
 
 	_renderer->persistSaveLoadImages(persistMgr);
+
+#ifdef ENABLE_WME3D
+	if (BaseEngine::instance().getFlags() & GF_3D) {
+		persistMgr->transferSint32(TMEMBER_INT(_maxShadowType));
+		persistMgr->transferSint32(TMEMBER(_editorResolutionWidth));
+		persistMgr->transferSint32(TMEMBER(_editorResolutionHeight));
+	} else {
+		_editorResolutionWidth = _editorResolutionHeight = 0;
+	}
+#endif
 
 	persistMgr->transferSint32(TMEMBER_INT(_textEncoding));
 	persistMgr->transferBool(TMEMBER(_textRTL));
@@ -3271,6 +4073,15 @@ bool BaseGame::handleMouseWheel(int32 delta) {
 	return true;
 }
 
+//////////////////////////////////////////////////////////////////////////
+bool BaseGame::handleCustomActionStart(BaseGameCustomAction action) {
+	return false;
+}
+
+//////////////////////////////////////////////////////////////////////////
+bool BaseGame::handleCustomActionEnd(BaseGameCustomAction action) {
+	return false;
+}
 
 //////////////////////////////////////////////////////////////////////////
 bool BaseGame::getVersion(byte *verMajor, byte *verMinor, byte *extMajor, byte *extMinor) const {
@@ -3300,7 +4111,7 @@ void BaseGame::setWindowTitle() {
 		if (title[0] != '\0') {
 			Common::strlcat(title, " - ", 512);
 		}
-		Common::strlcat(title, "WME Lite", 512);
+		Common::strlcat(title, "Wintermute Engine", 512);
 
 
 		Utf8String utf8Title;
@@ -3559,6 +4370,28 @@ bool BaseGame::drawCursor(BaseSprite *cursor) {
 	return cursor->draw(_mousePos.x, _mousePos.y);
 }
 
+//////////////////////////////////////////////////////////////////////////
+bool BaseGame::renderShadowGeometry() {
+	return STATUS_OK;
+}
+
+//////////////////////////////////////////////////////////////////////////
+bool BaseGame::storeSaveThumbnail() {
+	delete _cachedThumbnail;
+	_cachedThumbnail = new SaveThumbHelper(this);
+	if (DID_FAIL(_cachedThumbnail->storeThumbnail())) {
+		deleteSaveThumbnail();
+		return false;
+	}
+	return true;
+}
+
+//////////////////////////////////////////////////////////////////////////
+void BaseGame::deleteSaveThumbnail() {
+	delete _cachedThumbnail;
+	_cachedThumbnail = nullptr;
+}
+
 
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
@@ -3754,15 +4587,15 @@ bool BaseGame::displayDebugInfo() {
 	char str[strLength];
 
 	if (_debugShowFPS) {
-		sprintf(str, "FPS: %d", _gameRef->_fps);
+		Common::sprintf_s(str, "FPS: %d", _gameRef->_fps);
 		_systemFont->drawText((byte *)str, 0, 0, 100, TAL_LEFT);
 	}
 
 	if (_gameRef->_debugDebugMode) {
 		if (!_gameRef->_renderer->isWindowed()) {
-			sprintf(str, "Mode: %dx%dx%d", _renderer->getWidth(), _renderer->getHeight(), _renderer->getBPP());
+			Common::sprintf_s(str, "Mode: %dx%dx%d", _renderer->getWidth(), _renderer->getHeight(), _renderer->getBPP());
 		} else {
-			sprintf(str, "Mode: %dx%d windowed", _renderer->getWidth(), _renderer->getHeight());
+			Common::sprintf_s(str, "Mode: %dx%d windowed", _renderer->getWidth(), _renderer->getHeight());
 		}
 
 		Common::strlcat(str, " (", strLength);
@@ -3774,24 +4607,73 @@ bool BaseGame::displayDebugInfo() {
 
 		int scrTotal, scrRunning, scrWaiting, scrPersistent;
 		scrTotal = _scEngine->getNumScripts(&scrRunning, &scrWaiting, &scrPersistent);
-		sprintf(str, "Running scripts: %d (r:%d w:%d p:%d)", scrTotal, scrRunning, scrWaiting, scrPersistent);
+		Common::sprintf_s(str, "Running scripts: %d (r:%d w:%d p:%d)", scrTotal, scrRunning, scrWaiting, scrPersistent);
 		_systemFont->drawText((byte *)str, 0, 70, _renderer->getWidth(), TAL_RIGHT);
 
 
-		sprintf(str, "Timer: %d", getTimer()->getTime());
+		Common::sprintf_s(str, "Timer: %d", getTimer()->getTime());
 		_gameRef->_systemFont->drawText((byte *)str, 0, 130, _renderer->getWidth(), TAL_RIGHT);
 
 		if (_activeObject != nullptr) {
 			_systemFont->drawText((const byte *)_activeObject->getName(), 0, 150, _renderer->getWidth(), TAL_RIGHT);
 		}
 
-		sprintf(str, "GfxMem: %dMB", _usedMem / (1024 * 1024));
+		Common::sprintf_s(str, "GfxMem: %dMB", _usedMem / (1024 * 1024));
 		_systemFont->drawText((byte *)str, 0, 170, _renderer->getWidth(), TAL_RIGHT);
 
 	}
 
 	return STATUS_OK;
 }
+
+#ifdef ENABLE_WME3D
+//////////////////////////////////////////////////////////////////////////
+bool BaseGame::setMaxShadowType(TShadowType maxShadowType) {
+	if (maxShadowType > SHADOW_STENCIL) {
+		maxShadowType = SHADOW_STENCIL;
+	}
+
+	if (maxShadowType < 0) {
+		maxShadowType = SHADOW_NONE;
+	}
+
+	if (maxShadowType == SHADOW_FLAT && !_supportsRealTimeShadows) {
+		maxShadowType = SHADOW_SIMPLE;
+	}
+
+	_maxShadowType = maxShadowType;
+
+	return STATUS_OK;
+}
+
+//////////////////////////////////////////////////////////////////////////
+TShadowType BaseGame::getMaxShadowType(BaseObject *object) {
+	if (object) {
+		return MIN(_maxShadowType, object->_shadowType);
+	} else {
+		return _maxShadowType;
+	}
+}
+#endif
+
+//////////////////////////////////////////////////////////////////////////
+bool BaseGame::getLayerSize(int *layerWidth, int *layerHeight, Rect32 *viewport, bool *customViewport) {
+	if (_renderer) {
+		*layerWidth = _renderer->getWidth();
+		*layerHeight = _renderer->getHeight();
+		*customViewport = false;
+		viewport->setRect(0, 0, _renderer->getWidth(), _renderer->getHeight());
+		return true;
+	} else
+		return false;
+}
+
+#ifdef ENABLE_WME3D
+//////////////////////////////////////////////////////////////////////////
+uint32 BaseGame::getAmbientLightColor() {
+	return 0x00000000;
+}
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 void BaseGame::getMousePos(Point32 *pos) {
@@ -3830,6 +4712,14 @@ void BaseGame::getMousePos(Point32 *pos) {
 		}
 	}
 }
+
+#ifdef ENABLE_WME3D
+//////////////////////////////////////////////////////////////////////////
+bool BaseGame::getFogParams(bool *fogEnabled, uint32 *, float *, float *) {
+	*fogEnabled = false;
+	return true;
+}
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 void BaseGame::miniUpdate() { // TODO: Is this really necessary, it used to update sound, but the mixer does that now.
@@ -3884,7 +4774,6 @@ bool BaseGame::isDoubleClick(int32 buttonIndex) {
 //////////////////////////////////////////////////////////////////////////
 void BaseGame::autoSaveOnExit() {
 	_soundMgr->saveSettings();
-	ConfMan.flushToDisk();
 
 	if (!_autoSaveOnExit) {
 		return;
@@ -3925,6 +4814,40 @@ char *BaseGame::getKeyFromStringTable(const char *str) const {
 	return _settings->getKeyFromStringTable(str);
 }
 
+#ifdef ENABLE_HEROCRAFT
+uint8 BaseGame::getFilePartChecksumHc(const char *filename, uint32 begin, uint32 end) {
+	if (begin >= end) {
+		warning("Wrong limits for checksum check");
+		return 0;
+	}
+
+	uint32 size;
+	char *buffer = (char *)BaseFileManager::getEngineInstance()->readWholeFile(filename, &size);
+	if (buffer == nullptr) {
+		warning("Failed to open '%s' for checksum check", filename);
+		return 0;
+	}
+
+	if (size < end) {
+		warning("File '%s' is too small for checksum check", filename);
+		delete[] buffer;
+		return 0;
+	}
+
+	uint8 result = 0;
+	for (uint32 i = begin; i < end; i++) {
+		uint8 tmp = buffer[i];
+		result += tmp;
+		if (result < tmp) {
+			result++;
+		}
+	}
+
+	delete[] buffer;
+	return result;
+}
+#endif
+
 Common::String BaseGame::readRegistryString(const Common::String &key, const Common::String &initValue) const {
 	// Game specific hacks:
 	Common::String result = initValue;
@@ -3941,7 +4864,7 @@ Common::String BaseGame::readRegistryString(const Common::String &key, const Com
 	} else { // Just fallback to using ConfMan for now
 		Common::String privKey = "wme_" + StringUtil::encodeSetting(key);
 		if (ConfMan.hasKey(privKey)) {
-			result = StringUtil::decodeSetting(ConfMan.get(key));
+			result = StringUtil::decodeSetting(ConfMan.get(privKey));
 		}
 	}
 	return result;

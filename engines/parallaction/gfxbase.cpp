@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,20 +30,12 @@
 namespace Parallaction {
 
 GfxObj::GfxObj(uint objType, Frames *frames, const char* name) :
-	_frames(frames), x(0), y(0), z(0), _prog(0), _flags(0),
+	_name(name), _frames(frames), x(0), y(0), z(0), _prog(0), _flags(0),
 	type(objType), frame(0), layer(3), scale(100), _hasMask(false), _hasPath(false),
-	transparentKey(0), _maskId(0), _pathId(0) {
-
-	if (name) {
-		_name = strdup(name);
-	} else {
-		_name = 0;
-	}
-}
+	transparentKey(0), _maskId(0), _pathId(0) {}
 
 GfxObj::~GfxObj() {
 	delete _frames;
-	free(_name);
 }
 
 void GfxObj::release() {
@@ -53,7 +44,7 @@ void GfxObj::release() {
 }
 
 const char *GfxObj::getName() const {
-	return _name;
+	return _name.c_str();
 }
 
 uint GfxObj::getNum() {
@@ -240,10 +231,9 @@ void Gfx::drawGfxObject(GfxObj *obj, Graphics::Surface &surf) {
 
 }
 
-void Gfx::drawText(Font *font, Graphics::Surface* surf, uint16 x, uint16 y, const char *text, byte color) {
-	byte *dst = (byte *)surf->getBasePtr(x, y);
+void Gfx::drawText(Font *font, Graphics::Surface *surf, uint16 x, uint16 y, const char *text, byte color) {
 	font->setColor(color);
-	font->drawString(dst, surf->w, text);
+	font->drawString(surf, x, y, text);
 }
 
 void Gfx::unpackBlt(const Common::Rect& r, byte *data, uint size, Graphics::Surface *surf, uint16 z, uint scale, byte transparentColor) {

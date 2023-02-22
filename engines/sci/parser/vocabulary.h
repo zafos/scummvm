@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,13 +15,12 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
-#ifndef SCI_SCICORE_VOCABULARY_H
-#define SCI_SCICORE_VOCABULARY_H
+#ifndef SCI_PARSER_VOCABULARY_H
+#define SCI_PARSER_VOCABULARY_H
 
 #include "common/str.h"
 #include "common/hashmap.h"
@@ -208,6 +207,41 @@ public:
 	 */
 	void lookupWord(ResultWordList &retval, const char *word, int word_len);
 
+	/**
+	 * Looks up a single word in the words list, taking into account suffixes, and updating parent_retval if a matching prefix is found
+	 * Note: there is no equivalent in Sierra SCI, added to support specific languages translations
+	 * For other languages, it does nothing
+	 * @param parent_retval     parent's function list of matches
+	 * @param retval            the list of matches
+	 * @param word              pointer to the word to look up
+	 * @param word_len          length of the word to look up
+	 */
+	void lookupWordPrefix(ResultWordListList &parent_retval, ResultWordList &retval, const char *word, int word_len);
+
+	/**
+	 * Helper function for lookupWordPrefix, checking specific prefix for match
+	 * Intended for nouns and prepositions, and the prefix has meaning as another word
+	 * @param parent_retval     lookupWordPrefix's parent's function list of matches
+	 * @param retval            lookupWordPrefix's list of matches
+	 * @param word              pointer to the word to look up
+	 * @param word_len          length of the word to look up
+	 * @param prefix            the prefix to look for in the word
+	 * @param meaning           the meaning of that prefix
+	 * @return true on prefix match, false on prefix not matching
+	 */
+	bool lookupSpecificPrefixWithMeaning(ResultWordListList &parent_retval, ResultWordList &retval, const char *word, int word_len, unsigned char prefix, const char *meaning);
+
+	/**
+	 * Helper function for lookupWordPrefix, checking specific prefix for match
+	 * Intended for verbs, and the prefix doesn't have any meaning
+	 * @param parent_retval     lookupWordPrefix's parent's function list of matches
+	 * @param retval            lookupWordPrefix's list of matches
+	 * @param word              pointer to the word to look up
+	 * @param word_len          length of the word to look up
+	 * @param prefix            the prefix to look for in the word
+	 * @return true on prefix match, false on prefix not matching
+	 */
+	bool lookupVerbPrefix(ResultWordListList &parent_retval, ResultWordList &retval, Common::String word, int word_len, Common::String prefix);
 
 	/**
 	 * Tokenizes a string and compiles it into word_ts.
@@ -371,6 +405,11 @@ private:
 	SynonymList _synonyms; /**< The list of synonyms */
 	Common::Array<Common::List<AltInput> > _altInputs;
 
+	struct PrefixMeaning {
+		unsigned char prefix;
+		const char *meaning;
+	};
+
 	int _pronounReference;
 
 public:
@@ -401,4 +440,4 @@ int said(const byte *spec, bool verbose);
 
 } // End of namespace Sci
 
-#endif // SCI_SCICORE_VOCABULARY_H
+#endif // SCI_PARSER_VOCABULARY_H

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -153,11 +152,11 @@ void AIScripts::timerExpired(int actor, int timer) {
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
 		_AIScripts[actor]->TimerExpired(timer);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 void AIScripts::completedMovementTrack(int actor) {
@@ -166,11 +165,11 @@ void AIScripts::completedMovementTrack(int actor) {
 	}
 
 	if (!_vm->_actors[actor]->inCombat()) {
-		_inScriptCounter++;
+		++_inScriptCounter;
 		if (_AIScripts[actor]) {
 			_AIScripts[actor]->CompletedMovementTrack();
 		}
-		_inScriptCounter--;
+		--_inScriptCounter;
 	}
 }
 
@@ -179,11 +178,11 @@ void AIScripts::receivedClue(int actor, int clueId, int fromActorId) {
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
 		_AIScripts[actor]->ReceivedClue(clueId, fromActorId);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 void AIScripts::clickedByPlayer(int actor) {
@@ -192,79 +191,79 @@ void AIScripts::clickedByPlayer(int actor) {
 	}
 
 
-	if(_vm->_actors[actor]->inCombat()) {
+	if (_vm->_actors[actor]->inCombat()) {
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
 		_AIScripts[actor]->ClickedByPlayer();
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
-void AIScripts::enteredScene(int actor, int setId) {
+void AIScripts::enteredSet(int actor, int setId) {
 	if (actor >= _actorCount) {
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
-		_AIScripts[actor]->EnteredScene(setId);
+		_AIScripts[actor]->EnteredSet(setId);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
-void AIScripts::otherAgentEnteredThisScene(int actor, int otherActorId) {
+void AIScripts::otherAgentEnteredThisSet(int actor, int otherActorId) {
 	if (actor >= _actorCount) {
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
-		_AIScripts[actor]->OtherAgentEnteredThisScene(otherActorId);
+		_AIScripts[actor]->OtherAgentEnteredThisSet(otherActorId);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
-void AIScripts::otherAgentExitedThisScene(int actor, int otherActorId) {
+void AIScripts::otherAgentExitedThisSet(int actor, int otherActorId) {
 	if (actor >= _actorCount) {
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
-		_AIScripts[actor]->OtherAgentExitedThisScene(otherActorId);
+		_AIScripts[actor]->OtherAgentExitedThisSet(otherActorId);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 void AIScripts::otherAgentEnteredCombatMode(int actorId, int otherActorId, int combatMode) {
 	assert(actorId < _actorCount);
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actorId]) {
 		_AIScripts[actorId]->OtherAgentEnteredCombatMode(otherActorId, combatMode);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 void AIScripts::shotAtAndMissed(int actorId) {
 	assert(actorId < _actorCount);
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actorId]) {
 		_AIScripts[actorId]->ShotAtAndMissed();
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 bool AIScripts::shotAtAndHit(int actorId) {
 	assert(actorId < _actorCount);
 	bool result = true;
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actorId]) {
 		result = _AIScripts[actorId]->ShotAtAndHit();
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 	return result;
 }
 
@@ -273,11 +272,11 @@ void AIScripts::retired(int actor, int retiredByActorId) {
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
 		_AIScripts[actor]->Retired(retiredByActorId);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 void AIScripts::goalChanged(int actor, int currentGoalNumber, int newGoalNumber) {
@@ -285,11 +284,11 @@ void AIScripts::goalChanged(int actor, int currentGoalNumber, int newGoalNumber)
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
 		_AIScripts[actor]->GoalChanged(currentGoalNumber, newGoalNumber);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 bool AIScripts::reachedMovementTrackWaypoint(int actor, int waypointId) {
@@ -299,11 +298,11 @@ bool AIScripts::reachedMovementTrackWaypoint(int actor, int waypointId) {
 
 	bool result = false;
 	if (!_vm->_actors[actor]->inCombat()) {
-		_inScriptCounter++;
+		++_inScriptCounter;
 		if (_AIScripts[actor]) {
 			result = _AIScripts[actor]->ReachedMovementTrackWaypoint(waypointId);
 		}
-		_inScriptCounter--;
+		--_inScriptCounter;
 	}
 	return result;
 }
@@ -313,11 +312,11 @@ void AIScripts::updateAnimation(int actor, int *animation, int *frame) {
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
 		_AIScripts[actor]->UpdateAnimation(animation, frame);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 void AIScripts::changeAnimationMode(int actor, int mode) {
@@ -325,11 +324,11 @@ void AIScripts::changeAnimationMode(int actor, int mode) {
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
 		_AIScripts[actor]->ChangeAnimationMode(mode);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 void AIScripts::fledCombat(int actor) {
@@ -337,11 +336,11 @@ void AIScripts::fledCombat(int actor) {
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
 		_AIScripts[actor]->FledCombat();
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 void AIScripts::setAnimationState(int actor, int animationState, int animationFrame, int animationStateNext, int animationNext) {
@@ -349,25 +348,24 @@ void AIScripts::setAnimationState(int actor, int animationState, int animationFr
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
 		_AIScripts[actor]->SetAnimationState(animationState, animationFrame, animationStateNext, animationNext);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 
 void AIScripts::queryAnimationState(int actor, int *animationState, int *animationFrame, int *animationStateNext, int *animationNext) {
-		if (actor >= _actorCount) {
+	if (actor >= _actorCount) {
 		return;
 	}
 
-	_inScriptCounter++;
+	++_inScriptCounter;
 	if (_AIScripts[actor]) {
-		_AIScripts[actor]->FledCombat();
 		_AIScripts[actor]->QueryAnimationState(animationState, animationFrame, animationStateNext, animationNext);
 	}
-	_inScriptCounter--;
+	--_inScriptCounter;
 }
 
 

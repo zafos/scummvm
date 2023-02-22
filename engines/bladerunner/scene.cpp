@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -87,10 +86,14 @@ bool Scene::open(int setId, int sceneId, bool isLoadingGame) {
 	const Common::String sceneName = _vm->_gameInfo->getSceneName(_sceneId);
 
 	if (isLoadingGame) {
-		// TODO: _vm->overlays->resume()
+		_vm->_overlays->resume(true);
 	} else {
 		_regions->clear();
 		_exits->clear();
+#if BLADERUNNER_ORIGINAL_BUGS
+#else
+		_vm->_screenEffects->toggleEntry(-1, false); // clear the skip list
+#endif
 		_vm->_screenEffects->_entries.clear();
 		_vm->_overlays->removeAll();
 		_defaultLoop = 0;
@@ -113,7 +116,7 @@ bool Scene::open(int setId, int sceneId, bool isLoadingGame) {
 		delete _vqaPlayer;
 	}
 
-	_vqaPlayer = new VQAPlayer(_vm, &_vm->_surfaceBack);
+	_vqaPlayer = new VQAPlayer(_vm, &_vm->_surfaceBack, vqaName);
 
 	if (!_vm->_sceneScript->open(sceneName)) {
 		return false;
@@ -130,21 +133,42 @@ bool Scene::open(int setId, int sceneId, bool isLoadingGame) {
 
 	_vm->_sliceRenderer->setView(_vm->_view);
 
+	if ((setId == kSetMA02_MA04 || setId == kSetMA04)
+	    && sceneId == kSceneMA04) {
+		_vm->setExtraCNotify(0);
+	}
+
 	if (isLoadingGame) {
 		resume(true);
-		if (sceneId == kScenePS10 || sceneId == kScenePS11 || sceneId == kScenePS12 || sceneId == kScenePS13) { // police maze?
+		if (sceneId == kScenePS10    // police maze
+		    || sceneId == kScenePS11 // police maze
+		    || sceneId == kScenePS12 // police maze
+		    || sceneId == kScenePS13 // police maze
+#if BLADERUNNER_ORIGINAL_BUGS
+#else
+		    || sceneId == kSceneUG01 // Steam room
+#endif // BLADERUNNER_ORIGINAL_BUGS
+		) {
 			_vm->_sceneScript->sceneLoaded();
 		}
 		return true;
 	}
 
-	if (!_vqaPlayer->open(vqaName)) {
+	if (!_vqaPlayer->open()) {
 		return false;
 	}
 
 	if (_specialLoopMode == kSceneLoopModeNone) {
 		startDefaultLoop();
 	}
+
+	// This frame advancement (frame skip) may be required here
+	// It is in the original code and possible initializes some variables
+	// (or perhaps z-buffering related stuff)
+	// It may cause issues when in a scene we need to trigger some action
+	// based on the first frame of the loop when entering the scene (using SceneFrameAdvanced())
+	// (eg. it is contributing to the barrel flame glitch in pan from DR04 to DR01)
+	// However, better to resolve those issues with a workaround (eg. using InitializeScene())
 	advanceFrame();
 
 	_vm->_playerActor->setAtXYZ(_actorStartPosition, _actorStartFacing);
@@ -159,22 +183,26 @@ bool Scene::open(int setId, int sceneId, bool isLoadingGame) {
 	for (int i = 0; i != actorCount; ++i) {
 		Actor *actor = _vm->_actors[i];
 		if (actor->getSetId() == setId) {
+			//debug("Actor added: %d", i);
+#if !BLADERUNNER_ORIGINAL_BUGS
+			// ensure that actors' "hotspot" areas from previous scene are cleared up
+			actor->resetScreenRectangleAndBbox();
+#endif
 			_vm->_sceneObjects->addActor(
-				   i + kSceneObjectOffsetActors,
-				   actor->getBoundingBox(),
-				   actor->getScreenRectangle(),
-				   true,
-				   false,
-				   actor->isTarget(),
-				   actor->isRetired());
+				i + kSceneObjectOffsetActors,
+				actor->getBoundingBox(),
+				actor->getScreenRectangle(),
+				true,
+				false,
+				actor->isTarget(),
+				actor->isRetired()
+			);
 		}
 	}
 
 	_set->addObjectsToScene(_vm->_sceneObjects);
 	_vm->_items->addToSet(setId);
 	_vm->_sceneObjects->updateObstacles();
-	// TODO: add all items to scene
-	// TODO: calculate walking obstacles??
 
 	if (_specialLoopMode != kSceneLoopModeLoseControl) {
 		_vm->_sceneScript->playerWalkedIn();
@@ -209,8 +237,8 @@ bool Scene::close(bool isLoadingGame) {
 	return result;
 }
 
-int Scene::advanceFrame() {
-	int frame = _vqaPlayer->update();
+int Scene::advanceFrame(bool useTime) {
+	int frame = _vqaPlayer->update(false, true, useTime);
 	if (frame >= 0) {
 		blit(_vm->_surfaceBack, _vm->_surfaceFront);
 		_vqaPlayer->updateZBuffer(_vm->_zbuffer);
@@ -219,7 +247,7 @@ int Scene::advanceFrame() {
 		_vqaPlayer->updateLights(_vm->_lights);
 	}
 
-	if (_specialLoopMode == kSceneLoopModeLoseControl || _specialLoopMode == kSceneLoopModeOnce || _specialLoopMode == kSceneLoopModeSpinner) {
+	if (_specialLoopMode == kSceneLoopModeLoseControl || _specialLoopMode == kSceneLoopModeOnce || _specialLoopMode == kSceneLoopModeOnceNStay || _specialLoopMode == kSceneLoopModeSpinner) {
 		if (!_defaultLoopSet) {
 			_vqaPlayer->setLoop(_defaultLoop, -1, kLoopSetModeEnqueue, &Scene::loopEndedStatic, this);
 			_defaultLoopSet = true;
@@ -253,7 +281,9 @@ void Scene::resume(bool isLoadingGame) {
 
 	int targetFrame = _frame;
 
-	if (!isLoadingGame) {
+	if (isLoadingGame) {
+		_vqaPlayer->open();
+	} else {
 		_vm->_zbuffer->disable();
 	}
 
@@ -266,14 +296,13 @@ void Scene::resume(bool isLoadingGame) {
 		if (_defaultLoopPreloadedSet) {
 			_specialLoopMode = kSceneLoopModeNone;
 			startDefaultLoop();
-			advanceFrame();
+			advanceFrame(false);
 			loopStartSpecial(_specialLoopMode, _specialLoop, false);
 		} else {
 			_defaultLoopPreloadedSet = true;
 			loopStartSpecial(_specialLoopMode, _specialLoop, true);
 			if (_specialLoopMode == kSceneLoopModeLoseControl || _specialLoopMode == kSceneLoopModeChangeSet) {
 				_vm->playerGainsControl();
-
 			}
 		}
 		if (_specialLoopMode == kSceneLoopModeChangeSet) {
@@ -281,9 +310,19 @@ void Scene::resume(bool isLoadingGame) {
 		}
 	}
 
-	int frame;
+	int frame, frameStart, frameEnd;
 	do {
-		frame = advanceFrame();
+		// fast forward to targetFrame but do, at the very least, one advanceFrame() (with time=false)
+		frame = advanceFrame(false);
+		// check if active loop has changed, and we need to adjust targetFrame
+		if (_vqaPlayer->getCurrentBeginAndEndFrame(frame, &frameStart, &frameEnd)
+		    && targetFrame >= 0
+		    && (targetFrame < frameStart || targetFrame > frameEnd)
+		) {
+			// active loop has changed, and targetFrame has a remnant frame value from the previous loop's frameset,
+			// so set it to the current loop's start
+			targetFrame = frameStart;
+		}
 	} while (frame >= 0 && frame != targetFrame);
 
 	if (!isLoadingGame) {
@@ -311,7 +350,7 @@ void Scene::loopStartSpecial(int specialLoopMode, int loopId, bool immediately) 
 	_specialLoop = loopId;
 
 	int repeats = -1;
-	if (_specialLoopMode == kSceneLoopModeChangeSet) {
+	if (_specialLoopMode == kSceneLoopModeChangeSet || _specialLoopMode == kSceneLoopModeOnceNStay) {
 		repeats = 0;
 	}
 
@@ -362,7 +401,7 @@ void Scene::objectSetIsObstacle(int objectId, bool isObstacle, bool sceneLoaded,
 
 void Scene::objectSetIsObstacleAll(bool isObstacle, bool sceneLoaded) {
 	int i;
-	for (i = 0; i < (int)_set->getObjectCount(); i++) {
+	for (i = 0; i < (int)_set->getObjectCount(); ++i) {
 		_set->objectSetIsObstacle(i, isObstacle);
 		if (sceneLoaded) {
 			_vm->_sceneObjects->setIsObstacle(i + kSceneObjectOffsetObjects, isObstacle);

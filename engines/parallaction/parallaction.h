@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -37,6 +36,7 @@
 #include "parallaction/inventory.h"
 #include "parallaction/objects.h"
 #include "parallaction/disk.h"
+#include "parallaction/detection.h"
 
 #define PATH_LEN	200
 
@@ -65,16 +65,6 @@ enum {
 	kDebugInventory = 1 << 9
 };
 
-enum {
-	GF_DEMO = 1 << 0,
-	GF_LANG_EN = 1 << 1,
-	GF_LANG_FR = 1 << 2,
-	GF_LANG_DE = 1 << 3,
-	GF_LANG_IT = 1 << 4,
-	GF_LANG_MULT = 1 << 5
-};
-
-
 enum EngineFlags {
 	kEnginePauseJobs	= (1 << 1),
 	kEngineWalking		= (1 << 3),
@@ -94,12 +84,6 @@ enum {
 	kEvIngameMenu   = 8000
 };
 
-enum ParallactionGameType {
-	GType_Nippon = 1,
-	GType_BRA
-};
-
-struct PARALLACTIONGameDescription;
 
 
 
@@ -258,12 +242,12 @@ private:
 
 public:
 	Parallaction(OSystem *syst, const PARALLACTIONGameDescription *gameDesc);
-	~Parallaction();
+	~Parallaction() override;
 
 	// Engine APIs
 	virtual Common::Error init();
 	virtual Common::Error go() = 0;
-	virtual Common::Error run() {
+	Common::Error run() override {
 		Common::Error err;
 		err = init();
 		if (err.getCode() != Common::kNoError)
@@ -271,9 +255,8 @@ public:
 		return go();
 	}
 
-	virtual bool hasFeature(EngineFeature f) const;
-	virtual void pauseEngineIntern(bool pause);
-	virtual GUI::Debugger *getDebugger();
+	bool hasFeature(EngineFeature f) const override;
+	void pauseEngineIntern(bool pause) override;
 
 	// info
 	int32			_screenWidth;
@@ -285,7 +268,6 @@ public:
 	Gfx				*_gfx;
 	Disk			*_disk;
 	Input			*_input;
-	Debugger		*_debugger;
 	SaveLoad		*_saveLoad;
 	MenuInputHelper *_menuHelper;
 	Common::RandomSource _rnd;
@@ -375,7 +357,6 @@ public:
 	bool		isItemInInventory(int32 v);
 	const		InventoryItem* getInventoryItem(int16 pos);
 	int16		getInventoryItemIndex(int16 pos);
-	void		cleanInventory(bool keepVerbs = true);
 	void		openInventory();
 	void		closeInventory();
 
@@ -397,11 +378,11 @@ class Parallaction_ns : public Parallaction {
 
 public:
 	Parallaction_ns(OSystem* syst, const PARALLACTIONGameDescription *gameDesc);
-	~Parallaction_ns();
+	~Parallaction_ns() override;
 
 	// Engine APIs
-	virtual Common::Error init();
-	virtual Common::Error go();
+	Common::Error init() override;
+	Common::Error go() override;
 
 	SoundMan_ns*	_soundManI;
 
@@ -410,17 +391,17 @@ public:
 
 
 public:
-	virtual void parseLocation(const char *filename);
-	virtual void changeLocation();
-	virtual void changeCharacter(const char *name);
-	virtual void callFunction(uint index, void* parm);
-	virtual void runPendingZones();
-	virtual void cleanupGame();
-	virtual void updateWalkers();
-	virtual void scheduleWalk(int16 x, int16 y, bool fromUser);
-	virtual DialogueManager *createDialogueManager(ZonePtr z);
-	virtual bool processGameEvent(int event);
-
+	void parseLocation(const char *filename) override;
+	void changeLocation() override;
+	void changeCharacter(const char *name) override;
+	void callFunction(uint index, void* parm) override;
+	void runPendingZones() override;
+	void cleanupGame() override;
+	void updateWalkers() override;
+	void scheduleWalk(int16 x, int16 y, bool fromUser) override;
+	DialogueManager *createDialogueManager(ZonePtr z) override;
+	bool processGameEvent(int event) override;
+	void cleanInventory(bool keepVerbs);
 	void	changeBackground(const char *background, const char *mask = 0, const char *path = 0);
 
 private:
@@ -509,25 +490,28 @@ class Parallaction_br : public Parallaction {
 
 public:
 	Parallaction_br(OSystem* syst, const PARALLACTIONGameDescription *gameDesc);
-	~Parallaction_br();
+	~Parallaction_br() override;
 
-	virtual Common::Error init();
-	virtual Common::Error go();
+	Common::Error init() override;
+	Common::Error go() override;
 
 public:
-	virtual void parseLocation(const char* name);
-	virtual void changeLocation();
-	virtual void changeCharacter(const char *name);
-	virtual	void callFunction(uint index, void* parm);
-	virtual void runPendingZones();
-	virtual void cleanupGame();
-	virtual void updateWalkers();
-	virtual void scheduleWalk(int16 x, int16 y, bool fromUser);
-	virtual DialogueManager *createDialogueManager(ZonePtr z);
-	virtual bool processGameEvent(int event);
+	void parseLocation(const char* name) override;
+	void changeLocation() override;
+	void changeCharacter(const char *name) override;
+		void callFunction(uint index, void* parm) override;
+	void runPendingZones() override;
+	void cleanupGame() override;
+	void updateWalkers() override;
+	void scheduleWalk(int16 x, int16 y, bool fromUser) override;
+	DialogueManager *createDialogueManager(ZonePtr z) override;
+	bool processGameEvent(int event) override;
 
-	void setupSubtitles(char *s, char *s2, int y);
+	void setupSubtitles(const char *s, const char *s2, int y);
 	void clearSubtitles();
+
+	Inventory *findInventory(const char *name);
+	void linkUnlinkedZoneAnimations();
 
 	void testCounterCondition(const Common::String &name, int op, int value);
 	void restoreOrSaveZoneFlags(ZonePtr z, bool restore);
@@ -559,12 +543,13 @@ public:
 	ZonePtr		_activeZone2;
 	uint32		_zoneFlags[NUM_LOCATIONS][NUM_ZONES];
 
-
 private:
 	LocationParser_br		*_locationParser;
 	ProgramParser_br		*_programParser;
 	SoundMan_br				*_soundManI;
-	Inventory				*_charInventories[3];	// all the inventories
+	Inventory				*_dinoInventory;
+	Inventory				*_donnaInventory;
+	Inventory				*_dougInventory;
 
 	int32		_counters[32];
 	Table		*_countersNames;
@@ -573,6 +558,8 @@ private:
 	void	initResources();
 	void	initInventory();
 	void	destroyInventory();
+
+	void	cleanInventory(bool keepVerbs);
 	void	setupBalloonManager();
 	void	initFonts();
 	void	freeFonts();
@@ -590,6 +577,7 @@ private:
 	Common::String		_followerName;
 	AnimationPtr		_follower;
 	PathWalker_BR		*_walker;
+	int					_ferrcycleMode;
 
 	// dos callables
 	void _c_null(void *);

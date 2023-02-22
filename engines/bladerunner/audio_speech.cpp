@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,12 +27,13 @@
 #include "bladerunner/audio_player.h"
 #include "bladerunner/bladerunner.h"
 
-#include "common/debug.h"
 #include "common/str.h"
 
 namespace BladeRunner {
 
-const int AudioSpeech::kSpeechSamples[] = { 65, 355, 490, 465, 480, 485, 505, 760, 7655, 7770, 7740, 8170, 2705, 7200, 6460, 5560, 4870, 4555, 3880, 3525, 3595, 3250, 3070 };
+// Note: Speech samples here should be from A.TLK file
+const int kSpeechSamplesNumber = 23;
+const int AudioSpeech::kSpeechSamples[kSpeechSamplesNumber] = { 65, 355, 490, 465, 480, 485, 505, 760, 7655, 7770, 7740, 8170, 2705, 7200, 6460, 5560, 4870, 4555, 3880, 3525, 3595, 3250, 3070 };
 
 void AudioSpeech::ended() {
 	//Common::StackLock lock(_mutex);
@@ -48,19 +48,33 @@ void AudioSpeech::mixerChannelEnded(int channel, void *data) {
 
 AudioSpeech::AudioSpeech(BladeRunnerEngine *vm) {
 	_vm = vm;
-	_speechVolume = 50;
+	// _speechVolume here sets a percentage to be appied on the specified voice cue volume
+	// before sending it to the audio player
+	// (setting _speechVolume to 100 renders it indifferent)
+	_speechVolume = BLADERUNNER_ORIGINAL_SETTINGS ? 50 : 100;
 	_isActive = false;
 	_data = new byte[kBufferSize];
 	_channel = -1;
 }
 
 AudioSpeech::~AudioSpeech() {
+	stopSpeech();
+	while (isPlaying()) {
+		// wait for the mixer to finish
+	}
+
 	delete[] _data;
 }
 
 bool AudioSpeech::playSpeech(const Common::String &name, int pan) {
-	// debug("AudioSpeech::playSpeech(\"%s\")", name);
-	Common::ScopedPtr<Common::SeekableReadStream> r(_vm->getResourceStream(name));
+	if (isPlaying()) {
+		stopSpeech();
+	}
+
+	// Audio cache is not usable as hash function is producing collision for speech lines.
+	// It was not used in the original game either
+
+	Common::ScopedPtr<Common::SeekableReadStream> r(_vm->getResourceStream(_vm->_enhancedEdition ? ("audio/" + name) : name));
 
 	if (!r) {
 		warning("AudioSpeech::playSpeech: AUD resource \"%s\" not found", name.c_str());
@@ -68,7 +82,7 @@ bool AudioSpeech::playSpeech(const Common::String &name, int pan) {
 	}
 
 	if (r->size() > kBufferSize) {
-		warning("AudioSpeech::playSpeech: AUD larger than buffer size (%d > %d)", r->size(), kBufferSize);
+		warning("AudioSpeech::playSpeech: AUD larger than buffer size (%d > %d)", (int)r->size(), kBufferSize);
 		return false;
 	}
 
@@ -82,9 +96,7 @@ bool AudioSpeech::playSpeech(const Common::String &name, int pan) {
 		return false;
 	}
 
-	AudStream *audioStream = new AudStream(_data);
-
-	// TODO: shorty mode - set rate of sound to 33khz
+	AudStream *audioStream = new AudStream(_data, _vm->_shortyMode ? 33000 : -1);
 
 	_channel = _vm->_audioMixer->play(
 		Audio::Mixer::kSpeechSoundType,
@@ -94,7 +106,8 @@ bool AudioSpeech::playSpeech(const Common::String &name, int pan) {
 		_speechVolume,
 		pan,
 		mixerChannelEnded,
-		this);
+		this,
+		audioStream->getLength());
 
 	_isActive = true;
 
@@ -104,7 +117,7 @@ bool AudioSpeech::playSpeech(const Common::String &name, int pan) {
 void AudioSpeech::stopSpeech() {
 	//Common::StackLock lock(_mutex);
 	if (_channel != -1) {
-		_vm->_audioMixer->stop(_channel, 0);
+		_vm->_audioMixer->stop(_channel, 0u);
 	}
 }
 
@@ -116,21 +129,30 @@ bool AudioSpeech::isPlaying() const {
 }
 
 bool AudioSpeech::playSpeechLine(int actorId, int sentenceId, int volume, int a4, int priority) {
-	int balance = _vm->_actors[actorId]->soundBalance();
+	int pan = _vm->_actors[actorId]->soundPan();
 	Common::String name = Common::String::format("%02d-%04d%s.AUD", actorId, sentenceId, _vm->_languageCode.c_str());
-	return _vm->_audioPlayer->playAud(name, _speechVolume * volume / 100, balance, balance, priority, kAudioPlayerOverrideVolume);
+	return _vm->_audioPlayer->playAud(name, _speechVolume * volume / 100, pan, pan, priority, kAudioPlayerOverrideVolume, Audio::Mixer::kSpeechSoundType);
 }
 
-void AudioSpeech::setVolume(int volume) {
-	_speechVolume = volume;
-}
+// We no longer set the _speechVolume (speech default volume percent) via a public method
+// It is set in AudioSpeech::AudioSpeech() constructor and keeps its value constant.
+//void AudioSpeech::setVolume(int volume) {
+//	_speechVolume = volume;
+//}
 
 int AudioSpeech::getVolume() const {
 	return _speechVolume;
 }
 
 void AudioSpeech::playSample() {
-	_vm->_playerActor->speechPlay(kSpeechSamples[_vm->_rnd.getRandomNumber(22)], true);
+#if BLADERUNNER_ORIGINAL_BUGS
+	_vm->_playerActor->speechPlay(kSpeechSamples[_vm->_rnd.getRandomNumber(kSpeechSamplesNumber-1)], true);
+#else
+	if (_vm->openArchive("A.TLK")) {
+		// load sample speech even when in initial KIA screen (upon launch - but before loading a game)
+		_vm->_playerActor->speechPlay(kSpeechSamples[_vm->_rnd.getRandomNumber(kSpeechSamplesNumber-1)], true);
+	}
+#endif // BLADERUNNER_ORIGINAL_BUGS
 }
 
 } // End of namespace BladeRunner

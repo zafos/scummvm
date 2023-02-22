@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -56,7 +55,6 @@ bool GameInfo::open(const Common::String &name) {
 		return false;
 	}
 
-	uint32 unk;
 	_actorCount           = s->readUint32LE();   /* 00 */
 	_playerId             = s->readUint32LE();   /* 01 */
 	_flagCount            = s->readUint32LE();   /* 02 */
@@ -64,9 +62,9 @@ bool GameInfo::open(const Common::String &name) {
 	_globalVarCount       = s->readUint32LE();   /* 04 */
 	_sceneNamesCount      = s->readUint32LE();   /* 05 */
 	_initialSceneId       = s->readUint32LE();   /* 06 */
-	unk                   = s->readUint32LE();   /* 07 */
+	                        s->skip(4);          /* 07 */
 	_initialSetId         = s->readUint32LE();   /* 08 */
-	unk                   = s->readUint32LE();   /* 09 */
+	                        s->skip(4);          /* 09 */
 	_waypointCount        = s->readUint32LE();   /* 10 */
 	_sfxTrackCount        = s->readUint32LE();   /* 11 */
 	_musicTrackCount      = s->readUint32LE();   /* 12 */
@@ -75,8 +73,6 @@ bool GameInfo::open(const Common::String &name) {
 	_suspectCount         = s->readUint32LE();   /* 15 */
 	_coverWaypointCount   = s->readUint32LE();   /* 16 */
 	_fleeWaypointCount    = s->readUint32LE();   /* 17 */
-
-	(void)unk;
 
 	char buf[9];
 
@@ -109,23 +105,27 @@ bool GameInfo::open(const Common::String &name) {
 #if BLADERUNNER_DEBUG_CONSOLE
 	debug("\nScene names\n----------------");
 	for (uint32 i = 0; i != _sceneNamesCount; ++i) {
-		debug("%3d: %s", i, _sceneNames[i]);
+		debug("%3d: %s", i, _sceneNames[i].c_str());
 	}
 
 	debug("\nSfx tracks\n----------------");
 	for (uint32 i = 0; i != _sfxTrackCount; ++i) {
-		debug("%3d: %s", i, _sfxTracks[i]);
+		debug("%3d: %s", i, _sfxTracks[i].c_str());
 	}
 
 	debug("\nMusic tracks\n----------------");
 	for (uint32 i = 0; i != _musicTrackCount; ++i) {
-		debug("%3d: %s", i, _musicTracks[i]);
+		debug("%3d: %s", i, _musicTracks[i].c_str());
 	}
 
 	debug("\nOuttakes\n----------------");
 	for (uint32 i = 0; i != _outtakeCount; ++i) {
-		debug("%2d: %s.VQA", i, _outtakes[i]);
+		debug("%2d: %s.VQA", i, _outtakes[i].c_str());
 	}
+
+	debug("Clue Count: %d ", _clueCount);
+	debug("Crime Count: %d ", _crimeCount);
+	debug("Suspect Count: %d ", _suspectCount);
 #endif
 
 	bool err = s->err();

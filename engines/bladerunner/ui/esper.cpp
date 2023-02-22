@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -35,8 +34,10 @@
 #include "bladerunner/shape.h"
 #include "bladerunner/script/esper_script.h"
 #include "bladerunner/text_resource.h"
+#include "bladerunner/time.h"
 #include "bladerunner/ui/ui_image_picker.h"
 #include "bladerunner/vqa_player.h"
+#include "bladerunner/subtitles.h"
 
 #include "common/rect.h"
 #include "common/str.h"
@@ -49,26 +50,28 @@ ESPER::ESPER(BladeRunnerEngine *vm) {
 	_screen = Common::Rect(135, 123, 435, 387);
 
 	_isWaiting          = false;
-	_shapeButton        = nullptr;
-	_shapeThumbnail     = nullptr;
 	_regionSelectedAck  = false;
 	_isDrawingSelection = false;
 
-	_isOpen         = false;
-	_shapeButton    = nullptr;
-	_shapeThumbnail = nullptr;
-	_vqaPlayerMain  = nullptr;
-	_vqaPlayerPhoto = nullptr;
-	_script         = nullptr;
-
-	reset();
+	_isOpen             = false;
+	_shapesButtons      = new Shapes(vm);
+	_shapesPhotos       = new Shapes(vm);
+	_shapeThumbnail     = nullptr;
+	_vqaPlayerMain      = nullptr;
+	_vqaPlayerPhoto     = nullptr;
+	_script             = nullptr;
 
 	_buttons = new UIImagePicker(vm, kPhotoCount + 4);
+
+	reset();
 }
 
 ESPER::~ESPER() {
-	delete _buttons;
 	reset();
+
+	delete _buttons;
+	delete _shapesPhotos;
+	delete _shapesButtons;
 }
 
 void ESPER::open(Graphics::Surface *surface) {
@@ -82,7 +85,8 @@ void ESPER::open(Graphics::Surface *surface) {
 		_vm->_mouse->enable();
 	}
 
-	//TODO: time->lock()
+	_vm->_time->pause();
+
 	_ambientVolume = _vm->_ambientSounds->getVolume();
 	_vm->_ambientSounds->setVolume(_ambientVolume / 2);
 
@@ -92,23 +96,21 @@ void ESPER::open(Graphics::Surface *surface) {
 		return;
 	}
 
-	_surfacePhoto.create(kPhotoWidth, kPhotoHeight, createRGB555());
-
-	_surfaceViewport.create(_screen.width(), _screen.height(), createRGB555());
+	_surfacePhoto.create(kPhotoWidth, kPhotoHeight, gameDataPixelFormat());
+	_surfaceViewport.create(_screen.width(), _screen.height(), screenPixelFormat());
 
 	_viewportNext = _viewport;
 
-	_vm->_mainFont->setColor(0x001F);
-
-	_shapeButton = new Shape(_vm);
-	if (!_shapeButton->open("ESPBUTTN.SHP", 0)) {
+	if (!_shapesButtons->load("ESPBUTTN.SHP")) {
 		return;
 	}
 
-	_shapesPhotos.resize(10);
+	if (!_shapesPhotos->load("ESPTHUMB.SHP")) {
+		return;
+	}
 
-	_vqaPlayerMain = new VQAPlayer(_vm, &_vm->_surfaceBack);
-	if (!_vqaPlayerMain->open("ESPER.VQA")) {
+	_vqaPlayerMain = new VQAPlayer(_vm, &_vm->_surfaceBack, "ESPER.VQA");
+	if (!_vqaPlayerMain->open()) {
 		return;
 	}
 	_vqaPlayerMain->setLoop(2, -1, kLoopSetModeJustStart, nullptr, nullptr);
@@ -117,6 +119,7 @@ void ESPER::open(Graphics::Surface *surface) {
 	_flash = false;
 
 	_script = new ESPERScript(_vm);
+
 	activate(true);
 }
 
@@ -125,35 +128,29 @@ void ESPER::close() {
 	delete _script;
 	_script = nullptr;
 
-	_vm->_audioPlayer->playAud(_vm->_gameInfo->getSfxTrack(425), 25, 0, 0, 50, 0);
+	_vm->_audioPlayer->playAud(_vm->_gameInfo->getSfxTrack(kSfxBR035_7B), 25, 0, 0, 50, 0);
 
 	unloadPhotos();
-	_shapesPhotos.clear();
-
-	delete _shapeThumbnail;
-	_shapeThumbnail = nullptr;
 
 	_buttons->deactivate();
 	_buttons->resetImages();
 
-	delete _shapeButton;
-	_shapeButton = nullptr;
+	_shapesButtons->unload();
+	_shapesPhotos->unload();
 
 	_surfacePhoto.free();
-
 	_surfaceViewport.free();
 
-	if (_vqaPlayerMain) {
-		_vqaPlayerMain->close();
-		delete _vqaPlayerMain;
-		_vqaPlayerMain= nullptr;
-	}
+	delete _vqaPlayerMain;
+	_vqaPlayerMain = nullptr;
 
 	_vm->closeArchive("MODE.MIX");
 
-	//TODO: time->unlock()
+	_vm->_time->resume();
+
 	_vm->_ambientSounds->setVolume(_ambientVolume);
 	_vm->_scene->resume();
+
 	reset();
 }
 
@@ -189,7 +186,7 @@ void ESPER::handleMouseDown(int x, int y, bool mainButton) {
 		if (_statePhoto != kEsperPhotoStateVideoZoomOut) {
 			if (_screen.contains(x, y)) {
 				_isMouseDown = true;
-				playSound(460, 100);
+				playSound(kSfxBRTARGET, 100);
 			}
 			if (_mouseOverScroll >= 0 && _mouseOverScroll <= 3 && !_isScrolling) {
 				scrollingStart(_mouseOverScroll);
@@ -204,7 +201,7 @@ void ESPER::handleMouseDown(int x, int y, bool mainButton) {
 }
 
 void ESPER::tick() {
-	if (!_vm->_gameIsRunning) {
+	if (!_vm->_windowIsActive) {
 		return;
 	}
 
@@ -227,11 +224,8 @@ void ESPER::tick() {
 	drawMouse(_vm->_surfaceFront);
 
 	tickSound();
-
+	_vm->_subtitles->tick(_vm->_surfaceFront);
 	_vm->blitToScreen(_vm->_surfaceFront);
-
-	// TODO: implement 60hz lock for smoother experience
-	_vm->_system->delayMillis(10);
 
 	if (_statePhoto == kEsperPhotoStateVideoShow) {
 		if (_regionSelectedAck)	{
@@ -239,10 +233,6 @@ void ESPER::tick() {
 			_script->specialRegionSelected(_photoIdSelected, _regions[_regionSelected].regionId);
 		}
 	}
-}
-
-void ESPER::resume() {
-	//TODO
 }
 
 void ESPER::addPhoto(const char *name, int photoId, int shapeId) {
@@ -253,11 +243,6 @@ void ESPER::addPhoto(const char *name, int photoId, int shapeId) {
 		_photos[i].photoId   = photoId;
 		_photos[i].name      = name;
 
-		assert((uint)shapeId < _shapesPhotos.size());
-
-		_shapesPhotos[shapeId] = new Shape(_vm);
-		_shapesPhotos[shapeId]->open("ESPTHUMB.SHP", shapeId);
-
 		_buttons->defineImage(i,
 			Common::Rect(
 				100 * (i % 3) + _screen.left + 3,
@@ -265,12 +250,12 @@ void ESPER::addPhoto(const char *name, int photoId, int shapeId) {
 				100 * (i % 3) + _screen.left + 100 - 3,
 				 66 * (i / 3) + _screen.top  +  66 - 3
 			),
-			_shapesPhotos[shapeId],
-			_shapesPhotos[shapeId],
-			_shapesPhotos[shapeId],
+			_shapesPhotos->get(shapeId),
+			_shapesPhotos->get(shapeId),
+			_shapesPhotos->get(shapeId),
 			nullptr);
 	}
-	playSound(420, 25);
+	playSound(kSfxBR028_2A, 25);
 	wait(300);
 	tick();
 }
@@ -299,9 +284,7 @@ void ESPER::mouseUpCallback(int buttonId, void *callbackData) {
 	if (buttonId < kPhotoCount) {
 		self->selectPhoto(buttonId);
 	} else if (self->_statePhoto != kEsperPhotoStateVideoZoomOut) {
-		if (buttonId == kPhotoCount + 1) {
-			// TODO: is it even used?
-		} else if (buttonId == kPhotoCount + 2) {
+		if (buttonId == kPhotoCount + 2) {
 			self->zoomOutStop();
 		} else if (buttonId == kPhotoCount + 3) {
 			self->goBack();
@@ -311,14 +294,10 @@ void ESPER::mouseUpCallback(int buttonId, void *callbackData) {
 
 void ESPER::reset() {
 	_surfacePhoto.free();
-
 	_surfaceViewport.free();
 
-	delete _shapeButton;
-	_shapeButton = nullptr;
-
-	delete _shapeThumbnail;
-	_shapeThumbnail = nullptr;
+	_shapesButtons->unload();
+	_shapesPhotos->unload();
 
 	delete _vqaPlayerMain;
 	_vqaPlayerMain = nullptr;
@@ -331,21 +310,14 @@ void ESPER::reset() {
 
 	_isOpen = false;
 
-	_shapesPhotos.clear();
 	resetData();
 }
 
 void ESPER::resetData() {
-	if (_vqaPlayerPhoto) {
-		_vqaPlayerPhoto->close();
-		delete _vqaPlayerPhoto;
-		_vqaPlayerPhoto = nullptr;
-	}
+	delete _vqaPlayerPhoto;
+	_vqaPlayerPhoto = nullptr;
 
-	if (_shapeThumbnail) {
-		delete _shapeThumbnail;
-		_shapeThumbnail = nullptr;
-	}
+	_shapeThumbnail = nullptr;
 
 	_viewport     = Common::Rect();
 	_viewportNext = Common::Rect();
@@ -367,7 +339,7 @@ void ESPER::resetData() {
 	_flash              = false;
 	_isScrolling        = false;
 
-	_timeScrollNext = 0;
+	_timeScrollNextStart = 0u;
 
 	resetPhotos();
 	resetRegions();
@@ -402,7 +374,7 @@ void ESPER::resetViewport() {
 	_zoom           = _zoomVertical;
 	_zoomMin        = _zoom;
 
-	_timeZoomOutNext = 0;
+	_timeZoomOutNextStart = 0u;
 
 	_viewportPositionX = kPhotoWidth  / 2;
 	_viewportPositionY = kPhotoHeight / 2;
@@ -420,20 +392,22 @@ void ESPER::resetSelectionRect() {
 }
 
 void ESPER::resetSelectionBlinking() {
-	_selectionBlinkingCounter  = 0;
-	_selectionBlinkingStyle    = 0;
-	_timeSelectionBlinkingNext = 0;
+	_selectionBlinkingCounter       = 0;
+	_selectionBlinkingStyle         = 0;
+	_timeSelectionBlinkingNextStart = 0u;
 }
 
 void ESPER::resetPhotoZooming() {
 	_zoomStep     = 0;
-	_timeZoomNext = 0;
+	_timeZoomNextDiff  = 0u;
+	_timeZoomNextStart = 0u;
 }
 
 void ESPER::resetPhotoOpening() {
 	_photoOpeningWidth    = _screen.left + 1;
 	_photoOpeningHeight   = _screen.top  + 1;
-	_timePhotoOpeningNext = 0;
+	_timePhotoOpeningNextDiff  = 0u;
+	_timePhotoOpeningNextStart = 0u;
 }
 
 void ESPER::updateViewport() {
@@ -495,9 +469,9 @@ void ESPER::activate(bool withOpening) {
 
 	if (withOpening) {
 		setStateMain(kEsperMainStateOpening);
-		playSound(413, 25);
+		playSound(kSfxBR025_5A, 25);
 		wait(1000);
-		playSound(414, 25);
+		playSound(kSfxBR027_1P, 25);
 		wait(2000);
 	} else {
 		_buttons->deactivate();
@@ -505,9 +479,9 @@ void ESPER::activate(bool withOpening) {
 	}
 
 	_buttons->activate(nullptr, nullptr, mouseDownCallback, mouseUpCallback, this);
-	_buttons->defineImage(kPhotoCount + 3, Common::Rect(42, 403, 76, 437), nullptr, nullptr, _shapeButton, nullptr);
+	_buttons->defineImage(kPhotoCount + 3, Common::Rect(42, 403, 76, 437), nullptr, nullptr, _shapesButtons->get(0), nullptr);
 
-	playSound(415, 25);
+	playSound(kSfxBR024_4B, 25);
 	wait(1000);
 
 	setStateMain(kEsperMainStateList);
@@ -520,21 +494,20 @@ void ESPER::activate(bool withOpening) {
 void ESPER::setStateMain(EsperMainStates state) {
 	if (_isOpen) {
 		_stateMain = state;
-		debug("ESPER main state: %d", _stateMain);
-
 	}
 }
 
 void ESPER::setStatePhoto(EsperPhotoStates state) {
 	_statePhoto = state;
-	debug("ESPER photo state: %d", _statePhoto);
 }
 
-void ESPER::wait(int timeout) {
+void ESPER::wait(uint32 timeout) {
 	if (!_isWaiting) {
 		_isWaiting = true;
-		uint timeEnd = timeout + _vm->getTotalPlayTime();
-		while (_vm->getTotalPlayTime() < timeEnd) {
+//		int timeEnd = timeout + _vm->_time->current();
+		uint32  timeStart = _vm->_time->current();
+		// unsigned difference is intentional
+		while (_vm->_gameIsRunning && (_vm->_time->current() - timeStart < timeout)) {
 			_vm->gameTick();
 		}
 		_isWaiting = false;
@@ -567,7 +540,7 @@ void ESPER::draw(Graphics::Surface &surface) {
 		drawPhotoOpening(surface);
 		break;
 	case kEsperMainStateClear:
-		surface.fillRect(_screen, 0x0000);
+		surface.fillRect(_screen, surface.format.RGBToColor(0, 0, 0));
 		break;
 	case kEsperMainStatePhoto:
 		if (_isScrolling) {
@@ -590,7 +563,7 @@ void ESPER::draw(Graphics::Surface &surface) {
 								viewportXToScreenX(_regions[i].rectInner.right),
 								viewportYToScreenY(_regions[i].rectInner.bottom)
 							),
-							0x7FE0
+							surface.format.RGBToColor(248, 248, 0)
 						);
 						surface.frameRect(
 							Common::Rect(
@@ -599,7 +572,7 @@ void ESPER::draw(Graphics::Surface &surface) {
 								viewportXToScreenX(_regions[i].rectOuter.right),
 								viewportYToScreenY(_regions[i].rectOuter.bottom)
 							),
-							0x7FE0
+							surface.format.RGBToColor(248, 248, 0)
 						);
 					}
 				}
@@ -613,7 +586,7 @@ void ESPER::draw(Graphics::Surface &surface) {
 			drawPhotoWithGrid(surface);
 			if (!drawSelectionZooming(surface)) {
 				setStatePhoto(kEsperPhotoStateSelectionBlinking);
-				playSound(418, 25);
+				playSound(kSfxBR030_3A, 25);
 			}
 			break;
 		case kEsperPhotoStateSelectionBlinking:
@@ -652,23 +625,24 @@ void ESPER::draw(Graphics::Surface &surface) {
 
 void ESPER::drawPhotoOpening(Graphics::Surface &surface) {
 	bool needMoreZooming = true;
-	int timeNow = _vm->getTotalPlayTime();
-	if (timeNow >= _timePhotoOpeningNext) {
+	uint32 timeNow = _vm->_time->current();
+	// unsigned difference is intentional
+	if (timeNow - _timePhotoOpeningNextStart >= _timePhotoOpeningNextDiff) {
 		_photoOpeningWidth  = MIN(_photoOpeningWidth  + 8, _screen.right  - 1);
 		_photoOpeningHeight = MIN(_photoOpeningHeight + 7, _screen.bottom - 1);
 
 		if (_photoOpeningWidth == _screen.right - 1 && _photoOpeningHeight == _screen.bottom - 1) {
 			needMoreZooming = false;
 		}
-
-		_timePhotoOpeningNext = timeNow + 20;
+		_timePhotoOpeningNextDiff  = 20u;
+		_timePhotoOpeningNextStart = timeNow;
 	}
-	copyImageScale(&_surfacePhoto, _viewport, &surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
+	copyImageScale(_surfacePhoto, _viewport, surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
 
-	surface.hLine(_screen.left,           _photoOpeningHeight,     _screen.right  - 1, 0x03E0);
-	surface.vLine(_photoOpeningWidth,     _screen.top,             _screen.bottom - 1, 0x03E0);
-	surface.hLine(_screen.left,           _photoOpeningHeight - 1, _screen.right  - 1, 0x0240);
-	surface.vLine(_photoOpeningWidth - 1, _screen.top,             _screen.bottom - 1, 0x0240);
+	surface.hLine(_screen.left,           _photoOpeningHeight,     _screen.right  - 1, surface.format.RGBToColor(0, 248, 0));
+	surface.vLine(_photoOpeningWidth,     _screen.top,             _screen.bottom - 1, surface.format.RGBToColor(0, 248, 0));
+	surface.hLine(_screen.left,           _photoOpeningHeight - 1, _screen.right  - 1, surface.format.RGBToColor(0, 144, 0));
+	surface.vLine(_photoOpeningWidth - 1, _screen.top,             _screen.bottom - 1, surface.format.RGBToColor(0, 144, 0));
 
 	drawGrid(surface);
 
@@ -682,15 +656,16 @@ void ESPER::drawPhotoOpening(Graphics::Surface &surface) {
 bool ESPER::drawSelectionZooming(Graphics::Surface &surface) {
 	bool zooming = false;
 	bool needMoreZooming = true;
-	int timeNow = _vm->getTotalPlayTime();
-	if (timeNow > _timeSelectionZoomNext) {
+	uint32 timeNow = _vm->_time->current();
+	// unsigned difference is intentional
+	if (timeNow - _timeSelectionZoomNextStart > 150u) {
 		zooming = true;
 		_selection.left   += _selectionDelta.left;
 		_selection.top    += _selectionDelta.top;
 		_selection.right  += _selectionDelta.right;
 		_selection.bottom += _selectionDelta.bottom;
 		++_selectionZoomStep;
-		_timeSelectionZoomNext = timeNow + 150;
+		_timeSelectionZoomNextStart = timeNow;
 		if (_selectionZoomStep > kSelectionZoomSteps) {
 			needMoreZooming = false;
 			_selection.left   = _selectionTarget.left;
@@ -706,16 +681,17 @@ bool ESPER::drawSelectionZooming(Graphics::Surface &surface) {
 		zooming = false;
 	}
 	if (zooming) {
-		playSound(416, 20);
+		playSound(kSfxBR029_3A, 20);
 	}
 	return needMoreZooming;
 }
 
 bool ESPER::drawSelectionBlinking(Graphics::Surface &surface) {
 	bool needMoreBlinking = true;
-	int timeNow = _vm->getTotalPlayTime();
-	if (timeNow > _timeSelectionBlinkingNext) {
-		_timeSelectionBlinkingNext = timeNow + 100;
+	uint32 timeNow = _vm->_time->current();
+	// unsigned difference is intentional
+	if (timeNow - _timeSelectionBlinkingNextStart > 100u) {
+		_timeSelectionBlinkingNextStart = timeNow;
 		_selectionBlinkingStyle ^= 1;
 		++_selectionBlinkingCounter;
 		if (_selectionBlinkingCounter > 10) {
@@ -731,8 +707,9 @@ bool ESPER::drawSelectionBlinking(Graphics::Surface &surface) {
 }
 
 void ESPER::drawPhotoZooming(Graphics::Surface &surface) {
-	int timeNow = _vm->getTotalPlayTime();
-	if ((timeNow > _timeZoomNext) && (_zoomStep < _zoomSteps)) {
+	uint32 timeNow = _vm->_time->current();
+	// unsigned difference is intentional
+	if ((timeNow - _timeZoomNextStart > _timeZoomNextDiff) && (_zoomStep < _zoomSteps)) {
 		_flash = true;
 
 		_viewportPositionXCurrent += _viewportPositionXDelta;
@@ -761,7 +738,8 @@ void ESPER::drawPhotoZooming(Graphics::Surface &surface) {
 			_viewportPositionY = _viewportPositionYTarget;
 		}
 		updateViewport();
-		_timeZoomNext = timeNow + 300;
+		_timeZoomNextDiff  = 300u;
+		_timeZoomNextStart = timeNow;
 	}
 
 	if (_zoomDelta >= 0.0f) {
@@ -771,7 +749,8 @@ void ESPER::drawPhotoZooming(Graphics::Surface &surface) {
 	}
 	drawGrid(surface);
 
-	if ((timeNow > _timeZoomNext) && (_zoomStep >= _zoomSteps)) {
+	// unsigned difference is intentional
+	if ((timeNow - _timeZoomNextStart > _timeZoomNextDiff) && (_zoomStep >= _zoomSteps)) {
 		if (_regionSelectedAck) {
 			if (!_regions[_regionSelected].name.empty()) {
 				if (_zoomDelta < 0.0f) {
@@ -779,7 +758,7 @@ void ESPER::drawPhotoZooming(Graphics::Surface &surface) {
 					_zoomDelta = (_zoom * 1.5f - _zoom) / (float)_zoomSteps; // 0.5f * _zoom ???
 				}
 				setStatePhoto(kEsperPhotoStateVideoZooming);
-				_timeZoomNext += 300;
+				_timeZoomNextDiff += 300u;
 			} else {
 				_regionSelectedAck = false;
 				_selection.left   = viewportXToScreenX(_regions[_regionSelected].rectInner.left);
@@ -799,9 +778,10 @@ void ESPER::drawPhotoZooming(Graphics::Surface &surface) {
 }
 
 void ESPER::drawPhotoSharpening(Graphics::Surface &surface) {
-	int timeNow = _vm->getTotalPlayTime();
+	uint32 timeNow = _vm->_time->current();
 	bool needMoreSharpening = true;
-	if (timeNow >= _timePhotoOpeningNext) {
+	// unsigned difference is intentional
+	if (timeNow - _timePhotoOpeningNextStart >= _timePhotoOpeningNextDiff) {
 		_photoOpeningWidth  = MIN(_photoOpeningWidth  + 8, _screen.right  - 1);
 		_photoOpeningHeight = MIN(_photoOpeningHeight + 7, _screen.bottom - 1);
 
@@ -809,26 +789,27 @@ void ESPER::drawPhotoSharpening(Graphics::Surface &surface) {
 			needMoreSharpening = false;
 		}
 
-		_timePhotoOpeningNext = timeNow + 50;
+		_timePhotoOpeningNextDiff  = 50u;
+		_timePhotoOpeningNextStart = timeNow;
 	}
 
 	if (_regionSelectedAck && !_regions[_regionSelected].name.empty()) {
 		_vqaPlayerPhoto->update(true, false);
-		copyImageBlur(&_surfaceViewport, Common::Rect(0, 0, 299, 263), &surface, _screen, _blur);
-		copyImageBlit(&_surfaceViewport, Common::Rect(0, 0, 0, 0), &surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
+		copyImageBlur(_surfaceViewport, Common::Rect(0, 0, 299, 263), surface, _screen, _blur);
+		copyImageBlit(_surfaceViewport, Common::Rect(0, 0, 0, 0), surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
 	} else {
 		drawPhoto(surface);
-		copyImageScale(&_surfacePhoto, _viewport, &_surfaceViewport, Common::Rect(0, 0, _screen.width(), _screen.height()));
-		copyImageBlit(&_surfaceViewport, Common::Rect(0, 0, 0, 0), &surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
+		copyImageScale(_surfacePhoto, _viewport, _surfaceViewport, Common::Rect(0, 0, _screen.width(), _screen.height()));
+		copyImageBlit(_surfaceViewport, Common::Rect(0, 0, 0, 0), surface, Common::Rect(_screen.left, _screen.top, _photoOpeningWidth, _photoOpeningHeight));
 
 	}
 	drawGrid(surface);
-	surface.hLine(_screen.left,           _photoOpeningHeight,     _screen.right  - 1, 0x03E0);
-	surface.vLine(_photoOpeningWidth,     _screen.top,             _screen.bottom - 1, 0x03E0);
-	surface.hLine(_screen.left,           _photoOpeningHeight - 1, _screen.right  - 1, 0x0240);
-	surface.vLine(_photoOpeningWidth - 1, _screen.top,             _screen.bottom - 1, 0x0240);
+	surface.hLine(_screen.left,           _photoOpeningHeight,     _screen.right  - 1, surface.format.RGBToColor(0, 248, 0));
+	surface.vLine(_photoOpeningWidth,     _screen.top,             _screen.bottom - 1, surface.format.RGBToColor(0, 248, 0));
+	surface.hLine(_screen.left,           _photoOpeningHeight - 1, _screen.right  - 1, surface.format.RGBToColor(0, 144, 0));
+	surface.vLine(_photoOpeningWidth - 1, _screen.top,             _screen.bottom - 1, surface.format.RGBToColor(0, 144, 0));
 	if (!needMoreSharpening) {
-		if (_regionSelectedAck && !_regions[_regionSelected].name.empty()){
+		if (_regionSelectedAck && !_regions[_regionSelected].name.empty()) {
 			setStatePhoto(kEsperPhotoStateVideoShow);
 		} else {
 			setStatePhoto(kEsperPhotoStateShow);
@@ -840,9 +821,10 @@ void ESPER::drawPhotoSharpening(Graphics::Surface &surface) {
 }
 
 void ESPER::drawPhotoZoomOut(Graphics::Surface &surface) {
-	int timeNow = _vm->getTotalPlayTime();
-	if (timeNow >= _timeZoomOutNext) {
-		_timeZoomOutNext = timeNow + 300;
+	uint32 timeNow = _vm->_time->current();
+	// unsigned difference is intentional
+	if (timeNow - _timeZoomOutNextStart >= 300u) {
+		_timeZoomOutNextStart = timeNow;
 
 		if (_zoom > _zoomMin) {
 			_zoom /= 1.3f;
@@ -866,8 +848,8 @@ void ESPER::drawPhotoZoomOut(Graphics::Surface &surface) {
 
 void ESPER::drawVideoZooming(Graphics::Surface &surface) {
 	if (_vqaPlayerPhoto == nullptr) {
-		_vqaPlayerPhoto = new VQAPlayer(_vm, &_surfaceViewport);
-		if (!_vqaPlayerPhoto->open(Common::String(_regions[_regionSelected].name) + ".VQA")) {
+		_vqaPlayerPhoto = new VQAPlayer(_vm, &_surfaceViewport, Common::String(_regions[_regionSelected].name) + ".VQA");
+		if (!_vqaPlayerPhoto->open()) {
 			setStatePhoto(kEsperPhotoStateShow);
 			_vm->_mouse->enable();
 
@@ -877,15 +859,18 @@ void ESPER::drawVideoZooming(Graphics::Surface &surface) {
 			return;
 		}
 
-		_timeZoomNext = 0;
+		_timeZoomNextDiff  = 0u;
+		_timeZoomNextStart = 0u;
 	}
 
 	bool flash = false;
 	bool advanceFrame = false;
-	int timeNow = _vm->getTotalPlayTime();
-	if (timeNow > _timeZoomNext) {
-		_timeZoomNext = timeNow + 300;
-		playSound(419, 25);
+	uint32 timeNow = _vm->_time->current();
+	// unsigned difference is intentional
+	if (timeNow - _timeZoomNextStart > _timeZoomNextDiff) {
+		_timeZoomNextDiff  = 300u;
+		_timeZoomNextStart = timeNow;
+		playSound(kSfxBR031_1P, 25);
 		flash = true;
 		advanceFrame = true;
 		_blur += _zoomDelta * 5.0f;
@@ -895,23 +880,25 @@ void ESPER::drawVideoZooming(Graphics::Surface &surface) {
 	if (frame == _vqaPlayerPhoto->getFrameCount() - 1) {
 		_vqaLastFrame = frame;
 		setStatePhoto(kEsperPhotoStatePhotoSharpening);
-	}
-
-	if (flash) {
+	} else if (flash) {
+		// TODO? Temporary workaround for very noticeable blue tint in the first frame during zoom-out:
+		// Don't flash for the last frame of the photo (which is the starting frame when zooming out)
 		flashViewport();
 	}
-	copyImageBlur(&_surfaceViewport, Common::Rect(0, 0, 299, 263), &surface, _screen, _blur);
+
+	copyImageBlur(_surfaceViewport, Common::Rect(0, 0, 299, 263), surface, _screen, _blur);
 	drawGrid(surface);
 }
 
 void ESPER::drawVideoZoomOut(Graphics::Surface &surface) {
 	bool flash = false;
 	bool advanceFrame = false;
-	int timeNow = _vm->getTotalPlayTime();
-	if (timeNow > _timeZoomNext && _vqaLastFrame > 0) {
-		_timeZoomNext = timeNow + 300;
-		playSound(419, 25);
-		//TODO: implement frame loading after seek, then advanceFrame can be removed
+	uint32 timeNow = _vm->_time->current();
+	// unsigned difference is intentional
+	if (timeNow - _timeZoomNextStart > _timeZoomNextDiff && _vqaLastFrame > 0) {
+		_timeZoomNextDiff  = 300u;
+		_timeZoomNextStart = timeNow;
+		playSound(kSfxBR031_1P, 25);
 		_vqaPlayerPhoto->seekToFrame(_vqaLastFrame);
 		int nextFrame = _vqaPlayerPhoto->getFrameCount() / 4;
 		if (nextFrame <= 0) {
@@ -919,7 +906,12 @@ void ESPER::drawVideoZoomOut(Graphics::Surface &surface) {
 		} else if (nextFrame > 4) {
 			nextFrame = 4;
 		}
-		flash = true;
+
+		if (_vqaLastFrame < _vqaPlayerPhoto->getFrameCount() - 1) {
+			// TODO? Temporary workaround for persistent blue tint in the last frame:
+			// Don't flash for the last frame of the photo (starting frame when zooming out)
+			flash = true;
+		}
 		advanceFrame = true;
 		_vqaLastFrame -= nextFrame;
 	}
@@ -928,9 +920,10 @@ void ESPER::drawVideoZoomOut(Graphics::Surface &surface) {
 	if (flash) {
 		flashViewport();
 	}
-	copyImageBlit(&_surfaceViewport, Common::Rect(0, 0, 0, 0), &surface, _screen);
+	copyImageBlit(_surfaceViewport, Common::Rect(0, 0, 0, 0), surface, _screen);
 	drawGrid(surface);
-	if (timeNow > _timeZoomNext && _vqaLastFrame <= 0) {
+	// unsigned difference is intentional
+	if (timeNow - _timeZoomNextStart > _timeZoomNextDiff && _vqaLastFrame <= 0) {
 		_vqaPlayerPhoto->close();
 		delete _vqaPlayerPhoto;
 		_vqaPlayerPhoto = nullptr;
@@ -944,21 +937,21 @@ void ESPER::drawVideoZoomOut(Graphics::Surface &surface) {
 }
 
 void ESPER::drawPhoto(Graphics::Surface &surface) {
-	copyImageBlur(&_surfacePhoto, _viewport, &surface, _screen, _blur);
+	copyImageBlur(_surfacePhoto, _viewport, surface, _screen, _blur);
 }
 
 void ESPER::drawGrid(Graphics::Surface &surface) {
 	for (int i = 0; i < 7; ++i) {
-		surface.drawLine(_screen.left + i * 50, _screen.top, _screen.left + i * 50, _screen.bottom - 1, 0x109C);
+		surface.drawLine(_screen.left + i * 50, _screen.top, _screen.left + i * 50, _screen.bottom - 1, surface.format.RGBToColor(32, 32, 224));
 	}
 
 	for (int i = 0; i < 7; ++i) {
-		surface.drawLine(_screen.left, _screen.top + i * 44, _screen.right - 1, _screen.top + i * 44, 0x109C);
+		surface.drawLine(_screen.left, _screen.top + i * 44, _screen.right - 1, _screen.top + i * 44, surface.format.RGBToColor(32, 32, 224));
 	}
 }
 
 void ESPER::drawPhotoWithGrid(Graphics::Surface &surface) {
-	copyImageScale(&_surfacePhoto, _viewport, &surface, _screen);
+	copyImageScale(_surfacePhoto, _viewport, surface, _screen);
 	drawGrid(surface);
 }
 
@@ -968,9 +961,9 @@ void ESPER::drawSelection(Graphics::Surface &surface, bool crosshair, int style)
 	int right  = CLIP(_selection.right,  _screen.left, (int16)(_screen.right  - 1));
 	int bottom = CLIP(_selection.bottom, _screen.top,  (int16)(_screen.bottom - 1));
 
-	int color = 0x0240;
+	int color = surface.format.RGBToColor(0, 144, 0);
 	if (style) {
-		color = 0x03E0;
+		color = surface.format.RGBToColor(0, 248, 0);
 	}
 
 	// selection rectangle
@@ -998,7 +991,7 @@ void ESPER::drawSelection(Graphics::Surface &surface, bool crosshair, int style)
 
 		// ghosting
 		if (_selectionCrosshairX != right) {
-			surface.vLine(_selectionCrosshairX, _screen.top, _screen.bottom - 1, 0x0240);
+			surface.vLine(_selectionCrosshairX, _screen.top, _screen.bottom - 1, surface.format.RGBToColor(0, 144, 0));
 			if (abs(_selectionCrosshairX - right) <= 1) {
 				_selectionCrosshairX = right;
 			} else {
@@ -1006,7 +999,7 @@ void ESPER::drawSelection(Graphics::Surface &surface, bool crosshair, int style)
 			}
 		}
 		if (_selectionCrosshairY != bottom) {
-			surface.hLine(_screen.left, _selectionCrosshairY, _screen.right - 1, 0x0240);
+			surface.hLine(_screen.left, _selectionCrosshairY, _screen.right - 1, surface.format.RGBToColor(0, 144, 0));
 			if (abs(_selectionCrosshairY - bottom) <= 1) {
 				_selectionCrosshairY = bottom;
 			} else {
@@ -1014,20 +1007,37 @@ void ESPER::drawSelection(Graphics::Surface &surface, bool crosshair, int style)
 			}
 		}
 
-		surface.vLine(right,        _screen.top, _screen.bottom - 1, 0x03E0);
-		surface.hLine(_screen.left, bottom,      _screen.right  - 1, 0x03E0);
+		surface.vLine(right,        _screen.top, _screen.bottom - 1, surface.format.RGBToColor(0, 248, 0));
+		surface.hLine(_screen.left, bottom,      _screen.right  - 1, surface.format.RGBToColor(0, 248, 0));
 	}
 }
 
 void ESPER::drawVideoFrame(Graphics::Surface &surface) {
 	_vqaPlayerPhoto->update(true, false);
-	copyImageBlit(&_surfaceViewport, Common::Rect(0, 0, 0, 0), &surface, _screen);
+	copyImageBlit(_surfaceViewport, Common::Rect(0, 0, 0, 0), surface, _screen);
 }
 
 void ESPER::drawTextCoords(Graphics::Surface &surface) {
-	_vm->_mainFont->drawColor(Common::String::format("ZM %04.0f", _zoom / _zoomMin * 2.0f  ), surface, 155, 364, 0x001F);
-	_vm->_mainFont->drawColor(Common::String::format("NS %04d",   12 * _viewport.top  +  98), surface, 260, 364, 0x001F);
-	_vm->_mainFont->drawColor(Common::String::format("EW %04d",   12 * _viewport.left + 167), surface, 364, 364, 0x001F);
+	const char *zm = "ZM %04.0f";
+	const char *ns = "NS %04d";
+	const char *ew = "EW %04d";
+	if (_vm->_language == Common::RU_RUS) {
+		// ПР, ВР, ГР
+		if (_vm->_russianCP1251) {
+			// Patched transalation by Siberian Studio is using Windows-1251 encoding
+			zm = "\xcf\xd0 %04.0f";
+			ns = "\xc2\xd0 %04d";
+			ew = "\xc3\xd0 %04d";
+		} else {
+			// Original release uses custom encoding
+			zm = "gh %04.0f";
+			ns = "dh %04d";
+			ew = "uh %04d";
+		}
+	}
+	_vm->_mainFont->drawString(&surface, Common::String::format(zm, _zoom / _zoomMin * 2.0f  ), 155, 364, surface.w, surface.format.RGBToColor(0, 0, 255));
+	_vm->_mainFont->drawString(&surface, Common::String::format(ns, 12 * _viewport.top  +  98), 260, 364, surface.w, surface.format.RGBToColor(0, 0, 255));
+	_vm->_mainFont->drawString(&surface, Common::String::format(ew, 12 * _viewport.left + 167), 364, 364, surface.w, surface.format.RGBToColor(0, 0, 255));
 }
 
 void ESPER::drawMouse(Graphics::Surface &surface) {
@@ -1077,10 +1087,10 @@ void ESPER::drawMouse(Graphics::Surface &surface) {
 					_isDrawingSelection = false;
 				}
 			}
-			surface.vLine(p.x,     p.y - 8, p.y - 1, 0x03E0);
-			surface.vLine(p.x,     p.y + 8, p.y + 1, 0x03E0);
-			surface.hLine(p.x - 8, p.y,     p.x - 1, 0x03E0);
-			surface.hLine(p.x + 8, p.y,     p.x + 1, 0x03E0);
+			surface.vLine(p.x,     p.y - 8, p.y - 1, surface.format.RGBToColor(0, 248, 0));
+			surface.vLine(p.x,     p.y + 8, p.y + 1, surface.format.RGBToColor(0, 248, 0));
+			surface.hLine(p.x - 8, p.y,     p.x - 1, surface.format.RGBToColor(0, 248, 0));
+			surface.hLine(p.x + 8, p.y,     p.x + 1, surface.format.RGBToColor(0, 248, 0));
 			_mouseOverScroll = -1;
 		} else if (p.x >= 85 && p.y >= 73 && p.x <= 484 && p.y <= 436) {
 			if (!_isDrawingSelection && _statePhoto != kEsperPhotoStateVideoShow && _zoom != 2.0f) {
@@ -1114,21 +1124,20 @@ void ESPER::drawMouse(Graphics::Surface &surface) {
 }
 
 void ESPER::flashViewport() {
-	uint16 *ptr = (uint16 *)_surfaceViewport.getPixels();
-	for (int i = 0; i < _surfaceViewport.w * _surfaceViewport.h; ++i) {
-		int8 r = (*ptr >> 10) & 0x1F;
-		int8 g = (*ptr >>  5) & 0x1F;
-		int8 b = (*ptr      ) & 0x1F;
-		b = MIN(b * 2, 0x1F);
-		*ptr = r << 10 | g << 5 | b;
-
-		++ptr;
+	for (int y = 0; y < _surfaceViewport.h; ++y) {
+		for (int x = 0; x < _surfaceViewport.w; ++x) {
+			uint8 r, g, b;
+			void *ptr = _surfaceViewport.getBasePtr(x, y);
+			_surfaceViewport.format.colorToRGB(READ_UINT32(ptr), r, g, b);
+			b *= 2;
+			drawPixel(_surfaceViewport, ptr, _surfaceViewport.format.RGBToColor(r, g, b));
+		}
 	}
 }
 
-void ESPER::copyImageScale(Graphics::Surface *src, Common::Rect srcRect, Graphics::Surface *dst, Common::Rect dstRect) {
+void ESPER::copyImageScale(Graphics::Surface &src, Common::Rect srcRect, Graphics::Surface &dst, Common::Rect dstRect) {
 	if (_flash) {
-		playSound(419, 25);
+		playSound(kSfxBR031_1P, 25);
 	}
 
 	int srcDstWidthRatio  = srcRect.width()  / dstRect.width();
@@ -1144,19 +1153,19 @@ void ESPER::copyImageScale(Graphics::Surface *src, Common::Rect srcRect, Graphic
 			int srcX = srcRect.left;
 			int srcXCounter = 0;
 			for (int dstX = dstRect.left; dstX < dstRect.right; ++dstX) {
-				uint16 *srcPtr = (uint16 *)src->getBasePtr(srcX, srcY);
-				uint16 *dstPtr = (uint16 *)dst->getBasePtr(dstX, dstY);
+				srcX = CLIP(srcX, 0, src.w - 1);
+				srcY = CLIP(srcY, 0, src.h - 1);
 
+				dstX = CLIP(dstX, 0, dst.w - 1);
+				dstY = CLIP(dstY, 0, dst.h - 1);
+
+				uint8 r, g, b;
+				src.format.colorToRGB(READ_UINT32(src.getBasePtr(srcX, srcY)), r, g, b);
 				if (_flash) {
-					int8 r = (*srcPtr >> 10) & 0x1F;
-					int8 g = (*srcPtr >>  5) & 0x1F;
-					int8 b = (*srcPtr      ) & 0x1F;
 					// add blue-ish tint
-					b = MIN(b * 2, 0x1F);
-					*dstPtr = r << 10 | g << 5 | b;
-				} else {
-					*dstPtr = *srcPtr;
+					b *= 2;
 				}
+				drawPixel(dst, dst.getBasePtr(dstX, dstY), dst.format.RGBToColor(r, g, b));
 
 				srcX += srcDstWidthRatio;
 				srcXCounter += srcDstWidthRest;
@@ -1186,19 +1195,20 @@ void ESPER::copyImageScale(Graphics::Surface *src, Common::Rect srcRect, Graphic
 					srcXCounter -= dstRect.width();
 					++srcX;
 				}
-				uint16 *srcPtr = (uint16 *)src->getBasePtr(srcX, srcY);
-				uint16 *dstPtr = (uint16 *)dst->getBasePtr(dstX, dstY);
 
+				srcX = CLIP(srcX, 0, src.w - 1);
+				srcY = CLIP(srcY, 0, src.h - 1);
+
+				dstX = CLIP(dstX, 0, dst.w - 1);
+				dstY = CLIP(dstY, 0, dst.h - 1);
+
+				uint8 r, g, b;
+				src.format.colorToRGB(READ_UINT32(src.getBasePtr(srcX, srcY)), r, g, b);
 				if (_flash) {
-					int8 r = (*srcPtr >> 10) & 0x1F;
-					int8 g = (*srcPtr >>  5) & 0x1F;
-					int8 b = (*srcPtr      ) & 0x1F;
 					// add blue-ish tint
-					b = MIN(b * 2, 0x1F);
-					*dstPtr = r << 10 | g << 5 | b;
-				} else {
-					*dstPtr = *srcPtr;
+					b *= 2;
 				}
+				drawPixel(dst, dst.getBasePtr(dstX, dstY), dst.format.RGBToColor(r, g, b));
 			}
 
 			srcYCounter += srcRect.height();
@@ -1211,9 +1221,9 @@ void ESPER::copyImageScale(Graphics::Surface *src, Common::Rect srcRect, Graphic
 	_flash = false;
 }
 
-void ESPER::copyImageBlur(Graphics::Surface *src, Common::Rect srcRect, Graphics::Surface *dst, Common::Rect dstRect, float blur) {
+void ESPER::copyImageBlur(Graphics::Surface &src, Common::Rect srcRect, Graphics::Surface &dst, Common::Rect dstRect, float blur) {
 	if (_flash) {
-		playSound(419, 25);
+		playSound(kSfxBR031_1P, 25);
 	}
 
 	int srcDstWidthRatio  = srcRect.width()  / dstRect.width();
@@ -1250,19 +1260,20 @@ void ESPER::copyImageBlur(Graphics::Surface *src, Common::Rect srcRect, Graphics
 					}
 					int skipX = 0;
 					while (dstX < dstRect.right && skipX < skipXMax) {
-						uint16 *srcPtr = (uint16 *)src->getBasePtr(srcX, srcY);
-						uint16 *dstPtr = (uint16 *)dst->getBasePtr(dstX, dstY);
 
+						srcX = CLIP(srcX, 0, src.w - 1);
+						srcY = CLIP(srcY, 0, src.h - 1);
+
+						dstX = CLIP(dstX, 0, dst.w - 1);
+						dstY = CLIP(dstY, 0, dst.h - 1);
+
+						uint8 r, g, b;
+						src.format.colorToRGB(READ_UINT32(src.getBasePtr(srcX, srcY)), r, g, b);
 						if (_flash) {
-							int8 r = (*srcPtr >> 10) & 0x1F;
-							int8 g = (*srcPtr >>  5) & 0x1F;
-							int8 b = (*srcPtr      ) & 0x1F;
 							// add blue-ish tint
-							b = MIN(b * 2, 0x1F);
-							*dstPtr = r << 10 | g << 5 | b;
-						} else {
-							*dstPtr = *srcPtr;
+							b *= 2;
 						}
+						drawPixel(dst, dst.getBasePtr(dstX, dstY), dst.format.RGBToColor(r, g, b));
 
 						++dstX;
 						++skipX;
@@ -1317,22 +1328,22 @@ void ESPER::copyImageBlur(Graphics::Surface *src, Common::Rect srcRect, Graphics
 						srcXCounter += srcRect.width();
 						if (srcXCounter >= dstRect.width()) {
 							srcXCounter -= dstRect.width();
-							srcX += 1; // bug in original game? Is using 1 instead of skipX as for Y
+							++srcX; // bug in original game? Advancing by 1 instead of skipX as for Y
 						}
 
-						uint16 *srcPtr = (uint16 *)src->getBasePtr(srcX, srcY);
-						uint16 *dstPtr = (uint16 *)dst->getBasePtr(dstX, dstY);
+						srcX = CLIP(srcX, 0, src.w - 1);
+						srcY = CLIP(srcY, 0, src.h - 1);
 
+						dstX = CLIP(dstX, 0, dst.w - 1);
+						dstY = CLIP(dstY, 0, dst.h - 1);
+
+						uint8 r, g, b;
+						src.format.colorToRGB(READ_UINT32(src.getBasePtr(srcX, srcY)), r, g, b);
 						if (_flash) {
-							int8 r = (*srcPtr >> 10) & 0x1F;
-							int8 g = (*srcPtr >>  5) & 0x1F;
-							int8 b = (*srcPtr      ) & 0x1F;
 							// add blue-ish tint
-							b = MIN(b * 2, 0x1F);
-							*dstPtr = r << 10 | g << 5 | b;
-						} else {
-							*dstPtr = *srcPtr;
+							b *= 2;
 						}
+						drawPixel(dst, dst.getBasePtr(dstX, dstY), dst.format.RGBToColor(r, g, b));
 
 						++dstX;
 						++skipX;
@@ -1353,12 +1364,12 @@ void ESPER::copyImageBlur(Graphics::Surface *src, Common::Rect srcRect, Graphics
 	_flash = false;
 }
 
-void ESPER::copyImageBlit(Graphics::Surface *src, Common::Rect srcRect, Graphics::Surface *dst, Common::Rect dstRect) {
+void ESPER::copyImageBlit(Graphics::Surface &src, Common::Rect srcRect, Graphics::Surface &dst, Common::Rect dstRect) {
 	for (int y = 0; y < dstRect.height(); ++y) {
 		for (int x = 0; x < dstRect.width(); ++x) {
-			uint16 *srcPtr = (uint16 *)src->getBasePtr(srcRect.left + x, srcRect.top + y);
-			uint16 *dstPtr = (uint16 *)dst->getBasePtr(dstRect.left + x, dstRect.top + y);
-			*dstPtr = *srcPtr;
+			uint8 r, g, b;
+			src.format.colorToRGB(READ_UINT32(src.getBasePtr(CLIP(srcRect.left + x, 0, src.w - 1), CLIP(srcRect.top + y, 0, src.h - 1))), r, g, b);
+			drawPixel(dst, dst.getBasePtr(CLIP(dstRect.left + x, 0, dst.w - 1), CLIP(dstRect.top + y, 0, dst.h - 1)), dst.format.RGBToColor(r, g, b));
 		}
 	}
 }
@@ -1379,11 +1390,12 @@ void ESPER::tickSound() {
 }
 
 void ESPER::tickScroll() {
-	int timeNow = _vm->getTotalPlayTime();
-	if (timeNow <= _timeScrollNext) {
+	uint32 timeNow = _vm->_time->current();
+	// unsigned difference is intentional
+	if (timeNow - _timeScrollNextStart <= 300u) {
 		return;
 	}
-	_timeScrollNext = timeNow + 300;
+	_timeScrollNextStart = timeNow;
 
 	if (_scrollingDirection == 0) {
 		scrollUp();
@@ -1413,47 +1425,47 @@ void ESPER::selectPhoto(int photoId) {
 
 	Common::ScopedPtr<Common::SeekableReadStream> s(_vm->getResourceStream(_photos[photoId].name));
 
-	if (!s) {
-		reset();
-	}
-
-	int photoSize = _surfacePhoto.w * _surfacePhoto.h * _surfacePhoto.format.bytesPerPixel;
+	uint photoSize = _surfacePhoto.w * _surfacePhoto.h * _surfacePhoto.format.bytesPerPixel;
 
 	s->skip(3); // not used, but there is compression type
 	uint width  = s->readUint32LE();
 	uint height = s->readUint32LE();
-	int photoCompressedSize = s->size() - s->pos();
+	uint photoCompressedSize = s->size() - s->pos();
 	uint8 *photoCompressed = (uint8 *)_surfacePhoto.getPixels() + photoSize - photoCompressedSize;
 	s->read(photoCompressed, photoCompressedSize);
 
 	decompress_lcw(photoCompressed, photoCompressedSize, (uint8 *)_surfacePhoto.getPixels(), photoSize);
+#ifdef SCUMM_BIG_ENDIAN
+	// As the compression is working with 8-bit data, on big-endian architectures we have to switch order of bytes in uncompressed data
+	uint8 *rawData = (uint8 *)_surfacePhoto.getPixels();
+	for (size_t i = 0; i < photoSize - 1; i += 2) {
+		SWAP(rawData[i], rawData[i + 1]);
+	}
+#endif
 
 	// apply palette
 	for (uint j = 0; j < width * height; ++j) {
 		// _surfacePhoto[j] = Palette[_surfacePhoto[j]];
 	}
 
-	_shapeThumbnail = new Shape(_vm);
-	_shapeThumbnail->open("ESPTHUMB.SHP", _photos[photoId].shapeId);
+	_shapeThumbnail = _shapesPhotos->get(_photos[photoId].shapeId);
 	_buttons->resetImages();
 	_buttons->defineImage(kPhotoCount + 2, Common::Rect(480, 350, 578, 413), _shapeThumbnail, _shapeThumbnail, _shapeThumbnail, nullptr);
-	_buttons->defineImage(kPhotoCount + 3, Common::Rect(42, 403, 76, 437), nullptr, nullptr, _shapeButton, nullptr);
+	_buttons->defineImage(kPhotoCount + 3, Common::Rect(42, 403, 76, 437), nullptr, nullptr, _shapesButtons->get(0), nullptr);
 
 	resetPhotoOpening();
 	resetViewport();
 	setStateMain(kEsperMainStatePhotoOpening);
 	setStatePhoto(kEsperPhotoStateOpening);
-	playSound(422, 25);
-	playSound(423, 25);
+	playSound(kSfxBR032_7B, 25);
+	playSound(kSfxBR033_4B, 25);
 }
 
 void ESPER::unloadPhotos() {
 	for (int i = 0; i < kPhotoCount; ++i) {
 		if (_photos[i].isPresent) {
-			_buttons->resetImage(i);
-			delete _shapesPhotos[i];
-			_shapesPhotos[i] = nullptr;
 			_photos[i].isPresent = false;
+			_buttons->resetImage(i);
 		}
 	}
 }
@@ -1469,7 +1481,7 @@ int ESPER::findEmptyRegion() {
 
 int ESPER::findRegion(Common::Rect where) {
 	for (int i = 0; i < kRegionCount; ++i) {
-		if (_regions[i].isPresent && _regions[i].rectOuter.contains(where) && where.contains(_regions[i].rectInner)){
+		if (_regions[i].isPresent && _regions[i].rectOuter.contains(where) && where.contains(_regions[i].rectInner)) {
 			return i;
 		}
 	}
@@ -1614,8 +1626,8 @@ void ESPER::goBack() {
 }
 
 void ESPER::prepareZoom() {
-	_selectionZoomStep     = 0;
-	_timeSelectionZoomNext = 0;
+	_selectionZoomStep          = 0;
+	_timeSelectionZoomNextStart = 0u;
 
 	_selectionTarget = _selection;
 	resetSelectionRect();
@@ -1765,6 +1777,14 @@ void ESPER::updateSelection() {
 		if (!stop) {
 			alternate = !alternate;
 		}
+	}
+
+	if (left > right) {
+		SWAP(left, right);
+	}
+
+	if (top > bottom) {
+		SWAP(top, bottom);
 	}
 
 	_regionSelected = findRegion(Common::Rect(left, top, right, bottom));

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -71,6 +70,8 @@ uint32 AsScene1401Pipe::handleMessage(int messageNum, const MessageParam &param,
 	case 0x483A:
 		stSuckInProjector();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -85,6 +86,8 @@ uint32 AsScene1401Pipe::hmSuckInProjector(int messageNum, const MessageParam &pa
 			stDoneSucking();
 		SetMessageHandler(&AsScene1401Pipe::handleMessage);
 		SetUpdateHandler(&AsScene1401Pipe::update);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -132,6 +135,8 @@ uint32 AsScene1401Mouse::handleMessage(int messageNum, const MessageParam &param
 	case 0x4839:
 		stSuckedIn();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -142,8 +147,8 @@ void AsScene1401Mouse::suSuckedIn() {
 		playSound(0, 0x0E32247F);
 		stopAnimation();
 		setVisible(false);
-		SetMessageHandler(NULL);
-		SetSpriteUpdate(NULL);
+		SetMessageHandler(nullptr);
+		SetSpriteUpdate(nullptr);
 	}
 }
 
@@ -169,6 +174,8 @@ uint32 AsScene1401Cheese::handleMessage(int messageNum, const MessageParam &para
 	case 0x4839:
 		stSuckedIn();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -179,8 +186,8 @@ void AsScene1401Cheese::suSuckedIn() {
 		playSound(0, 0x18020439);
 		stopAnimation();
 		setVisible(false);
-		SetMessageHandler(NULL);
-		SetSpriteUpdate(NULL);
+		SetMessageHandler(nullptr);
+		SetSpriteUpdate(nullptr);
 	}
 }
 
@@ -229,6 +236,8 @@ uint32 AsScene1401BackDoor::handleMessage(int messageNum, const MessageParam &pa
 		_countdown = 168;
 		if (!_isOpen)
 			stOpenDoor();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -323,6 +332,8 @@ uint32 AsCommonProjector::handleMessage(int messageNum, const MessageParam &para
 	case 0x4839:
 		stStartSuckedIn();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -366,6 +377,8 @@ uint32 AsCommonProjector::hmLockedInSlot(int messageNum, const MessageParam &par
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -375,6 +388,8 @@ uint32 AsCommonProjector::hmAnimation(int messageNum, const MessageParam &param,
 	switch (messageNum) {
 	case NM_ANIMATION_STOP:
 		gotoNextState();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -438,14 +453,14 @@ void AsCommonProjector::stSuckedIn() {
 		stopAnimation();
 		setVisible(false);
 		SetMessageHandler(&Sprite::handleMessage);
-		SetSpriteUpdate(NULL);
+		SetSpriteUpdate(nullptr);
 	}
 }
 
 void AsCommonProjector::stIdle() {
 	startAnimation(0x10E3042B, 0, -1);
 	SetMessageHandler(&AsCommonProjector::handleMessage);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 }
 
 void AsCommonProjector::stMoving() {
@@ -459,14 +474,14 @@ void AsCommonProjector::stMoving() {
 void AsCommonProjector::stStartLockedInSlot() {
 	startAnimation(0x80C32213, 0, -1);
 	SetMessageHandler(&AsCommonProjector::hmAnimation);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 	NextState(&AsCommonProjector::stStayLockedInSlot);
 }
 
 void AsCommonProjector::stStayLockedInSlot() {
 	startAnimation(0xD23B207F, 0, -1);
 	SetMessageHandler(&AsCommonProjector::hmLockedInSlot);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 }
 
 void AsCommonProjector::stStartProjecting() {
@@ -476,7 +491,7 @@ void AsCommonProjector::stStartProjecting() {
 	_vm->_soundMan->addSound(0x05331081, 0xCE428854);
 	_vm->_soundMan->playSoundLooping(0xCE428854);
 	SetMessageHandler(&AsCommonProjector::hmAnimation);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 	NextState(&AsCommonProjector::stLockedInSlot);
 }
 
@@ -484,7 +499,7 @@ void AsCommonProjector::stLockedInSlot() {
 	sendMessage(_parentScene, NM_KLAYMEN_LOWER_LEVER, 0);
 	startAnimation(0xD833207F, 0, -1);
 	SetMessageHandler(&AsCommonProjector::hmLockedInSlot);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 }
 
 void AsCommonProjector::stStopProjecting() {
@@ -493,7 +508,7 @@ void AsCommonProjector::stStopProjecting() {
 	playSound(0, 0xCC4A8456);
 	_vm->_soundMan->deleteSound(0xCE428854);
 	SetMessageHandler(&AsCommonProjector::hmAnimation);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 	NextState(&AsCommonProjector::stStayLockedInSlot);
 }
 
@@ -561,6 +576,8 @@ uint32 AsScene1402PuzzleBox::handleMessage(int messageNum, const MessageParam &p
 		break;
 	case NM_ANIMATION_STOP:
 		gotoNextState();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -757,6 +774,8 @@ uint32 AsScene1407Mouse::handleMessage(int messageNum, const MessageParam &param
 			}
 		}
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -765,7 +784,7 @@ void AsScene1407Mouse::stIdleLookAtGoodHole() {
 	setDoDeltaX(kScene1407MouseHoles[kScene1407MouseSections[_currSectionIndex].goodHoleIndex].x < _x ? 1 : 0);
 	startAnimation(0x72215194, 0, -1);
 	SetMessageHandler(&AsScene1407Mouse::handleMessage);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 }
 
 void AsScene1407Mouse::stWalkToDest() {
@@ -791,8 +810,8 @@ void AsScene1407Mouse::stGoThroughHole() {
 	setVisible(false);
 	_countdown = 12;
 	SetUpdateHandler(&AsScene1407Mouse::upGoThroughHole);
-	SetMessageHandler(NULL);
-	SetSpriteUpdate(NULL);
+	SetMessageHandler(nullptr);
+	SetSpriteUpdate(nullptr);
 	NextState(&AsScene1407Mouse::stArriveAtHole);
 }
 
@@ -860,6 +879,8 @@ uint32 AsScene1405Tile::handleMessage(int messageNum, const MessageParam &param,
 			sendMessage(_parentScene, 0x2000, _tileIndex);
 		}
 		messageResult = 1;
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -945,6 +966,8 @@ uint32 KmScene1401::xHandleMessage(int messageNum, const MessageParam &param) {
 		else
 			GotoState(&Klaymen::stTurnToBack);
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -985,6 +1008,8 @@ uint32 KmScene1402::xHandleMessage(int messageNum, const MessageParam &param) {
 		break;
 	case NM_KLAYMEN_RETURN_FROM_USE:
 		GotoState(&Klaymen::stReturnFromUse);
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -1046,6 +1071,8 @@ uint32 KmScene1403::xHandleMessage(int messageNum, const MessageParam &param) {
 		break;
 	case 0x4840:
 		startSpecialWalkLeft(param.asInteger());
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -1122,6 +1149,8 @@ uint32 KmScene1404::xHandleMessage(int messageNum, const MessageParam &param) {
 		break;
 	case 0x4840:
 		startSpecialWalkLeft(param.asInteger());
+		break;
+	default:
 		break;
 	}
 	return 0;

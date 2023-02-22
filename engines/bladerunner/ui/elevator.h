@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,20 +27,20 @@
 namespace BladeRunner {
 
 class BladeRunnerEngine;
-class Shape;
+class Shapes;
 class VQAPlayer;
 class UIImagePicker;
 
 class Elevator {
-	BladeRunnerEngine     *_vm;
-	bool                   _isOpen;
-	VQAPlayer             *_vqaPlayer;
-	int                    _buttonClicked;
-	Common::Array<Shape *> _shapes;
-	UIImagePicker         *_imagePicker;
-	int                    _actorId;
-	int                    _sentenceId;
-	int                    _timeSpeakDescription;
+	BladeRunnerEngine *_vm;
+	bool               _isOpen;
+	VQAPlayer         *_vqaPlayer;
+	int                _buttonClicked;
+	Shapes            *_shapes;
+	UIImagePicker     *_imagePicker;
+	int                _actorId;
+	int                _sentenceId;
+	uint32             _timeSpeakDescriptionStart;
 
 public:
 	Elevator(BladeRunnerEngine *vm);
@@ -59,7 +58,6 @@ public:
 	void setupDescription(int actorId, int sentenceId);
 	void resetDescription();
 	void tickDescription();
-	void resume();
 
 private:
 	static void mouseInCallback(int, void *);

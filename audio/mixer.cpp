@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "gui/EventRecorder.h"
 
 #include "common/util.h"
-#include "common/system.h"
 #include "common/textconsole.h"
 
 #include "audio/mixer_intern.h"
@@ -128,6 +126,11 @@ public:
 	Timestamp getElapsedTime();
 
 	/**
+	 * Replaces the channel's stream with a version that loops indefinitely.
+	 */
+	void loop();
+
+	/**
 	 * Queries the channel's sound type.
 	 */
 	Mixer::SoundType getType() const { return _type; }
@@ -173,14 +176,13 @@ private:
 #pragma mark --- Mixer ---
 #pragma mark -
 
-// TODO: parameter "system" is unused
-MixerImpl::MixerImpl(OSystem *system, uint sampleRate)
-	: _mutex(), _sampleRate(sampleRate), _mixerReady(false), _handleSeed(0), _soundTypeSettings() {
+MixerImpl::MixerImpl(uint sampleRate, bool stereo, uint outBufSize)
+	: _mutex(), _sampleRate(sampleRate), _stereo(stereo), _outBufSize(outBufSize), _mixerReady(false), _handleSeed(0), _soundTypeSettings() {
 
 	assert(sampleRate > 0);
 
 	for (int i = 0; i != NUM_CHANNELS; i++)
-		_channels[i] = 0;
+		_channels[i] = nullptr;
 }
 
 MixerImpl::~MixerImpl() {
@@ -189,6 +191,8 @@ MixerImpl::~MixerImpl() {
 }
 
 void MixerImpl::setReady(bool ready) {
+	Common::StackLock lock(_mutex);
+
 	_mixerReady = ready;
 }
 
@@ -196,10 +200,18 @@ uint MixerImpl::getOutputRate() const {
 	return _sampleRate;
 }
 
+bool MixerImpl::getOutputStereo() const {
+	return _stereo;
+}
+
+uint MixerImpl::getOutputBufSize() const {
+	return _outBufSize;
+}
+
 void MixerImpl::insertChannel(SoundHandle *handle, Channel *chan) {
 	int index = -1;
 	for (int i = 0; i != NUM_CHANNELS; i++) {
-		if (_channels[i] == 0) {
+		if (_channels[i] == nullptr) {
 			index = i;
 			break;
 		}
@@ -231,7 +243,7 @@ void MixerImpl::playStream(
 			bool reverseStereo) {
 	Common::StackLock lock(_mutex);
 
-	if (stream == 0) {
+	if (stream == nullptr) {
 		warning("stream is 0");
 		return;
 	}
@@ -242,7 +254,7 @@ void MixerImpl::playStream(
 	// Prevent duplicate sounds
 	if (id != -1) {
 		for (int i = 0; i != NUM_CHANNELS; i++)
-			if (_channels[i] != 0 && _channels[i]->getId() == id) {
+			if (_channels[i] != nullptr && _channels[i]->getId() == id) {
 				// Delete the stream if were asked to auto-dispose it.
 				// Note: This could cause trouble if the client code does not
 				// yet expect the stream to be gone. The primary example to
@@ -272,15 +284,21 @@ int MixerImpl::mixCallback(byte *samples, uint len) {
 	Common::StackLock lock(_mutex);
 
 	int16 *buf = (int16 *)samples;
-	// we store stereo, 16-bit samples
-	assert(len % 4 == 0);
-	len >>= 2;
 
 	// Since the mixer callback has been called, the mixer must be ready...
 	_mixerReady = true;
 
 	//  zero the buf
-	memset(buf, 0, 2 * len * sizeof(int16));
+	memset(buf, 0, len);
+
+	// we store 16-bit samples
+	if (_stereo) {
+		assert(len % 4 == 0);
+		len >>= 2;
+	} else {
+		assert(len % 2 == 0);
+		len >>= 1;
+	}
 
 	// mix all channels
 	int res = 0, tmp;
@@ -288,7 +306,7 @@ int MixerImpl::mixCallback(byte *samples, uint len) {
 		if (_channels[i]) {
 			if (_channels[i]->isFinished()) {
 				delete _channels[i];
-				_channels[i] = 0;
+				_channels[i] = nullptr;
 			} else if (!_channels[i]->isPaused()) {
 				tmp = _channels[i]->mix(buf, len);
 
@@ -303,9 +321,9 @@ int MixerImpl::mixCallback(byte *samples, uint len) {
 void MixerImpl::stopAll() {
 	Common::StackLock lock(_mutex);
 	for (int i = 0; i != NUM_CHANNELS; i++) {
-		if (_channels[i] != 0 && !_channels[i]->isPermanent()) {
+		if (_channels[i] != nullptr && !_channels[i]->isPermanent()) {
 			delete _channels[i];
-			_channels[i] = 0;
+			_channels[i] = nullptr;
 		}
 	}
 }
@@ -313,9 +331,9 @@ void MixerImpl::stopAll() {
 void MixerImpl::stopID(int id) {
 	Common::StackLock lock(_mutex);
 	for (int i = 0; i != NUM_CHANNELS; i++) {
-		if (_channels[i] != 0 && _channels[i]->getId() == id) {
+		if (_channels[i] != nullptr && _channels[i]->getId() == id) {
 			delete _channels[i];
-			_channels[i] = 0;
+			_channels[i] = nullptr;
 		}
 	}
 }
@@ -329,7 +347,7 @@ void MixerImpl::stopHandle(SoundHandle handle) {
 		return;
 
 	delete _channels[index];
-	_channels[index] = 0;
+	_channels[index] = nullptr;
 }
 
 void MixerImpl::muteSoundType(SoundType type, bool mute) {
@@ -397,10 +415,20 @@ Timestamp MixerImpl::getElapsedTime(SoundHandle handle) {
 	return _channels[index]->getElapsedTime();
 }
 
+void MixerImpl::loopChannel(SoundHandle handle) {
+	Common::StackLock lock(_mutex);
+
+	const int index = handle._val % NUM_CHANNELS;
+	if (!_channels[index] || _channels[index]->getHandle()._val != handle._val)
+		return;
+
+	_channels[index]->loop();
+}
+
 void MixerImpl::pauseAll(bool paused) {
 	Common::StackLock lock(_mutex);
 	for (int i = 0; i != NUM_CHANNELS; i++) {
-		if (_channels[i] != 0) {
+		if (_channels[i] != nullptr) {
 			_channels[i]->pause(paused);
 		}
 	}
@@ -409,7 +437,7 @@ void MixerImpl::pauseAll(bool paused) {
 void MixerImpl::pauseID(int id, bool paused) {
 	Common::StackLock lock(_mutex);
 	for (int i = 0; i != NUM_CHANNELS; i++) {
-		if (_channels[i] != 0 && _channels[i]->getId() == id) {
+		if (_channels[i] != nullptr && _channels[i]->getId() == id) {
 			_channels[i]->pause(paused);
 			return;
 		}
@@ -497,16 +525,16 @@ int MixerImpl::getVolumeForSoundType(SoundType type) const {
 #pragma mark -
 
 Channel::Channel(Mixer *mixer, Mixer::SoundType type, AudioStream *stream,
-                 DisposeAfterUse::Flag autofreeStream, bool reverseStereo, int id, bool permanent)
-    : _type(type), _mixer(mixer), _id(id), _permanent(permanent), _volume(Mixer::kMaxChannelVolume),
-      _balance(0), _pauseLevel(0), _samplesConsumed(0), _samplesDecoded(0), _mixerTimeStamp(0),
-      _pauseStartTime(0), _pauseTime(0), _converter(0), _volL(0), _volR(0),
-      _stream(stream, autofreeStream) {
+				 DisposeAfterUse::Flag autofreeStream, bool reverseStereo, int id, bool permanent)
+	: _type(type), _mixer(mixer), _id(id), _permanent(permanent), _volume(Mixer::kMaxChannelVolume),
+	  _balance(0), _pauseLevel(0), _samplesConsumed(0), _samplesDecoded(0), _mixerTimeStamp(0),
+	  _pauseStartTime(0), _pauseTime(0), _converter(nullptr), _volL(0), _volR(0),
+	  _stream(stream, autofreeStream) {
 	assert(mixer);
 	assert(stream);
 
 	// Get a rate converter instance
-	_converter = makeRateConverter(_stream->getRate(), mixer->getOutputRate(), _stream->isStereo(), reverseStereo);
+	_converter = makeRateConverter(_stream->getRate(), mixer->getOutputRate(), _stream->isStereo(), mixer->getOutputStereo(), reverseStereo);
 }
 
 Channel::~Channel() {
@@ -602,6 +630,15 @@ Timestamp Channel::getElapsedTime() {
 	// isn't invoked at the regular intervals that I first imagined.
 
 	return ts;
+}
+
+void Channel::loop() {
+	assert(_stream);
+
+	if (_stream.isDynamicallyCastable<RewindableAudioStream>()) {
+		Audio::LoopingAudioStream *loopingStream = new Audio::LoopingAudioStream(Common::move(_stream.moveAndDynamicCast<RewindableAudioStream>()), 0, false);
+		_stream.reset(loopingStream, DisposeAfterUse::YES);
+	}
 }
 
 int Channel::mix(int16 *data, uint len) {

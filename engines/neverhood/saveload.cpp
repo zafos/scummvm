@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -120,6 +119,38 @@ bool NeverhoodEngine::loadgame(const char *filename) {
 
 	_gameVars->loadState(in);
 
+	// If user has changed NHC it may have changed the correct solution for
+	// crystal puzzle. If it did and it was already solved, changed solors to the new solution
+	// if it wasn't solved, just let the code do full reinit.
+	if (_gameVars->getGlobalVar(V_CRYSTAL_COLORS_INIT)) {
+		TextResource textResource(this);
+		const char *textStart, *textEnd;
+		bool colorsChanged = false, colorsAreCorrect = true;
+		textResource.load(0x46691611);
+		textStart = textResource.getString(0, textEnd);
+		byte newCorrectColorNum[5];
+		for (uint index = 0; index < 5; index++) {
+			newCorrectColorNum[index] = GameModule::parseCrystalColor(textStart[index]);
+		}
+		for (uint index = 0; index < 5; index++) {
+			if (_gameVars->getSubVar(VA_GOOD_CRYSTAL_COLORS, index) != newCorrectColorNum[index]) {
+				colorsChanged = true;
+			}
+			if (_gameVars->getSubVar(VA_GOOD_CRYSTAL_COLORS, index) != _gameVars->getSubVar(VA_CURR_CRYSTAL_COLORS, index)) {
+				colorsAreCorrect = false;
+			}
+		}
+		if (colorsChanged && colorsAreCorrect) {
+			for (uint index = 0; index < 5; index++) {
+				_gameVars->setSubVar(VA_GOOD_CRYSTAL_COLORS, index, newCorrectColorNum[index]);
+				_gameVars->setSubVar(VA_CURR_CRYSTAL_COLORS, index, newCorrectColorNum[index]);
+			}
+		}
+		if (colorsChanged && !colorsAreCorrect) {
+			_gameVars->setGlobalVar(V_CRYSTAL_COLORS_INIT, 0);
+		}
+	}
+
 	_gameState.sceneNum = _gameVars->getGlobalVar(V_CURRENT_SCENE);
 	_gameState.which = _gameVars->getGlobalVar(V_CURRENT_SCENE_WHICH);
 
@@ -130,15 +161,15 @@ bool NeverhoodEngine::loadgame(const char *filename) {
 }
 
 Common::Error NeverhoodEngine::loadGameState(int slot) {
-	const char *fileName = getSavegameFilename(slot);
-	if (!loadgame(fileName))
+	Common::String fileName = getSaveStateName(slot);
+	if (!loadgame(fileName.c_str()))
 		return Common::kReadingFailed;
 	return Common::kNoError;
 }
 
-Common::Error NeverhoodEngine::saveGameState(int slot, const Common::String &description) {
-	const char *fileName = getSavegameFilename(slot);
-	if (!savegame(fileName, description.c_str()))
+Common::Error NeverhoodEngine::saveGameState(int slot, const Common::String &description, bool isAutosave) {
+	Common::String fileName = getSaveStateName(slot);
+	if (!savegame(fileName.c_str(), description.c_str()))
 		return Common::kWritingFailed;
 	return Common::kNoError;
 }
@@ -150,10 +181,8 @@ Common::Error NeverhoodEngine::removeGameState(int slot) {
 	return Common::kNoError;
 }
 
-const char *NeverhoodEngine::getSavegameFilename(int num) {
-	static Common::String filename;
-	filename = getSavegameFilename(_targetName, num);
-	return filename.c_str();
+Common::String NeverhoodEngine::getSaveStateName(int slot) const {
+	return getSavegameFilename(_targetName, slot);
 }
 
 Common::String NeverhoodEngine::getSavegameFilename(const Common::String &target, int num) {

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -44,22 +43,22 @@ class DynamicBitmap : public Bitmap {
 	friend class RenderObject;
 
 public:
-	virtual ~DynamicBitmap();
+	~DynamicBitmap() override;
 
-	virtual uint getPixel(int x, int y) const;
+	uint getPixel(int x, int y) const override;
 
-	virtual bool setContent(const byte *pixeldata, uint size, uint offset, uint stride);
+	bool setContent(const byte *pixeldata, uint size, uint offset, uint stride) override;
 
-	virtual bool isScalingAllowed() const;
-	virtual bool isAlphaAllowed() const;
-	virtual bool isColorModulationAllowed() const;
-	virtual bool isSetContentAllowed() const;
+	bool isScalingAllowed() const override;
+	bool isAlphaAllowed() const override;
+	bool isColorModulationAllowed() const override;
+	bool isSetContentAllowed() const override;
 
-	virtual bool persist(OutputPersistenceBlock &writer);
-	virtual bool unpersist(InputPersistenceBlock &reader);
+	bool persist(OutputPersistenceBlock &writer) override;
+	bool unpersist(InputPersistenceBlock &reader) override;
 
 protected:
-	virtual bool doRender(RectangleList *updateRects);
+	bool doRender(RectangleList *updateRects) override;
 
 private:
 	DynamicBitmap(RenderObjectPtr<RenderObject> parentPtr, uint width, uint height);

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,6 +23,10 @@
 #define GOB_DRAW_H
 
 #include "gob/video.h"
+
+namespace Common {
+class WinResources;
+}
 
 namespace Gob {
 
@@ -144,15 +147,11 @@ public:
 	int8 _cursorAnimLow[40];
 	int8 _cursorAnimHigh[40];
 	int8 _cursorAnimDelays[40];
+	Common::String _cursorNames[40];
+	Common::String _cursorName;
+	bool _cursorDrawnFromScripts;
 
 	int32 _cursorCount;
-	bool *_doCursorPalettes;
-	byte *_cursorPalettes;
-	byte *_cursorKeyColors;
-	uint16 *_cursorPaletteStarts;
-	uint16 *_cursorPaletteCounts;
-	int32 *_cursorHotspotsX;
-	int32 *_cursorHotspotsY;
 
 	int16 _palLoadData1[4];
 	int16 _palLoadData2[4];
@@ -192,6 +191,7 @@ public:
 	void adjustCoords(char adjust, uint16 *coord1, uint16 *coord2) {
 		adjustCoords(adjust, (int16 *)coord1, (int16 *)coord2);
 	}
+	void resizeCursors(int16 width, int16 height, int16 count, bool transparency);
 	int stringLength(const char *str, uint16 fontIndex);
 	void printTextCentered(int16 id, int16 left, int16 top, int16 right,
 			int16 bottom, const char *str, int16 fontIndex, int16 color);
@@ -209,6 +209,7 @@ public:
 	virtual void initScreen() = 0;
 	virtual void closeScreen() = 0;
 	virtual void blitCursor() = 0;
+
 	virtual void animateCursor(int16 cursor) = 0;
 	virtual void printTotText(int16 id) = 0;
 	virtual void spriteOperation(int16 operation) = 0;
@@ -231,28 +232,28 @@ protected:
 
 class Draw_v1 : public Draw {
 public:
-	virtual void initScreen();
-	virtual void closeScreen();
-	virtual void blitCursor();
-	virtual void animateCursor(int16 cursor);
-	virtual void printTotText(int16 id);
-	virtual void spriteOperation(int16 operation);
+	void initScreen() override;
+	void closeScreen() override;
+	void blitCursor() override;
+	void animateCursor(int16 cursor) override;
+	void printTotText(int16 id) override;
+	void spriteOperation(int16 operation) override;
 
 	Draw_v1(GobEngine *vm);
-	virtual ~Draw_v1() {}
+	~Draw_v1() override {}
 };
 
 class Draw_v2 : public Draw_v1 {
 public:
-	virtual void initScreen();
-	virtual void closeScreen();
-	virtual void blitCursor();
-	virtual void animateCursor(int16 cursor);
-	virtual void printTotText(int16 id);
-	virtual void spriteOperation(int16 operation);
+	void initScreen() override;
+	void closeScreen() override;
+	void blitCursor() override;
+	void animateCursor(int16 cursor) override;
+	void printTotText(int16 id) override;
+	void spriteOperation(int16 operation) override;
 
 	Draw_v2(GobEngine *vm);
-	virtual ~Draw_v2() {}
+	~Draw_v2() override {}
 
 private:
 	uint8 _mayorWorkaroundStatus;
@@ -262,17 +263,17 @@ private:
 
 class Draw_Bargon: public Draw_v2 {
 public:
-	virtual void initScreen();
+	void initScreen() override;
 
 	Draw_Bargon(GobEngine *vm);
-	virtual ~Draw_Bargon() {}
+	~Draw_Bargon() override {}
 };
 
 class Draw_Fascination: public Draw_v2 {
 public:
 	Draw_Fascination(GobEngine *vm);
-	virtual ~Draw_Fascination() {}
-	virtual void spriteOperation(int16 operation);
+	~Draw_Fascination() override {}
+	void spriteOperation(int16 operation) override;
 
 	void decompWin(int16 x, int16 y, SurfacePtr destPtr);
 	void drawWin(int16 fct);
@@ -281,22 +282,39 @@ public:
 	void handleWinBorder(int16 id);
 	void drawWinTrace(int16 left, int16 top, int16 width, int16 height);
 
-	virtual int16 openWin(int16 id);
-	virtual void closeWin(int16 id);
-	virtual int16 getWinFromCoord(int16 &dx, int16 &dy);
-	virtual int16 handleCurWin();
-	virtual void activeWin(int16 id);
-	virtual void moveWin(int16 id);
-	virtual bool overlapWin(int16 idWin1, int16 idWin2);
-	virtual void closeAllWin();
+	int16 openWin(int16 id) override;
+	void closeWin(int16 id) override;
+	int16 getWinFromCoord(int16 &dx, int16 &dy) override;
+	int16 handleCurWin() override;
+	void activeWin(int16 id) override;
+	void moveWin(int16 id) override;
+	bool overlapWin(int16 idWin1, int16 idWin2) override;
+	void closeAllWin() override;
 
 };
 
 class Draw_Playtoons: public Draw_v2 {
 public:
 	Draw_Playtoons(GobEngine *vm);
-	virtual ~Draw_Playtoons() {}
-	virtual void spriteOperation(int16 operation);
+	~Draw_Playtoons() override {}
+	void spriteOperation(int16 operation) override;
+};
+
+
+class Draw_v7 : public Draw_Playtoons {
+public:
+	Draw_v7(GobEngine *vm);
+	~Draw_v7() override;
+
+	void initScreen() override;
+	void animateCursor(int16 cursor) override;
+
+
+private:
+	Common::WinResources *_cursors;
+
+	bool loadCursorFile();
+	bool loadCursorFromFile(Common::String filename);
 };
 
 // Draw operations

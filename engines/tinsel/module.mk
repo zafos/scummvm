@@ -1,6 +1,7 @@
 MODULE := engines/tinsel
 
 MODULE_OBJS := \
+    noir/lzss.o \
 	actors.o \
 	adpcm.o \
 	anim.o \
@@ -11,18 +12,21 @@ MODULE_OBJS := \
 	config.o \
 	cursor.o \
 	debugger.o \
-	detection.o \
 	dialogs.o \
 	drives.o \
 	effect.o \
 	events.o \
 	faders.o \
+	film.o \
 	font.o \
 	graphics.o \
 	handle.o \
 	heapmem.o \
+	inv_objects.o \
 	mareels.o \
+	metaengine.o \
 	move.o \
+	movers.o \
 	multiobj.o \
 	music.o \
 	object.o \
@@ -31,7 +35,6 @@ MODULE_OBJS := \
 	pdisplay.o \
 	play.o \
 	polygons.o \
-	rince.o \
 	saveload.o \
 	savescn.o \
 	scene.o \
@@ -45,7 +48,10 @@ MODULE_OBJS := \
 	timers.o \
 	tinlib.o \
 	tinsel.o \
-	token.o
+	token.o \
+	noir/notebook.o \
+	noir/notebook_page.o \
+	noir/sysreel.o \
 
 # This module can be built as a plugin
 ifeq ($(ENABLE_TINSEL), DYNAMIC_PLUGIN)
@@ -54,3 +60,6 @@ endif
 
 # Include common rules
 include $(srcdir)/rules.mk
+
+# Detection objects
+DETECT_OBJS += $(MODULE)/detection.o

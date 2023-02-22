@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,6 +23,9 @@
 #include "sci/engine/message.h"
 #include "sci/engine/kernel.h"
 #include "sci/engine/seg_manager.h"
+#include "sci/engine/state.h"
+#include "sci/engine/tts.h"
+#include "sci/engine/workarounds.h"
 #include "sci/util.h"
 
 namespace Sci {
@@ -69,7 +71,7 @@ class MessageReaderV2 : public MessageReader {
 public:
 	MessageReaderV2(const SciSpan<const byte> &data) : MessageReader(data, 6, 4) { }
 
-	bool findRecord(const MessageTuple &tuple, MessageRecord &record) {
+	bool findRecord(const MessageTuple &tuple, MessageRecord &record) override {
 		SciSpan<const byte> recordPtr = _data.subspan(_headerSize);
 
 		for (uint i = 0; i < _messageCount; i++) {
@@ -97,7 +99,7 @@ class MessageReaderV3 : public MessageReader {
 public:
 	MessageReaderV3(const SciSpan<const byte> &data) : MessageReader(data, 8, 10) { }
 
-	bool findRecord(const MessageTuple &tuple, MessageRecord &record) {
+	bool findRecord(const MessageTuple &tuple, MessageRecord &record) override {
 		SciSpan<const byte> recordPtr = _data.subspan(_headerSize);
 		for (uint i = 0; i < _messageCount; i++) {
 			if ((recordPtr[0] == tuple.noun) && (recordPtr[1] == tuple.verb)
@@ -125,7 +127,7 @@ class MessageReaderV4 : public MessageReader {
 public:
 	MessageReaderV4(const SciSpan<const byte> &data) : MessageReader(data, 10, 11) { }
 
-	bool findRecord(const MessageTuple &tuple, MessageRecord &record) {
+	bool findRecord(const MessageTuple &tuple, MessageRecord &record) override {
 		SciSpan<const byte> recordPtr = _data.subspan(_headerSize);
 		for (uint i = 0; i < _messageCount; i++) {
 			if ((recordPtr[0] == tuple.noun) && (recordPtr[1] == tuple.verb)
@@ -149,14 +151,14 @@ public:
 	}
 };
 
-#ifdef ENABLE_SCI32_MAC
+#ifdef ENABLE_SCI32
 // SCI32 Mac decided to add an extra byte (currently unknown in meaning) between
 // the talker and the string...
 class MessageReaderV4_MacSCI32 : public MessageReader {
 public:
 	MessageReaderV4_MacSCI32(const SciSpan<const byte> &data) : MessageReader(data, 10, 12) { }
 
-	bool findRecord(const MessageTuple &tuple, MessageRecord &record) {
+	bool findRecord(const MessageTuple &tuple, MessageRecord &record) override {
 		SciSpan<const byte> recordPtr = _data.subspan(_headerSize);
 		for (uint i = 0; i < _messageCount; i++) {
 			if ((recordPtr[0] == tuple.noun) && (recordPtr[1] == tuple.verb)
@@ -182,10 +184,17 @@ public:
 #endif
 
 bool MessageState::getRecord(CursorStack &stack, bool recurse, MessageRecord &record) {
-	Resource *res = g_sci->getResMan()->findResource(ResourceId(kResourceTypeMessage, stack.getModule()), false);
+	// find a workaround for the requested message and use the prescribed module
+	int module = stack.getModule();
+	MessageTuple &tuple = stack.top();
+	SciMessageWorkaroundSolution workaround = findMessageWorkaround(module, tuple.noun, tuple.verb, tuple.cond, tuple.seq);
+	if (workaround.type != MSG_WORKAROUND_NONE) {
+		module = workaround.module;
+	}
+	Resource *res = g_sci->getResMan()->findResource(ResourceId(kResourceTypeMessage, module), false);
 
 	if (!res) {
-		warning("Failed to open message resource %d", stack.getModule());
+		warning("Failed to open message resource %d", module);
 		return false;
 	}
 
@@ -202,8 +211,6 @@ bool MessageState::getRecord(CursorStack &stack, bool recurse, MessageRecord &re
 	case 4:
 #ifdef ENABLE_SCI32
 	case 5: // v5 seems to be compatible with v4
-#endif
-#ifdef ENABLE_SCI32_MAC
 		// SCI32 Mac is different than SCI32 DOS/Win here
 		if (g_sci->getPlatform() == Common::kPlatformMacintosh && getSciVersion() >= SCI_VERSION_2_1_EARLY)
 			reader = new MessageReaderV4_MacSCI32(*res);
@@ -223,48 +230,49 @@ bool MessageState::getRecord(CursorStack &stack, bool recurse, MessageRecord &re
 		return false;
 	}
 
+	// apply the message workaround
+	if (workaround.type == MSG_WORKAROUND_REMAP) {
+		// remap the request to a different message record.
+		//  this alters the stack, nextMessage() will return the next
+		//  record in the sequence following the returned record.
+		stack.setModule(module);
+		tuple.noun = workaround.noun;
+		tuple.verb = workaround.verb;
+		tuple.cond = workaround.cond;
+		tuple.seq = workaround.seq;
+	} else if (workaround.type == MSG_WORKAROUND_FAKE) {
+		// return a fake message record hard-coded in the workaround.
+		//  this leaves the stack unchanged.
+		record.tuple = tuple;
+		record.refTuple = MessageTuple();
+		record.string = workaround.text;
+		record.length = strlen(workaround.text);
+		record.talker = workaround.talker;
+		delete reader;
+		return true;
+	} else if (workaround.type == MSG_WORKAROUND_EXTRACT) {
+		// extract and return text from a different message record.
+		//  use the talker provided by the workaround since the correct value
+		//  could be in either, or neither, of the records.
+		//  this leaves the stack unchanged.
+		MessageTuple textTuple(workaround.noun, workaround.verb, workaround.cond, workaround.seq);
+		MessageRecord textRecord;
+		if (reader->findRecord(textTuple, textRecord)) {
+			uint32 textLength = (workaround.substringLength == 0) ? textRecord.length : workaround.substringLength;
+			if (workaround.substringIndex + textLength <= textRecord.length) {
+				record.tuple = tuple;
+				record.refTuple = MessageTuple();
+				record.string = textRecord.string + workaround.substringIndex;
+				record.length = textLength;
+				record.talker = workaround.talker;
+				delete reader;
+				return true;
+			}
+		}
+	}
+
 	while (1) {
 		MessageTuple &t = stack.top();
-
-		// Fix known incorrect message tuples
-		if (g_sci->getGameId() == GID_QFG1VGA && stack.getModule() == 322 &&
-			t.noun == 14 && t.verb == 1 && t.cond == 19 && t.seq == 1) {
-			// Talking to Kaspar the shopkeeper - bug #3604944
-			t.verb = 2;
-		}
-
-		if (g_sci->getGameId() == GID_PQ1 && stack.getModule() == 38 &&
-			t.noun == 10 && t.verb == 4 && t.cond == 8 && t.seq == 1) {
-			// Using the hand icon on Keith in the Blue Room - bug #3605654
-			t.cond = 9;
-		}
-
-		if (g_sci->getGameId() == GID_PQ1 && stack.getModule() == 38 &&
-			t.noun == 10 && t.verb == 1 && t.cond == 0 && t.seq == 1) {
-			// Using the eye icon on Keith in the Blue Room - bug #3605654
-			t.cond = 13;
-		}
-
-		// Fill in known missing message tuples
-		if (g_sci->getGameId() == GID_SQ4 && stack.getModule() == 16 &&
-			t.noun == 7 && t.verb == 0 && t.cond == 3 && t.seq == 1) {
-			// This fixes the error message shown when speech and subtitles are
-			// enabled simultaneously in SQ4 - the (very) long dialog when Roger
-			// is talking with the aliens is missing - bug #3538416.
-			record.tuple = t;
-			record.refTuple = MessageTuple();
-			record.talker = 7;	// Roger
-			// The missing text is just too big to fit in one speech bubble, and
-			// if it's added here manually and drawn on screen, it's painted over
-			// the entrance in the back where the Sequel Police enters, so it
-			// looks very ugly. Perhaps this is why this particular text is missing,
-			// as the text shown in this screen is very short (one-liners).
-			// Just output an empty string here instead of showing an error.
-			record.string = "";
-			record.length = 0;
-			delete reader;
-			return true;
-		}
 
 		if (!reader->findRecord(t, record)) {
 			// Tuple not found
@@ -302,10 +310,11 @@ int MessageState::nextMessage(reg_t buf) {
 
 	if (!buf.isNull()) {
 		if (getRecord(_cursorStack, true, record)) {
-			outputString(buf, processString(record.string));
+			outputString(buf, processString(record.string, record.length));
 			_lastReturned = record.tuple;
 			_lastReturnedModule = _cursorStack.getModule();
 			_cursorStack.top().seq++;
+			g_sci->_tts->setMessage(record.string);
 			return record.talker;
 		} else {
 			MessageTuple &t = _cursorStack.top();
@@ -315,9 +324,10 @@ int MessageState::nextMessage(reg_t buf) {
 	} else {
 		CursorStack stack = _cursorStack;
 
-		if (getRecord(stack, true, record))
+		if (getRecord(stack, true, record)) {
+			g_sci->_tts->setMessage(record.string);
 			return record.talker;
-		else
+		} else
 			return 0;
 	}
 }
@@ -340,6 +350,7 @@ bool MessageState::messageRef(int module, const MessageTuple &t, MessageTuple &r
 	stack.init(module, t);
 	if (getRecord(stack, false, record)) {
 		ref = record.refTuple;
+		g_sci->_tts->setMessage(record.string);
 		return true;
 	}
 
@@ -426,9 +437,19 @@ bool MessageState::stringStage(Common::String &outstr, const Common::String &inS
 			return true;
 		}
 
+		// For Russian we allow all upper characters
+		if (g_sci->getLanguage() == Common::RU_RUS) {
+			if (((byte)inStr[i] >= 'a') || ((inStr[i] >= '0') && (inStr[i] <= '9') && (getSciVersion() < SCI_VERSION_2)))
+				return false;
+		}
+
 		// If we find a lowercase character or a digit, it's not a stage direction
 		// SCI32 seems to support having digits in stage directions
 		if (((inStr[i] >= 'a') && (inStr[i] <= 'z')) || ((inStr[i] >= '0') && (inStr[i] <= '9') && (getSciVersion() < SCI_VERSION_2)))
+			return false;
+
+		// If it contains Hebrew letters, it's not a stage direction
+		if (g_sci->getLanguage() == Common::HE_ISR && (byte)inStr[i] >= 128)
 			return false;
 	}
 
@@ -436,16 +457,21 @@ bool MessageState::stringStage(Common::String &outstr, const Common::String &inS
 	return false;
 }
 
-Common::String MessageState::processString(const char *s) {
+Common::String MessageState::processString(const char *s, uint32 maxLength) {
 	Common::String outStr;
 	Common::String inStr = Common::String(s);
 
 	uint index = 0;
 
-	while (index < inStr.size()) {
-		// Check for hex escape sequence
-		if (stringHex(outStr, inStr, index))
-			continue;
+	while (index < inStr.size() && index < maxLength) {
+		// Check for hex escape sequence.
+		//  SQ4CD predates this interpreter feature but has a message on the
+		//  hintbook screen which appears to contain hex strings and renders
+		//  incorrectly if converted, so exclude it. Fixes #11070
+		if (g_sci->getGameId() != GID_SQ4) {
+			if (stringHex(outStr, inStr, index))
+				continue;
+		}
 
 		// Check for literal escape sequence
 		if (stringLit(outStr, inStr, index))
@@ -472,11 +498,11 @@ void MessageState::outputString(reg_t buf, const Common::String &str) {
 		SegmentRef buffer_r = _segMan->dereference(buf);
 
 		if ((unsigned)buffer_r.maxSize >= str.size() + 1) {
-			_segMan->strcpy(buf, str.c_str());
+			_segMan->strcpy_(buf, str.c_str());
 		} else {
 			// LSL6 sets an exit text here, but the buffer size allocated
 			// is too small. Don't display a warning in this case, as we
-			// don't use the exit text anyway - bug report #3035533
+			// don't use the exit text anyway - bug report #5000
 			if (g_sci->getGameId() == GID_LSL6 && str.hasPrefix("\r\n(c) 1993 Sierra On-Line, Inc")) {
 				// LSL6 buggy exit text, don't show warning
 			} else {
@@ -485,7 +511,7 @@ void MessageState::outputString(reg_t buf, const Common::String &str) {
 
 			// Set buffer to empty string if possible
 			if (buffer_r.maxSize > 0)
-				_segMan->strcpy(buf, "");
+				_segMan->strcpy_(buf, "");
 		}
 #ifdef ENABLE_SCI32
 	}

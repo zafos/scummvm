@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,70 +15,54 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef DIRECTOR_LINGO_LINGO_H
 #define DIRECTOR_LINGO_LINGO_H
 
-#include "audio/audiostream.h"
 #include "common/hash-ptr.h"
 #include "common/hash-str.h"
+#include "common/str-array.h"
+#include "common/queue.h"
+#include "common/rect.h"
 
-#include "director/director.h"
-#include "director/score.h"
-#include "director/lingo/lingo-gr.h"
-#include "director/lingo/lingo-the.h"
+#include "director/types.h"
+
+namespace Audio {
+class AudioStream;
+}
+namespace Common {
+class SeekableReadStreamEndian;
+}
 
 namespace Director {
 
-enum LEvent {
-	kEventPrepareMovie,
-	kEventStartMovie,
-	kEventStepMovie,
-	kEventStopMovie,
-
-	kEventNew,
-	kEventBeginSprite,
-	kEventEndSprite,
-
-	kEventNone,
-	kEventEnterFrame,
-	kEventPrepareFrame,
-	kEventIdle,
-	kEventStepFrame,
-	kEventExitFrame,
-	kEventTimeout,
-
-	kEventActivateWindow,
-	kEventDeactivateWindow,
-	kEventMoveWindow,
-	kEventResizeWindow,
-	kEventOpenWindow,
-	kEventCloseWindow,
-
-	kEventKeyUp,
-	kEventKeyDown,
-	kEventMouseUp,
-	kEventMouseDown,
-	kEventRightMouseUp,
-	kEventRightMouseDown,
-	kEventMouseEnter,
-	kEventMouseLeave,
-	kEventMouseUpOutSide,
-	kEventMouseWithin,
-
-	kEventStart
-};
+struct ChunkReference;
+struct MenuReference;
+struct TheEntity;
+struct TheEntityField;
+struct LingoArchive;
+struct LingoV4Bytecode;
+struct LingoV4TheEntity;
+struct Node;
+class AbstractObject;
+class Cast;
+class ScriptContext;
+class DirectorEngine;
+class Frame;
+class LingoCompiler;
 
 typedef void (*inst)(void);
 #define	STOP (inst)0
 #define ENTITY_INDEX(t,id) ((t) * 100000 + (id))
+#define printWithArgList g_lingo->printSTUBWithArglist
+
+int calcStringAlignment(const char *s);
+int calcCodeAlignment(int l);
 
 typedef Common::Array<inst> ScriptData;
-typedef Common::Array<double> FloatArray;
 
 struct FuncDesc {
 	Common::String name;
@@ -89,48 +73,147 @@ struct FuncDesc {
 
 typedef Common::HashMap<void *, FuncDesc *> FuncHash;
 
+struct BuiltinProto {
+	const char *name;
+	void (*func)(int);
+	int minArgs;	// -1 -- arglist
+	int maxArgs;
+	int version;
+	SymbolType type;
+};
+
 struct Symbol {	/* symbol table entry */
-	Common::String name;
-	int type;
+	Common::String *name;
+	SymbolType type;
 	union {
-		int		i;			/* VAR */
-		double	f;			/* FLOAT */
-		ScriptData	*defn;	/* FUNCTION, PROCEDURE */
+		ScriptData	*defn;	/* HANDLER */
 		void (*func)();		/* OPCODE */
 		void (*bltin)(int);	/* BUILTIN */
 		Common::String	*s;	/* STRING */
-		FloatArray *arr;	/* ARRAY, POINT, RECT */
 	} u;
+
+	int *refCount;
+
 	int nargs;		/* number of arguments */
 	int maxArgs;	/* maximal number of arguments, for builtins */
-	bool parens;	/* whether parens required or not, for builitins */
+	int targetType;	/* valid target objects, for method builtins */
 
-	bool global;
+	Common::Array<Common::String> *argNames;
+	Common::Array<Common::String> *varNames;
+	ScriptContext *ctx;		/* optional script context to execute with */
+	AbstractObject *target;			/* optional method target */
+	bool anonymous;
 
 	Symbol();
+	Symbol(const Symbol &s);
+	Symbol& operator=(const Symbol &s);
+	void reset();
+	~Symbol();
 };
 
+struct PArray {
+	bool _sorted;
+	PropertyArray arr;
+
+	PArray() : _sorted(false) {}
+
+	PArray(int size) : _sorted(false), arr(size) {}
+};
+
+struct FArray {
+	bool _sorted;
+	DatumArray arr;
+
+	FArray() : _sorted(false) {}
+
+	FArray(int size) : _sorted(false), arr(size) {}
+};
+
+
 struct Datum {	/* interpreter stack type */
-	int type;
+	DatumType type;
 
 	union {
-		int	i;
-		double f;
-		Common::String *s;
-		Symbol	*sym;
-		FloatArray *arr;	/* ARRAY, POINT, RECT */
+		int	i;				/* INT, ARGC, ARGCNORET */
+		double f;			/* FLOAT */
+		Common::String *s;	/* STRING, VARREF, OBJECT */
+		FArray *farr;	/* ARRAY, POINT, RECT */
+		PArray *parr; /* PARRAY */
+		AbstractObject *obj; /* OBJECT */
+		ChunkReference *cref; /* CHUNKREF */
+		CastMemberID *cast;	/* CASTREF, FIELDREF */
+		MenuReference *menu; /* MENUREF	*/
 	} u;
 
-	Datum() { u.sym = NULL; type = VOID; }
-	Datum(int val) { u.i = val; type = INT; }
-	Datum(double val) { u.f = val; type = FLOAT; }
-	Datum(Common::String *val) { u.s = val; type = STRING; }
+	int *refCount;
 
-	double toFloat();
-	int toInt();
-	Common::String *toString();
+	bool ignoreGlobal; // True if this Datum should be ignored by showGlobals and clearGlobals
 
-	const char *type2str(bool isk = false);
+	Datum();
+	Datum(const Datum &d);
+	Datum& operator=(const Datum &d);
+	Datum(int val);
+	Datum(double val);
+	Datum(const Common::String &val);
+	Datum(AbstractObject *val);
+	Datum(const CastMemberID &val);
+	Datum(const Common::Rect &rect);
+	void reset();
+
+	~Datum() {
+		reset();
+	}
+
+	Datum eval() const;
+	double asFloat() const;
+	int asInt() const;
+	Common::String asString(bool printonly = false) const;
+	CastMemberID asMemberID(CastType castType = kCastTypeAny) const;
+	Common::Point asPoint() const;
+
+	bool isRef() const;
+	bool isVarRef() const;
+	bool isCastRef() const;
+
+	const char *type2str(bool ilk = false) const;
+
+	int equalTo(Datum &d, bool ignoreCase = false) const;
+	CompareResult compareTo(Datum &d) const;
+
+	bool operator==(Datum &d) const;
+	bool operator>(Datum &d) const;
+	bool operator<(Datum &d) const;
+	bool operator>=(Datum &d) const;
+	bool operator<=(Datum &d) const;
+};
+
+struct ChunkReference {
+	Datum source;
+	ChunkType type;
+	int startChunk;
+	int endChunk;
+	int start;
+	int end;
+
+	ChunkReference(const Datum &src, ChunkType t, int sc, int ec, int s, int e)
+		: source(src), type(t), startChunk(sc), endChunk(ec), start(s), end(e) {}
+};
+
+struct MenuReference {
+	int menuIdNum;
+	Common::String *menuIdStr;
+	int menuItemIdNum;
+	Common::String *menuItemIdStr;
+
+	MenuReference();
+};
+
+struct PCell {
+	Datum p;
+	Datum v;
+
+	PCell();
+	PCell(const Datum &prop, const Datum &val);
 };
 
 struct Builtin {
@@ -140,424 +223,280 @@ struct Builtin {
 	Builtin(void (*func1)(void), int nargs1) : func(func1), nargs(nargs1) {}
 };
 
-typedef Common::HashMap<int32, ScriptData *> ScriptHash;
+typedef Common::HashMap<int32, ScriptContext *> ScriptContextHash;
 typedef Common::Array<Datum> StackData;
-typedef Common::HashMap<Common::String, Symbol *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> SymbolHash;
+typedef Common::HashMap<Common::String, Symbol, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> SymbolHash;
+typedef Common::HashMap<Common::String, Datum, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> DatumHash;
 typedef Common::HashMap<Common::String, Builtin *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> BuiltinHash;
+typedef Common::HashMap<Common::String, VarType, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> VarTypeHash;
+typedef void (*XLibFunc)(int);
+typedef Common::HashMap<Common::String, XLibFunc, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> XLibFuncHash;
+typedef Common::HashMap<Common::String, ObjectType, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> OpenXLibsHash;
 
 typedef Common::HashMap<Common::String, TheEntity *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> TheEntityHash;
 typedef Common::HashMap<Common::String, TheEntityField *, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> TheEntityFieldHash;
 
 struct CFrame {	/* proc/func call stack frame */
-	Symbol	*sp;	/* symbol table entry */
-	int		retpc;	/* where to resume after return */
-	ScriptData	*retscript;	 /* which script to resume after return */
-	SymbolHash *localvars;
+	Symbol			sp;					/* symbol table entry */
+	int				retPC;				/* where to resume after return */
+	ScriptData		*retScript;			/* which script to resume after return */
+	ScriptContext	*retContext;		/* which script context to use after return */
+	DatumHash		*retLocalVars;
+	Datum			retMe;				/* which me obj to use after return */
+	uint			stackSizeBefore;
+	bool			allowRetVal;		/* whether to allow a return value */
+	Datum			defaultRetVal;		/* default return value */
+	int				paramCount;			/* original number of arguments submitted */
+};
+
+struct LingoEvent {
+	LEvent event;
+	int eventId;
+	ScriptType scriptType;
+	CastMemberID scriptId;
+	bool passByDefault;
+	int channelId;
+
+	LingoEvent (LEvent e, int ei, ScriptType st, CastMemberID si, bool pass, int ci = -1) {
+		event = e;
+		eventId = ei;
+		scriptType = st;
+		scriptId = si;
+		passByDefault = pass;
+		channelId = ci;
+	}
+};
+
+
+struct LingoArchive {
+	LingoArchive(Cast *c) : cast(c) {};
+	~LingoArchive();
+
+	Cast *cast;
+	ScriptContextHash lctxContexts;
+	ScriptContextHash scriptContexts[kMaxScriptType + 1];
+	Common::Array<Common::String> names;
+	Common::HashMap<uint32, Common::String> primaryEventHandlers;
+	SymbolHash functionHandlers;
+
+	ScriptContext *getScriptContext(ScriptType type, uint16 id);
+	ScriptContext *findScriptContext(uint16 id);
+	Common::String getName(uint16 id);
+	Common::String formatFunctionList(const char *prefix);
+
+	void addCode(const Common::U32String &code, ScriptType type, uint16 id, const char *scriptName = nullptr, uint32 preprocFlags = kLPPNone);
+	void removeCode(ScriptType type, uint16 id);
+	void replaceCode(const Common::U32String &code, ScriptType type, uint16 id, const char *scriptName = nullptr);
+	void addCodeV4(Common::SeekableReadStreamEndian &stream, uint16 lctxIndex, const Common::String &archName, uint16 version);
+	void addNamesV4(Common::SeekableReadStreamEndian &stream);
+};
+
+struct LingoState {
+	// Execution state for a Lingo process, created every time
+	// a top-level handler is called (e.g. on mouseDown).
+	// Can be swapped out when another script gets called with priority.
+	// Call frames are pushed and popped from the callstack with
+	// pushContext and popContext.
+	Common::Array<CFrame *> callstack;		// call stack
+	uint pc = 0;							// current program counter
+	ScriptData *script = nullptr;			// current Lingo script
+	ScriptContext *context = nullptr;		// current Lingo script context
+	DatumHash *localVars = nullptr;			// current local variables
+	Datum me;								// current me object
+
+	~LingoState();
 };
 
 class Lingo {
+
 public:
 	Lingo(DirectorEngine *vm);
 	~Lingo();
 
-	void restartLingo();
+	void resetLingo();
+	void cleanupLingo();
+	void resetLingoGo();
 
-	void addCode(const char *code, ScriptType type, uint16 id);
-	void executeScript(ScriptType type, uint16 id);
-	void printStack(const char *s);
-	Common::String decodeInstruction(uint pc, uint *newPC = NULL);
+	int getMenuNum();
+	int getMenuItemsNum(Datum &d);
 
+	void executeHandler(const Common::String &name);
+	void executeScript(ScriptType type, CastMemberID id);
+	Common::String formatStack();
+	void printStack(const char *s, uint pc);
+	Common::String formatCallStack(uint pc);
+	void printCallStack(uint pc);
+	Common::String formatFrame();
+	Common::String formatCurrentInstruction();
+	Common::String decodeInstruction(ScriptData *sd, uint pc, uint *newPC = NULL);
+	Common::String decodeScript(ScriptData *sd);
+	Common::String formatFunctionName(Symbol &sym);
+	Common::String formatFunctionBody(Symbol &sym);
+
+	void reloadBuiltIns();
 	void initBuiltIns();
+	void initBuiltIns(BuiltinProto protos[]);
+	void cleanupBuiltIns();
+	void cleanupBuiltIns(BuiltinProto protos[]);
 	void initFuncs();
-	void initTheEntities();
+	void cleanupFuncs();
+	void initBytecode();
+	void initMethods();
+	void cleanupMethods();
+	void initXLibs();
+	void cleanupXLibs();
+
+	Common::String normalizeXLibName(Common::String name);
+	void openXLib(Common::String name, ObjectType type);
+	void closeXLib(Common::String name);
+	void closeOpenXLibs();
+	void reloadOpenXLibs();
 
 	void runTests();
-
-private:
-	const char *findNextDefinition(const char *s);
 
 	// lingo-events.cpp
 private:
 	void initEventHandlerTypes();
-	void primaryEventHandler(LEvent event);
-	void processInputEvent(LEvent event);
-	void processFrameEvent(LEvent event);
-	void processGenericEvent(LEvent event);
-	void runMovieScript(LEvent event);
-	void processSpriteEvent(LEvent event);
-	void processEvent(LEvent event, ScriptType st, int entityId);
+	void processEvent(LEvent event, ScriptType st, CastMemberID scriptId, int channelId = -1);
+
 public:
 	ScriptType event2script(LEvent ev);
-	Symbol *getHandler(Common::String &name);
+	Symbol getHandler(const Common::String &name);
 
-	void processEvent(LEvent event);
+	void processEvents(Common::Queue<LingoEvent> &queue);
 
 public:
-	void execute(uint pc);
-	void pushContext();
-	void popContext();
-	Symbol *lookupVar(const char *name, bool create = true, bool putInGlobalList = false);
+	void execute();
+	void switchStateFromWindow();
+	void freezeState();
+	void pushContext(const Symbol funcSym, bool allowRetVal, Datum defaultRetVal, int paramCount);
+	void popContext(bool aborting = false);
 	void cleanLocalVars();
-	void define(Common::String &s, int start, int nargs, Common::String *prefix = NULL, int end = -1);
-	void processIf(int elselabel, int endlabel);
+	void varAssign(const Datum &var, const Datum &value);
+	Datum varFetch(const Datum &var, bool silent = false);
+	Common::U32String evalChunkRef(const Datum &var);
+	Datum findVarV4(int varType, const Datum &id);
+	CastMemberID resolveCastMember(const Datum &memberID, const Datum &castLib, CastType type);
+	void exposeXObject(const char *name, Datum obj);
 
-	int alignTypes(Datum &d1, Datum &d2);
+	int getAlignedType(const Datum &d1, const Datum &d2, bool numsOnly);
 
-	int code1(inst code) { _currentScript->push_back(code); return _currentScript->size() - 1; }
-	int code2(inst code_1, inst code_2) { int o = code1(code_1); code1(code_2); return o; }
-	int code3(inst code_1, inst code_2, inst code_3) { int o = code1(code_1); code1(code_2); code1(code_3); return o; }
-	int codeString(const char *s);
-	void codeLabel(int label);
-	int codeConst(int val);
-	int codeArray(int arraySize);
+	Common::String formatAllVars();
+	void printAllVars();
 
-	int calcStringAlignment(const char *s) {
-		return calcCodeAlignment(strlen(s) + 1);
-	}
-	int calcCodeAlignment(int l) {
-		int instLen = sizeof(inst);
-		return (l + instLen - 1) / instLen;
-	}
-
-	void codeArg(Common::String *s);
-	void codeArgStore();
-	int codeSetImmediate(bool state);
-	int codeFunc(Common::String *s, int numpar);
-	int codeMe(Common::String *method, int numpar);
-	int codeFloat(double f);
-	void codeFactory(Common::String &s);
+	inst readInst() { return getInst(_state->pc++); }
+	inst getInst(uint pc) { return (*_state->script)[pc]; }
+	int readInt() { return getInt(_state->pc++); }
+	int getInt(uint pc);
+	double readFloat() { double d = getFloat(_state->pc); _state->pc += calcCodeAlignment(sizeof(double)); return d; }
+	double getFloat(uint pc) { return *(double *)(&((*_state->script)[_state->pc])); }
+	char *readString() { char *s = getString(_state->pc); _state->pc += calcStringAlignment(s); return s; }
+	char *getString(uint pc) { return (char *)(&((*_state->script)[_state->pc])); }
 
 	void pushVoid();
-
-	static void c_xpop();
-	static void c_printtop();
-
-	static void c_add();
-	static void c_sub();
-	static void c_mul();
-	static void c_div();
-	static void c_mod();
-	static void c_negate();
-
-	static void c_and();
-	static void c_or();
-	static void c_not();
-
-	static void c_ampersand();
-	static void c_after();
-	static void c_before();
-	static void c_concat();
-	static void c_contains();
-	static void c_starts();
-
-	static void c_intersects();
-	static void c_within();
-	static void c_charOf();
-	static void c_charToOf();
-	static void c_itemOf();
-	static void c_itemToOf();
-	static void c_lineOf();
-	static void c_lineToOf();
-	static void c_wordOf();
-	static void c_wordToOf();
-
-	static void c_constpush();
-	static void c_voidpush();
-	static void c_fconstpush();
-	static void c_stringpush();
-	static void c_symbolpush();
-	static void c_varpush();
-	static void c_arraypush();
-	static void c_assign();
-	bool verify(Symbol *s);
-	static void c_eval();
-	static void c_setImmediate();
-
-	static void c_swap();
-
-	static void c_theentitypush();
-	static void c_theentityassign();
-
-	static void c_repeatwhilecode();
-	static void c_repeatwithcode();
-	static void c_ifcode();
-	static void c_whencode();
-	static void c_tellcode();
-	static void c_exitRepeat();
-	static void c_eq();
-	static void c_neq();
-	static void c_gt();
-	static void c_lt();
-	static void c_ge();
-	static void c_le();
-	static void c_call();
-
-	void call(Common::String name, int nargs);
-
-	static void c_procret();
-
-	static void c_mci();
-	static void c_mciwait();
-	static void c_goto();
-	static void c_gotoloop();
-	static void c_gotonext();
-	static void c_gotoprevious();
-	static void c_global();
-	static void c_instance();
-	static void c_property();
-
-	static void c_play();
-	static void c_playdone();
-
-	static void c_open();
 
 	void printSTUBWithArglist(const char *funcname, int nargs, const char *prefix = "STUB:");
 	void convertVOIDtoString(int arg, int nargs);
 	void dropStack(int nargs);
 	void drop(uint num);
 
-	static void b_abs(int nargs);
-	static void b_atan(int nargs);
-	static void b_cos(int nargs);
-	static void b_exp(int nargs);
-	static void b_float(int nargs);
-	static void b_integer(int nargs);
-	static void b_log(int nargs);
-	static void b_pi(int nargs);
-	static void b_power(int nargs);
-	static void b_random(int nargs);
-	static void b_sin(int nargs);
-	static void b_sqrt(int nargs);
-	static void b_tan(int nargs);
+	void lingoError(const char *s, ...);
 
-	static void b_chars(int nargs);
-	static void b_charToNum(int nargs);
-	static void b_delete(int nargs);
-	static void b_hilite(int nargs);
-	static void b_length(int nargs);
-	static void b_numToChar(int nargs);
-	static void b_offset(int nargs);
-	static void b_string(int nargs);
-
-	static void b_add(int nargs);
-	static void b_addAt(int nargs);
-	static void b_addProp(int nargs);
-	static void b_append(int nargs);
-	static void b_count(int nargs);
-	static void b_deleteAt(int nargs);
-	static void b_deleteProp(int nargs);
-	static void b_findPos(int nargs);
-	static void b_findPosNear(int nargs);
-	static void b_getaProp(int nargs);
-	static void b_getAt(int nargs);
-	static void b_getLast(int nargs);
-	static void b_getOne(int nargs);
-	static void b_getPos(int nargs);
-	static void b_getProp(int nargs);
-	static void b_getPropAt(int nargs);
-	static void b_list(int nargs);
-	static void b_listP(int nargs);
-	static void b_max(int nargs);
-	static void b_min(int nargs);
-	static void b_setaProp(int nargs);
-	static void b_setAt(int nargs);
-	static void b_setProp(int nargs);
-	static void b_sort(int nargs);
-
-	static void b_floatP(int nargs);
-	static void b_ilk(int nargs);
-	static void b_integerp(int nargs);
-	static void b_objectp(int nargs);
-	static void b_pictureP(int nargs);
-	static void b_stringp(int nargs);
-	static void b_symbolp(int nargs);
-	static void b_voidP(int nargs);
-
-	static void b_alert(int nargs);
-	static void b_birth(int nargs);
-	static void b_clearGlobals(int nargs);
-	static void b_cursor(int nargs);
-	static void b_framesToHMS(int nargs);
-	static void b_HMStoFrames(int nargs);
-	static void b_param(int nargs);
-	static void b_printFrom(int nargs);
-	static void b_showGlobals(int nargs);
-	static void b_showLocals(int nargs);
-	static void b_value(int nargs);
-
-	static void b_constrainH(int nargs);
-	static void b_constrainV(int nargs);
-	static void b_copyToClipBoard(int nargs);
-	static void b_duplicate(int nargs);
-	static void b_editableText(int nargs);
-	static void b_erase(int nargs);
-	static void b_findEmpty(int nargs);
-	static void b_importFileInto(int nargs);
-	static void b_installMenu(int nargs);
-	static void b_label(int nargs);
-	static void b_marker(int nargs);
-	static void b_move(int nargs);
-	static void b_moveableSprite(int nargs);
-	static void b_pasteClipBoardInto(int nargs);
-	static void b_puppetPalette(int nargs);
-	static void b_puppetSound(int nargs);
-	static void b_puppetSprite(int nargs);
-	static void b_puppetTempo(int nargs);
-	static void b_puppetTransition(int nargs);
-	static void b_ramNeeded(int nargs);
-	static void b_rollOver(int nargs);
-	static void b_spriteBox(int nargs);
-	static void b_unLoad(int nargs);
-	static void b_unLoadCast(int nargs);
-	static void b_updateStage(int nargs);
-	static void b_zoomBox(int nargs);
-
-	static void b_abort(int nargs);
-	static void b_continue(int nargs);
-	static void b_dontPassEvent(int nargs);
-	static void b_delay(int nargs);
-	static void b_do(int nargs);
-	static void b_halt(int nargs);
-	static void b_nothing(int nargs);
-	static void b_pass(int nargs);
-	static void b_pause(int nargs);
-	static void b_playAccel(int nargs);
-	static void b_preLoad(int nargs);
-	static void b_preLoadCast(int nargs);
-	static void b_quit(int nargs);
-	static void b_restart(int nargs);
-	static void b_shutDown(int nargs);
-	static void b_startTimer(int nargs);
-
-	static void b_closeDA(int nargs);
-	static void b_closeResFile(int nargs);
-	static void b_closeXlib(int nargs);
-	static void b_getNthFileNameInFolder(int nargs);
-	static void b_openDA(int nargs);
-	static void b_openResFile(int nargs);
-	static void b_openXlib(int nargs);
-	static void b_setCallBack(int nargs);
-	static void b_saveMovie(int nargs);
-	static void b_showResFile(int nargs);
-	static void b_showXlib(int nargs);
-	static void b_xFactoryList(int nargs);
-
-	static void b_point(int nargs);
-	static void b_inside(int nargs);
-	static void b_intersect(int nargs);
-	static void b_map(int nargs);
-	static void b_offsetRect(int nargs);
-	static void b_rect(int nargs);
-	static void b_union(int nargs);
-
-	static void b_close(int nargs);
-	static void b_forget(int nargs);
-	static void b_inflate(int nargs);
-	static void b_moveToBack(int nargs);
-	static void b_moveToFront(int nargs);
-	static void b_window(int nargs);
-
-	static void b_beep(int nargs);
-	static void b_mci(int nargs);
-	static void b_mciwait(int nargs);
-	static void b_soundBusy(int nargs);
-	static void b_soundClose(int nargs);
-	static void b_soundFadeIn(int nargs);
-	static void b_soundFadeOut(int nargs);
-	static void b_soundPlayFile(int nargs);
-	static void b_soundStop(int nargs);
-
-	static void b_ancestor(int nargs);
-	static void b_backspace(int nargs);
-	static void b_empty(int nargs);
-	static void b_enter(int nargs);
-	static void b_false(int nargs);
-	static void b_quote(int nargs);
-	static void b_return(int nargs);
-	static void b_tab(int nargs);
-	static void b_true(int nargs);
-	static void b_version(int nargs);
-
-	static void b_factory(int nargs);
-	void factoryCall(Common::String &name, int nargs);
-
-	static void b_cast(int nargs);
-	static void b_field(int nargs);
-	static void b_me(int nargs);
-	static void b_script(int nargs);
-
-	void func_mci(Common::String &s);
-	void func_mciwait(Common::String &s);
+	void func_mci(const Common::String &name);
+	void func_mciwait(const Common::String &name);
 	void func_beep(int repeats);
-	void func_goto(Datum &frame, Datum &movie);
+	void func_goto(Datum &frame, Datum &movie, bool commandgo = false );
 	void func_gotoloop();
 	void func_gotonext();
 	void func_gotoprevious();
 	void func_play(Datum &frame, Datum &movie);
 	void func_playdone();
-	void func_cursor(int c);
+	void func_cursor(Datum cursorDatum);
 	int func_marker(int m);
+	uint16 func_label(Datum &label);
 
+	// lingo-the.cpp
 public:
-	void setTheEntity(int entity, Datum &id, int field, Datum &d);
-	void setTheSprite(Datum &id, int field, Datum &d);
-	void setTheCast(Datum &id, int field, Datum &d);
+	void initTheEntities();
+	void cleanUpTheEntities();
+	const char *entity2str(int id);
+	const char *field2str(int id);
+
+	// global kTheEntity
+	Datum _actorList;
+	Common::u32char_type_t _itemDelimiter;
+	bool _exitLock;
+	bool _preLoadEventAbort; // no-op, everything is always preloaded
+	Datum _searchPath;
+	bool _trace;	// state of movie's trace function
+	int _traceLoad; // internal Director verbosity level
+	bool _updateMovieEnabled;
+	bool _romanLingo;
+
 	Datum getTheEntity(int entity, Datum &id, int field);
+	void setTheEntity(int entity, Datum &id, int field, Datum &d);
 	Datum getTheSprite(Datum &id, int field);
+	void setTheSprite(Datum &id, int field, Datum &d);
 	Datum getTheCast(Datum &id, int field);
+	void setTheCast(Datum &id, int field, Datum &d);
+	Datum getTheField(Datum &id1, int field);
+	void setTheField(Datum &id1, int field, Datum &d);
+	Datum getTheChunk(Datum &chunk, int field);
+	void setTheChunk(Datum &chunk, int field, Datum &d);
+	void getObjectProp(Datum &obj, Common::String &propName);
+	void setObjectProp(Datum &obj, Common::String &propName, Datum &d);
+	Datum getTheDate(int field);
+	Datum getTheTime(int field);
+
+private:
+	Common::StringArray _entityNames;
+	Common::StringArray _fieldNames;
 
 public:
-	ScriptData *_currentScript;
-	ScriptType _currentScriptType;
-	uint16 _currentEntityId;
-	bool _returning;
-	bool _indef;
-	bool _ignoreMe;
-	bool _immediateMode;
+	LingoCompiler *_compiler;
+	LingoState *_state;
 
-	Common::Array<CFrame *> _callstack;
-	Common::Array<Common::String *> _argstack;
+	int _currentChannelId;
+
+	bool _freezeState;
+	bool _abort;
+	bool _expectError;
+	bool _caughtError;
+
 	TheEntityHash _theEntities;
 	TheEntityFieldHash _theEntityFields;
-	Common::Array<int> _labelstack;
 
-	SymbolHash _builtins;
-	Common::HashMap<Common::String, bool> _twoWordBuiltins;
-	Common::HashMap<uint32, Symbol *> _handlers;
+	int _objectEntityId;
 
-	int _linenumber;
-	int _colnumber;
+	SymbolHash _builtinCmds;
+	SymbolHash _builtinFuncs;
+	SymbolHash _builtinConsts;
+	SymbolHash _methods;
+	XLibFuncHash _xlibOpeners;
+	XLibFuncHash _xlibClosers;
+
+	OpenXLibsHash _openXLibs;
 
 	Common::String _floatPrecisionFormat;
 
-	bool _hadError;
-
-	bool _inFactory;
-	Common::String _currentFactory;
-
-	bool _exitRepeat;
-
-	bool _cursorOnStack;
-
-private:
-	int parse(const char *code);
-	void parseMenu(const char *code);
-
+public:
 	void push(Datum d);
-	Datum pop(void);
+	Datum pop();
+	Datum peek(uint offset);
 
+public:
 	Common::HashMap<uint32, const char *> _eventHandlerTypes;
-	Common::HashMap<Common::String, uint32> _eventHandlerTypeIds;
+	Common::HashMap<Common::String, uint32, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> _eventHandlerTypeIds;
 	Common::HashMap<Common::String, Audio::AudioStream *> _audioAliases;
 
-	ScriptHash _scripts[kMaxScriptType + 1];
-
-	SymbolHash _globalvars;
-	SymbolHash *_localvars;
+	DatumHash _globalvars;
 
 	FuncHash _functions;
 
-	uint _pc;
+	Common::HashMap<int, LingoV4Bytecode *> _lingoV4;
+	Common::HashMap<int, LingoV4TheEntity *> _lingoV4TheEntity;
+
+	uint _globalCounter;
 
 	StackData _stack;
 
@@ -565,10 +504,25 @@ private:
 
 	int _floatPrecision;
 
-	bool dontPassEvent;
+	Datum _theResult;
+
+	// events
+	bool _passEvent;
+	Datum _perFrameHook;
+
+	Datum _windowList;
 
 public:
 	void executeImmediateScripts(Frame *frame);
+	void executePerFrameHook(int frame, int subframe);
+
+	// lingo-utils.cpp
+private:
+	Common::HashMap<uint32, Common::U32String> _charNormalizations;
+	void initCharNormalizations();
+
+public:
+	Common::String normalizeString(const Common::String &str);
 };
 
 extern Lingo *g_lingo;

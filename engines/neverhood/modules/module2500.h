@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -33,7 +32,7 @@ namespace Neverhood {
 class Module2500 : public Module {
 public:
 	Module2500(NeverhoodEngine *vm, Module *parentModule, int which);
-	virtual ~Module2500();
+	~Module2500() override;
 protected:
 	int _sceneNum;
 	int _soundIndex;
@@ -48,7 +47,7 @@ class AsCommonCar;
 class Scene2501 : public Scene {
 public:
 	Scene2501(NeverhoodEngine *vm, Module *parentModule, int which);
-	virtual ~Scene2501();
+	~Scene2501() override;
 protected:
 	AsCommonCar *_asCar;
 	Sprite *_ssTrackShadowBackground;

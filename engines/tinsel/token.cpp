@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * To ensure exclusive use of resources and exclusive control responsibilities.
  */
@@ -34,7 +33,8 @@ struct Token {
 	Common::PROCESS		*proc;
 };
 
-static Token g_tokens[NUMTOKENS];	// FIXME: Avoid non-const global vars
+// These vars are reset upon engine destruction
+static Token g_tokens[NUMTOKENS];
 
 
 /**
@@ -45,7 +45,7 @@ static void TerminateProcess(Common::PROCESS *tProc) {
 	// Release tokens held by the process
 	for (int i = 0; i < NUMTOKENS; i++) {
 		if (g_tokens[i].proc == tProc) {
-			g_tokens[i].proc = NULL;
+			g_tokens[i].proc = nullptr;
 		}
 	}
 
@@ -69,7 +69,7 @@ void GetControlToken() {
  */
 void FreeControlToken() {
 	// Allow anyone to free TOKEN_CONTROL
-	g_tokens[TOKEN_CONTROL].proc = NULL;
+	g_tokens[TOKEN_CONTROL].proc = nullptr;
 }
 
 
@@ -101,7 +101,7 @@ void FreeToken(int which) {
 
 	assert(g_tokens[which].proc == CoroScheduler.getCurrentProcess());	// we'd have been killed if some other proc had taken this token
 
-	g_tokens[which].proc = NULL;
+	g_tokens[which].proc = nullptr;
 }
 
 /**
@@ -119,7 +119,7 @@ bool TestToken(int which) {
  */
 void FreeAllTokens() {
 	for (int i = 0; i < NUMTOKENS; i++) {
-		g_tokens[i].proc = NULL;
+		g_tokens[i].proc = nullptr;
 	}
 }
 

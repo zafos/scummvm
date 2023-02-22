@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,6 +30,8 @@
 #include "sword1/sworddefs.h"
 #include "sword1/console.h"
 
+struct ADGameDescription;
+
 /**
  * This is the namespace of the Sword1 engine.
  *
@@ -39,11 +40,8 @@
  * Games using this engine:
  * - Broken Sword: The Shadow of the Templars
  */
-namespace Sword1 {
 
-enum {
-	GF_DEMO = 1 << 0
-};
+namespace Sword1 {
 
 enum ControlPanelMode {
 	CP_NORMAL = 0,
@@ -74,15 +72,17 @@ struct SystemVars {
 	bool   showText;
 	uint8   language;
 	bool    isDemo;
+	bool    isSpanishDemo;
 	Common::Platform platform;
 	Common::Language realLanguage;
+	bool isLangRtl;
 };
 
 class SwordEngine : public Engine {
 	friend class SwordConsole;
 public:
-	SwordEngine(OSystem *syst);
-	virtual ~SwordEngine();
+	SwordEngine(OSystem *syst, const ADGameDescription *gameDesc);
+	~SwordEngine() override;
 	static SystemVars _systemVars;
 	void reinitialize();
 
@@ -98,23 +98,23 @@ protected:
 	// Engine APIs
 	Common::Error init();
 	Common::Error go();
-	virtual Common::Error run() {
+	Common::Error run() override {
 		Common::Error err;
 		err = init();
 		if (err.getCode() != Common::kNoError)
 			return err;
 		return go();
 	}
-	virtual bool hasFeature(EngineFeature f) const;
-	virtual void syncSoundSettings();
+	bool hasFeature(EngineFeature f) const override;
+	void syncSoundSettings() override;
 
-	GUI::Debugger *getDebugger() { return _console; }
-
-	Common::Error loadGameState(int slot);
-	bool canLoadGameStateCurrently();
-	Common::Error saveGameState(int slot, const Common::String &desc);
-	bool canSaveGameStateCurrently();
-
+	Common::Error loadGameState(int slot) override;
+	bool canLoadGameStateCurrently() override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	bool canSaveGameStateCurrently() override;
+	Common::String getSaveStateName(int slot) const override {
+		return Common::String::format("sword1.%03d", slot);
+	}
 private:
 	void delay(int32 amount);
 
@@ -124,8 +124,6 @@ private:
 	void flagsToBool(bool *dest, uint8 flags);
 
 	void reinitRes(); //Reinits the resources after a GMM load
-
-	SwordConsole *_console;
 
 	uint8 mainLoop();
 

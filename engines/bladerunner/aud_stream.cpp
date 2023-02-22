@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,31 +15,32 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "bladerunner/aud_stream.h"
 
-#include "bladerunner/audio_player.h"
+#include "bladerunner/audio_cache.h"
 
 #include "common/util.h"
 
 namespace BladeRunner {
 
-AudStream::AudStream(byte *data) {
+AudStream::AudStream(byte *data, int overrideFrequency) {
 	_hash  = 0;
 	_cache = nullptr;
+	_overrideFrequency = overrideFrequency;
 
 	init(data);
 }
 
-AudStream::AudStream(AudioCache *cache, int32 hash) {
+AudStream::AudStream(AudioCache *cache, int32 hash, int overrideFrequency) {
 	assert(cache != nullptr);
 
 	_cache = cache;
 	_hash  = hash;
+	_overrideFrequency = overrideFrequency;
 
 	_cache->incRef(_hash);
 
@@ -102,8 +103,11 @@ int AudStream::readBuffer(int16 *buffer, const int numSamples) {
 			assert(_end - _p >= _deafBlockRemain);
 
 			int bytesConsumed = MIN<int>(_deafBlockRemain, (numSamples - samplesRead) / 2);
-
-			_decoder.decode(_p, bytesConsumed, buffer + samplesRead);
+			if (buffer) {
+				_decoder.decode(_p, bytesConsumed, buffer + samplesRead, false);
+			} else {
+				_decoder.decode(_p, bytesConsumed, nullptr, false);
+			}
 			_p += bytesConsumed;
 			_deafBlockRemain -= bytesConsumed;
 
@@ -111,12 +115,38 @@ int AudStream::readBuffer(int16 *buffer, const int numSamples) {
 		}
 	} else {
 		samplesRead = MIN(numSamples, (int)(_end - _p) / 2);
-		for (int i = 0; i < samplesRead; i++, _p += 2) {
-			buffer[i] = READ_LE_UINT16(_p);
+		if (buffer) {
+			for (int i = 0; i < samplesRead; ++i, _p += 2) {
+				buffer[i] = READ_LE_UINT16(_p);
+			}
 		}
 	}
 
 	return samplesRead;
+}
+
+int AudStream::getBytesPerSecond() const {
+	int bytesPerSecond = _overrideFrequency > 0 ? _overrideFrequency : _frequency;
+	if (_flags & 1) { // 16 bit
+		bytesPerSecond *= 2;
+	}
+	if (_flags & 2) { // stereo
+		bytesPerSecond *= 2;
+	}
+	return bytesPerSecond;
+}
+
+bool AudStream::startAtSecond(uint32 startSecond) {
+	uint32 audStreamLengthMillis = getLength();
+	if (startSecond == 0 || startSecond * 1000 > audStreamLengthMillis || audStreamLengthMillis == 0) { 
+		return false;
+	}
+	if (rewind()) {
+		int samplesPerSecond = _overrideFrequency > 0 ? _overrideFrequency : _frequency;
+		readBuffer(nullptr, startSecond * samplesPerSecond);
+		return true;
+	}
+	return false;
 }
 
 bool AudStream::rewind() {
@@ -125,20 +155,18 @@ bool AudStream::rewind() {
 	return true;
 }
 
-int AudStream::getLength() const {
-	int bytesPerSecond = _frequency;
-	if (_flags & 1) { // 16 bit
-		bytesPerSecond *= 2;
-	}
-	if (_flags & 2) { // stereo
-		bytesPerSecond *= 2;
-	}
-
+/**
+* Returns audio length in milliseconds
+*/
+uint32 AudStream::getLength() const {
 	// since everything is 44100, we easily get overflows with ints
 	// thus we must use doubles
+	int bytesPerSecond = getBytesPerSecond();
+	if (bytesPerSecond <= 0) {
+		return 0u;
+	}
 	double res = (double)_sizeDecompressed * 1000.0 / (double)bytesPerSecond;
-
-	return (int32)res;
+	return (uint32)res;
 }
 
 } // End of namespace BladeRunner

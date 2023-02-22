@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,7 +40,7 @@ protected:
 class AsScene2401FlowingWater : public AnimatedSprite {
 public:
 	AsScene2401FlowingWater(NeverhoodEngine *vm);
-	virtual ~AsScene2401FlowingWater();
+	~AsScene2401FlowingWater() override;
 protected:
 	bool _isWaterFlowing;
 	uint32 handleMessage(int messageNum, const MessageParam &param, Entity *sender);
@@ -83,7 +82,7 @@ protected:
 class AsScene2402TV : public AnimatedSprite {
 public:
 	AsScene2402TV(NeverhoodEngine *vm, Klaymen *klaymen);
-	virtual ~AsScene2402TV();
+	~AsScene2402TV() override;
 protected:
 	Klaymen *_klaymen;
 	int _countdown1;
@@ -110,28 +109,28 @@ protected:
 	void stContSpitIntoPipe();
 	uint32 hmSpit(int messageNum, const MessageParam &param, Entity *sender);
 
-	uint32 xHandleMessage(int messageNum, const MessageParam &param);
+	uint32 xHandleMessage(int messageNum, const MessageParam &param) override;
 };
 
 class KmScene2402 : public Klaymen {
 public:
 	KmScene2402(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16 y);
 protected:
-	uint32 xHandleMessage(int messageNum, const MessageParam &param);
+	uint32 xHandleMessage(int messageNum, const MessageParam &param) override;
 };
 
 class KmScene2403 : public Klaymen {
 public:
 	KmScene2403(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16 y);
 protected:
-	uint32 xHandleMessage(int messageNum, const MessageParam &param);
+	uint32 xHandleMessage(int messageNum, const MessageParam &param) override;
 };
 
 class KmScene2406 : public Klaymen {
 public:
 	KmScene2406(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16 y, NRect *clipRects, int clipRectsCount);
 protected:
-	uint32 xHandleMessage(int messageNum, const MessageParam &param);
+	uint32 xHandleMessage(int messageNum, const MessageParam &param) override;
 };
 
 } // End of namespace Neverhood

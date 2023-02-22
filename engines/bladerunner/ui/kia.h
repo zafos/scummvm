@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,12 +24,11 @@
 
 #include "common/str.h"
 
+#include "graphics/surface.h"
+
 namespace Common {
 struct KeyState;
-}
-
-namespace Graphics {
-struct Surface;
+struct Event;
 }
 
 namespace BladeRunner {
@@ -48,8 +46,8 @@ class KIASectionSettings;
 class KIASectionPogo;
 class KIASectionSave;
 class KIASectionSuspects;
-class KIAShapes;
 class Shape;
+class Shapes;
 class UIImagePicker;
 class VQAPlayer;
 
@@ -78,18 +76,18 @@ class KIA {
 
 	BladeRunnerEngine *_vm;
 
-	int _forceOpen;
 	int _transitionId;
 
-	int        _playerVqaTimeLast;
-	VQAPlayer *_playerVqaPlayer;
-	int        _playerVqaFrame;
-	int        _playerVisualizerState;
-	int        _playerPhotographId;
-	Shape     *_playerPhotograph;
-	int        _playerSliceModelId;
-	float      _playerSliceModelAngle;
-	int        _timeLast;
+	uint32             _playerVqaTimeLast;
+	VQAPlayer         *_playerVqaPlayer;
+	uint32             _playerVqaFrame;
+	uint32             _playerVisualizerState;
+	int                _playerPhotographId;
+	Shapes            *_playerPhotographs;
+	int                _playerSliceModelId;
+	float              _playerSliceModelAngle;
+	Graphics::Surface  _playerImage;
+	uint32             _timeLast;
 
 	ActorDialogueQueueEntry _playerActorDialogueQueue[kPlayerActorDialogueQueueCapacity];
 	int                     _playerActorDialogueQueuePosition;
@@ -117,14 +115,25 @@ class KIA {
 
 	int                   _pogoPos;
 
+
 public:
-	KIALog     *_log;
-	KIAScript  *_script;
-	KIAShapes  *_shapes;
+	// Indicates when KIA opens after player has died
+	// or the game just launched and there are existing saved games to load.
+	// In forced open mode, certain KIA tabs are not available,
+	// such as the Save Game tab and the Crime Scene, Suspect, Clue database tabs.
+	bool              _forceOpen;
+
+	KIALog           *_log;
+	KIAScript        *_script;
+	Shapes           *_shapes;
+
+	Graphics::Surface _thumbnail;
 
 public:
 	KIA(BladeRunnerEngine *vm);
 	~KIA();
+
+	void reset();
 
 	void openLastOpened();
 	void open(KIASections sectionId);
@@ -136,13 +145,19 @@ public:
 
 	void handleMouseDown(int mouseX, int mouseY, bool mainButton);
 	void handleMouseUp(int mouseX, int mouseY, bool mainButton);
+	void handleMouseScroll(int mouseX, int mouseY, int direction); // Added by ScummVM team
 	void handleKeyUp(const Common::KeyState &kbd);
 	void handleKeyDown(const Common::KeyState &kbd);
+	void handleCustomEventStop(const Common::Event &evt);
+	void handleCustomEventStart(const Common::Event &evt);
 
 	void playerReset();
 	void playActorDialogue(int actorId, int sentenceId);
 	void playSliceModel(int sliceModelId);
 	void playPhotograph(int photographId);
+	void playImage(const Graphics::Surface &image);
+
+	const char *scrambleSuspectsName(const char *name);
 
 private:
 	static void mouseDownCallback(int buttonId, void *callbackData);
@@ -164,6 +179,7 @@ private:
 	void playTransitionSound(int transitionId);
 
 	void playPrivateAddon();
+	void playObjectDescription(); // for restored content mode
 };
 
 } // End of namespace BladeRunner

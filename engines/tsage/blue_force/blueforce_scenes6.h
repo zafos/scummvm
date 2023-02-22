@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,7 +42,7 @@ class Scene600 : public SceneExt {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	SequenceManager _sequenceManager;
@@ -53,9 +52,9 @@ public:
 	BackgroundSceneObject _object4, _object5;
 	BackgroundSceneObject _object6, _object7, _object8;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void signal();
-	virtual void remove();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void signal() override;
+	void remove() override;
 };
 
 class Scene620 : public PalettedScene {
@@ -65,21 +64,21 @@ public:
 	NamedObject _object1, _object2, _object3;
 	NamedObject _object4, _object5, _object6;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void signal();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void signal() override;
 };
 
 class Scene666 : public SceneExt {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 	/* Items */
 	class Item1: public NamedHotspot {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 public:
 	Action1 _action1;
@@ -88,9 +87,9 @@ public:
 	Item1 _item1;
 	SceneText _text;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void remove();
-	virtual void signal();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void remove() override;
+	void signal() override;
 };
 
 
@@ -98,11 +97,11 @@ class Scene690 : public SceneExt {
 	/* Objects */
 	class Object1: public NamedObject {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 	class Object2: public NamedObject {
 	public:
-		virtual bool startAction(CursorType action, Event &event);
+		bool startAction(CursorType action, Event &event) override;
 	};
 public:
 	SequenceManager _sequenceManager;
@@ -115,8 +114,8 @@ public:
 	NamedHotspot _item16, _item17;
 	SpeakerJake _jakeSpeaker;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void signal();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void signal() override;
 };
 } // End of namespace BlueForce
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,7 +24,7 @@
 
 #include "gui/widget.h"
 #include "common/str.h"
-#include "scrollbar.h"
+#include "gui/widgets/scrollbar.h"
 
 namespace GUI {
 
@@ -34,33 +33,39 @@ class ScrollContainerWidget: public Widget, public CommandSender {
 	int16 _scrolledX, _scrolledY;
 	uint16 _limitH;
 	uint32 _reflowCmd;
+	ThemeEngine::WidgetBackground _backgroundType;
+	Common::String _dialogName;
 
 	void recalc();
 
 public:
 	ScrollContainerWidget(GuiObject *boss, int x, int y, int w, int h, uint32 reflowCmd = 0);
-	ScrollContainerWidget(GuiObject *boss, const Common::String &name, uint32 reflowCmd = 0);
-	~ScrollContainerWidget();
+	ScrollContainerWidget(GuiObject *boss, const Common::String &name, const Common::String &dialogName, uint32 reflowCmd = 0);
+	~ScrollContainerWidget() override;
 
 	void init();
-	virtual void handleCommand(CommandSender *sender, uint32 cmd, uint32 data);
-	virtual void reflowLayout();
+	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data) override;
+	void reflowLayout() override;
 
-	virtual bool containsWidget(Widget *) const;
+	bool containsWidget(Widget *) const override;
 
 	Common::Rect getClipRect() const override;
 
-protected:
+	void setBackgroundType(ThemeEngine::WidgetBackground backgroundType);
+
+	void handleMouseWheel(int x, int y, int direction) override;
+
 	// We overload getChildY to make sure child widgets are positioned correctly.
 	// Essentially this compensates for the space taken up by the tab title header.
-	virtual int16	getChildX() const;
-	virtual int16	getChildY() const;
-	virtual uint16	getWidth() const;
-	virtual uint16	getHeight() const;
+	int16	getChildX() const override;
+	int16	getChildY() const override;
+	uint16	getWidth() const override;
+	uint16	getHeight() const override;
 
-	virtual void drawWidget();
+protected:
+	void drawWidget() override;
 
-	virtual Widget *findWidget(int x, int y);
+	Widget *findWidget(int x, int y) override;
 };
 
 } // End of namespace GUI

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -71,27 +70,27 @@ public:
 	/**
 	 * Setup the glyph
 	 */
-	virtual bool setup(CPetControl *petControl, CPetGlyphs *owner);
+	bool setup(CPetControl *petControl, CPetGlyphs *owner) override;
 
 	/**
 	 * Reset the glyph
 	 */
-	virtual bool reset();
+	bool reset() override;
 
 	/**
 	 * Handles any secondary drawing of the glyph
 	 */
-	virtual void draw2(CScreenManager *screenManager);
+	void draw2(CScreenManager *screenManager) override;
 
 	/**
 	 * Called for mouse button down messages
 	 */
-	virtual bool MouseButtonDownMsg(const Point &pt);
+	bool MouseButtonDownMsg(const Point &pt) override;
 
 	/**
 	 * Handles keypresses when the glyph is focused
 	 */
-	virtual bool KeyCharMsg(int key);
+	bool KeyCharMsg(int key) override;
 
 	/**
 	 * Resets highlighting on the save slots

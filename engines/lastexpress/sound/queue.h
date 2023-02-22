@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -38,33 +37,30 @@ class SubtitleEntry;
 class SoundQueue : Common::Serializable {
 public:
 	SoundQueue(LastExpressEngine *engine);
-	~SoundQueue();
-
-	// Timer
-	void handleTimer();
+	~SoundQueue() override;
 
 	// Queue
 	void addToQueue(SoundEntry *entry);
-	void removeFromQueue(Common::String filename);
-	void removeFromQueue(EntityIndex entity);
+	void stop(Common::String filename);
+	void stop(EntityIndex entity);
 	void updateQueue();
-	void resetQueue();
-	void resetQueue(SoundType type1, SoundType type2 = kSoundTypeNone);
-	void clearQueue();
+	void stopAmbient();
+	void stopAllExcept(SoundTag tag1, SoundTag tag2 = kSoundTagNone);
+	void destroyAllSound();
 
 	// State
-	void clearStatus();
-	int getSoundState() { return _state; }
-	void resetState() { resetState(kSoundState1); }
-	void resetState(SoundState state) { _state |= state; }
+	void stopAll();
+	int getAmbientState() { return _ambientState; }
+	void startAmbient() { _ambientState |= kAmbientSoundEnabled; }
+	void setAmbientToSteam() { _ambientState |= kAmbientSoundSteam; }
 
 	// Entries
-	void setupEntry(SoundType type, EntityIndex index);
-	void processEntry(EntityIndex entity);
-	void processEntry(SoundType type);
-	void processEntry(Common::String filename);
-	void processEntries();
-	SoundEntry *getEntry(SoundType type);
+	void assignNISLink(EntityIndex index);
+	void fade(EntityIndex entity);
+	void fade(SoundTag tag);
+	void fade(Common::String filename);
+	void endAmbient();
+	SoundEntry *getEntry(SoundTag tag);
 	SoundEntry *getEntry(EntityIndex index);
 	SoundEntry *getEntry(Common::String name);
 	uint32 getEntryTime(EntityIndex index);
@@ -79,15 +75,15 @@ public:
 	SubtitleEntry *getCurrentSubtitle() { return _currentSubtitle; }
 
 	// Serializable
-	void saveLoadWithSerializer(Common::Serializer &ser);
+	void saveLoadWithSerializer(Common::Serializer &ser) override;
 	uint32 count();
 
 	// Accessors
 	uint32 getFlag() { return _flag; }
 	int getSubtitleFlag() { return _subtitlesFlag; }
 	void setSubtitleFlag(int flag) { _subtitlesFlag = flag; }
-	SoundType getCurrentType() { return _currentType; }
-	void setCurrentType(SoundType type) { _currentType = type; }
+
+	int32 generateNextTag() { return _currentTag++; }
 
 protected:
 	// Debug
@@ -96,12 +92,9 @@ protected:
 private:
 	LastExpressEngine *_engine;
 
-	Common::Mutex _mutex;
-
 	// State & shared data
-	int _state;
-	SoundType _currentType;
-	// TODO: this seems to be a synchronization flag for the sound timer
+	int _ambientState;
+	int32 _currentTag;
 	uint32 _flag;
 
 	// Entries

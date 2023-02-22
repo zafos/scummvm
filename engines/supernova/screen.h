@@ -1,24 +1,23 @@
 /* ScummVM - Graphic Adventure Engine
-*
-* ScummVM is the legal property of its developers, whose names
-* are too numerous to list here. Please refer to the COPYRIGHT
-* file distributed with this source distribution.
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-*
-*/
+ *
+ * ScummVM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 #ifndef SUPERNOVA_SCREEN_H
 #define SUPERNOVA_SCREEN_H
@@ -29,6 +28,7 @@
 
 #include "supernova/imageid.h"
 #include "supernova/msn_def.h"
+#include "supernova/resman.h"
 
 namespace Supernova {
 
@@ -43,6 +43,7 @@ class Screen;
 const int kScreenWidth  = 320;
 const int kScreenHeight = 200;
 const int kFontWidth = 5;
+const int kFontWidth2 = 4;
 const int kFontHeight = 8;
 
 enum Color {
@@ -62,6 +63,7 @@ enum Color {
 	kColorLightGreen  = 13,
 	kColorLightYellow = 14,
 	kColorLightRed    = 15,
+	kColorPurple      = 16,
 	kColorCursorTransparent = kColorWhite25
 };
 
@@ -99,8 +101,10 @@ public:
 	};
 
 	Marquee(Screen *screen, MarqueeId id, const char *text);
+	~Marquee();
 
-	void renderCharacter();
+	bool renderCharacter();
+	void reset();
 
 private:
 	void clearText();
@@ -111,6 +115,7 @@ private:
 	bool _loop;
 	int _delay;
 	int _color;
+	byte *_oldColor;
 	int _x;
 	int _y;
 	int _textWidth;
@@ -132,16 +137,19 @@ public:
 	static int textWidth(const Common::String &text);
 
 public:
-	Screen(SupernovaEngine *vm, GameManager *gm, ResourceManager *resMan);
+	Screen(SupernovaEngine *vm, ResourceManager *resMan);
 
+	int getScreenWidth() const;
+	int getScreenHeight() const;
 	int getViewportBrightness() const;
 	void setViewportBrightness(int brightness);
 	int getGuiBrightness() const;
 	void setGuiBrightness(int brightness);
-	const MSNImage *getCurrentImage() const;
+	MSNImage *getCurrentImage();
+	const ImageInfo *getImageInfo(ImageId id) const;
 	bool isMessageShown() const;
-	void paletteFadeIn();
-	void paletteFadeOut();
+	void paletteFadeIn(int maxViewportBrightness);
+	void paletteFadeOut(int minBrightness);
 	void paletteBrightness();
 	void renderImage(ImageId id, bool removeImage = false);
 	void renderImage(int section);
@@ -150,19 +158,19 @@ public:
 	void saveScreen(const GuiElement &guiElement);
 	void restoreScreen();
 	void renderRoom(Room &room);
-	void renderMessage(const char *text, MessagePosition position = kMessageNormal);
+	void renderMessage(const char *text, MessagePosition position = kMessageNormal, int positionX = -1, int positionY = -1);
 	void renderMessage(const Common::String &text, MessagePosition position = kMessageNormal);
-	void renderMessage(StringId stringId, MessagePosition position = kMessageNormal,
+	void renderMessage(int stringId, MessagePosition position = kMessageNormal,
 					   Common::String var1 = "", Common::String var2 = "");
 	void removeMessage();
 	void renderText(const uint16 character);
 	void renderText(const char *text);
 	void renderText(const Common::String &text);
-	void renderText(StringId stringId);
+	void renderText(int stringId);
 	void renderText(const uint16 character, int x, int y, byte color);
 	void renderText(const char *text, int x, int y, byte color);
 	void renderText(const Common::String &text, int x, int y, byte color);
-	void renderText(StringId stringId, int x, int y, byte color);
+	void renderText(int stringId, int x, int y, byte color);
 	void renderText(const GuiElement &guiElement);
 	void renderBox(int x, int y, int width, int height, byte color);
 	void renderBox(const GuiElement &guiElement);
@@ -172,15 +180,15 @@ public:
 	byte getTextCursorColor();
 	void setTextCursorColor(byte color);
 	void update();
+	void changeCursor(ResourceManager::CursorId);
 
 private:
-	void renderImageSection(const MSNImage *image, int section);
+	void renderImageSection(const MSNImage *image, int section, bool invert);
 
 private:
 	SupernovaEngine *_vm;
-	GameManager *_gm;
 	ResourceManager *_resMan;
-	const MSNImage *_currentImage;
+	MSNImage *_currentImage;
 	ScreenBufferStack _screenBuffer;
 	int _screenWidth;
 	int _screenHeight;

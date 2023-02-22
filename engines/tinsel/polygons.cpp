@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "tinsel/actors.h"
@@ -25,11 +24,15 @@
 #include "tinsel/pcode.h"
 #include "tinsel/pid.h"
 #include "tinsel/polygons.h"
-#include "tinsel/rince.h"
+#include "tinsel/movers.h"
+#include "tinsel/noir/notebook.h"
 #include "tinsel/sched.h"
 #include "common/serializer.h"
 #include "tinsel/tinsel.h"
 #include "tinsel/token.h"
+#include "tinsel/sysvar.h"
+
+#include "tinsel/background.h"
 
 #include "common/textconsole.h"
 #include "common/util.h"
@@ -42,7 +45,7 @@ namespace Tinsel {
 /** different types of polygon */
 enum POLY_TYPE {
 	POLY_PATH, POLY_NPATH, POLY_BLOCK, POLY_REFER, POLY_EFFECT,
-	POLY_EXIT, POLY_TAG
+	POLY_EXIT, POLY_TAG, POLY_SCALE
 };
 
 // Note 7/10/94, with adjacency reduction ANKHMAP max is 3, UNSEEN max is 4
@@ -107,8 +110,12 @@ struct POLYGON {
 	 */
 	POLYGON *adjpaths[MAXADJ];
 
+	void setPoint(int index, const Common::Point &point) {
+		cx[index] = point.x;
+		cy[index] = point.y;
+	}
+	bool containsPoint(const Common::Point &point) const;
 };
-typedef POLYGON *PPOLYGON;
 
 #define MAXONROUTE 40
 
@@ -184,6 +191,13 @@ public:
 	int32 reel;			// } PATH and NPATH
 	int32 zFactor;		// }
 
+	int32 playfield;	// Noir field
+	int32 sceneId;		// Noir field
+
+	int32 vx[4]; // Noir field, only for scale polygon
+	int32 vy[4]; // Noir field, only for scale polygon
+	int32 vz[4]; // Noir field, only for scale polygon
+
 protected:
 	int32 nodecount;		///<The number of nodes in this polygon
 	int32 pnodelistx, pnodelisty;	///<offset in chunk to this array if present
@@ -230,7 +244,9 @@ void Poly::nextPoly() {
 	const byte *pRecord = _pData;
 
 	int typeVal = nextLong(_pData);
-	if ((FROM_32(typeVal) == 5) && TinselV2)
+	if ((FROM_32(typeVal) == 6) && (TinselVersion == 3))
+		typeVal = TO_32(7);
+	if ((FROM_32(typeVal) == 5) && TinselVersion >= 2)
 		typeVal = TO_32(6);
 	type = (POLY_TYPE)typeVal;
 
@@ -239,32 +255,59 @@ void Poly::nextPoly() {
 	for (int i = 0; i < 4; ++i)
 		y[i] = nextLong(_pData);
 
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		xoff = nextLong(_pData);
 		yoff = nextLong(_pData);
 		id = nextLong(_pData);
-		reftype = nextLong(_pData);
+		if (TinselVersion == 3) {
+			sceneId = nextLong(_pData);
+			playfield = nextLong(_pData);
+		}
 	}
 
-	tagx = nextLong(_pData);
-	tagy = nextLong(_pData);
-	hTagtext = nextLong(_pData);
-	nodex = nextLong(_pData);
-	nodey = nextLong(_pData);
-	hFilm = nextLong(_pData);
+	// Noir is for scale polygons using union with some alignment
+	if ((TinselVersion == 3) && type == POLY_SCALE) {
+		vx[0] = nextLong(_pData);
+		vx[1] = nextLong(_pData);
+		vx[2] = nextLong(_pData);
+		vx[3] = nextLong(_pData);
 
-	if (!TinselV2) {
-		reftype = nextLong(_pData);
-		id = nextLong(_pData);
+		vy[0] = nextLong(_pData);
+		vy[1] = nextLong(_pData);
+		vy[2] = nextLong(_pData);
+		vy[3] = nextLong(_pData);
+
+		vz[0] = nextLong(_pData);
+		vz[1] = nextLong(_pData);
+		vz[2] = nextLong(_pData);
+		vz[3] = nextLong(_pData);
+	} else {
+		if (TinselVersion >= 2) {
+			reftype = nextLong(_pData);
+		}
+		tagx = nextLong(_pData);
+		tagy = nextLong(_pData);
+		hTagtext = nextLong(_pData);
+		nodex = nextLong(_pData);
+		nodey = nextLong(_pData);
+		hFilm = nextLong(_pData);
+
+		if (TinselVersion <= 1) {
+			reftype = nextLong(_pData);
+			id = nextLong(_pData);
+		}
+
+		scale1 = nextLong(_pData);
+		scale2 = nextLong(_pData);
+
+		if (TinselVersion >= 2) {
+			level1 = nextLong(_pData);
+			level2 = nextLong(_pData);
+			bright1 = nextLong(_pData);
+		}
 	}
 
-	scale1 = nextLong(_pData);
-	scale2 = nextLong(_pData);
-
-	if (TinselV2) {
-		level1 = nextLong(_pData);
-		level2 = nextLong(_pData);
-		bright1 = nextLong(_pData);
+	if (TinselVersion >= 2) {
 		bright2 = nextLong(_pData);
 	}
 
@@ -278,7 +321,7 @@ void Poly::nextPoly() {
 	nlistx = (const int32 *)(_pStart + (int)FROM_32(pnodelistx));
 	nlisty = (const int32 *)(_pStart + (int)FROM_32(pnodelisty));
 
-	if (TinselV0)
+	if (TinselVersion == 0)
 		// Skip to the last 4 bytes of the record for the hScript value
 		_pData = pRecord + 0x62C;
 
@@ -287,7 +330,7 @@ void Poly::nextPoly() {
 
 //----------------- LOCAL GLOBAL DATA --------------------
 
-// FIXME: Avoid non-const global vars
+// These vars are reset upon engine destruction
 
 static int MaxPolys = MAX_POLY;
 
@@ -319,6 +362,16 @@ static POLY_VOLATILE volatileStuff[MAX_POLY];
 #define CHECK_HP(mvar, str)	assert(mvar >= 0 && mvar <= noofPolys);
 
 //-------------------- METHODS ----------------------
+
+void ResetVarsPolygons() {
+	DropPolygons();
+
+	MaxPolys = MAX_POLY;
+	pHandle = 0;
+
+	memset(&extraBlock, 0, sizeof(extraBlock));
+	memset(volatileStuff, 0, sizeof(volatileStuff));
+}
 
 static HPOLYGON PolygonIndex(const POLYGON *pp) {
 	for (int i = 0; i <= MAX_POLY; ++i) {
@@ -357,33 +410,36 @@ static HPOLYGON PolygonIndex(const POLYGON *pp) {
  * have two polygon corners above it and two corners to the left of it.
  */
 bool IsInPolygon(int xt, int yt, HPOLYGON hp) {
-	const POLYGON *pp;
-	int	i;
-	bool BeenTested = false;
-	int	pl = 0, pa = 0;
-
 	CHECK_HP_OR(hp, "Out of range polygon handle (1)");
-	pp = Polys[hp];
+	const POLYGON *pp = Polys[hp];
 	assert(pp != NULL); // Testing whether in a NULL polygon
 
 	// Shift cursor for relative polygons
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		xt -= volatileStuff[hp].xoff;
 		yt -= volatileStuff[hp].yoff;
 	}
 
+	return pp->containsPoint(Common::Point(xt, yt));
+}
+
+bool POLYGON::containsPoint(const Common::Point &point) const {
+	int xt = point.x;
+	int yt = point.y;
 	/* Is point within the external rectangle? */
-	if (xt < pp->pleft || xt > pp->pright || yt < pp->ptop || yt > pp->pbottom)
+	if (point.x < this->pleft || point.x > this->pright || yt < this->ptop || yt > this->pbottom)
 		return false;
 
+	bool BeenTested = false;
+
 	// For each corner/side
-	for (i = 0; i < 4; i++)	{
+	for (int i = 0; i < 4; i++)	{
 		// If within this side's 'testable' area
 		// i.e. within the width of the line in y direction of end of line
 		// or within the height of the line in x direction of end of line
-		if ((xt >= pp->lleft[i] && xt <= pp->lright[i]  && ((yt > pp->cy[i]) == (pp->cy[(i+1)%4] > pp->cy[i])))
-		 || (yt >= pp->ltop[i]  && yt <= pp->lbottom[i] && ((xt > pp->cx[i]) == (pp->cx[(i+1)%4] > pp->cx[i])))) {
-			if (((long)xt*pp->a[i] + (long)yt*pp->b[i]) < pp->c[i])
+		if ((xt >= this->lleft[i] && xt <= this->lright[i]  && ((yt > this->cy[i]) == (this->cy[(i+1)%4] > this->cy[i])))
+		 || (yt >= this->ltop[i]  && yt <= this->lbottom[i] && ((xt > this->cx[i]) == (this->cx[(i+1)%4] > this->cx[i])))) {
+			if (((long)xt*this->a[i] + (long)yt*this->b[i]) < this->c[i])
 				return false;
 			else
 				BeenTested = true;
@@ -392,21 +448,23 @@ bool IsInPolygon(int xt, int yt, HPOLYGON hp) {
 
 	if (BeenTested) {
 		// New dodgy code 29/12/94
-		if (pp->polyType == BLOCK) {
+		if (this->polyType == BLOCK) {
 			// For each corner/side
-			for (i = 0; i < 4; i++) {
+			for (int i = 0; i < 4; i++) {
 				// Pretend the corners of blocking polys are not in the poly.
-				if (xt == pp->cx[i] && yt == pp->cy[i])
+				if (xt == this->cx[i] && yt == this->cy[i])
 					return false;
 			}
 		}
 		return true;
 	} else {
+		int	pl = 0, pa = 0;
+
 		// Is point within the internal rectangle?
-		for (i = 0; i < 4; i++) {
-			if (pp->cx[i] < xt)
+		for (int i = 0; i < 4; i++) {
+			if (this->cx[i] < xt)
 				pl++;
-			if (pp->cy[i] < yt)
+			if (this->cy[i] < yt)
 				pa++;
 		}
 
@@ -585,7 +643,7 @@ void FindBestPoint(HPOLYGON hp, int *x, int *y, int *pline) {
 	pp = Polys[hp];
 
 	// Pointer to polygon data
-	Poly ptp(LockMem(pHandle), pp->pIndex);	// This polygon
+	Poly ptp(_vm->_handle->LockMem(pHandle), pp->pIndex); // This polygon
 
 	// Look for fit of perpendicular to lines between nodes
 	for (int i = 0; i < ptp.getNodecount() - 1; i++) {
@@ -690,7 +748,7 @@ void FindBestPoint(HPOLYGON hp, int *x, int *y, int *pline) {
 }
 
 /**
- * Returns TRUE if two paths are asdjacent.
+ * Returns TRUE if two paths are adjacent.
  */
 bool IsAdjacentPath(HPOLYGON hPath1, HPOLYGON hPath2) {
 	const POLYGON *pp1, *pp2;
@@ -774,7 +832,7 @@ static HPOLYGON PathOnTheWay(HPOLYGON from, HPOLYGON to) {
 
 	const POLYGON *p = TryPath(Polys[from], Polys[to], Polys[from]);
 
-	if (TinselV2 && !p)
+	if ((TinselVersion >= 2) && !p)
 		return NOPOLY;
 
 	assert(p != NULL); // Trying to find route between unconnected paths
@@ -824,7 +882,7 @@ int NearestEndNode(HPOLYGON hPath, int x, int y) {
 	CHECK_HP(hPath, "Out of range polygon handle (8)");
 	pp = Polys[hPath];
 
-	Poly ptp(LockMem(pHandle), pp->pIndex);	// This polygon
+	Poly ptp(_vm->_handle->LockMem(pHandle), pp->pIndex); // This polygon
 
 	const int nodecount = ptp.getNodecount() - 1;
 
@@ -851,7 +909,7 @@ int NearEndNode(HPOLYGON hSpath, HPOLYGON hDpath) {
 	pSpath = Polys[hSpath];
 	pDpath = Polys[hDpath];
 
-	uint8 *pps = LockMem(pHandle);		// All polygons
+	uint8 *pps = _vm->_handle->LockMem(pHandle); // All polygons
 	Poly ps(pps, pSpath->pIndex);	// Start polygon
 	Poly pd(pps, pDpath->pIndex);	// Dest polygon
 
@@ -894,7 +952,7 @@ int NearestNodeWithin(HPOLYGON hNpath, int x, int y) {
 
 	CHECK_HP(hNpath, "Out of range polygon handle (11)");
 
-	Poly ptp(LockMem(pHandle), Polys[hNpath]->pIndex);	// This polygon
+	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hNpath]->pIndex); // This polygon
 
 	const int numNodes = ptp.getNodecount();	// Number of nodes in this follow nodes path
 
@@ -991,7 +1049,7 @@ int GetScale(HPOLYGON hPath, int y) {
 
 	CHECK_HP(hPath, "Out of range polygon handle (14)");
 
-	Poly ptp(LockMem(pHandle), Polys[hPath]->pIndex);
+	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hPath]->pIndex);
 
 	// Path is of a constant scale?
 	if (FROM_32(ptp.scale2) == 0)
@@ -1030,7 +1088,7 @@ int GetBrightness(HPOLYGON hPath, int y) {
 
 	CHECK_HP(hPath, "Out of range polygon handle (38)");
 
-	Poly ptp(LockMem(pHandle), Polys[hPath]->pIndex);
+	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hPath]->pIndex);
 
 	// Path is of a constant brightness?
 	if (FROM_32(ptp.bright1) == FROM_32(ptp.bright2))
@@ -1061,7 +1119,7 @@ void getNpathNode(HPOLYGON hNpath, int node, int *px, int *py) {
 	CHECK_HP(hNpath, "Out of range polygon handle (15)");
 	assert(Polys[hNpath] != NULL && Polys[hNpath]->polyType == PATH && Polys[hNpath]->subtype == NODE); // must be given a node path!
 
-	Poly ptp(LockMem(pHandle), Polys[hNpath]->pIndex);	// This polygon
+	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hNpath]->pIndex); // This polygon
 
 	// Might have just walked to the node from above.
 	if (node == ptp.getNodecount())
@@ -1077,10 +1135,10 @@ void getNpathNode(HPOLYGON hNpath, int node, int *px, int *py) {
 void GetTagTag(HPOLYGON hp, SCNHANDLE *hTagText, int *tagx, int *tagy) {
 	CHECK_HP(hp, "Out of range polygon handle (16)");
 
-	Poly ptp(LockMem(pHandle), Polys[hp]->pIndex);
+	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hp]->pIndex);
 
-	*tagx = (int)FROM_32(ptp.tagx) + (TinselV2 ? volatileStuff[hp].xoff : 0);
-	*tagy = (int)FROM_32(ptp.tagy) + (TinselV2 ? volatileStuff[hp].yoff : 0);
+	*tagx = (int)FROM_32(ptp.tagx) + ((TinselVersion >= 2) ? volatileStuff[hp].xoff : 0);
+	*tagy = (int)FROM_32(ptp.tagy) + ((TinselVersion >= 2) ? volatileStuff[hp].yoff : 0);
 	*hTagText = FROM_32(ptp.hTagtext);
 }
 
@@ -1090,7 +1148,7 @@ void GetTagTag(HPOLYGON hp, SCNHANDLE *hTagText, int *tagx, int *tagy) {
 SCNHANDLE GetPolyFilm(HPOLYGON hp) {
 	CHECK_HP(hp, "Out of range polygon handle (17)");
 
-	Poly ptp(LockMem(pHandle), Polys[hp]->pIndex);
+	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hp]->pIndex);
 
 	return FROM_32(ptp.hFilm);
 }
@@ -1101,7 +1159,7 @@ SCNHANDLE GetPolyFilm(HPOLYGON hp) {
 SCNHANDLE GetPolyScript(HPOLYGON hp) {
 	CHECK_HP(hp, "Out of range polygon handle (19)");
 
-	Poly ptp(LockMem(pHandle), Polys[hp]->pIndex);
+	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hp]->pIndex);
 
 	return FROM_32(ptp.hScript);
 }
@@ -1113,7 +1171,7 @@ REEL GetPolyReelType(HPOLYGON hp) {
 
 	CHECK_HP(hp, "Out of range polygon handle (20)");
 
-	Poly ptp(LockMem(pHandle), Polys[hp]->pIndex);
+	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hp]->pIndex);
 
 	return (REEL)FROM_32(ptp.reel);
 }
@@ -1122,7 +1180,7 @@ int32 GetPolyZfactor(HPOLYGON hp) {
 	CHECK_HP(hp, "Out of range polygon handle (21)");
 	assert(Polys[hp] != NULL);
 
-	Poly ptp(LockMem(pHandle), Polys[hp]->pIndex);
+	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hp]->pIndex);
 
 	return (int)FROM_32(ptp.zFactor);
 }
@@ -1131,7 +1189,7 @@ int numNodes(HPOLYGON hp) {
 	CHECK_HP(hp, "Out of range polygon handle (22)");
 	assert(Polys[hp] != NULL);
 
-	Poly ptp(LockMem(pHandle), Polys[hp]->pIndex);
+	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hp]->pIndex);
 
 	return ptp.getNodecount();
 }
@@ -1222,22 +1280,22 @@ void syncPolyInfo(Common::Serializer &s) {
  */
 
 void SaveDeadPolys(bool *sdp) {
-	assert(!TinselV2);
+	assert(TinselVersion <= 1);
 	memcpy(sdp, deadPolys, MAX_POLY*sizeof(bool));
 }
 
 void RestoreDeadPolys(bool *sdp) {
-	assert(!TinselV2);
+	assert(TinselVersion <= 1);
 	memcpy(deadPolys, sdp, MAX_POLY*sizeof(bool));
 }
 
 void SavePolygonStuff(POLY_VOLATILE *sps) {
-	assert(TinselV2);
+	assert(TinselVersion >= 2);
 	memcpy(sps, volatileStuff, MAX_POLY*sizeof(POLY_VOLATILE));
 }
 
 void RestorePolygonStuff(POLY_VOLATILE *sps) {
-	assert(TinselV2);
+	assert(TinselVersion >= 2);
 	memcpy(volatileStuff, sps, MAX_POLY*sizeof(POLY_VOLATILE));
 }
 
@@ -1314,8 +1372,8 @@ static int DistinctCorners(HPOLYGON hp1, HPOLYGON hp2) {
 /**
  * Returns true if the two paths are on the same level
  */
-static bool MatchingLevels(PPOLYGON p1, PPOLYGON p2) {
-	byte *pps = LockMem(pHandle);		// All polygons
+static bool MatchingLevels(POLYGON *p1, POLYGON *p2) {
+	byte *pps = _vm->_handle->LockMem(pHandle); // All polygons
 	Poly pp1(pps, p1->pIndex);	// This polygon 1
 	Poly pp2(pps, p2->pIndex);	// This polygon 2
 
@@ -1336,7 +1394,7 @@ static void SetPathAdjacencies() {
 
 	// Reset them all
 	for (i1 = 0; i1 < noofPolys; i1++)
-		memset(Polys[i1]->adjpaths, 0, MAXADJ * sizeof(PPOLYGON));
+		memset(Polys[i1]->adjpaths, 0, MAXADJ * sizeof(POLYGON *));
 
 	// For each polygon..
 	for (i1 = 0; i1 < MAX_POLY-1; i1++) {
@@ -1353,7 +1411,7 @@ static void SetPathAdjacencies() {
 				continue;
 
 			// Must be on the same level
-			if (TinselV2 && !MatchingLevels(p1, p2))
+			if ((TinselVersion >= 2) && !MatchingLevels(p1, p2))
 				continue;
 
 			int j = DistinctCorners(i1, i2);
@@ -1398,7 +1456,7 @@ void CheckNPathIntegrity() {
 	int		i, j;	// Loop counters
 	int		n;	// Last node in current path
 
-	pps = LockMem(pHandle);		// All polygons
+	pps = _vm->_handle->LockMem(pHandle);		// All polygons
 
 	for (i = 0; i < MAX_POLY; i++) {		// For each polygon..
 		rp = Polys[i];
@@ -1412,9 +1470,9 @@ void CheckNPathIntegrity() {
 			hp = PolygonIndex(rp);
 			for (j = 0; j <= n; j++) {
 				if (!IsInPolygon(cp.getNodeX(j), cp.getNodeY(j), hp)) {
-					sprintf(TextBufferAddr(), "Node (%d, %d) is not in its own path (starting (%d, %d))",
+					Common::sprintf_s(_vm->_font->TextBufferAddr(), "Node (%d, %d) is not in its own path (starting (%d, %d))",
 						 cp.getNodeX(j), cp.getNodeY(j), rp->cx[0], rp->cy[0]);
-					error(TextBufferAddr());
+					error(_vm->_font->TextBufferAddr());
 				}
 			}
 
@@ -1424,14 +1482,14 @@ void CheckNPathIntegrity() {
 					break;
 
 				if (IsInPolygon(cp.getNodeX(0), cp.getNodeY(0), PolygonIndex(rp->adjpaths[j]))) {
-					sprintf(TextBufferAddr(), "Node (%d, %d) is in another path (starting (%d, %d))",
+					Common::sprintf_s(_vm->_font->TextBufferAddr(), "Node (%d, %d) is in another path (starting (%d, %d))",
 						 cp.getNodeX(0), cp.getNodeY(0), rp->adjpaths[j]->cx[0], rp->adjpaths[j]->cy[0]);
-					error(TextBufferAddr());
+					error(_vm->_font->TextBufferAddr());
 				}
 				if (IsInPolygon(cp.getNodeX(n), cp.getNodeY(n), PolygonIndex(rp->adjpaths[j]))) {
-					sprintf(TextBufferAddr(), "Node (%d, %d) is in another path (starting (%d, %d))",
+					Common::sprintf_s(_vm->_font->TextBufferAddr(), "Node (%d, %d) is in another path (starting (%d, %d))",
 						 cp.getNodeX(n), cp.getNodeY(n), rp->adjpaths[j]->cx[0], rp->adjpaths[j]->cy[0]);
-					error(TextBufferAddr());
+					error(_vm->_font->TextBufferAddr());
 				}
 			}
 		}
@@ -1573,13 +1631,10 @@ static void FiddlyBit(POLYGON *p) {
 /**
  * Allocate a POLYGON structure and reset it to default values
  */
-static PPOLYGON GetPolyEntry() {
-	int i;		// Loop counter
-	PPOLYGON p;
-
-	for (i = 0; i < MaxPolys; i++) {
+static POLYGON *GetPolyEntry() {
+	for (int i = 0; i < MaxPolys; i++) {
 		if (!Polys[i]) {
-			p = Polys[i] = &Polygons[i];
+			POLYGON *p = Polys[i] = &Polygons[i];
 
 			// What the hell, just clear it all out - it's safer
 			memset(p, 0, sizeof(POLYGON));
@@ -1595,15 +1650,14 @@ static PPOLYGON GetPolyEntry() {
  * Variation of  GetPolyEntry from Tinsel 1 that splits up getting a new
  * polygon structure from initializing it
  */
-static PPOLYGON CommonInits(PTYPE polyType, int pno, const Poly &ptp, bool bRestart) {
-	int i;
+static POLYGON * CommonInits(PTYPE polyType, int pno, const Poly &ptp, bool bRestart) {
 	HPOLYGON hp;
-	PPOLYGON p = GetPolyEntry();	// Obtain a slot
+	POLYGON *p = GetPolyEntry();	// Obtain a slot
 
 	p->polyType = polyType;			// Polygon type
 	p->pIndex = pno;
 
-	for (i = 0; i < 4; i++) {		// Polygon definition
+	for (int i = 0; i < 4; i++) {		// Polygon definition
 		p->cx[i] = (short)FROM_32(ptp.x[i]);
 		p->cy[i] = (short)FROM_32(ptp.y[i]);
 	}
@@ -1649,9 +1703,9 @@ static void PseudoCenter(POLYGON *p) {
 #ifdef DEBUG
 	//	assert(IsInPolygon(p->pcenterx, p->pcentery, PolygonIndex(p)));  // Pseudo-center is not in path
 	if (!IsInPolygon(p->pcenterx, p->pcentery, PolygonIndex(p))) {
-		sprintf(TextBufferAddr(), "Pseudo-center is not in path (starting (%d, %d)) - polygon reversed?",
+		Common::sprintf_s(_vm->_font->TextBufferAddr(), "Pseudo-center is not in path (starting (%d, %d)) - polygon reversed?",
 			p->cx[0], p->cy[0]);
-		error(TextBufferAddr());
+		error(_vm->_font->TextBufferAddr());
 	}
 #endif
 }
@@ -1667,7 +1721,7 @@ static void InitExit(const Poly &ptp, int pno, bool bRestart) {
  * Initialize a PATH or NPATH polygon.
  */
 static void InitPath(const Poly &ptp, bool NodePath, int pno, bool bRestart) {
-	PPOLYGON p = CommonInits(PATH, pno, ptp, bRestart);
+	POLYGON *p = CommonInits(PATH, pno, ptp, bRestart);
 
 	p->subtype = NodePath ? NODE : NORMAL;
 
@@ -1688,7 +1742,7 @@ static void InitBlock(const Poly &ptp, int pno, bool bRestart) {
  * trying to walk through the actor you first thought of.
  * This is for dynamic blocking.
  */
-HPOLYGON InitExtraBlock(PMOVER ca, PMOVER ta) {
+HPOLYGON InitExtraBlock(MOVER *ca, MOVER *ta) {
 	int	caX, caY;	// Calling actor co-ords
 	int	taX, taY;	// Test actor co-ords
 	int	left, right;
@@ -1729,7 +1783,7 @@ static void InitEffect(const Poly &ptp, int pno, bool bRestart) {
  * Initialize a REFER polygon.
  */
 static void InitRefer(const Poly &ptp, int pno, bool bRestart) {
-	PPOLYGON p = CommonInits(REFER, pno, ptp, bRestart);
+	POLYGON *p = CommonInits(REFER, pno, ptp, bRestart);
 
 	p->subtype = FROM_32(ptp.reftype);	// Refer type
 }
@@ -1741,6 +1795,15 @@ static void InitRefer(const Poly &ptp, int pno, bool bRestart) {
 static void InitTag(const Poly &ptp, int pno, bool bRestart) {
 	CommonInits(TAG, pno, ptp, bRestart);
 }
+
+
+/**
+ * Initialize a scale polygon. Noir only.
+ */
+static void InitScale(const Poly &ptp, int pno, bool bRestart) {
+	CommonInits(SCALE, pno, ptp, bRestart);
+}
+
 
 /**
  * Called at the restart of a scene, nobbles polygons which are dead.
@@ -1773,6 +1836,10 @@ static void KillDeadPolygons() {
 				Polys[i]->polyType = EX_TAG;
 				break;
 
+			case SCALE:
+				Polys[i]->polyType = EX_SCALE;
+				break;
+
 			default:
 				error("Impossible message");
 			}
@@ -1803,21 +1870,21 @@ void InitPolygons(SCNHANDLE ph, int numPoly, bool bRestart) {
 	for (int i = 0; i < noofPolys; i++)	{
 		if (Polys[i]) {
 			Polys[i]->pointState = PS_NOT_POINTING;
-			Polys[i] = NULL;
+			Polys[i]= nullptr;
 		}
 	}
 
 	memset(RoutePaths, 0, sizeof(RoutePaths));
 
 	if (!bRestart) {
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			memset(volatileStuff, 0, sizeof(volatileStuff));
 		else
 			memset(deadPolys, 0, sizeof(deadPolys));
 	}
 
 	if (numPoly > 0) {
-		Poly ptp(LockMem(ph));
+		Poly ptp(_vm->_handle->LockMem(ph));
 
 		for (int i = 0; i < numPoly; ++i, ++ptp) {
 			switch (ptp.getType()) {
@@ -1849,13 +1916,17 @@ void InitPolygons(SCNHANDLE ph, int numPoly, bool bRestart) {
 				InitTag(ptp, i, bRestart);
 				break;
 
+			case POLY_SCALE:
+				InitScale(ptp, i, bRestart);
+				break;
+
 			default:
 				error("Unknown polygon type");
 			}
 		}
 	}
 
-	if (!TinselV2) {
+	if (TinselVersion <= 1) {
 		SetPathAdjacencies();		// Paths need to know the facts
 #ifdef DEBUG
 		CheckNPathIntegrity();
@@ -1872,7 +1943,13 @@ void InitPolygons(SCNHANDLE ph, int numPoly, bool bRestart) {
 			KillDeadPolygons();
 		} else {
 			for (int i = numPoly - 1; i >= 0; i--) {
-				if (Polys[i]->polyType == TAG) {
+				if (Polys[i]->polyType == TAG){
+					if (TinselVersion == 3) {
+						Poly ptp(_vm->_handle->LockMem(pHandle), Polys[i]->pIndex);
+						if (ptp.sceneId != -1) {
+							continue;
+						}
+					}
 					PolygonEvent(Common::nullContext, i, STARTUP, 0, false, 0);
 				}
 			}
@@ -1889,17 +1966,17 @@ void InitPolygons(SCNHANDLE ph, int numPoly, bool bRestart) {
 void DropPolygons() {
 	pathsOnRoute = 0;
 	memset(RoutePaths, 0, sizeof(RoutePaths));
-	RouteEnd = NULL;
+	RouteEnd= nullptr;
 
 	for (int i = 0; i < noofPolys; i++)	{
 		if (Polys[i]) {
 			Polys[i]->pointState = PS_NOT_POINTING;
-			Polys[i] = NULL;
+			Polys[i]= nullptr;
 		}
 	}
 	noofPolys = 0;
 	free(Polygons);
-	Polygons = NULL;
+	Polygons= nullptr;
 }
 
 
@@ -1983,10 +2060,10 @@ void MaxPolygons(int numPolys) {
 void GetPolyNode(HPOLYGON hp, int *pNodeX, int *pNodeY) {
 	CHECK_HP(hp, "GetPolyNode(): Out of range polygon handle");
 
-	Poly ptp(LockMem(pHandle), Polys[hp]->pIndex);
+	Poly ptp(_vm->_handle->LockMem(pHandle), Polys[hp]->pIndex);
 
 	// WORKAROUND: Invalid node adjustment for DW2 Cartwheel scene refer polygon
-	if (TinselV2 && (pHandle == 0x74191900) && (hp == 8)) {
+	if ((TinselVersion >= 2) && (pHandle == 0x74191900) && (hp == 8)) {
 		*pNodeX = 480;
 		*pNodeY = 408;
 	} else {
@@ -1994,7 +2071,7 @@ void GetPolyNode(HPOLYGON hp, int *pNodeX, int *pNodeY) {
 		*pNodeY = FROM_32(ptp.nodey);
 	}
 
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		*pNodeX += volatileStuff[hp].xoff;
 		*pNodeY += volatileStuff[hp].yoff;
 	}
@@ -2012,7 +2089,7 @@ void SetPolyPointedTo(HPOLYGON hp, bool bPointedTo) {
 bool PolyIsPointedTo(HPOLYGON hp) {
 	CHECK_HP(hp, "Out of range polygon handle (31)");
 
-	if (TinselV2)
+	if (TinselVersion >= 2)
 		return (Polys[hp]->tagFlags & POINTING);
 
 	return PolyPointState(hp) == PS_POINTING;
@@ -2199,14 +2276,14 @@ void EnableTag(CORO_PARAM, int tag) {
 		Polys[_ctx->i]->polyType = TAG;
 		volatileStuff[_ctx->i].bDead = false;
 
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			CORO_INVOKE_ARGS(PolygonEvent, (CORO_SUBCTX, _ctx->i, SHOWEVENT, 0, true, 0));
 	} else if ((_ctx->i = FindPolygon(TAG, tag)) != NOPOLY) {
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			CORO_INVOKE_ARGS(PolygonEvent, (CORO_SUBCTX, _ctx->i, SHOWEVENT, 0, true, 0));
 	}
 
-	if (!TinselV2) {
+	if (TinselVersion <= 1) {
 		TAGSTATE *pts = &TagStates[SceneTags[currentTScene].offset];
 		for (int j = 0; j < SceneTags[currentTScene].nooftags; j++, pts++) {
 			if (pts->tid == tag) {
@@ -2322,14 +2399,14 @@ void DisableTag(CORO_PARAM, int tag) {
 
 		volatileStuff[_ctx->i].bDead = true;
 
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			CORO_INVOKE_ARGS(PolygonEvent, (CORO_SUBCTX, _ctx->i, HIDEEVENT, 0, true, 0));
 	} else if ((_ctx->i = FindPolygon(EX_TAG, tag)) != NOPOLY) {
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			CORO_INVOKE_ARGS(PolygonEvent, (CORO_SUBCTX, _ctx->i, HIDEEVENT, 0, true, 0));
 	}
 
-	if (!TinselV2) {
+	if (TinselVersion <= 1) {
 		TAGSTATE *pts = &TagStates[SceneTags[currentTScene].offset];
 		for (int j = 0; j < SceneTags[currentTScene].nooftags; j++, pts++) {
 			if (pts->tid == tag) {
@@ -2363,6 +2440,143 @@ void DisableExit(int exitno) {
 			break;
 		}
 	}
+}
+
+#if 0
+void drawpolys() {
+	int Loffset, Toffset;
+
+	_vm->_bg->PlayfieldGetPos(FIELD_WORLD, &Loffset, &Toffset);
+	for (int i = 0; i < noofPolys; ++i) {
+		POLYGON* p = Polys[i];
+		if (volatileStuff[i].bDead) continue;
+		if (p->polyType != PATH) continue;
+		int xoff = volatileStuff[i].xoff - Loffset;
+		int yoff = volatileStuff[i].yoff - Toffset;
+		// if (p->polyType == TAG) {
+
+		uint color = 0xFFFF;
+		_vm->screen().drawLine(xoff + p->cx[0], yoff + p->cy[0], xoff + p->cx[1], yoff + p->cy[1], 0xFFFF);
+		_vm->screen().drawLine(xoff + p->cx[2], yoff + p->cy[2], xoff + p->cx[1], yoff + p->cy[1], 0xFFFF);
+		_vm->screen().drawLine(xoff + p->cx[2], yoff + p->cy[2], xoff + p->cx[3], yoff + p->cy[3], 0xFFFF);
+		_vm->screen().drawLine(xoff + p->cx[0], yoff + p->cy[0], xoff + p->cx[3], yoff + p->cy[3], 0xFFFF);
+	}
+}
+#endif
+
+void UpdateGroundPlane() {
+	int i;
+	for (i = 0; i < noofPolys; ++i) {
+		if (Polys[i]->polyType == SCALE && Polys[i]->polyID == SysVar(SV_SPRITER_SCENE_ID)) {
+			break;
+		}
+	}
+	if (i >= noofPolys)
+		return;
+	// assert(i < noofPolys);// No scale polygon
+
+	POLYGON *pp = Polys[i];
+	Poly ptp(_vm->_handle->LockMem(pHandle), pp->pIndex);
+
+	// Vertex2c v[4];
+
+	// float scale = SysVar(SV_SPRITER_SCALE);
+	// TransformXYZ(ptp.vx[0] * scale, -ptp.vy[0] * scale, -ptp.vz[0] * scale, v[0]);
+	// TransformXYZ(ptp.vx[1] * scale, -ptp.vy[1] * scale, -ptp.vz[1] * scale, v[1]);
+	// TransformXYZ(ptp.vx[2] * scale, -ptp.vy[2] * scale, -ptp.vz[2] * scale, v[2]);
+	// TransformXYZ(ptp.vx[3] * scale, -ptp.vy[3] * scale, -ptp.vz[3] * scale, v[3]);
+	//...
+}
+
+class NoteBookPolygonsImpl : public NoteBookPolygons {
+public:
+	NoteBookPolygonsImpl() {
+		setPolygon(NoteBookPoly::MAIN,
+				   Common::Point(220, 0),
+				   Common::Point(446, 0),
+				   Common::Point(553, 425),
+				   Common::Point(164, 410));
+	}
+
+	void setPolygon(NoteBookPoly polyKind, const Common::Point &c0, const Common::Point &c1, const Common::Point &c2, const Common::Point &c3) override {
+		POLYGON *poly = nullptr;
+		switch(polyKind) {
+		case NoteBookPoly::MAIN:
+			poly = &_main;
+			break;
+		case NoteBookPoly::NEXT:
+			poly = &_next;
+			break;
+		case NoteBookPoly::PREV:
+			poly = &_prev;
+			break;
+		default:
+			poly = _cluePoly + static_cast<int>(polyKind);
+			break;
+		}
+		poly->polyType = SHAPE;
+		poly->setPoint(0, c0);
+		poly->setPoint(1, c1);
+		poly->setPoint(2, c2);
+		poly->setPoint(3, c3);
+		FiddlyBit(poly);
+	}
+
+	void pushPolygon(const Common::Point &c0, const Common::Point &c1, const Common::Point &c2, const Common::Point &c3) override {
+		assert(_polyIndex < MAX_CLUE_POLYS);
+		setPolygon(static_cast<NoteBookPoly>(_polyIndex), c0, c1, c2, c3);
+		_polyIndex++;
+	}
+
+	bool isInsideNotebook(const Common::Point &point) const override {
+		return _main.containsPoint(point);
+	}
+
+	int lineHit(const Common::Point &point) const override {
+		for (int i = 0; i < MAX_CLUE_POLYS; i++) {
+			if (_cluePoly[i].containsPoint(point)) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	NoteBookPoly mostSpecificHit(const Common::Point &point) const override {
+		auto line = lineHit(point);
+		if (line != -1) {
+			return static_cast<NoteBookPoly>(line);
+		}
+		if (_next.containsPoint(point)) {
+			return NoteBookPoly::NEXT;
+		} else if (_prev.containsPoint(point)) {
+			return NoteBookPoly::PREV;
+		} else if (_main.containsPoint(point)) {
+			return NoteBookPoly::MAIN;
+		}
+		return NoteBookPoly::NONE;
+	}
+private:
+	static const int MAX_CLUE_POLYS = 8;
+	int _polyIndex = 0;
+	POLYGON _main, _prev, _next;
+	POLYGON _cluePoly[MAX_CLUE_POLYS];
+};
+
+NoteBookPolygons *instantiateNoteBookPolygons() {
+	return new NoteBookPolygonsImpl;
+}
+
+// Notebook (Tinsel)
+void NotebookPolyEntry(Common::Point c0, Common::Point c1, Common::Point c2, Common::Point c3) {
+	_vm->_notebook->_polygons->pushPolygon(c0, c1, c2, c3);
+}
+
+void NotebookPolyNextPage(Common::Point c0, Common::Point c1, Common::Point c2, Common::Point c3) {
+	_vm->_notebook->_polygons->setPolygon(NoteBookPoly::NEXT, c0, c1, c2, c3);
+}
+
+void NotebookPolyPrevPage(Common::Point c0, Common::Point c1, Common::Point c2, Common::Point c3) {
+	_vm->_notebook->_polygons->setPolygon(NoteBookPoly::PREV, c0, c1, c2, c3);
 }
 
 } // End of namespace Tinsel

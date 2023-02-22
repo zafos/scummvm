@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,66 +15,30 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
-#include "common/system.h"
-#include "common/savefile.h"
-#include "common/translation.h"
 #include "common/file.h"
 #include "common/md5.h"
 #include "common/debug.h"
-
-#include "graphics/thumbnail.h"
 
 #include "engines/advancedDetector.h"
 
 #include "adl/detection.h"
 #include "adl/disk.h"
+#include "adl/disk_image_helpers.h"
+#include "adl/adl.h"
 
 namespace Adl {
 
-// Mystery House was designed for monochrome display, so we default to
-// monochrome mode there. All the other games default to color mode.
-#define GAMEOPTION_COLOR_DEFAULT_OFF GUIO_GAMEOPTIONS1
-#define GAMEOPTION_SCANLINES         GUIO_GAMEOPTIONS2
-#define GAMEOPTION_COLOR_DEFAULT_ON  GUIO_GAMEOPTIONS3
-
-static const ADExtraGuiOptionsMap optionsList[] = {
-	{
-		GAMEOPTION_COLOR_DEFAULT_OFF,
-		{
-			_s("Color mode"),
-			_s("Use color graphics"),
-			"color",
-			false
-		}
-	},
-
-	{
-		GAMEOPTION_COLOR_DEFAULT_ON,
-		{
-			_s("Color mode"),
-			_s("Use color graphics"),
-			"color",
-			true
-		}
-	},
-
-	{
-		GAMEOPTION_SCANLINES,
-		{
-			_s("Scanlines"),
-			_s("Show scanlines"),
-			"scanlines",
-			false
-		}
-	},
-
-	AD_EXTRA_GUI_OPTIONS_TERMINATOR
+static const DebugChannelDef debugFlagList[] = {
+	{Adl::kDebugChannelScript, "Script", "Trace script execution"},
+	DEBUG_CHANNEL_END
 };
+
+#define DEFAULT_OPTIONS GUIO5(GAMEOPTION_NTSC, GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_MONO_TEXT, GAMEOPTION_SCANLINES, GUIO_NOMIDI)
+#define MH_OPTIONS GUIO5(GAMEOPTION_NTSC, GAMEOPTION_COLOR_DEFAULT_OFF, GAMEOPTION_MONO_TEXT, GAMEOPTION_SCANLINES, GUIO_NOMIDI)
 
 static const PlainGameDescriptor adlGames[] = {
 	{ "hires0", "Hi-Res Adventure #0: Mission Asteroid" },
@@ -84,19 +48,13 @@ static const PlainGameDescriptor adlGames[] = {
 	{ "hires4", "Hi-Res Adventure #4: Ulysses and the Golden Fleece" },
 	{ "hires5", "Hi-Res Adventure #5: Time Zone" },
 	{ "hires6", "Hi-Res Adventure #6: The Dark Crystal" },
-	{ 0, 0 }
-};
-
-struct AdlGameDescription {
-	ADGameDescription desc;
-	GameType gameType;
-	GameVersion version;
+	{ nullptr, nullptr }
 };
 
 static const AdlGameDescription gameFileDescriptions[] = {
-	{ // Hi-Res Adventure #1: Mystery House - Apple II - Contains Simi Valley address
+	{ // Hi-Res Adventure #1: Mystery House - Apple II - Simi Valley
 		{
-			"hires1", 0,
+			"hires1", "On-Line Systems [A]",
 			{
 				{ "ADVENTURE", 0, "22d9e63a11d69fa033ba1738715ad09a", 29952 },
 				{ "AUTO LOAD OBJ", 0, "a2ab7be25842e1fa9f1343b0894a8b6f", 4095 },
@@ -105,14 +63,62 @@ static const AdlGameDescription gameFileDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformApple2,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_COLOR_DEFAULT_OFF, GAMEOPTION_SCANLINES)
+			MH_OPTIONS
 		},
 		GAME_TYPE_HIRES1,
 		GAME_VER_HR1_SIMI
 	},
-	{ // Hi-Res Adventure #1: Mystery House - Apple II - Contains Coarsegold address
+	{ // Hi-Res Adventure #1: Mystery House - Apple II - Coarsegold - Without MIXEDON
 		{
-			"hires1", 0,
+			"hires1", "On-Line Systems [B]",
+			{
+				{ "ADVENTURE", 0, "22d9e63a11d69fa033ba1738715ad09a", 29952 },
+				{ "AUTO LOAD OBJ", 0, "669b5f313ffdfb373ab8dce5961688d3", 12288 },
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			MH_OPTIONS
+		},
+		GAME_TYPE_HIRES1,
+		GAME_VER_HR1_COARSE
+	},
+	{ // Hi-Res Adventure #1: Mystery House - Apple II - French - Without MIXEDON
+		{
+			"hires1", "Malibu Microcomputing [A]",
+			{
+				{ "ADVENTURE", 0, "6e2245979871b44a9fec46b4b2ba590a", 29952 },
+				{ "AUTO LOAD OBJ", 0, "3d417e923e70abe9a82e51155974027d", 12288 },
+				AD_LISTEND
+			},
+			Common::FR_FRA,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			MH_OPTIONS
+		},
+		GAME_TYPE_HIRES1,
+		GAME_VER_HR1_VF1
+	},
+	{ // Hi-Res Adventure #1: Mystery House - Apple II - French - Modified parser
+		{
+			"hires1", "Malibu Microcomputing [B]",
+			{
+				{ "ADVENTURE", 0, "f9a1add3609b4bc24b5dc4a9db1fec67", 29952 },
+				{ "AUTO LOAD OBJ", 0, "2a348058363da4c78a069ee5a2d81a31", 12287 },
+				AD_LISTEND
+			},
+			Common::FR_FRA,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			MH_OPTIONS
+		},
+		GAME_TYPE_HIRES1,
+		GAME_VER_HR1_VF2
+	},
+	{ // Hi-Res Adventure #1: Mystery House - Apple II - Coarsegold - With MIXEDON
+		{
+			"hires1", "On-Line Systems [C]",
 			{
 				{ "ADVENTURE", 0, "22d9e63a11d69fa033ba1738715ad09a", 29952 },
 				{ "AUTO LOAD OBJ", 0, "f6a6ac60c04c6ba6dff68b92cc279ba2", 12291 },
@@ -121,24 +127,23 @@ static const AdlGameDescription gameFileDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformApple2,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_COLOR_DEFAULT_OFF, GAMEOPTION_SCANLINES)
+			MH_OPTIONS
 		},
 		GAME_TYPE_HIRES1,
 		GAME_VER_HR1_COARSE
 	},
-	{ // Hi-Res Adventure #1: Mystery House - Apple II - Roberta Williams Anthology
+	{ // Hi-Res Adventure #1: Mystery House - Apple II - Public Domain
 		{
-			"hires1", 0,
+			"hires1", "Public Domain",
 			{
 				{ "ADVENTURE", 0, "22d9e63a11d69fa033ba1738715ad09a", 29952 },
 				{ "AUTO LOAD OBJ", 0, "23bfccfe9fcff9b22cf6c41bde9078ac", 12291 },
-				{ "MYSTERY.HELLO", 0, "2289b7fea300b506e902a4c597968369", 836 },
 				AD_LISTEND
 			},
 			Common::EN_ANY,
 			Common::kPlatformApple2,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_COLOR_DEFAULT_OFF, GAMEOPTION_SCANLINES)
+			MH_OPTIONS
 		},
 		GAME_TYPE_HIRES1,
 		GAME_VER_HR1_PD
@@ -147,84 +152,153 @@ static const AdlGameDescription gameFileDescriptions[] = {
 };
 
 static const AdlGameDescription gameDiskDescriptions[] = {
-	{ // Hi-Res Adventure #1: Mystery House - Apple II - Contains Coarsegold address
+	{ // Hi-Res Adventure #1: Mystery House - Apple II - Simi Valley - DOS 3.2 only
 		{
-			"hires1", 0,
-			{
-				{ "mysthous", 0, "8df0b3b3e609a2e40237e2419c1cb767", 116480 },
-				AD_LISTEND
-			},
+			"hires1", "On-Line Systems [A]",
+			AD_ENTRY1s("mysthous", "629b9d034cbf8d8e3a612398f53a8dfc", 116480),
 			Common::EN_ANY,
 			Common::kPlatformApple2,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_COLOR_DEFAULT_OFF, GAMEOPTION_SCANLINES)
+			MH_OPTIONS
+		},
+		GAME_TYPE_HIRES1,
+		GAME_VER_HR1_SIMI
+	},
+	{ // Hi-Res Adventure #1: Mystery House - Apple II - Coarsegold - Without MIXEDON
+		{
+			"hires1", "On-Line Systems [B]",
+			AD_ENTRY1s("mysthous", "b22561b5327c7dcdb659e2d649749310", 116480),
+			Common::EN_ANY,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			MH_OPTIONS
+		},
+		GAME_TYPE_HIRES1,
+		GAME_VER_HR1_COARSE
+	},
+	{ // Hi-Res Adventure #1: Mystery House - Apple II - French - Modified parser
+		{
+			"hires1", "Malibu Microcomputing [B]",
+			AD_ENTRY1s("mysthous", "7bd1918ffc28e551e5b3baf610982bd3", 116480),
+			Common::FR_FRA,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			MH_OPTIONS
+		},
+		GAME_TYPE_HIRES1,
+		GAME_VER_HR1_VF2
+	},
+	{ // Hi-Res Adventure #1: Mystery House - Apple II - Coarsegold - With MIXEDON
+		{
+			"hires1", "On-Line Systems [C]",
+			AD_ENTRY1s("mysthous", "8df0b3b3e609a2e40237e2419c1cb767", 116480),
+			Common::EN_ANY,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			MH_OPTIONS
 		},
 		GAME_TYPE_HIRES1,
 		GAME_VER_HR1_COARSE
 	},
 	{ // Hi-Res Adventure #1: Mystery House - Apple II - Roberta Williams Anthology
 		{
-			"hires1", 0,
-			{
-				{ "mysthous", 0, "54d20eb1ef0084ac3c2d16c31c5b7eb7", 143360 },
-				AD_LISTEND
-			},
+			"hires1", "Public Domain",
+			AD_ENTRY1s("mysthous", "54d20eb1ef0084ac3c2d16c31c5b7eb7", 143360),
 			Common::EN_ANY,
 			Common::kPlatformApple2,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_COLOR_DEFAULT_OFF, GAMEOPTION_SCANLINES)
+			MH_OPTIONS
 		},
 		GAME_TYPE_HIRES1,
 		GAME_VER_HR1_PD
 	},
-	{ // Hi-Res Adventure #2: Wizard and the Princess - Apple II - Roberta Williams Anthology
+	{ // Hi-Res Adventure #1: Mystery House - Apple II - Public Domain
 		{
-			"hires2", 0,
-			{
-				{ "wizard", 0, "72b114bf8f94fafe5672daac2a70c765", 143360 },
-				AD_LISTEND
-			},
+			"hires1", "Public Domain",
+			AD_ENTRY1s("mysthous", "bc0f34d153a530b9bb4e554b0a42f8d7", 143360),
 			Common::EN_ANY,
 			Common::kPlatformApple2,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
+			MH_OPTIONS
+		},
+		GAME_TYPE_HIRES1,
+		GAME_VER_HR1_PD
+	},
+	{ // Hi-Res Adventure #2: Wizard and the Princess - Apple II - DOS 3.2 only
+		{
+			"hires2", "On-Line Systems [A]",
+			AD_ENTRY1s("wizard", "5201c87db24ba7e3fa447471f4f2ec99", 116480),
+			Common::EN_ANY,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			DEFAULT_OPTIONS
+		},
+		GAME_TYPE_HIRES2,
+		GAME_VER_NONE
+	},
+	{ // Hi-Res Adventure #2: Wizard and the Princess - Apple II
+		{
+			"hires2", "On-Line Systems [B]",
+			AD_ENTRY1s("wizard", "1de984859212ff11cf61b29cb9b55f8c", 116480),
+			Common::EN_ANY,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			DEFAULT_OPTIONS
+		},
+		GAME_TYPE_HIRES2,
+		GAME_VER_NONE
+	},
+	{ // Hi-Res Adventure #2: Wizard and the Princess - Apple II - Green Valley Publishing
+		{
+			"hires2", "Green Valley [A]",
+			AD_ENTRY1s("wizard", "73cd373e9a2946c3181b72fdf7a32c77", 143360),
+			Common::EN_ANY,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			DEFAULT_OPTIONS
+		},
+		GAME_TYPE_HIRES2,
+		GAME_VER_NONE
+	},
+	{ // Hi-Res Adventure #2: Wizard and the Princess - Apple II - Roberta Williams Anthology
+		{
+			"hires2", "Green Valley [B]",
+			AD_ENTRY1s("wizard", "72b114bf8f94fafe5672daac2a70c765", 143360),
+			Common::EN_ANY,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			DEFAULT_OPTIONS
 		},
 		GAME_TYPE_HIRES2,
 		GAME_VER_NONE
 	},
 	{ // Hi-Res Adventure #0: Mission Asteroid - Apple II - Roberta Williams Anthology
 		{
-			"hires0", 0,
-			{
-				{ "mission", 0, "6bc53f51a3c8ee65c020af55fb8bd875", 116480 },
-				AD_LISTEND
-			},
+			"hires0", "",
+			AD_ENTRY1s("mission", "6bc53f51a3c8ee65c020af55fb8bd875", 116480),
 			Common::EN_ANY,
 			Common::kPlatformApple2,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
+			DEFAULT_OPTIONS
 		},
 		GAME_TYPE_HIRES0,
 		GAME_VER_NONE
 	},
 	{ // Hi-Res Adventure #3: Cranston Manor - Apple II
 		{
-			"hires3", 0,
-			{
-				{ "cranston", 0, "e4d35440791a36e55299c7be1ccd2b04", 116480 },
-				AD_LISTEND
-			},
+			"hires3", "",
+			AD_ENTRY1s("cranston", "e4d35440791a36e55299c7be1ccd2b04", 116480),
 			Common::EN_ANY,
 			Common::kPlatformApple2,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
+			DEFAULT_OPTIONS
 		},
 		GAME_TYPE_HIRES3,
 		GAME_VER_NONE
 	},
 	{ // Hi-Res Adventure #4: Ulysses and the Golden Fleece - Apple II - Load 'N' Go
 		{
-			"hires4", 0,
+			"hires4", "",
 			{
 				{ "ulyssesa", 0, "1eaeb2f1a773ce2d1cb9f16b2ef09049", 143360 },
 				{ "ulyssesb", 1, "9fa8552255ae651b252844168b8b6617", 143360 },
@@ -233,14 +307,14 @@ static const AdlGameDescription gameDiskDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformApple2,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
+			DEFAULT_OPTIONS
 		},
 		GAME_TYPE_HIRES4,
 		GAME_VER_NONE
 	},
 	{ // Hi-Res Adventure #4: Ulysses and the Golden Fleece - Atari 8-bit - Re-release
 		{
-			"hires4", 0,
+			"hires4", "",
 			{
 				{ "ulys1b", 0, "bb6aab9a35b41d160b6eefa088165f56", 92160 },
 				{ "ulys1a", 0, "c227eeee34d0bacd62b2d6231c409204", 92160 },
@@ -258,7 +332,7 @@ static const AdlGameDescription gameDiskDescriptions[] = {
 	},
 	{ // Hi-Res Adventure #5: Time Zone - Apple II - Version 1.1 - Roberta Williams Anthology
 		{
-			"hires5", 0,
+			"hires5", "",
 			{
 				{ "tzone1a", 2, "731844b1d19c2801e3a5bc61d109af54", 143360 },
 				{ "tzone1b", 3, "4eaf8d790e3f93097cca9ddbe863df50", 143360 },
@@ -277,14 +351,14 @@ static const AdlGameDescription gameDiskDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformApple2,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
+			DEFAULT_OPTIONS
 		},
 		GAME_TYPE_HIRES5,
 		GAME_VER_NONE
 	},
-	{ // Hi-Res Adventure #6: The Dark Crystal - Apple II - Roberta Williams Anthology
+	{ // Hi-Res Adventure #6: The Dark Crystal - Apple II - Roberta Williams Anthology / SierraVenture
 		{
-			"hires6", 0,
+			"hires6", "SierraVenture [A]",
 			{
 				{ "dark1a", 0, "9a5968a8f378c84454d88f4cd4e143a9", 143360 },
 				{ "dark1b", 3, "1271ff9c3e1bdb4942301dd37dd0ef87", 143360 },
@@ -295,7 +369,25 @@ static const AdlGameDescription gameDiskDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformApple2,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
+			DEFAULT_OPTIONS
+		},
+		GAME_TYPE_HIRES6,
+		GAME_VER_NONE
+	},
+	{ // Hi-Res Adventure #6: The Dark Crystal - Apple II - SierraVenture
+		{
+			"hires6", "SierraVenture [B]",
+			{
+				{ "dark1a", 0, "d0b8e808b02564b6ce58b5ea5cc61ead", 143360 },
+				{ "dark1b", 3, "1271ff9c3e1bdb4942301dd37dd0ef87", 143360 },
+				{ "dark2a", 4, "090e77563add7b4c9ab25f444d727316", 143360 },
+				{ "dark2b", 5, "f2db96af0955324900b800505af4d91f", 143360 },
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			DEFAULT_OPTIONS
 		},
 		GAME_TYPE_HIRES6,
 		GAME_VER_NONE
@@ -303,207 +395,43 @@ static const AdlGameDescription gameDiskDescriptions[] = {
 	{ AD_TABLE_END_MARKER, GAME_TYPE_NONE, GAME_VER_NONE }
 };
 
-struct DiskImageExt {
-	Common::Platform platform;
-	const char *extension;
-};
-
-const DiskImageExt diskImageExts[] = {
-	{ Common::kPlatformApple2, ".nib" },
-	{ Common::kPlatformApple2, ".dsk" },
-	{ Common::kPlatformApple2, ".d13" },
-	{ Common::kPlatformAtari8Bit, ".xfd" }
-};
-
-class AdlMetaEngine : public AdvancedMetaEngine {
+class AdlMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	AdlMetaEngine() : AdvancedMetaEngine(gameFileDescriptions, sizeof(AdlGameDescription), adlGames, optionsList) { }
+	AdlMetaEngineDetection() : AdvancedMetaEngineDetection(gameFileDescriptions, sizeof(AdlGameDescription), adlGames) { }
 
-	const char *getName() const {
+	const char *getEngineName() const override {
 		return "ADL";
 	}
 
-	const char *getOriginalCopyright() const {
+	const char *getName() const override {
+		return "adl";
+	}
+
+	const char *getOriginalCopyright() const override {
 		return "Copyright (C) Sierra On-Line";
 	}
 
-	bool hasFeature(MetaEngineFeature f) const;
-	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const;
-	int getMaximumSaveSlot() const { return 'O' - 'A'; }
-	SaveStateList listSaves(const char *target) const;
-	void removeSaveState(const char *target, int slot) const;
-	virtual ADGameDescList detectGame(const Common::FSNode &parent, const FileMap &allFiles, Common::Language language, Common::Platform platform, const Common::String &extra, bool useUnknownGameDialog = false) const;
+	const DebugChannelDef *getDebugChannels() const override {
+		return debugFlagList;
+	}
 
-	bool addFileProps(const FileMap &allFiles, Common::String fname, ADFilePropertiesMap &filePropsMap) const;
+	ADDetectedGames detectGame(const Common::FSNode &parent, const FileMap &allFiles, Common::Language language, Common::Platform platform, const Common::String &extra, uint32 skipADFlags, bool skipIncomplete) override;
 
-	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const;
+	bool addFileProps(const FileMap &allFiles, Common::String fname, FilePropertiesMap &filePropsMap) const;
 };
 
-bool AdlMetaEngine::hasFeature(MetaEngineFeature f) const {
-	switch(f) {
-	case kSupportsListSaves:
-	case kSupportsLoadingDuringStartup:
-	case kSupportsDeleteSave:
-	case kSavesSupportMetaInfo:
-	case kSavesSupportThumbnail:
-	case kSavesSupportCreationDate:
-	case kSavesSupportPlayTime:
-	case kSimpleSavesNames:
-		return true;
-	default:
-		return false;
-	}
-}
-
-SaveStateDescriptor AdlMetaEngine::querySaveMetaInfos(const char *target, int slot) const {
-	Common::String fileName = Common::String::format("%s.s%02d", target, slot);
-	Common::InSaveFile *inFile = g_system->getSavefileManager()->openForLoading(fileName);
-
-	if (!inFile)
-		return SaveStateDescriptor();
-
-	if (inFile->readUint32BE() != MKTAG('A', 'D', 'L', ':')) {
-		delete inFile;
-		return SaveStateDescriptor();
-	}
-
-	byte saveVersion = inFile->readByte();
-	if (saveVersion != SAVEGAME_VERSION) {
-		delete inFile;
-		return SaveStateDescriptor();
-	}
-
-	char name[SAVEGAME_NAME_LEN] = { };
-	inFile->read(name, sizeof(name) - 1);
-	inFile->readByte();
-
-	if (inFile->eos() || inFile->err()) {
-		delete inFile;
-		return SaveStateDescriptor();
-	}
-
-	SaveStateDescriptor sd(slot, name);
-
-	int year = inFile->readUint16BE();
-	int month = inFile->readByte();
-	int day = inFile->readByte();
-	sd.setSaveDate(year + 1900, month + 1, day);
-
-	int hour = inFile->readByte();
-	int minutes = inFile->readByte();
-	sd.setSaveTime(hour, minutes);
-
-	uint32 playTime = inFile->readUint32BE();
-	sd.setPlayTime(playTime);
-
-	if (inFile->eos() || inFile->err()) {
-		delete inFile;
-		return SaveStateDescriptor();
-	}
-
-	Graphics::Surface *thumbnail;
-	if (!Graphics::loadThumbnail(*inFile, thumbnail)) {
-		delete inFile;
-		return SaveStateDescriptor();
-	}
-	sd.setThumbnail(thumbnail);
-
-	delete inFile;
-	return sd;
-}
-
-SaveStateList AdlMetaEngine::listSaves(const char *target) const {
-	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
-	Common::StringArray files = saveFileMan->listSavefiles(Common::String(target) + ".s##");
-
-	SaveStateList saveList;
-
-	for (uint i = 0; i < files.size(); ++i) {
-		const Common::String &fileName = files[i];
-		Common::InSaveFile *inFile = saveFileMan->openForLoading(fileName);
-		if (!inFile) {
-			warning("Cannot open save file '%s'", fileName.c_str());
-			continue;
-		}
-
-		if (inFile->readUint32BE() != MKTAG('A', 'D', 'L', ':')) {
-			warning("No header found in '%s'", fileName.c_str());
-			delete inFile;
-			continue;
-		}
-
-		byte saveVersion = inFile->readByte();
-		if (saveVersion != SAVEGAME_VERSION) {
-			warning("Unsupported save game version %i found in '%s'", saveVersion, fileName.c_str());
-			delete inFile;
-			continue;
-		}
-
-		char name[SAVEGAME_NAME_LEN] = { };
-		inFile->read(name, sizeof(name) - 1);
-		delete inFile;
-
-		int slotNum = atoi(fileName.c_str() + fileName.size() - 2);
-		SaveStateDescriptor sd(slotNum, name);
-		saveList.push_back(sd);
-	}
-
-	// Sort saves based on slot number.
-	Common::sort(saveList.begin(), saveList.end(), SaveStateDescriptorSlotComparator());
-	return saveList;
-}
-
-void AdlMetaEngine::removeSaveState(const char *target, int slot) const {
-	Common::String fileName = Common::String::format("%s.s%02d", target, slot);
-	g_system->getSavefileManager()->removeSavefile(fileName);
-}
-
-Common::String getDiskImageName(const AdlGameDescription &adlDesc, byte volume) {
-	const ADGameDescription &desc = adlDesc.desc;
-	for (uint i = 0; desc.filesDescriptions[i].fileName; ++i) {
-		const ADGameFileDescription &fDesc = desc.filesDescriptions[i];
-
-		if (fDesc.fileType == volume) {
-			for (uint e = 0; e < ARRAYSIZE(diskImageExts); ++e) {
-				if (diskImageExts[e].platform == desc.platform) {
-					Common::String testFileName(fDesc.fileName);
-					testFileName += diskImageExts[e].extension;
-					if (Common::File::exists(testFileName))
-						return testFileName;
-				}
-			}
-
-			error("Failed to find disk image '%s'", fDesc.fileName);
-		}
-	}
-
-	error("Disk volume %d not found", volume);
-}
-
-GameType getGameType(const AdlGameDescription &adlDesc) {
-	return adlDesc.gameType;
-}
-
-GameVersion getGameVersion(const AdlGameDescription &adlDesc) {
-	return adlDesc.version;
-}
-
-Common::Platform getPlatform(const AdlGameDescription &adlDesc) {
-	return adlDesc.desc.platform;
-}
-
-bool AdlMetaEngine::addFileProps(const FileMap &allFiles, Common::String fname, ADFilePropertiesMap &filePropsMap) const {
+bool AdlMetaEngineDetection::addFileProps(const FileMap &allFiles, Common::String fname, FilePropertiesMap &filePropsMap) const {
 	if (filePropsMap.contains(fname))
 		return true;
 
 	if (!allFiles.contains(fname))
 		return false;
 
-	ADFileProperties fileProps;
+	FileProperties fileProps;
 	fileProps.size = computeMD5(allFiles[fname], fileProps.md5, 16384);
 
 	if (fileProps.size != -1) {
-		debug(3, "> '%s': '%s'", fname.c_str(), fileProps.md5.c_str());
+		debugC(3, kDebugGlobalDetection, "> '%s': '%s'", fname.c_str(), fileProps.md5.c_str());
 		filePropsMap[fname] = fileProps;
 	}
 
@@ -511,42 +439,41 @@ bool AdlMetaEngine::addFileProps(const FileMap &allFiles, Common::String fname, 
 }
 
 // Based on AdvancedMetaEngine::detectGame
-ADGameDescList AdlMetaEngine::detectGame(const Common::FSNode &parent, const FileMap &allFiles, Common::Language language, Common::Platform platform, const Common::String &extra, bool useUnknownGameDialog) const {
-	// We run the file-based detector first and then add to the returned list
-	ADGameDescList matched = AdvancedMetaEngine::detectGame(parent, allFiles, language, platform, extra, useUnknownGameDialog);
+ADDetectedGames AdlMetaEngineDetection::detectGame(const Common::FSNode &parent, const FileMap &allFiles, Common::Language language, Common::Platform platform, const Common::String &extra, uint32 skipADFlags, bool skipIncomplete) {
+	// We run the file-based detector first, if it finds a match we do not search for disk images
+	ADDetectedGames matched = AdvancedMetaEngineDetection::detectGame(parent, allFiles, language, platform, extra, skipADFlags, skipIncomplete);
 
-	debug(3, "Starting disk image detection in dir '%s'", parent.getPath().c_str());
+	if (!matched.empty())
+		return matched;
 
-	ADFilePropertiesMap filesProps;
-	ADGameIdList matchedGameIds;
-	bool gotAnyMatchesWithAllFiles = false;
+	debugC(3, kDebugGlobalDetection, "Starting disk image detection in dir '%s'", parent.getPath().c_str());
 
-	for (uint g = 0; gameDiskDescriptions[g].desc.gameId != 0; ++g) {
-		const ADGameDescription &desc = gameDiskDescriptions[g].desc;
+	FilePropertiesMap filesProps;
+
+	for (uint g = 0; gameDiskDescriptions[g].desc.gameId != nullptr; ++g) {
+		ADDetectedGame game(&gameDiskDescriptions[g].desc);
 
 		// Skip games that don't meet the language/platform/extra criteria
-		if (language != Common::UNK_LANG && desc.language != Common::UNK_LANG) {
-			if (desc.language != language && !(language == Common::EN_ANY && (desc.flags & ADGF_ADDENGLISH)))
-			    continue;
+		if (language != Common::UNK_LANG && game.desc->language != Common::UNK_LANG) {
+			if (game.desc->language != language && !(language == Common::EN_ANY && (game.desc->flags & ADGF_ADDENGLISH)))
+				continue;
 		}
 
-		if (platform != Common::kPlatformUnknown && desc.platform != Common::kPlatformUnknown && desc.platform != platform)
+		if (platform != Common::kPlatformUnknown && game.desc->platform != Common::kPlatformUnknown && game.desc->platform != platform)
 			continue;
 
-		if ((_flags & kADFlagUseExtraAsHint) && !extra.empty() && desc.extra != extra)
+		if ((_flags & kADFlagUseExtraAsHint) && !extra.empty() && game.desc->extra != extra)
 			continue;
 
-		bool fileMissing = false;
 		bool allFilesPresent = true;
-		bool hashOrSizeMismatch = false;
 
-		for (uint f = 0;  desc.filesDescriptions[f].fileName; ++f) {
-			const ADGameFileDescription &fDesc = desc.filesDescriptions[f];
+		for (uint f = 0; game.desc->filesDescriptions[f].fileName; ++f) {
+			const ADGameFileDescription &fDesc = game.desc->filesDescriptions[f];
 			Common::String fileName;
 			bool foundDiskImage = false;
 
 			for (uint e = 0; e < ARRAYSIZE(diskImageExts); ++e) {
-				if (diskImageExts[e].platform == desc.platform) {
+				if (diskImageExts[e].platform == game.desc->platform) {
 					Common::String testFileName(fDesc.fileName);
 					testFileName += diskImageExts[e].extension;
 
@@ -563,102 +490,50 @@ ADGameDescList AdlMetaEngine::detectGame(const Common::FSNode &parent, const Fil
 			}
 
 			if (!foundDiskImage) {
-				fileMissing = true;
 				allFilesPresent = false;
 				break;
 			}
 
-			if (hashOrSizeMismatch)
+			game.matchedFiles[fileName] = filesProps[fileName];
+
+			if (game.hasUnknownFiles)
 				continue;
 
 			if (fDesc.md5 && fDesc.md5 != filesProps[fileName].md5) {
-				debug(3, "MD5 Mismatch. Skipping (%s) (%s)", fDesc.md5, filesProps[fileName].md5.c_str());
-				fileMissing = true;
-				hashOrSizeMismatch = true;
+				debugC(3, kDebugGlobalDetection, "MD5 Mismatch. Skipping (%s) (%s)", fDesc.md5, filesProps[fileName].md5.c_str());
+				game.hasUnknownFiles = true;
 				continue;
 			}
 
 			if (fDesc.fileSize != -1 && fDesc.fileSize != filesProps[fileName].size) {
-				debug(3, "Size Mismatch. Skipping");
-				fileMissing = true;
-				hashOrSizeMismatch = true;
+				debugC(3, kDebugGlobalDetection, "Size Mismatch. Skipping");
+				game.hasUnknownFiles = true;
 				continue;
 			}
 
-			debug(3, "Matched file: %s", fileName.c_str());
+			debugC(3, kDebugGlobalDetection, "Matched file: %s", fileName.c_str());
 		}
 
-		if (!fileMissing) {
-			debug(2, "Found game: %s (%s/%s) (%d)", desc.gameId, getPlatformDescription(desc.platform), getLanguageDescription(desc.language), g);
-			matched.push_back(&desc);
-		} else {
-			if (allFilesPresent) {
-				gotAnyMatchesWithAllFiles = true;
-				if (!matchedGameIds.size() || strcmp(matchedGameIds.back(), desc.gameId) != 0)
-					matchedGameIds.push_back(desc.gameId);
+		// This assumes that the detection table groups together games that have the same gameId and platform
+		if (allFilesPresent) {
+			if (!game.hasUnknownFiles) {
+				debugC(2, kDebugGlobalDetection, "Found game: %s (%s/%s) (%d)", game.desc->gameId, getPlatformDescription(game.desc->platform), getLanguageDescription(game.desc->language), g);
+				// If we just added an unknown variant for this game and platform, remove it
+				if (!matched.empty() && strcmp(matched.back().desc->gameId, game.desc->gameId) == 0 && matched.back().desc->platform == game.desc->platform)
+					matched.pop_back();
+				matched.push_back(game);
+			} else {
+				debugC(5, kDebugGlobalDetection, "Skipping game: %s (%s/%s) (%d)", game.desc->gameId, getPlatformDescription(game.desc->platform), getLanguageDescription(game.desc->language), g);
+				// If we already added a known or unknown variant for this game and platform, don't add another
+				if (matched.empty() || strcmp(matched.back().desc->gameId, game.desc->gameId) != 0 || matched.back().desc->platform != game.desc->platform)
+					matched.push_back(game);
 			}
-
-			debug(5, "Skipping game: %s (%s/%s) (%d)", desc.gameId, getPlatformDescription(desc.platform), getLanguageDescription(desc.language), g);
-		}
-	}
-
-	// TODO: This could be improved to handle matched and unknown games together in a single directory
-	if (matched.empty()) {
-		if (!filesProps.empty() && gotAnyMatchesWithAllFiles) {
-			reportUnknown(parent, filesProps, matchedGameIds, useUnknownGameDialog);
 		}
 	}
 
 	return matched;
 }
 
-Engine *HiRes1Engine_create(OSystem *syst, const AdlGameDescription *gd);
-Engine *HiRes2Engine_create(OSystem *syst, const AdlGameDescription *gd);
-Engine *HiRes0Engine_create(OSystem *syst, const AdlGameDescription *gd);
-Engine *HiRes3Engine_create(OSystem *syst, const AdlGameDescription *gd);
-Engine *HiRes4Engine_create(OSystem *syst, const AdlGameDescription *gd);
-Engine *HiRes5Engine_create(OSystem *syst, const AdlGameDescription *gd);
-Engine *HiRes6Engine_create(OSystem *syst, const AdlGameDescription *gd);
-
-bool AdlMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const {
-	if (!gd)
-		return false;
-
-	const AdlGameDescription *adlGd = (const AdlGameDescription *)gd;
-
-	switch (adlGd->gameType) {
-	case GAME_TYPE_HIRES1:
-		*engine = HiRes1Engine_create(syst, adlGd);
-		break;
-	case GAME_TYPE_HIRES2:
-		*engine = HiRes2Engine_create(syst, adlGd);
-		break;
-	case GAME_TYPE_HIRES0:
-		*engine = HiRes0Engine_create(syst, adlGd);
-		break;
-	case GAME_TYPE_HIRES3:
-		*engine = HiRes3Engine_create(syst, adlGd);
-		break;
-	case GAME_TYPE_HIRES4:
-		*engine = HiRes4Engine_create(syst, adlGd);
-		break;
-	case GAME_TYPE_HIRES5:
-		*engine = HiRes5Engine_create(syst, adlGd);
-		break;
-	case GAME_TYPE_HIRES6:
-		*engine = HiRes6Engine_create(syst, adlGd);
-		break;
-	default:
-		error("Unknown GameType");
-	}
-
-	return true;
-}
-
 } // End of namespace Adl
 
-#if PLUGIN_ENABLED_DYNAMIC(ADL)
-	REGISTER_PLUGIN_DYNAMIC(ADL, PLUGIN_TYPE_ENGINE, Adl::AdlMetaEngine);
-#else
-	REGISTER_PLUGIN_STATIC(ADL, PLUGIN_TYPE_ENGINE, Adl::AdlMetaEngine);
-#endif
+REGISTER_PLUGIN_STATIC(ADL_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, Adl::AdlMetaEngineDetection);

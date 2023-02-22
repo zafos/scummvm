@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "common/util.h"
 #include "gui/widgets/tab.h"
 #include "gui/gui-manager.h"
+#include "gui/widgets/scrollcontainer.h"
 
 #include "gui/ThemeEval.h"
 
@@ -33,26 +33,7 @@ enum {
 	kCmdRight = 'RGHT'
 };
 
-static const int kTabTitleSpacing = 2 * 5;
-
-TabWidget::TabWidget(GuiObject *boss, int x, int y, int w, int h)
-	: Widget(boss, x, y, w, h), _bodyBackgroundType(GUI::ThemeEngine::kDialogBackgroundDefault) {
-	init();
-}
-
-TabWidget::TabWidget(GuiObject *boss, const String &name)
-	: Widget(boss, name), _bodyBackgroundType(GUI::ThemeEngine::kDialogBackgroundDefault) {
-	init();
-}
-
-void TabWidget::init() {
-	setFlags(WIDGET_ENABLED);
-	_type = kTabWidget;
-	_activeTab = -1;
-	_firstVisibleTab = 0;
-	_lastVisibleTab = 0;
-	_navButtonsVisible = false;
-
+void TabWidget::recalc() {
 	_minTabWidth = g_gui.xmlEval()->getVar("Globals.TabWidget.Tab.Width");
 	_tabHeight = g_gui.xmlEval()->getVar("Globals.TabWidget.Tab.Height");
 	_titleVPad = g_gui.xmlEval()->getVar("Globals.TabWidget.Tab.Padding.Top");
@@ -62,15 +43,47 @@ void TabWidget::init() {
 	_bodyLP = g_gui.xmlEval()->getVar("Globals.TabWidget.Body.Padding.Left");
 	_bodyRP = g_gui.xmlEval()->getVar("Globals.TabWidget.Body.Padding.Right");
 
-	_butRP = g_gui.xmlEval()->getVar("Globals.TabWidget.NavButtonPadding.Right", 0);
+	_butRP = g_gui.xmlEval()->getVar("Globals.TabWidget.NavButton.Padding.Right", 0);
 	_butTP = g_gui.xmlEval()->getVar("Globals.TabWidget.NavButton.Padding.Top", 0);
 	_butW = g_gui.xmlEval()->getVar("Globals.TabWidget.NavButton.Width", 10);
 	_butH = g_gui.xmlEval()->getVar("Globals.TabWidget.NavButton.Height", 10);
 
+	_titleSpacing = g_gui.xmlEval()->getVar("Globals.TabWidget.TitleSpacing");
+}
+
+TabWidget::TabWidget(GuiObject *boss, int x, int y, int w, int h)
+	: Widget(boss, x, y, w, h), _bodyBackgroundType(GUI::ThemeEngine::kDialogBackgroundDefault) {
+	init();
+}
+
+TabWidget::TabWidget(GuiObject *boss, const Common::String &name)
+	: Widget(boss, name), _bodyBackgroundType(GUI::ThemeEngine::kDialogBackgroundDefault) {
+	init();
+}
+
+void TabWidget::init() {
+	setFlags(WIDGET_ENABLED | WIDGET_TRACK_MOUSE);
+	_type = kTabWidget;
+	_activeTab = -1;
+	_firstVisibleTab = 0;
+	_lastVisibleTab = 0;
+	_navButtonsVisible = false;
+
+	recalc();
+
 	int x = _w - _butRP - _butW * 2 - 2;
 	int y = _butTP - _tabHeight;
-	_navLeft = new ButtonWidget(this, x, y, _butW, _butH, "<", 0, kCmdLeft);
-	_navRight = new ButtonWidget(this, x + _butW + 2, y, _butW, _butH, ">", 0, kCmdRight);
+
+	Common::String leftArrow = g_gui.useRTL() ? ">" : "<";
+	Common::String rightArrow = g_gui.useRTL() ? "<" : ">";
+
+	_navLeft = new ButtonWidget(this, x, y, _butW, _butH, Common::U32String(leftArrow), Common::U32String(), kCmdLeft);
+	_navRight = new ButtonWidget(this, x + _butW + 2, y, _butW, _butH, Common::U32String(rightArrow), Common::U32String(), kCmdRight);
+
+	_navLeft->setEnabled(false);
+	_navRight->setEnabled(true);
+
+	_lastRead = -1;
 }
 
 TabWidget::~TabWidget() {
@@ -78,12 +91,18 @@ TabWidget::~TabWidget() {
 	// having been switched using setActiveTab() afterward, then the
 	// firstWidget in the _tabs list for the active tab may not be up to
 	// date. So update it now.
+
 	if (_activeTab != -1)
 		_tabs[_activeTab].firstWidget = _firstWidget;
-	_firstWidget = 0;
+	_firstWidget = nullptr;
 	for (uint i = 0; i < _tabs.size(); ++i) {
-		delete _tabs[i].firstWidget;
-		_tabs[i].firstWidget = 0;
+		if (_tabs[i].scrollWidget) {
+			delete _tabs[i].scrollWidget;
+		} else {
+			delete _tabs[i].firstWidget;
+		}
+		_tabs[i].scrollWidget = nullptr;
+		_tabs[i].firstWidget = nullptr;
 	}
 	_tabs.clear();
 	delete _navRight;
@@ -103,14 +122,16 @@ uint16 TabWidget::getHeight() const {
 	return _h + _tabHeight;
 }
 
-int TabWidget::addTab(const String &title) {
+int TabWidget::addTab(const Common::U32String &title, const Common::String &dialogName, bool withScroll) {
 	// Add a new tab page
 	Tab newTab;
 	newTab.title = title;
-	newTab.firstWidget = 0;
+	newTab.dialogName = dialogName;
+	newTab.firstWidget = nullptr;
+	newTab.scrollWidget = nullptr;
 
 	// Determine the new tab width
-	int newWidth = g_gui.getStringWidth(title) + kTabTitleSpacing;
+	int newWidth = g_gui.getStringWidth(title) + _titleSpacing;
 	if (newWidth < _minTabWidth)
 		newWidth = _minTabWidth;
 	newTab._tabWidth = newWidth;
@@ -119,10 +140,33 @@ int TabWidget::addTab(const String &title) {
 
 	int numTabs = _tabs.size();
 
-	// Activate the new tab
+	// Activate the new tab, also writes back our _firstWidget
 	setActiveTab(numTabs - 1);
 
+	if (withScroll) {
+		_tabs.back().scrollWidget = new ScrollContainerWidget(this, "", dialogName, 'gtcr');
+		_tabs.back().scrollWidget->setBackgroundType(ThemeEngine::kWidgetBackgroundNo);
+		_tabs.back().scrollWidget->setTarget(this);
+		_firstWidget = _tabs.back().scrollWidget;
+	}
+
 	return _activeTab;
+}
+
+Widget *TabWidget::addChild(Widget *newChild) {
+	if (_activeTab == -1 || _tabs[_activeTab].scrollWidget == nullptr)
+		return Widget::addChild(newChild);
+
+	newChild->setBoss(_tabs[_activeTab].scrollWidget);
+	return _tabs[_activeTab].scrollWidget->addChild(newChild);
+}
+
+void TabWidget::removeWidget(Widget *del) {
+	if (_activeTab == -1 || _tabs[_activeTab].scrollWidget == nullptr){
+		Widget::removeWidget(del);
+		return;
+	}
+	_tabs[_activeTab].scrollWidget->removeWidget(del);
 }
 
 void TabWidget::removeTab(int tabID) {
@@ -132,11 +176,15 @@ void TabWidget::removeTab(int tabID) {
 	if (tabID == _activeTab) {
 		_tabs[tabID].firstWidget = _firstWidget;
 		releaseFocus();
-		_firstWidget = 0;
+		_firstWidget = nullptr;
 	}
 
 	// Dispose the widgets in that tab and then the tab itself
-	delete _tabs[tabID].firstWidget;
+	if (_tabs[tabID].scrollWidget) {
+		delete _tabs[tabID].scrollWidget;
+	} else {
+		delete _tabs[tabID].firstWidget;
+	}
 	_tabs.remove_at(tabID);
 
 	// Adjust _firstVisibleTab if necessary
@@ -166,8 +214,11 @@ void TabWidget::setActiveTab(int tabID) {
 			releaseFocus();
 		}
 		_activeTab = tabID;
-		_firstWidget = _tabs[tabID].firstWidget;
-		
+		if (_tabs[tabID].scrollWidget)
+			_firstWidget = _tabs[_activeTab].scrollWidget;
+		else
+			_firstWidget = _tabs[tabID].firstWidget;
+
 		// Also ensure the tab is visible in the tab bar
 		if (_firstVisibleTab > tabID)
 			setFirstVisible(tabID, true);
@@ -184,15 +235,32 @@ void TabWidget::handleCommand(CommandSender *sender, uint32 cmd, uint32 data) {
 
 	switch (cmd) {
 	case kCmdLeft:
+		if (!_navRight->isEnabled()) {
+			_navRight->setEnabled(true);
+		}
+
 		if (_firstVisibleTab > 0) {
 			setFirstVisible(_firstVisibleTab - 1);
+		}
+		if (_firstVisibleTab == 0) {
+			_navLeft->setEnabled(false);
 		}
 		break;
 
 	case kCmdRight:
+		if (!_navLeft->isEnabled()) {
+			_navLeft->setEnabled(true);
+		}
+
 		if (_lastVisibleTab + 1 < (int)_tabs.size()) {
 			setFirstVisible(_firstVisibleTab + 1, false);
 		}
+		if (_lastVisibleTab + 1 == (int)_tabs.size()) {
+			_navRight->setEnabled(false);
+		}
+		break;
+
+	default:
 		break;
 	}
 }
@@ -216,6 +284,31 @@ void TabWidget::handleMouseDown(int x, int y, int button, int clickCount) {
 		setActiveTab(tabID);
 }
 
+void TabWidget::handleMouseMoved(int x, int y, int button) {
+	if (y < 0 || y >= _tabHeight)
+		return;
+
+	if (x < 0)
+		return;
+
+	// Determine which tab the mouse is on
+	int tabID;
+	for (tabID = _firstVisibleTab; tabID <= _lastVisibleTab; ++tabID) {
+		x -= _tabs[tabID]._tabWidth;
+		if (x < 0)
+			break;
+	}
+
+	if (tabID <= _lastVisibleTab) {
+		if (tabID != _lastRead) {
+			read(_tabs[tabID].title);
+			_lastRead = tabID;
+		}
+	}
+	else
+		_lastRead = -1;
+}
+
 bool TabWidget::handleKeyDown(Common::KeyState state) {
 	if (state.hasFlags(Common::KBD_SHIFT) && state.keycode == Common::KEYCODE_TAB)
 		adjustTabs(kTabBackwards);
@@ -225,15 +318,37 @@ bool TabWidget::handleKeyDown(Common::KeyState state) {
 	return Widget::handleKeyDown(state);
 }
 
+void TabWidget::handleMouseWheel(int x, int y, int direction) {
+	if (direction == 1) {
+		adjustTabs(kTabForwards);
+	} else {
+		adjustTabs(kTabBackwards);
+	}
+}
+
 void TabWidget::adjustTabs(int value) {
 	// Determine which tab is next
 	int tabID = _activeTab + value;
+	int lastVis = _lastVisibleTab;
+
 	if (tabID >= (int)_tabs.size())
 		tabID = 0;
 	else if (tabID < 0)
 		tabID = ((int)_tabs.size() - 1);
 
 	setActiveTab(tabID);
+
+	if (_navButtonsVisible) {
+		if (lastVis != _lastVisibleTab) {
+			_navLeft->setEnabled(true);
+			_navRight->setEnabled(true);
+		}
+
+		if (_firstVisibleTab == 0)
+			_navLeft->setEnabled(false);
+		else if (_lastVisibleTab == (int)_tabs.size() - 1)
+			_navRight->setEnabled(false);
+	}
 }
 
 int TabWidget::getFirstVisible() const {
@@ -254,14 +369,7 @@ void TabWidget::reflowLayout() {
 
 	// NOTE: if you change that, make sure to do the same
 	// changes in the ThemeLayoutTabWidget (gui/ThemeLayout.cpp)
-	_tabHeight = g_gui.xmlEval()->getVar("Globals.TabWidget.Tab.Height");
-	_minTabWidth = g_gui.xmlEval()->getVar("Globals.TabWidget.Tab.Width");
-	_titleVPad = g_gui.xmlEval()->getVar("Globals.TabWidget.Tab.Padding.Top");
-
-	_butRP = g_gui.xmlEval()->getVar("Globals.TabWidget.NavButton.PaddingRight", 0);
-	_butTP = g_gui.xmlEval()->getVar("Globals.TabWidget.NavButton.Padding.Top", 0);
-	_butW = g_gui.xmlEval()->getVar("GlobalsTabWidget.NavButton.Width", 10);
-	_butH = g_gui.xmlEval()->getVar("Globals.TabWidget.NavButton.Height", 10);
+	recalc();
 
 	// If widgets were added or removed in the current tab, without tabs
 	// having been switched using setActiveTab() afterward, then the
@@ -271,16 +379,23 @@ void TabWidget::reflowLayout() {
 		_tabs[_activeTab].firstWidget = _firstWidget;
 
 	for (uint i = 0; i < _tabs.size(); ++i) {
-		Widget *w = _tabs[i].firstWidget;
-		while (w) {
-			w->reflowLayout();
-			w = w->next();
+		if (_tabs[i].scrollWidget) {
+			_tabs[i].scrollWidget->resize(_x, _y, _w, _h, false);
+			_tabs[i].scrollWidget->reflowLayout();
+		} else {
+			g_gui.xmlEval()->reflowDialogLayout(_tabs[i].dialogName, _tabs[i].firstWidget);
+
+			Widget *w = _tabs[i].firstWidget;
+			while (w) {
+				w->reflowLayout();
+				w = w->next();
+			}
 		}
 	}
 
 	for (uint i = 0; i < _tabs.size(); ++i) {
 		// Determine the new tab width
-		int newWidth = g_gui.getStringWidth(_tabs[i].title) + kTabTitleSpacing;
+		int newWidth = g_gui.getStringWidth(_tabs[i].title) + _titleSpacing;
 		if (newWidth < _minTabWidth)
 			newWidth = _minTabWidth;
 		_tabs[i]._tabWidth = newWidth;
@@ -309,23 +424,24 @@ void TabWidget::reflowLayout() {
 
 	int x = _w - _butRP - _butW * 2 - 2;
 	int y = _butTP - _tabHeight;
-	_navLeft->resize(x, y, _butW, _butH);
-	_navRight->resize(x + _butW + 2, y, _butW, _butH);
+	_navLeft->resize(x, y, _butW, _butH, false);
+	_navRight->resize(x + _butW + 2, y, _butW, _butH, false);
 }
 
 void TabWidget::drawWidget() {
-	Common::Array<Common::String> tabs;
+	Common::Array<Common::U32String> tabs;
 	Common::Array<int> widths;
 	for (int i = _firstVisibleTab; i <= _lastVisibleTab; ++i) {
 		tabs.push_back(_tabs[i].title);
 		widths.push_back(_tabs[i]._tabWidth);
 	}
+
 	g_gui.theme()->drawDialogBackground(
 			Common::Rect(_x + _bodyLP, _y + _bodyTP, _x + _w - _bodyRP, _y + _h - _bodyBP + _tabHeight),
 			_bodyBackgroundType);
 
 	g_gui.theme()->drawTab(Common::Rect(_x, _y, _x + _w, _y + _h), _tabHeight, widths, tabs,
-	                       _activeTab - _firstVisibleTab);
+				_activeTab - _firstVisibleTab, (g_gui.useRTL() && _useRTL));
 }
 
 void TabWidget::draw() {
@@ -375,7 +491,7 @@ Widget *TabWidget::findWidget(int x, int y) {
 void TabWidget::computeLastVisibleTab(bool adjustFirstIfRoom) {
 	int availableWidth = _w;
 	if (_navButtonsVisible)
-		availableWidth -= 2 + _butW * 2;
+		availableWidth -= 2 + _butW * 2 + _butRP;
 
 	_lastVisibleTab = _tabs.size() - 1;
 	for (int i = _firstVisibleTab; i < (int)_tabs.size(); ++i) {

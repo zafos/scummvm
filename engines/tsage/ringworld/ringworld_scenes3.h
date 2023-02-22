@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -39,59 +38,59 @@ class Scene2000 : public Scene {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action3 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action4 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action5 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action6 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action7 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action8 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action9 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action10 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action11 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action12 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action13 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action14 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 public:
@@ -121,119 +120,119 @@ public:
 	SceneObject _object6, _object7, _object8, _object9, _object10;
 	ASound _soundHandler1, _soundHandler2;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void stripCallback(int v);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void stripCallback(int v) override;
 };
 
 class Scene2100 : public Scene {
 	/* Actions */
 	class Action1 : public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action3 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action4 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action5 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action6 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action7 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action8 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action9 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action10 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action11 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action12 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action13 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action14 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action15 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action16 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action17 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 	/* Hotspots */
 	class Hotspot2 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot3 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot4 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot8 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot10 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot14 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 
 	/* Objects */
 	class Object1 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Object2 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Object3 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 public:
 	SequenceManager _sequenceManager;
@@ -287,10 +286,10 @@ public:
 	SceneArea _area1, _area2, _area3, _area4;
 
 	Scene2100();
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void stripCallback(int v);
-	virtual void signal();
-	virtual void synchronize(Serializer &s);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void stripCallback(int v) override;
+	void signal() override;
+	void synchronize(Serializer &s) override;
 };
 
 class Scene2120 : public Scene {
@@ -311,8 +310,8 @@ class Scene2120 : public Scene {
 	public:
 		Action1();
 
-		virtual void signal();
-		virtual void dispatch();
+		void signal() override;
+		void dispatch() override;
 	};
 
 public:
@@ -327,41 +326,41 @@ public:
 	int _lineOffset;
 
 	Scene2120();
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void synchronize(Serializer &s);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void synchronize(Serializer &s) override;
 };
 
 class Scene2150 : public Scene {
 	/* Actions */
 	class Action1 : public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 	/* Hotspots */
 	class Hotspot1 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot2 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot4 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot7 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot10 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 public:
 	ASound _soundHandler;
@@ -384,44 +383,44 @@ public:
 	Action2 _action2;
 
 	Scene2150();
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void synchronize(Serializer &s);
-	virtual void signal();
-	virtual void dispatch();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void synchronize(Serializer &s) override;
+	void signal() override;
+	void dispatch() override;
 };
 
 class Scene2200 : public Scene {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action3 : public ActionExt {
 	public:
-		virtual void signal();
-		virtual void process(Event &event);
+		void signal() override;
+		void process(Event &event) override;
 	};
 	class Action4 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 	/* Hotspots */
 	class Hotspot3 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot5 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot9 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 public:
 	SequenceManager _sequenceManager;
@@ -448,22 +447,22 @@ public:
 	ASound _soundHandler1, _soundHandler2;
 
 	Scene2200();
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void stripCallback(int v);
-	virtual void synchronize(Serializer &s);
-	virtual void signal();
-	virtual void dispatch();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void stripCallback(int v) override;
+	void synchronize(Serializer &s) override;
+	void signal() override;
+	void dispatch() override;
 };
 
 class Scene2222 : public Scene {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 public:
@@ -477,84 +476,84 @@ public:
 	Action2 _action2;
 	SceneObject _hotspot1, _hotspot2, _hotspot3, _hotspot4, _hotspot5;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
 };
 
 class Scene2230 : public Scene {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action3 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action4 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action5 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action6 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action7 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action8 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 	/* Hotspots */
 	class Hotspot1 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot3 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot4 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot5 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot6 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot7 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot8 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot10 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot11 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot12 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 public:
 	ASound _soundHandler;
@@ -582,78 +581,78 @@ public:
 	int _sceneMode;
 
 	Scene2230();
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void synchronize(Serializer &s);
-	virtual void dispatch();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void synchronize(Serializer &s) override;
+	void dispatch() override;
 };
 
 class Scene2280 : public Scene {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action3 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action4 : public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 	/* Hotspots */
 	class Hotspot1 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot2 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot4 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot7 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot8 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot10 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot12 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot14 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot15 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot16 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot17 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot18 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 
 public:
@@ -682,39 +681,39 @@ public:
 	Hotspot18 _hotspot18;
 
 	Scene2280();
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void synchronize(Serializer &s);
-	virtual void signal();
-	virtual void dispatch();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void synchronize(Serializer &s) override;
+	void signal() override;
+	void dispatch() override;
 };
 
 class Scene2300 : public Scene {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action3 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action4 : public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 	/* Hotspots */
 	class Hotspot5 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot7 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 public:
 	ASound _soundHandler1, _soundHandler2;
@@ -734,7 +733,7 @@ public:
 	DisplayHotspot _hotspot11, _hotspot12, _hotspot13, _hotspot14, _hotspot15;
 
 	Scene2300();
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
 };
 
 class Scene2310 : public Scene {
@@ -763,80 +762,80 @@ public:
 	ProtectionEntry _pageList[21];
 
 	Scene2310();
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void synchronize(Serializer &s);
-	virtual void signal();
-	virtual void process(Event &event);
-	virtual void dispatch();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void synchronize(Serializer &s) override;
+	void signal() override;
+	void process(Event &event) override;
+	void dispatch() override;
 };
 
 class Scene2320 : public Scene {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action3 : public ActionExt {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action4 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action5 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action6 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action7 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action8 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 	/* Hotspots */
 	class Hotspot5 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot6 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot8 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot10 : public SceneObjectExt {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot11 : public SceneObjectExt {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot12 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot14 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 	class Hotspot15 : public SceneObject {
 	public:
-		virtual void doAction(int action);
+		void doAction(int action) override;
 	};
 public:
 	ASound _soundHandler;
@@ -876,23 +875,23 @@ public:
 	Action8 _action8;
 
 	Scene2320();
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
-	virtual void synchronize(Serializer &s);
-	virtual void signal();
+	void postInit(SceneObjectList *OwnerList = NULL) override;
+	void synchronize(Serializer &s) override;
+	void signal() override;
 };
 
 class Scene2400 : public Scene {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
-		virtual void dispatch();
+		void signal() override;
+		void dispatch() override;
 	};
 public:
 	Action1 _action1;
 	SceneObject _object;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
 };
 
 } // End of namespace Ringworld

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,7 +25,7 @@
 
 namespace Graphics {
 
-void drawLine(int x0, int y0, int x1, int y1, int color, void (*plotProc)(int, int, int, void *), void *data) {
+void drawLine(int x0, int y0, int x1, int y1, uint32 color, void (*plotProc)(int, int, int, void *), void *data) {
 	// Bresenham's line algorithm, as described by Wikipedia
 	const bool steep = ABS(y1 - y0) > ABS(x1 - x0);
 
@@ -64,7 +63,7 @@ void drawLine(int x0, int y0, int x1, int y1, int color, void (*plotProc)(int, i
 	}
 }
 
-void drawHLine(int x1, int x2, int y, int color, void (*plotProc)(int, int, int, void *), void *data) {
+void drawHLine(int x1, int x2, int y, uint32 color, void (*plotProc)(int, int, int, void *), void *data) {
 	if (x1 > x2)
 		SWAP(x1, x2);
 
@@ -72,7 +71,7 @@ void drawHLine(int x1, int x2, int y, int color, void (*plotProc)(int, int, int,
 		(*plotProc)(x, y, color, data);
 }
 
-void drawVLine(int x, int y1, int y2, int color, void (*plotProc)(int, int, int, void *), void *data) {
+void drawVLine(int x, int y1, int y2, uint32 color, void (*plotProc)(int, int, int, void *), void *data) {
 	if (y1 > y2)
 		SWAP(y1, y2);
 
@@ -80,7 +79,7 @@ void drawVLine(int x, int y1, int y2, int color, void (*plotProc)(int, int, int,
 		(*plotProc)(x, y, color, data);
 }
 
-void drawThickLine(int x0, int y0, int x1, int y1, int penX, int penY, int color, void (*plotProc)(int, int, int, void *), void *data) {
+void drawThickLine(int x0, int y0, int x1, int y1, int penX, int penY, uint32 color, void (*plotProc)(int, int, int, void *), void *data) {
 	assert(penX > 0 && penY > 0);
 
 	// Shortcut
@@ -99,7 +98,7 @@ void drawThickLine(int x0, int y0, int x1, int y1, int penX, int penY, int color
 
 /* Bresenham as presented in Foley & Van Dam */
 /* Code is based on GD lib http://libgd.github.io/ */
-void drawThickLine2(int x1, int y1, int x2, int y2, int thick, int color, void (*plotProc)(int, int, int, void *), void *data) {
+void drawThickLine2(int x1, int y1, int x2, int y2, int thick, uint32 color, void (*plotProc)(int, int, int, void *), void *data) {
 	int incr1, incr2, d, x, y, xend, yend, xdirflag, ydirflag;
 	int wid;
 	int w, wstart;
@@ -110,30 +109,27 @@ void drawThickLine2(int x1, int y1, int x2, int y2, int thick, int color, void (
 	if (dx == 0) {
 		int xn = x1 - thick / 2;
 		Common::Rect r(xn, MIN(y1, y2), xn + thick - 1, MAX(y1, y2));
-		drawFilledRect(r, color, plotProc, data);
+		drawFilledRect1(r, color, plotProc, data);
 		return;
 	} else if (dy == 0) {
 		int yn = y1 - thick / 2;
 		Common::Rect r(MIN(x1, x2), yn, MAX(x1, x2), yn + thick - 1);
-		drawFilledRect(r, color, plotProc, data);
+		drawFilledRect1(r, color, plotProc, data);
 		return;
 	}
 
 	if (dy <= dx) {
 		/* More-or-less horizontal. use wid for vertical stroke */
-		/* Doug Claar: watch out for NaN in atan2 (2.0.5) */
 
 		/* 2.0.12: Michael Schwartz: divide rather than multiply;
 			  TBB: but watch out for /0! */
-		double ac = cos(atan2((double)dy, (double)dx));
-		if (ac != 0) {
-			wid = thick / ac;
+		if (dx != 0 && thick != 0) {
+			double ac_recip = 1.0/dx * sqrt((double)(dx * dx + dy * dy)); // 1 / cos(atan2((double)dy, (double)dx));
+			wid = thick * ac_recip;
 		} else {
 			wid = 1;
 		}
-		if (wid == 0) {
-			wid = 1;
-		}
+
 		d = 2 * dy - dx;
 		incr1 = 2 * dy;
 		incr2 = 2 * (dy - dx);
@@ -185,14 +181,12 @@ void drawThickLine2(int x1, int y1, int x2, int y2, int thick, int color, void (
 		/* More-or-less vertical. use wid for horizontal stroke */
 		/* 2.0.12: Michael Schwartz: divide rather than multiply;
 		   TBB: but watch out for /0! */
-		double as = sin(atan2((double)dy, (double)dx));
-		if (as != 0) {
-			wid = thick / as;
+		if (dy != 0 && thick != 0) {
+			double as_recip = 1.0/dy * sqrt((double)(dx * dx + dy * dy)); // 1 / sin(atan2((double)dy, (double)dx));
+			wid = thick * as_recip;
 		} else {
 			wid = 1;
 		}
-		if (wid == 0)
-			wid = 1;
 
 		d = 2 * dx - dy;
 		incr1 = 2 * dx;
@@ -244,13 +238,44 @@ void drawThickLine2(int x1, int y1, int x2, int y2, int thick, int color, void (
 	}
 }
 
-void drawFilledRect(Common::Rect &rect, int color, void (*plotProc)(int, int, int, void *), void *data) {
+void drawFilledRect(Common::Rect &rect, uint32 color, void (*plotProc)(int, int, int, void *), void *data) {
+	for (int y = rect.top; y < rect.bottom; y++)
+		drawHLine(rect.left, rect.right - 1, y, color, plotProc, data);
+}
+
+/**
+ * @brief Draws filled rectangle _with_ right and bottom edges
+ */
+void drawFilledRect1(Common::Rect &rect, uint32 color, void (*plotProc)(int, int, int, void *), void *data) {
 	for (int y = rect.top; y <= rect.bottom; y++)
 		drawHLine(rect.left, rect.right, y, color, plotProc, data);
 }
 
+void drawRect(Common::Rect &rect, uint32 color, void (*plotProc)(int, int, int, void *), void *data) {
+	drawHLine(rect.left, rect.right - 1, rect.top, color, plotProc, data);
+	drawHLine(rect.left, rect.right - 1, rect.bottom - 1, color, plotProc, data);
+	drawVLine(rect.left, rect.top, rect.bottom - 1, color, plotProc, data);
+	drawVLine(rect.right - 1, rect.top, rect.bottom - 1, color, plotProc, data);
+}
+
+/**
+ * @brief Draws rectangle outline _with_ right and bottom edges
+ */
+void drawRect1(Common::Rect &rect, uint32 color, void (*plotProc)(int, int, int, void *), void *data) {
+	drawHLine(rect.left + 1, rect.right - 1, rect.top, color, plotProc, data);
+	drawHLine(rect.left + 1, rect.right - 1, rect.bottom, color, plotProc, data);
+	drawVLine(rect.left, rect.top, rect.bottom, color, plotProc, data);
+	drawVLine(rect.right, rect.top, rect.bottom, color, plotProc, data);
+}
+
+void drawRoundRect(Common::Rect &rect, int arc, uint32 color, bool filled, void (*plotProc)(int, int, int, void *), void *data) {
+	Common::Rect r(rect.left, rect.top, rect.right - 1, rect.bottom - 1);
+
+	drawRoundRect1(r, arc, color, filled, plotProc, data);
+}
+
 // http://members.chello.at/easyfilter/bresenham.html
-void drawRoundRect(Common::Rect &rect, int arc, int color, bool filled, void (*plotProc)(int, int, int, void *), void *data) {
+void drawRoundRect1(Common::Rect &rect, int arc, uint32 color, bool filled, void (*plotProc)(int, int, int, void *), void *data) {
 	if (rect.height() < rect.width()) {
 		int x = -arc, y = 0, err = 2-2*arc; /* II. Quadrant */
 		int dy = rect.height() - arc * 2;
@@ -288,7 +313,7 @@ void drawRoundRect(Common::Rect &rect, int arc, int color, bool filled, void (*p
 			drawHLine(rect.left + x + r, rect.right - x - r, rect.bottom + y - r + stop, color, plotProc, data);
 		}
 
-		for (int i = 0; i < dy; i++) {
+		for (int i = 1; i < dy; i++) {
 			if (filled) {
 				drawHLine(rect.left, rect.right, rect.top + r + i, color, plotProc, data);
 			} else {
@@ -333,7 +358,7 @@ void drawRoundRect(Common::Rect &rect, int arc, int color, bool filled, void (*p
 			drawVLine(rect.right + x - r + stop, rect.top + y + r, rect.bottom - y - r, color, plotProc, data);
 		}
 
-		for (int i = 0; i < dx; i++) {
+		for (int i = 1; i < dx; i++) {
 			if (filled) {
 				drawVLine(rect.left + r + i, rect.top, rect.bottom, color, plotProc, data);
 			} else {
@@ -346,7 +371,7 @@ void drawRoundRect(Common::Rect &rect, int arc, int color, bool filled, void (*p
 
 // Based on public-domain code by Darel Rex Finley, 2007
 // http://alienryderflex.com/polygon_fill/
-void drawPolygonScan(int *polyX, int *polyY, int npoints, Common::Rect &bbox, int color, void (*plotProc)(int, int, int, void *), void *data) {
+void drawPolygonScan(int *polyX, int *polyY, int npoints, Common::Rect &bbox, uint32 color, void (*plotProc)(int, int, int, void *), void *data) {
 	int *nodeX = (int *)calloc(npoints, sizeof(int));
 	int i, j;
 
@@ -384,7 +409,7 @@ void drawPolygonScan(int *polyX, int *polyY, int npoints, Common::Rect &bbox, in
 }
 
 // http://members.chello.at/easyfilter/bresenham.html
-void drawEllipse(int x0, int y0, int x1, int y1, int color, bool filled, void (*plotProc)(int, int, int, void *), void *data) {
+void drawEllipse(int x0, int y0, int x1, int y1, uint32 color, bool filled, void (*plotProc)(int, int, int, void *), void *data) {
 	int a = abs(x1 - x0), b = abs(y1 - y0), b1 = b & 1; /* values of diameter */
 	long dx = 4 * (1 - a) * b * b, dy = 4 * (b1 + 1) * a * a; /* error increment */
 	long err = dx + dy + b1 * a * a, e2; /* error of 1.step */

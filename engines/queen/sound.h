@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -125,20 +124,20 @@ protected:
 class PCSound : public Sound {
 public:
 	PCSound(Audio::Mixer *mixer, QueenEngine *vm);
-	~PCSound();
+	~PCSound() override;
 
-	void playSfx(uint16 sfx);
-	void playSpeech(const char *base);
-	void playSong(int16 songNum);
+	void playSfx(uint16 sfx) override;
+	void playSpeech(const char *base) override;
+	void playSong(int16 songNum) override;
 
-	void stopSfx()			{ _mixer->stopHandle(_sfxHandle); }
-	void stopSong();
-	void stopSpeech()		{ _mixer->stopHandle(_speechHandle); }
+	void stopSfx() override			{ _mixer->stopHandle(_sfxHandle); }
+	void stopSong() override;
+	void stopSpeech() override		{ _mixer->stopHandle(_speechHandle); }
 
-	bool isSpeechActive() const	{ return _mixer->isSoundHandleActive(_speechHandle); }
-	bool isSfxActive() const	{ return _mixer->isSoundHandleActive(_sfxHandle); }
+	bool isSpeechActive() const override	{ return _mixer->isSoundHandleActive(_speechHandle); }
+	bool isSfxActive() const override	{ return _mixer->isSoundHandleActive(_sfxHandle); }
 
-	void setVolume(int vol);
+	void setVolume(int vol) override;
 
 protected:
 	void playSound(const char *base, bool isSpeech);
@@ -154,15 +153,15 @@ class AmigaSound : public Sound {
 public:
 	AmigaSound(Audio::Mixer *mixer, QueenEngine *vm);
 
-	void playSfx(uint16 sfx);
-	void playSong(int16 song);
+	void playSfx(uint16 sfx) override;
+	void playSong(int16 song) override;
 
-	void stopSfx();
-	void stopSong();
+	void stopSfx() override;
+	void stopSong() override;
 
-	bool isSfxActive() const { return _mixer->isSoundHandleActive(_sfxHandle); }
+	bool isSfxActive() const override { return _mixer->isSoundHandleActive(_sfxHandle); }
 
-	void updateMusic();
+	void updateMusic() override;
 
 protected:
 

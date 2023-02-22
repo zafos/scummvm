@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,23 +24,21 @@
 
 #if defined(__ANDROID__)
 
+#include "backends/platform/android/portdefs.h"
 #include "common/fs.h"
 #include "common/archive.h"
+#include "common/mutex.h"
+#include "common/ustr.h"
 #include "audio/mixer_intern.h"
-#include "graphics/palette.h"
-#include "graphics/surface.h"
-#include "backends/base-backend.h"
+#include "backends/modular-backend.h"
 #include "backends/plugins/posix/posix-provider.h"
 #include "backends/fs/posix/posix-fs-factory.h"
 
-#include "backends/platform/android/texture.h"
+#include "backends/platform/android/touchcontrols.h"
 
 #include <pthread.h>
 
 #include <android/log.h>
-
-#include <GLES/gl.h>
-#include <GLES/glext.h>
 
 // toggles start
 //#define ANDROID_DEBUG_ENTER
@@ -88,7 +85,7 @@ extern void checkGlError(const char *expr, const char *file, int line);
 
 #define GLTHREADCHECK \
 	do { \
-		assert(pthread_self() == _main_thread); \
+		assert(dynamic_cast<OSystem_Android *>(g_system)->isRunningInMainThread()); \
 	} while (false)
 
 #else
@@ -96,41 +93,15 @@ extern void checkGlError(const char *expr, const char *file, int line);
 #define GLTHREADCHECK do {  } while (false)
 #endif
 
-class OSystem_Android : public EventsBaseBackend, public PaletteManager {
+void *androidGLgetProcAddress(const char *name);
+
+class OSystem_Android : public ModularGraphicsBackend, Common::EventSource {
 private:
 	// passed from the dark side
 	int _audio_sample_rate;
 	int _audio_buffer_size;
 
 	int _screen_changeid;
-	int _egl_surface_width;
-	int _egl_surface_height;
-	bool _htc_fail;
-
-	bool _force_redraw;
-
-	// Game layer
-	GLESBaseTexture *_game_texture;
-	int _shake_offset;
-	Common::Rect _focus_rect;
-
-	// Overlay layer
-	GLES4444Texture *_overlay_texture;
-	bool _show_overlay;
-
-	// Mouse layer
-	GLESBaseTexture *_mouse_texture;
-	GLESBaseTexture *_mouse_texture_palette;
-	GLES5551Texture *_mouse_texture_rgb;
-	Common::Point _mouse_hotspot;
-	uint32 _mouse_keycolor;
-	int _mouse_targetscale;
-	bool _show_mouse;
-	bool _use_mouse_palette;
-
-	int _graphicsMode;
-	bool _fullscreen;
-	bool _ar_correction;
 
 	pthread_t _main_thread;
 
@@ -142,7 +113,6 @@ private:
 	pthread_t _audio_thread;
 	static void *audioThreadFunc(void *arg);
 
-	bool _enable_zoning;
 	bool _virtkeybd_on;
 
 	Audio::MixerImpl *_mixer;
@@ -150,144 +120,95 @@ private:
 
 	Common::String getSystemProperty(const char *name) const;
 
-	void initSurface();
-	void deinitSurface();
-	void initViewport();
-
-	void initOverlay();
-
-#ifdef USE_RGB_COLOR
-	Common::String getPixelFormatName(const Graphics::PixelFormat &format) const;
-	void initTexture(GLESBaseTexture **texture, uint width, uint height,
-						const Graphics::PixelFormat *format);
-#endif
-
-	void setupKeymapper();
-	void setCursorPaletteInternal(const byte *colors, uint start, uint num);
-
 public:
+	enum {
+		TOUCH_MODE_TOUCHPAD = 0,
+		TOUCH_MODE_MOUSE = 1,
+		TOUCH_MODE_GAMEPAD = 2,
+		TOUCH_MODE_MAX = 3
+	};
+
 	OSystem_Android(int audio_sample_rate, int audio_buffer_size);
 	virtual ~OSystem_Android();
 
-	virtual void initBackend();
-	void enableZoning(bool enable) { _enable_zoning = enable; }
+	void initBackend() override;
 
-	virtual bool hasFeature(Feature f);
-	virtual void setFeatureState(Feature f, bool enable);
-	virtual bool getFeatureState(Feature f);
-
-	virtual const GraphicsMode *getSupportedGraphicsModes() const;
-	virtual int getDefaultGraphicsMode() const;
-	virtual bool setGraphicsMode(int mode);
-	virtual int getGraphicsMode() const;
-
-#ifdef USE_RGB_COLOR
-	virtual Graphics::PixelFormat getScreenFormat() const;
-	virtual Common::List<Graphics::PixelFormat> getSupportedFormats() const;
-#endif
-
-	virtual void initSize(uint width, uint height,
-							const Graphics::PixelFormat *format);
-
-	enum FixupType {
-		kClear = 0,		// glClear
-		kClearSwap,		// glClear + swapBuffers
-		kClearUpdate	// glClear + updateScreen
-	};
-
-	void clearScreen(FixupType type, byte count = 1);
-
-	void updateScreenRect();
-	virtual int getScreenChangeID() const;
-
-	virtual int16 getHeight();
-	virtual int16 getWidth();
-
-	virtual PaletteManager *getPaletteManager() {
-		return this;
-	}
+	bool hasFeature(OSystem::Feature f) override;
+	void setFeatureState(OSystem::Feature f, bool enable) override;
+	bool getFeatureState(OSystem::Feature f) override;
 
 public:
-	void pushEvent(int type, int arg1, int arg2, int arg3, int arg4, int arg5);
+	void pushEvent(int type, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6);
+	void pushEvent(const Common::Event &event);
+	void pushEvent(const Common::Event &event1, const Common::Event &event2);
+
+	TouchControls &getTouchControls() { return _touchControls; }
+	void applyTouchSettings(bool _3dMode, bool overlayShown);
+	void setupTouchMode(int oldValue, int newValue);
 
 private:
 	Common::Queue<Common::Event> _event_queue;
 	Common::Event _queuedEvent;
 	uint32 _queuedEventTime;
-	MutexRef _event_queue_lock;
+	Common::Mutex *_event_queue_lock;
 
-	Common::Point _touch_pt_down, _touch_pt_scroll, _touch_pt_dt;
+	Common::Point _touch_pt_down, _touch_pt_scroll, _touch_pt_dt, _touch_pt_multi;
 	int _eventScaleX;
 	int _eventScaleY;
-	bool _touchpad_mode;
+	int _touch_mode;
 	int _touchpad_scale;
 	int _trackball_scale;
 	int _dpad_scale;
 	int _joystick_scale;
-	int _fingersDown;
+//	int _fingersDown;
+	int _firstPointerId;
+	int _secondPointerId;
+	int _thirdPointerId;
 
-	void clipMouse(Common::Point &p);
-	void scaleMouse(Common::Point &p, int x, int y, bool deductDrawRect = true, bool touchpadMode = false);
-	void updateEventScale();
-	void disableCursorPalette();
-
-protected:
-	// PaletteManager API
-	virtual void setPalette(const byte *colors, uint start, uint num);
-	virtual void grabPalette(byte *colors, uint start, uint num) const;
+	TouchControls _touchControls;
 
 public:
-	virtual void copyRectToScreen(const void *buf, int pitch, int x, int y,
-									int w, int h);
-	virtual void updateScreen();
-	virtual Graphics::Surface *lockScreen();
-	virtual void unlockScreen();
-	virtual void setShakePos(int shakeOffset);
-	virtual void fillScreen(uint32 col);
-	virtual void setFocusRectangle(const Common::Rect& rect);
-	virtual void clearFocusRectangle();
+	bool pollEvent(Common::Event &event) override;
+	Common::HardwareInputSet *getHardwareInputSet() override;
+	Common::KeymapArray getGlobalKeymaps() override;
+	Common::KeymapperDefaultBindings *getKeymapperDefaultBindings() override;
 
-	virtual void showOverlay();
-	virtual void hideOverlay();
-	virtual void clearOverlay();
-	virtual void grabOverlay(void *buf, int pitch);
-	virtual void copyRectToOverlay(const void *buf, int pitch,
-									int x, int y, int w, int h);
-	virtual int16 getOverlayHeight();
-	virtual int16 getOverlayWidth();
-	virtual Graphics::PixelFormat getOverlayFormat() const;
+	void registerDefaultSettings(const Common::String &target) const override;
+	GUI::OptionsContainerWidget *buildBackendOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const override;
+	void applyBackendSettings() override;
 
-	virtual bool showMouse(bool visible);
+	uint32 getMillis(bool skipRecord = false) override;
+	void delayMillis(uint msecs) override;
+	Common::MutexInternal *createMutex() override;
 
-	virtual void warpMouse(int x, int y);
-	virtual void setMouseCursor(const void *buf, uint w, uint h, int hotspotX,
-								int hotspotY, uint32 keycolor,
-								bool dontScale,
-								const Graphics::PixelFormat *format);
-	virtual void setCursorPalette(const byte *colors, uint start, uint num);
+	void quit() override;
 
-	virtual bool pollEvent(Common::Event &event);
-	virtual uint32 getMillis(bool skipRecord = false);
-	virtual void delayMillis(uint msecs);
+	void setWindowCaption(const Common::U32String &caption) override;
 
-	virtual MutexRef createMutex(void);
-	virtual void lockMutex(MutexRef mutex);
-	virtual void unlockMutex(MutexRef mutex);
-	virtual void deleteMutex(MutexRef mutex);
+	Audio::Mixer *getMixer() override;
+	void getTimeAndDate(TimeDate &td, bool skipRecord = false) const override;
+	void logMessage(LogMessageType::Type type, const char *message) override;
+	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0) override;
+	bool openUrl(const Common::String &url) override;
+	bool hasTextInClipboard() override;
+	Common::U32String getTextFromClipboard() override;
+	bool setTextInClipboard(const Common::U32String &text) override;
+	bool isConnectionLimited() override;
+	Common::String getSystemLanguage() const override;
 
-	virtual void quit();
+	const OSystem::GraphicsMode *getSupportedGraphicsModes() const override;
+	int getDefaultGraphicsMode() const override;
+	bool setGraphicsMode(int mode, uint flags) override;
+	int getGraphicsMode() const override;
 
-	virtual void setWindowCaption(const char *caption);
-	virtual void displayMessageOnOSD(const char *msg);
-	virtual void showVirtualKeyboard(bool enable);
+	OpenGL::ContextType getOpenGLType() const override { return OpenGL::kContextGLES2; }
+#if defined(USE_OPENGL) && defined(USE_GLAD)
+	void *getOpenGLProcAddress(const char *name) const override;
+#endif
 
-	virtual Audio::Mixer *getMixer();
-	virtual void getTimeAndDate(TimeDate &t) const;
-	virtual void logMessage(LogMessageType::Type type, const char *message);
-	virtual void addSysArchivesToSearchSet(Common::SearchSet &s,
-											int priority = 0);
-	virtual bool openUrl(const Common::String &url);
-	virtual Common::String getSystemLanguage() const;
+#ifdef ANDROID_DEBUG_GL_CALLS
+	bool isRunningInMainThread() { return pthread_self() == _main_thread; }
+#endif
 };
 
 #endif

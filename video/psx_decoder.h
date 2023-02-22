@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -36,6 +35,7 @@ class QueuingAudioStream;
 }
 
 namespace Common {
+template <class BITSTREAM>
 class Huffman;
 }
 
@@ -105,16 +105,18 @@ private:
 			kPlaneV = 2
 		};
 
+		typedef Common::Huffman<Common::BitStreamMemory16LEMSB> HuffmanDecoder;
+
 		uint16 _macroBlocksW, _macroBlocksH;
 		byte *_yBuffer, *_cbBuffer, *_crBuffer;
 		void decodeMacroBlock(Common::BitStreamMemory16LEMSB *bits, int mbX, int mbY, uint16 scale, uint16 version);
 		void decodeBlock(Common::BitStreamMemory16LEMSB *bits, byte *block, int pitch, uint16 scale, uint16 version, PlaneType plane);
 
 		void readAC(Common::BitStreamMemory16LEMSB *bits, int *block);
-		Common::Huffman *_acHuffman;
+		HuffmanDecoder *_acHuffman;
 
 		int readDC(Common::BitStreamMemory16LEMSB *bits, uint16 version, PlaneType plane);
-		Common::Huffman *_dcHuffmanLuma, *_dcHuffmanChroma;
+		HuffmanDecoder *_dcHuffmanLuma, *_dcHuffmanChroma;
 		int _lastDC[3];
 
 		void dequantizeBlock(int *coefficients, float *block, uint16 scale);
@@ -137,11 +139,9 @@ private:
 
 		Audio::QueuingAudioStream *_audStream;
 
-		struct ADPCMStatus {
-			int16 sample[2];
-		} _adpcmStatus[2];
-
 		bool _endOfTrack;
+		bool _stereo;
+		uint _rate;
 	};
 
 	CDSpeed _speed;

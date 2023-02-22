@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -189,6 +188,28 @@ enum TSFXType {
 enum TSpriteCacheType {
 	CACHE_ALL,
 	CACHE_HALF
+};
+
+enum TTextCharset {
+	CHARSET_ANSI = 0,
+	CHARSET_DEFAULT = 1,
+	CHARSET_OEM = 2,
+	CHARSET_BALTIC = 3,
+	CHARSET_CHINESEBIG5 = 4,
+	CHARSET_EASTEUROPE = 5,
+	CHARSET_GB2312 = 6,
+	CHARSET_GREEK = 7,
+	CHARSET_HANGUL = 8,
+	CHARSET_MAC = 9,
+	CHARSET_RUSSIAN = 10,
+	CHARSET_SHIFTJIS = 11,
+	CHARSET_SYMBOL = 12,
+	CHARSET_TURKISH = 13,
+	CHARSET_VIETNAMESE = 14,
+	CHARSET_JOHAB = 15,
+	CHARSET_ARABIC = 16,
+	CHARSET_HEBREW = 17,
+	CHARSET_THAI = 18
 };
 
 enum TTextEncoding {

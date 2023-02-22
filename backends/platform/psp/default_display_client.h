@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -78,14 +77,14 @@ public:
  */
 class Screen : public DefaultDisplayClient {
 public:
-	Screen() : _shakePos(0) {
+	Screen() : _shakeXOffset(0), _shakeYOffset(0) {
 		memset(&_pixelFormat, 0, sizeof(_pixelFormat));
 		memset(&_frameBuffer, 0, sizeof(_frameBuffer));
 	}
 
 	void init();
 	bool allocate();
-	void setShakePos(int pos);
+	void setShakePos(int shakeXOffset, int shakeYOffset);
 	void setScummvmPixelFormat(const Graphics::PixelFormat *format);
 	const Graphics::PixelFormat &getScummvmPixelFormat() const { return _pixelFormat; }
 	Graphics::Surface *lockAndGetForEditing();
@@ -93,7 +92,8 @@ public:
 	void setSize(uint32 width, uint32 height);
 
 private:
-	uint32 _shakePos;
+	uint32 _shakeXOffset;
+	uint32 _shakeYOffset;
 	Graphics::PixelFormat _pixelFormat;
 	Graphics::Surface _frameBuffer;
 };

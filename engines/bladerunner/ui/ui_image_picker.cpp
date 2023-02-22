@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,6 +26,7 @@
 #include "bladerunner/font.h"
 #include "bladerunner/mouse.h"
 #include "bladerunner/shape.h"
+#include "bladerunner/time.h"
 
 #include "common/rect.h"
 #include "common/str.h"
@@ -48,7 +48,7 @@ UIImagePicker::~UIImagePicker() {
 }
 
 void UIImagePicker::resetImages() {
-	for (int i = 0; i != _imageCount; i++) {
+	for (int i = 0; i != _imageCount; ++i) {
 		resetImage(i);
 	}
 }
@@ -62,8 +62,8 @@ bool UIImagePicker::defineImage(int i, Common::Rect rect, const Shape *shapeUp, 
 
 	img.rect = rect;
 	// for rect to be inclusive
-	img.rect.right += 1;
-	img.rect.bottom += 1;
+	++(img.rect.right);
+	++(img.rect.bottom);
 	img.shapeUp = shapeUp;
 	img.shapeHovered = shapeHovered;
 	img.shapeDown = shapeDown;
@@ -98,6 +98,18 @@ bool UIImagePicker::setImageLeft(int i, int left) {
 	Image &img = _images[i];
 
 	img.rect.moveTo(left, img.rect.top);
+
+	return true;
+}
+
+bool UIImagePicker::setImageWidth(int i, int16 width) {
+	if (i < 0 || i >= _imageCount || !_images[i].active) {
+		return false;
+	}
+
+	Image &img = _images[i];
+
+	img.rect.setWidth(width);
 
 	return true;
 }
@@ -146,6 +158,36 @@ bool UIImagePicker::setImageTooltip(int i, const char *tooltip) {
 	return true;
 }
 
+int UIImagePicker::getImageTop(int i) {
+	if (i < 0 || i >= _imageCount || !_images[i].active) {
+		return false;
+	}
+
+	Image &img = _images[i];
+
+	return img.rect.top;
+}
+
+int UIImagePicker::getImageLeft(int i) {
+	if (i < 0 || i >= _imageCount || !_images[i].active) {
+		return false;
+	}
+
+	Image &img = _images[i];
+
+	return img.rect.left;
+}
+
+int UIImagePicker::getImageWidth(int i) {
+	if (i < 0 || i >= _imageCount || !_images[i].active) {
+		return false;
+	}
+
+	Image &img = _images[i];
+
+	return img.rect.width();
+}
+
 bool UIImagePicker::resetActiveImage(int i) {
 	if (i < 0 || i >= _imageCount || !_images[i].active) {
 		return false;
@@ -156,17 +198,17 @@ bool UIImagePicker::resetActiveImage(int i) {
 }
 
 void UIImagePicker::activate(UIImagePickerCallback *mouseInCallback,
-                             UIImagePickerCallback *mouseOutCallback,
-                             UIImagePickerCallback *mouseDownCallback,
-                             UIImagePickerCallback *mouseUpCallback,
-                             void *callbackData) {
+							 UIImagePickerCallback *mouseOutCallback,
+							 UIImagePickerCallback *mouseDownCallback,
+							 UIImagePickerCallback *mouseUpCallback,
+							 void *callbackData) {
 	_isButtonDown        = false;
 	_mouseInCallback     = mouseInCallback;
 	_mouseOutCallback    = mouseOutCallback;
 	_mouseDownCallback   = mouseDownCallback;
 	_mouseUpCallback     = mouseUpCallback;
 	_callbackData        = callbackData;
-	_hoverStartTimestamp = 0;
+	_hoverStartTimestamp = 0u;
 	_isVisible           = true;
 	_hoveredImageIndex   = -1;
 	_pressedImageIndex   = -1;
@@ -179,7 +221,7 @@ void UIImagePicker::deactivate() {
 	_mouseDownCallback   = nullptr;
 	_mouseUpCallback     = nullptr;
 	_callbackData        = nullptr;
-	_hoverStartTimestamp = 0;
+	_hoverStartTimestamp = 0u;
 	_isVisible           = false;
 	_hoveredImageIndex   = -1;
 	_pressedImageIndex   = -1;
@@ -196,27 +238,24 @@ void UIImagePicker::draw(Graphics::Surface &surface) {
 			continue;
 		}
 
-		if (i == _hoveredImageIndex && i == _pressedImageIndex && _isButtonDown) {
-			if (!_vm->_mouse->isDisabled()) {
-				if (img.shapeDown) {
-					img.shapeDown->draw(surface, img.rect.left, img.rect.top);
-				}
-			}
-		} else if (i == _hoveredImageIndex && !_isButtonDown) {
-			if (!_vm->_mouse->isDisabled()) {
-				if (img.shapeHovered) {
-					img.shapeHovered->draw(surface, img.rect.left, img.rect.top);
-				}
-			}
+		if (i == _hoveredImageIndex && i == _pressedImageIndex && _isButtonDown
+			&& !_vm->_mouse->isDisabled()
+			&& img.shapeDown) {
+			img.shapeDown->draw(surface, img.rect.left, img.rect.top);
+		} else if (i == _hoveredImageIndex && !_isButtonDown
+			&& !_vm->_mouse->isDisabled()
+			&& img.shapeHovered) {
+			img.shapeHovered->draw(surface, img.rect.left, img.rect.top);
 		} else {
+			// this shape should always be the fall back shape to prevent blinking
 			if (img.shapeUp) {
 				img.shapeUp->draw(surface, img.rect.left, img.rect.top);
 			}
 		}
 
 		if (_vm->_debugger->_viewUI) {
-			surface.frameRect(img.rect, 0x7fff);
-			_vm->_mainFont->drawColor(Common::String::format("%d", i), surface, (img.rect.left + img.rect.right) / 2, (img.rect.top + img.rect.bottom) / 2, 0x7fff);
+			surface.frameRect(img.rect, surface.format.RGBToColor(255, 255, 255));
+			_vm->_mainFont->drawString(&surface, Common::String::format("%d", i), (img.rect.left + img.rect.right) / 2, (img.rect.top + img.rect.bottom) / 2, surface.w, surface.format.RGBToColor(255, 255, 255));
 		}
 	}
 }
@@ -226,7 +265,12 @@ void UIImagePicker::drawTooltip(Graphics::Surface &surface, int x, int y) {
 		return;
 	}
 
-	if (_hoveredImageIndex == -1 || _vm->_mouse->isDisabled() || !_images[_hoveredImageIndex].active || _vm->getTotalPlayTime() < _hoverStartTimestamp + 1000) {
+	if (
+		(_hoveredImageIndex == -1) ||
+		(_vm->_mouse->isDisabled()) ||
+		(!_images[_hoveredImageIndex].active) ||
+		(_vm->_time->current() - _hoverStartTimestamp < 1000u)
+	) { // unsigned difference is intentional (time difference)
 		return;
 	}
 
@@ -236,8 +280,8 @@ void UIImagePicker::drawTooltip(Graphics::Surface &surface, int x, int y) {
 		return;
 	}
 
-	int width = _vm->_mainFont->getTextWidth(tooltip) + 1;
-	int height = _vm->_mainFont->getTextHeight(tooltip) + 1;
+	int width = _vm->_mainFont->getStringWidth(tooltip) + 1;
+	int height = _vm->_mainFont->getFontHeight() + 1;
 
 	Common::Rect rect;
 	rect.left = x - ((width / 2) + 1);
@@ -251,20 +295,24 @@ void UIImagePicker::drawTooltip(Graphics::Surface &surface, int x, int y) {
 	}
 
 	rect.right = width + rect.left + 3;
-	if (rect.right >= 640) {
-		rect.right = 639;
-		rect.left = 636 - width;
+	if (rect.right >= BladeRunnerEngine::kOriginalGameWidth) {
+		rect.right = BladeRunnerEngine::kOriginalGameWidth - 1;
+		rect.left = BladeRunnerEngine::kOriginalGameWidth - 4 - width;
+		if (rect.left < 0)  rect.left = 0;  // should never happen
+		if (rect.right < 0) rect.right = 0; // should never happen
 	}
 
-	rect.bottom = height + rect.top + 1;
-	if (rect.bottom >= 480) {
-		rect.bottom = 479;
-		rect.top = 478 - height;
+	rect.bottom = height + rect.top + 2;
+	if (rect.bottom >= BladeRunnerEngine::kOriginalGameHeight) {
+		rect.bottom = BladeRunnerEngine::kOriginalGameHeight - 1;
+		rect.top = BladeRunnerEngine::kOriginalGameHeight - 3 - height;
+		if (rect.top < 0)    rect.top = 0;    // should never happen
+		if (rect.bottom < 0) rect.bottom = 0; // should never happen
 	}
 
-	surface.fillRect(rect, 0);
-	surface.frameRect(rect, 0x7FFF);
-	_vm->_mainFont->drawColor(tooltip, surface, rect.left + 2, rect.top, 0x7FFF);
+	surface.fillRect(rect, surface.format.RGBToColor(0, 0, 0));
+	surface.frameRect(rect, surface.format.RGBToColor(255, 255, 255));
+	_vm->_mainFont->drawString(&surface, tooltip, rect.left + 2, rect.top, surface.w, surface.format.RGBToColor(255, 255, 255));
 }
 
 bool UIImagePicker::handleMouseAction(int x, int y, bool down, bool up, bool ignore) {
@@ -293,7 +341,7 @@ bool UIImagePicker::handleMouseAction(int x, int y, bool down, bool up, bool ign
 				}
 			}
 		}
-		_hoverStartTimestamp = _vm->getTotalPlayTime();
+		_hoverStartTimestamp = _vm->_time->current();
 		_hoveredImageIndex = hoveredImageIndex;
 	}
 
@@ -349,7 +397,7 @@ void UIImagePicker::reset() {
 	_isVisible           = false;
 	_hoveredImageIndex   = -1;
 	_pressedImageIndex   = -1;
-	_hoverStartTimestamp = 0;
+	_hoverStartTimestamp = 0u;
 	_isButtonDown        = false;
 	_mouseInCallback     = nullptr;
 	_mouseOutCallback    = nullptr;

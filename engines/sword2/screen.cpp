@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1994-1998 Revolution Software Ltd.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 // ---------------------------------------------------------------------------
@@ -86,8 +85,8 @@ Screen::Screen(Sword2Engine *vm, int16 width, int16 height) {
 	_largestLayerArea = 0;
 	_largestSpriteArea = 0;
 
-	strcpy(_largestLayerInfo,  "largest layer:  none registered");
-	strcpy(_largestSpriteInfo, "largest sprite: none registered");
+	Common::strcpy_s(_largestLayerInfo,  "largest layer:  none registered");
+	Common::strcpy_s(_largestSpriteInfo, "largest sprite: none registered");
 
 	_fadeStatus = RDFADE_NONE;
 	_renderAverageTime = 60;
@@ -156,6 +155,8 @@ void Screen::setRenderLevel(int8 level) {
 		// Highest setting: transparency-blending + shading +
 		// edge-blending + improved stretching
 		_renderCaps = RDBLTFX_SPRITEBLEND | RDBLTFX_SHADOWBLEND | RDBLTFX_EDGEBLEND;
+		break;
+	default:
 		break;
 	}
 }
@@ -536,7 +537,7 @@ void Screen::processLayer(byte *file, uint32 layer_number) {
 
 	if (current_layer_area > _largestLayerArea) {
 		_largestLayerArea = current_layer_area;
-		sprintf(_largestLayerInfo,
+		Common::sprintf_s(_largestLayerInfo,
 			"largest layer:  %s layer(%d) is %dx%d",
 			_vm->_resman->fetchName(_thisScreen.background_layer_id),
 			layer_number, layer_head.width, layer_head.height);
@@ -554,7 +555,8 @@ void Screen::processImage(BuildUnit *build_unit) {
 	if ( (Sword2Engine::isPsx() &&  _vm->_logic->readVar(DEMO)) &&
 		 ((build_unit->anim_resource == 369 && build_unit->anim_pc == 0) ||
 		 (build_unit->anim_resource == 296 && build_unit->anim_pc == 5)  ||
-		 (build_unit->anim_resource == 534 && build_unit->anim_pc == 13)) )
+		 (build_unit->anim_resource == 534 && build_unit->anim_pc == 13) ||
+		 (build_unit->anim_resource == 416 && build_unit->anim_pc == 41)) )
 		return;
 
 	byte *file = _vm->_resman->openResource(build_unit->anim_resource);
@@ -609,6 +611,8 @@ void Screen::processImage(BuildUnit *build_unit) {
 			if (Sword2Engine::isPsx())
 				colTablePtr++; // There is one additional byte to skip before the table in psx version
 			break;
+		default:
+			break;
 		}
 	}
 
@@ -638,7 +642,7 @@ void Screen::processImage(BuildUnit *build_unit) {
 
 	if (current_sprite_area > _largestSpriteArea) {
 		_largestSpriteArea = current_sprite_area;
-		sprintf(_largestSpriteInfo,
+		Common::sprintf_s(_largestSpriteInfo,
 			"largest sprite: %s frame(%d) is %dx%d",
 			_vm->_resman->fetchName(build_unit->anim_resource),
 			build_unit->anim_pc,
@@ -845,22 +849,18 @@ enum {
 };
 
 struct CreditsLine {
-	char *str;
+	Common::String str;
 	byte type;
 	int top;
 	int height;
 	byte *sprite;
 
 	CreditsLine() {
-		str = NULL;
 		sprite = NULL;
 	}
 
 	~CreditsLine() {
-		free(str);
 		free(sprite);
-		str = NULL;
-		sprite = NULL;
 	}
 };
 
@@ -1036,7 +1036,7 @@ void Screen::rollCredits() {
 				creditsLines[lineCount]->top = lineTop;
 				creditsLines[lineCount]->height = CREDITS_FONT_HEIGHT;
 				creditsLines[lineCount]->type = LINE_LEFT;
-				creditsLines[lineCount]->str = strdup(line);
+				creditsLines[lineCount]->str = line;
 
 				lineCount++;
 				*center_mark = '^';
@@ -1063,7 +1063,7 @@ void Screen::rollCredits() {
 			lineTop += CREDITS_LINE_SPACING;
 		}
 
-		creditsLines[lineCount]->str = strdup(line);
+		creditsLines[lineCount]->str = line;
 		lineCount++;
 	}
 
@@ -1113,7 +1113,7 @@ void Screen::rollCredits() {
 			// Free any sprites that have scrolled off the screen
 
 			if (creditsLines[i]->top + creditsLines[i]->height < scrollPos) {
-				debug(2, "Freeing line %d: '%s'", i, creditsLines[i]->str);
+				debug(2, "Freeing line %d: '%s'", i, creditsLines[i]->str.c_str());
 
 				delete creditsLines[i];
 				creditsLines[i] = NULL;
@@ -1121,8 +1121,8 @@ void Screen::rollCredits() {
 				startLine = i + 1;
 			} else if (creditsLines[i]->top < scrollPos + 400) {
 				if (!creditsLines[i]->sprite) {
-					debug(2, "Creating line %d: '%s'", i, creditsLines[i]->str);
-					creditsLines[i]->sprite = _vm->_fontRenderer->makeTextSprite((byte *)creditsLines[i]->str, 600, 14, _vm->_speechFontId, 0);
+					debug(2, "Creating line %d: '%s'", i, creditsLines[i]->str.c_str());
+					creditsLines[i]->sprite = _vm->_fontRenderer->makeTextSprite((const byte *)creditsLines[i]->str.c_str(), 600, 14, _vm->_speechFontId, 0);
 				}
 
 				FrameHeader frame;
@@ -1143,13 +1143,16 @@ void Screen::rollCredits() {
 					spriteInfo.x = RENDERWIDE / 2 + 5;
 					break;
 				case LINE_CENTER:
-					if (strcmp(creditsLines[i]->str, "@") == 0) {
+					if (strcmp(creditsLines[i]->str.c_str(), "@") == 0) {
 						spriteInfo.data = logoData;
 						spriteInfo.x = (RENDERWIDE - logoWidth) / 2;
 						spriteInfo.w = logoWidth;
 						spriteInfo.h = logoHeight;
-					} else
+					} else {
 						spriteInfo.x = (RENDERWIDE - frame.width) / 2;
+					}
+					break;
+				default:
 					break;
 				}
 

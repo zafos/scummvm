@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,7 +24,7 @@
 namespace BladeRunner {
 
 AIScriptGeneralDoll::AIScriptGeneralDoll(BladeRunnerEngine *vm) : AIScriptBase(vm) {
-	_flag = 0;
+	_resumeIdleAfterFramesetCompletesFlag = false;
 }
 
 void AIScriptGeneralDoll::Initialize() {
@@ -34,66 +33,69 @@ void AIScriptGeneralDoll::Initialize() {
 	_animationStateNext = 0;
 	_animationNext = 0;
 
-	_flag = 0;
+	_resumeIdleAfterFramesetCompletesFlag = false;
 
 	Actor_Put_In_Set(kActorGeneralDoll, kSetFreeSlotG);
 	Actor_Set_At_Waypoint(kActorGeneralDoll, 39, 0);
+
 	Actor_Set_Goal_Number(kActorGeneralDoll, 100);
 }
 
 bool AIScriptGeneralDoll::Update() {
 	if (Global_Variable_Query(kVariableChapter) == 2
-			&& Actor_Query_Goal_Number(kActorGeneralDoll) <= 101
-			&& Player_Query_Current_Scene() == kSceneBB05) {
+	 && Actor_Query_Goal_Number(kActorGeneralDoll) <= 101
+	 && Player_Query_Current_Scene() == kSceneBB05
+	) {
 		Actor_Set_Goal_Number(kActorGeneralDoll, 101);
-	} else if (Global_Variable_Query(kVariableChapter) != 3 || Actor_Query_Goal_Number(kActorGeneralDoll) >= 200) {
-		return false;
+		return true;
 	}
 
-	return true;
+	if (Global_Variable_Query(kVariableChapter) == 3
+	 && Actor_Query_Goal_Number(kActorGeneralDoll) < 200
+	) {
+		return true;
+	}
+
+	return false;
 }
 
 void AIScriptGeneralDoll::TimerExpired(int timer) {
-	if (timer != 2)
-		return; //false;
-
-	Actor_Change_Animation_Mode(kActorMcCoy, 48);
-	Actor_Change_Animation_Mode(kActorGeneralDoll, 48);
-	AI_Countdown_Timer_Reset(kActorGeneralDoll, 2);
-
-	return; //true;
+	if (timer == kActorTimerAIScriptCustomTask2) {
+		Actor_Change_Animation_Mode(kActorMcCoy, kAnimationModeDie);
+		Actor_Change_Animation_Mode(kActorGeneralDoll, kAnimationModeDie);
+		AI_Countdown_Timer_Reset(kActorGeneralDoll, kActorTimerAIScriptCustomTask2);
+		return; //true;
+	}
+	return; //false;
 }
 
 void AIScriptGeneralDoll::CompletedMovementTrack() {
 	switch (Actor_Query_Goal_Number(kActorGeneralDoll)) {
-	case 200:
-		Actor_Set_Goal_Number(kActorGeneralDoll, 201);
-		return; //true;
-
-	case 201:
-		Actor_Set_Goal_Number(kActorGeneralDoll, 200);
-		return; //true;
-
 	case 101:
-		if (Player_Query_Current_Scene() == 6) {
+		if (Player_Query_Current_Scene() == kSceneBB05) {
 			switch (Random_Query(0, 5)) {
 			case 0:
-				Ambient_Sounds_Play_Speech_Sound(58, 0, 80, 0, 0, 0);
+				Ambient_Sounds_Play_Speech_Sound(kActorGeneralDoll, 0, 80, 0, 0, 0);
 				break;
+
 			case 1:
-				Ambient_Sounds_Play_Speech_Sound(58, 10, 80, 0, 0, 0);
+				Ambient_Sounds_Play_Speech_Sound(kActorGeneralDoll, 10, 80, 0, 0, 0);
 				break;
+
 			case 2:
-				Ambient_Sounds_Play_Speech_Sound(58, 20, 80, 0, 0, 0);
+				Ambient_Sounds_Play_Speech_Sound(kActorGeneralDoll, 20, 80, 0, 0, 0);
 				break;
+
 			case 3:
-				Ambient_Sounds_Play_Speech_Sound(58, 30, 80, 0, 0, 0);
+				Ambient_Sounds_Play_Speech_Sound(kActorGeneralDoll, 30, 80, 0, 0, 0);
 				break;
+
 			case 4:
-				Ambient_Sounds_Play_Speech_Sound(58, 40, 80, 0, 0, 0);
+				Ambient_Sounds_Play_Speech_Sound(kActorGeneralDoll, 40, 80, 0, 0, 0);
 				break;
+
 			case 5:
-				Ambient_Sounds_Play_Speech_Sound(58, 50, 80, 0, 0, 0);
+				Ambient_Sounds_Play_Speech_Sound(kActorGeneralDoll, 50, 80, 0, 0, 0);
 				break;
 			}
 			Actor_Set_Goal_Number(kActorGeneralDoll, 102);
@@ -110,6 +112,13 @@ void AIScriptGeneralDoll::CompletedMovementTrack() {
 		Actor_Set_Goal_Number(kActorGeneralDoll, 101);
 		return; //true;
 
+	case 200:
+		Actor_Set_Goal_Number(kActorGeneralDoll, 201);
+		return; //true;
+
+	case 201:
+		Actor_Set_Goal_Number(kActorGeneralDoll, 200);
+		return; //true;
 	}
 
 	return; //false
@@ -120,20 +129,20 @@ void AIScriptGeneralDoll::ReceivedClue(int clueId, int fromActorId) {
 }
 
 void AIScriptGeneralDoll::ClickedByPlayer() {
-	Actor_Face_Actor(kActorMcCoy, kActorGeneralDoll, 1);
+	Actor_Face_Actor(kActorMcCoy, kActorGeneralDoll, true);
 	Actor_Voice_Over(30, kActorVoiceOver);
 	Actor_Voice_Over(40, kActorVoiceOver);
 }
 
-void AIScriptGeneralDoll::EnteredScene(int sceneId) {
+void AIScriptGeneralDoll::EnteredSet(int setId) {
 	// return false;
 }
 
-void AIScriptGeneralDoll::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptGeneralDoll::OtherAgentEnteredThisSet(int otherActorId) {
 	// return false;
 }
 
-void AIScriptGeneralDoll::OtherAgentExitedThisScene(int otherActorId) {
+void AIScriptGeneralDoll::OtherAgentExitedThisSet(int otherActorId) {
 	// return false;
 }
 
@@ -147,13 +156,15 @@ void AIScriptGeneralDoll::ShotAtAndMissed() {
 
 bool AIScriptGeneralDoll::ShotAtAndHit() {
 	AI_Movement_Track_Flush(kActorGeneralDoll);
-	Global_Variable_Increment(25, 1);
-	if (!Game_Flag_Query(399) && Global_Variable_Query(25) == 1) {
-		Sound_Play(121, 100, 0, 0, 50);
-		Game_Flag_Set(399);
+	Global_Variable_Increment(kVariableGeneralDollShot, 1);
+	if (!Game_Flag_Query(kFlagGeneralDollShot)
+	 &&  Global_Variable_Query(kVariableGeneralDollShot) == 1
+	) {
+		Sound_Play(kSfxSERVOD1, 100, 0, 0, 50);
+		Game_Flag_Set(kFlagGeneralDollShot);
 		Actor_Set_Goal_Number(kActorGeneralDoll, 104);
-		ChangeAnimationMode(48);
-		Actor_Set_Targetable(kActorGeneralDoll, 0);
+		ChangeAnimationMode(kAnimationModeDie);
+		Actor_Set_Targetable(kActorGeneralDoll, false);
 	}
 
 	return false;
@@ -279,49 +290,49 @@ bool AIScriptGeneralDoll::GoalChanged(int currentGoalNumber, int newGoalNumber) 
 bool AIScriptGeneralDoll::UpdateAnimation(int *animation, int *frame) {
 	switch (_animationState) {
 	case 0:
-		*animation = 834;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(834)) {
+		*animation = kModelGeneralDollIdle;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelGeneralDollIdle)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 1:
-		*animation = 835;
-		if (!_animationFrame && _flag) {
-			*animation = 834;
+		*animation = kModelGeneralDollHaltSalute;
+		if (_animationFrame == 0 && _resumeIdleAfterFramesetCompletesFlag) {
+			*animation = kModelGeneralDollIdle;
 			_animationFrame = 0;
 			_animationState = 0;
 		} else {
-			_animationFrame++;
-			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(835)) {
+			++_animationFrame;
+			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelGeneralDollHaltSalute)) {
 				_animationFrame = 0;
 			}
 		}
 		break;
 
 	case 2:
-		*animation = 833;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(833)) {
+		*animation = kModelGeneralDollWalking;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelGeneralDollWalking)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 3:
-		*animation = 837;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(837)) {
-			*animation = 834;
+		*animation = kModelGeneralDollGotHit;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelGeneralDollGotHit)) {
+			*animation = kModelGeneralDollIdle;
 			_animationFrame = 0;
 			_animationState = 0;
 		}
 		break;
 
 	case 4:
-		*animation = 836;
-		if (_animationFrame < Slice_Animation_Query_Number_Of_Frames(836) - 1) {
-			_animationFrame++;
+		*animation = kModelGeneralDollShotDead;
+		if (_animationFrame < Slice_Animation_Query_Number_Of_Frames(kModelGeneralDollShotDead) - 1) {
+			++_animationFrame;
 		}
 		break;
 
@@ -337,12 +348,13 @@ bool AIScriptGeneralDoll::ChangeAnimationMode(int mode) {
 	switch (mode) {
 	case 0:
 		if (_animationState == 1) {
-			_flag = 1;
+			_resumeIdleAfterFramesetCompletesFlag = true;
 		} else {
 			_animationState = 0;
 			_animationFrame = 0;
 		}
 		break;
+
 	case 1:
 		_animationState = 2;
 		_animationFrame = 0;
@@ -351,7 +363,7 @@ bool AIScriptGeneralDoll::ChangeAnimationMode(int mode) {
 	case 3:
 		_animationState = 1;
 		_animationFrame = 0;
-		_flag = 0;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		break;
 
 	case 43:
@@ -359,7 +371,7 @@ bool AIScriptGeneralDoll::ChangeAnimationMode(int mode) {
 		_animationFrame = 0;
 		break;
 
-	case 48:
+	case kAnimationModeDie:
 		_animationState = 4;
 		_animationFrame = 0;
 		break;

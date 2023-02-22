@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -53,7 +52,15 @@ protected:
 		int16 xpos, ypos;
 		byte color;
 		byte charset;
-		byte text[256];
+		byte text[512];
+
+		void clear() {
+			xpos = 0;
+			ypos = 0;
+			color = 0;
+			charset = 0;
+			for (uint i = 0; i < ARRAYSIZE(text); i++) text[i] = 0;
+		}
 	};
 
 	/** BlastObjects to draw */
@@ -63,18 +70,21 @@ protected:
 		uint16 scaleX, scaleY;
 		uint16 image;
 		uint16 mode;
+
+		void clear() {
+			number = 0;
+			rect = Common::Rect();
+			scaleX = 0;
+			scaleY = 0;
+			image = 0;
+			mode = 0;
+		}
 	};
 
 	int _blastObjectQueuePos;
+	int _blastObjectRectsQueue = 0;
 	BlastObject _blastObjectQueue[200];
-
-	struct BlastText : TextObject {
-		Common::Rect rect;
-		bool center;
-	};
-
-	int _blastTextQueuePos;
-	BlastText _blastTextQueue[50];
+	Common::Rect _blastObjectsRectsToBeRestored[200];
 
 	// Akos Class
 	struct {
@@ -95,23 +105,24 @@ protected:
 public:
 	ScummEngine_v6(OSystem *syst, const DetectorResult &dr);
 
-	virtual void resetScumm();
+	void resetScumm() override;
 
 protected:
-	virtual void setupOpcodes();
+	void setupOpcodes() override;
 
-	virtual void scummLoop_handleActors();
-	virtual void processKeyboard(Common::KeyState lastKeyHit);
+	void scummLoop_handleSaveLoad() override;
+	void scummLoop_handleActors() override;
+	void processKeyboard(Common::KeyState lastKeyHit) override;
 
-	virtual void setupScummVars();
+	void setupScummVars() override;
 	virtual void decodeParseString(int a, int b);
-	virtual void readArrayFromIndexFile();
+	void readArrayFromIndexFile() override;
 
-	virtual byte *getStringAddress(ResId idx);
-	virtual void readMAXS(int blockSize);
+	byte *getStringAddress(ResId idx) override;
+	void readMAXS(int blockSize) override;
 
-	virtual void palManipulateInit(int resID, int start, int end, int time);
-	virtual void drawDirtyScreenParts();
+	void palManipulateInit(int resID, int start, int end, int time) override;
+	void drawDirtyScreenParts() override;
 
 	int getStackList(int *args, uint maxnum);
 	int popRoomAndObj(int *room);
@@ -121,33 +132,41 @@ protected:
 	int findFreeArrayId();
 public: // FIXME. TODO
 	void nukeArray(int array);
+	void removeBlastObjects();
+	void restoreBlastObjectsRects();
 
 protected:
 	virtual int readArray(int array, int index, int base);
 	virtual void writeArray(int array, int index, int base, int value);
 	void shuffleArray(int num, int minIdx, int maxIdx);
 
-	virtual void setDefaultCursor();
-	void setCursorTransparency(int a);
-	void setCursorHotspot(int x, int y);
+	void setDefaultCursor() override;
+	void setCursorTransparency(int a) override;
+	void setCursorHotspot(int x, int y) override;
 
 	virtual void setCursorFromImg(uint img, uint room, uint imgindex);
 	void useIm01Cursor(const byte *im, int w, int h);
 	void useBompCursor(const byte *im, int w, int h);
 	void grabCursor(int x, int y, int w, int h);
+	void setCursorFromBuffer(const byte *ptr, int width, int height, int pitch, bool preventScale = false) override;
+	void ditherCursor();
 
-	void enqueueText(const byte *text, int x, int y, byte color, byte charset, bool center);
-	void drawBlastTexts();
-	void removeBlastTexts();
+	virtual void drawBlastTexts() {}
+	virtual void removeBlastTexts() {}
 
 	void enqueueObject(int objectNumber, int objectX, int objectY, int objectWidth,
 	                   int objectHeight, int scaleX, int scaleY, int image, int mode);
 	void drawBlastObjects();
 	void drawBlastObject(BlastObject *eo);
-	void removeBlastObjects();
-	void removeBlastObject(BlastObject *eo);
 
-	virtual void clearDrawQueues();
+	void restoreBlastObjectRect(Common::Rect r);
+
+	void clearDrawQueues() override;
+
+	int getBannerColor(int bannerId) override;
+	const char *getGUIString(int stringId) override;
+	void setSkipVideo(int value) override { _skipVideo = value; }
+	void setUpMainMenuControls() override;
 
 public:
 	bool akos_increaseAnims(const byte *akos, Actor *a);
@@ -156,7 +175,7 @@ protected:
 	void akos_queCommand(byte cmd, Actor *a, int param_1, int param_2);
 	virtual void akos_processQueue();
 
-	virtual void processActors();
+	void processActors() override;
 
 	int getSpecialBox(int x, int y);
 

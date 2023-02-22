@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,10 +39,9 @@ DECLARE_SINGLETON(ConfigManager);
 
 char const *const ConfigManager::kApplicationDomain = "scummvm";
 char const *const ConfigManager::kTransientDomain = "__TRANSIENT";
+char const *const ConfigManager::kSessionDomain = "__SESSION"; 
 
-#ifdef ENABLE_KEYMAPPER
 char const *const ConfigManager::kKeymapperDomain = "keymapper";
-#endif
 
 #ifdef USE_CLOUD
 char const *const ConfigManager::kCloudDomain = "cloud";
@@ -68,9 +66,8 @@ void ConfigManager::copyFrom(ConfigManager &source) {
 	_miscDomains = source._miscDomains;
 	_appDomain = source._appDomain;
 	_defaultsDomain = source._defaultsDomain;
-#ifdef ENABLE_KEYMAPPER
 	_keymapperDomain = source._keymapperDomain;
-#endif
+	_sessionDomain = source._sessionDomain; 
 #ifdef USE_CLOUD
 	_cloudDomain = source._cloudDomain;
 #endif
@@ -81,7 +78,7 @@ void ConfigManager::copyFrom(ConfigManager &source) {
 }
 
 
-void ConfigManager::loadDefaultConfigFile() {
+void ConfigManager::loadDefaultConfigFile(const String &fallbackFilename) {
 	// Open the default config file
 	assert(g_system);
 	SeekableReadStream *stream = g_system->createConfigReadStream();
@@ -95,24 +92,39 @@ void ConfigManager::loadDefaultConfigFile() {
 		delete stream;
 
 	} else {
-		// No config file -> create new one!
-		debug("Default configuration file missing, creating a new one");
+		// No config file -> try to load fallback, flush initial config to disk
+		if (!loadFallbackConfigFile(fallbackFilename))
+			debug("Default configuration file missing, creating a new one");
 
 		flushToDisk();
 	}
 }
 
-void ConfigManager::loadConfigFile(const String &filename) {
+void ConfigManager::loadConfigFile(const String &filename, const String &fallbackFilename) {
 	_filename = filename;
 
 	FSNode node(filename);
 	File cfg_file;
 	if (!cfg_file.open(node)) {
-		debug("Creating configuration file: %s", filename.c_str());
+		if (!loadFallbackConfigFile(fallbackFilename))
+			debug("Creating configuration file: %s", filename.c_str());
 	} else {
 		debug("Using configuration file: %s", _filename.c_str());
 		loadFromStream(cfg_file);
 	}
+}
+
+bool ConfigManager::loadFallbackConfigFile(const String &filename) {
+	if (filename.empty())
+		return false;
+
+	File fallbackFile;
+	if (!fallbackFile.open(FSNode(filename)))
+		return false;
+
+	debug("Using initial configuration file: %s", filename.c_str());
+	loadFromStream(fallbackFile);
+	return true;
 }
 
 /**
@@ -124,10 +136,8 @@ void ConfigManager::addDomain(const String &domainName, const ConfigManager::Dom
 		return;
 	if (domainName == kApplicationDomain) {
 		_appDomain = domain;
-#ifdef ENABLE_KEYMAPPER
 	} else if (domainName == kKeymapperDomain) {
 		_keymapperDomain = domain;
-#endif
 #ifdef USE_CLOUD
 	} else if (domainName == kCloudDomain) {
 		_cloudDomain = domain;
@@ -167,10 +177,9 @@ void ConfigManager::loadFromStream(SeekableReadStream &stream) {
 	_miscDomains.clear();
 	_transientDomain.clear();
 	_domainSaveOrder.clear();
+	_sessionDomain.clear(); 
 
-#ifdef ENABLE_KEYMAPPER
 	_keymapperDomain.clear();
-#endif
 #ifdef USE_CLOUD
 	_cloudDomain.clear();
 #endif
@@ -234,7 +243,7 @@ void ConfigManager::loadFromStream(SeekableReadStream &stream) {
 			// Split string at '=' into 'key' and 'value'. First, find the "=" delimeter.
 			const char *p = strchr(t, '=');
 			if (!p)
-				error("Config file buggy: Junk found in line line %d: '%s'", lineno, t);
+				error("Config file buggy: Junk found in line %d: '%s'", lineno, t);
 
 			// Extract the key/value pair
 			String key(t, p);
@@ -245,7 +254,7 @@ void ConfigManager::loadFromStream(SeekableReadStream &stream) {
 			value.trim();
 
 			// Finally, store the key/value pair in the active domain
-			domain[key] = value;
+			domain.setVal(key, value);
 
 			// Store comment
 			domain.setKVComment(key, comment);
@@ -282,10 +291,8 @@ void ConfigManager::flushToDisk() {
 	// Write the application domain
 	writeDomain(*stream, kApplicationDomain, _appDomain);
 
-#ifdef ENABLE_KEYMAPPER
 	// Write the keymapper domain
 	writeDomain(*stream, kKeymapperDomain, _keymapperDomain);
-#endif
 #ifdef USE_CLOUD
 	// Write the cloud domain
 	writeDomain(*stream, kCloudDomain, _cloudDomain);
@@ -323,7 +330,7 @@ void ConfigManager::writeDomain(WriteStream &stream, const String &name, const D
 	if (domain.empty())
 		return; // Don't bother writing empty domains.
 
-	// WORKAROUND: Fix for bug #1972625 "ALL: On-the-fly targets are
+	// WORKAROUND: Fix for bug #3746 "ALL: On-the-fly targets are
 	// written to the config file": Do not save domains that came from
 	// the command line
 	if (domain.contains("id_came_from_command_line"))
@@ -373,10 +380,10 @@ const ConfigManager::Domain *ConfigManager::getDomain(const String &domName) con
 		return &_transientDomain;
 	if (domName == kApplicationDomain)
 		return &_appDomain;
-#ifdef ENABLE_KEYMAPPER
 	if (domName == kKeymapperDomain)
 		return &_keymapperDomain;
-#endif
+	if (domName == kSessionDomain)
+		return &_sessionDomain; 
 #ifdef USE_CLOUD
 	if (domName == kCloudDomain)
 		return &_cloudDomain;
@@ -397,10 +404,10 @@ ConfigManager::Domain *ConfigManager::getDomain(const String &domName) {
 		return &_transientDomain;
 	if (domName == kApplicationDomain)
 		return &_appDomain;
-#ifdef ENABLE_KEYMAPPER
 	if (domName == kKeymapperDomain)
 		return &_keymapperDomain;
-#endif
+	if (domName == kSessionDomain)
+		return &_sessionDomain; 
 #ifdef USE_CLOUD
 	if (domName == kCloudDomain)
 		return &_cloudDomain;
@@ -420,12 +427,16 @@ ConfigManager::Domain *ConfigManager::getDomain(const String &domName) {
 bool ConfigManager::hasKey(const String &key) const {
 	// Search the domains in the following order:
 	// 1) the transient domain,
-	// 2) the active game domain (if any),
-	// 3) the application domain.
+	// 2) the session domain, 
+	// 3) the active game domain (if any),
+	// 4) the application domain.
 	// The defaults domain is explicitly *not* checked.
 
 	if (_transientDomain.contains(key))
 		return true;
+
+	if (_sessionDomain.contains(key))
+		return true; 
 
 	if (_activeDomain && _activeDomain->contains(key))
 		return true;
@@ -443,6 +454,9 @@ bool ConfigManager::hasKey(const String &key, const String &domName) const {
 	if (domName.empty())
 		return hasKey(key);
 
+	if (_sessionDomain.contains(key))
+		return true; 
+
 	const Domain *domain = getDomain(domName);
 
 	if (!domain)
@@ -458,6 +472,7 @@ void ConfigManager::removeKey(const String &key, const String &domName) {
 		      key.c_str(), domName.c_str());
 
 	domain->erase(key);
+	_sessionDomain.erase(key); 
 }
 
 
@@ -467,12 +482,14 @@ void ConfigManager::removeKey(const String &key, const String &domName) {
 const String &ConfigManager::get(const String &key) const {
 	if (_transientDomain.contains(key))
 		return _transientDomain[key];
+	else if (_sessionDomain.contains(key))
+		return _sessionDomain[key]; 
 	else if (_activeDomain && _activeDomain->contains(key))
 		return (*_activeDomain)[key];
 	else if (_appDomain.contains(key))
 		return _appDomain[key];
 
-	return _defaultsDomain.getVal(key);
+	return _defaultsDomain.getValOrDefault(key);
 }
 
 const String &ConfigManager::get(const String &key, const String &domName) const {
@@ -481,6 +498,9 @@ const String &ConfigManager::get(const String &key, const String &domName) const
 	// and should be removed ASAP.
 	if (domName.empty())
 		return get(key);
+
+	if (_sessionDomain.contains(key))
+		return _sessionDomain.getVal(key); 
 
 	const Domain *domain = getDomain(domName);
 
@@ -491,7 +511,7 @@ const String &ConfigManager::get(const String &key, const String &domName) const
 	if (domain->contains(key))
 		return (*domain)[key];
 
-	return _defaultsDomain.getVal(key);
+	return _defaultsDomain.getValOrDefault(key);
 }
 
 int ConfigManager::getInt(const String &key, const String &domName) const {
@@ -530,15 +550,29 @@ bool ConfigManager::getBool(const String &key, const String &domName) const {
 
 
 void ConfigManager::set(const String &key, const String &value) {
-	// Remove the transient domain value, if any.
+	// Remove the transient and session domain value, if any.
 	_transientDomain.erase(key);
+	_sessionDomain.erase(key); 
 
 	// Write the new key/value pair into the active domain, resp. into
 	// the application domain if no game domain is active.
 	if (_activeDomain)
-		(*_activeDomain)[key] = value;
+		(*_activeDomain).setVal(key, value);
 	else
-		_appDomain[key] = value;
+		_appDomain.setVal(key, value);
+}
+
+void ConfigManager::setAndFlush(const String &key, const Common::String &value) {
+	if (value.empty() && !hasKey(key)) {
+		return;
+	}
+
+	if (hasKey(key) && get(key) == value) {
+		return;
+	}
+
+	set(key, value);
+	flushToDisk();
 }
 
 void ConfigManager::set(const String &key, const String &value, const String &domName) {
@@ -556,9 +590,12 @@ void ConfigManager::set(const String &key, const String &value, const String &do
 		error("ConfigManager::set(%s,%s,%s) called on non-existent domain",
 		      key.c_str(), value.c_str(), domName.c_str());
 
-	(*domain)[key] = value;
+	if (domName != kSessionDomain && domName != kTransientDomain)
+		_sessionDomain.erase(key); 
 
-	// TODO/FIXME: We used to erase the given key from the transient domain
+	(*domain).setVal(key, value);
+
+		// TODO/FIXME: We used to erase the given key from the transient domain
 	// here. Do we still want to do that?
 	// It was probably there to simplify the options dialogs code:
 	// Imagine you are editing the current options (via the SCUMM ConfigDialog,
@@ -571,14 +608,14 @@ void ConfigManager::set(const String &key, const String &value, const String &do
 	// to replace it in a clean fashion...
 #if 0
 	if (domName == kTransientDomain)
-		_transientDomain[key] = value;
+		_transientDomain.setVal(key, value);
 	else {
 		if (domName == kApplicationDomain) {
-			_appDomain[key] = value;
+			_appDomain.setVal(key, value;
 			if (_activeDomainName.empty() || !_gameDomains[_activeDomainName].contains(key))
 				_transientDomain.erase(key);
 		} else {
-			_gameDomains[domName][key] = value;
+			_gameDomains[domName].setVal(key, value);
 			if (domName == _activeDomainName)
 				_transientDomain.erase(key);
 		}
@@ -599,7 +636,7 @@ void ConfigManager::setBool(const String &key, bool value, const String &domName
 
 
 void ConfigManager::registerDefault(const String &key, const String &value) {
-	_defaultsDomain[key] = value;
+	_defaultsDomain.setVal(key, value);
 }
 
 void ConfigManager::registerDefault(const String &key, const char *value) {
@@ -695,7 +732,7 @@ void ConfigManager::renameDomain(const String &oldName, const String &newName, D
 	Domain &newDom = map[newName];
 	Domain::const_iterator iter;
 	for (iter = oldDom.begin(); iter != oldDom.end(); ++iter)
-		newDom[iter->_key] = iter->_value;
+		newDom.setVal(iter->_key, iter->_value);
 
 	map.erase(oldName);
 }
@@ -708,6 +745,10 @@ bool ConfigManager::hasGameDomain(const String &domName) const {
 bool ConfigManager::hasMiscDomain(const String &domName) const {
 	assert(!domName.empty());
 	return isValidDomainName(domName) && _miscDomains.contains(domName);
+}
+
+bool ConfigManager::isKeyTemporary(const String &key) const {
+	return _transientDomain.contains(key) || _sessionDomain.contains(key);
 }
 
 #pragma mark -

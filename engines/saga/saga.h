@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,30 +30,18 @@
 #include "common/textconsole.h"
 
 #include "saga/gfx.h"
+#include "saga/detection.h"
 
 struct ADGameFileDescription;
 
 /**
  * This is the namespace of the SAGA engine.
  *
- * Status of this engine:
- *
- * This engine contains 2 main engine generations, SAGA and SAGA2
- *
- * SAGA status: complete
- *
- * SAGA2 status: in early stages of development, no recent activity. Contact sev
- *  if you want to work on it, since we have some original source codes.
+ * Status of this engine: complete
  *
  * Games using this engine:
- *
- * SAGA:
  * - Inherit the Earth
  * - I Have No Mouth And I Must Scream
- *
- * SAGA2:
- * - Dinotopia
- * - Faery Tale Adventure II: Halls of the Dead
  *
  */
 namespace Saga {
@@ -106,41 +93,6 @@ class ResourceContext;
 enum ERRORCODE {
 	FAILURE = -1,
 	SUCCESS = 0
-};
-
-enum GameIds {
-	GID_ITE = 0,
-	GID_IHNM = 1,
-	GID_DINO = 2,
-	GID_FTA2 = 3
-};
-
-enum GameFileTypes {
-	// Common
-	GAME_RESOURCEFILE     = 1 << 0,    // Game resources
-	GAME_SCRIPTFILE       = 1 << 1,    // Game scripts
-	GAME_SOUNDFILE        = 1 << 2,    // SFX (also contains voices and MIDI music in SAGA 2 games)
-	GAME_VOICEFILE        = 1 << 3,    // Voices (also contains SFX in the ITE floppy version)
-	// ITE specific
-	GAME_DIGITALMUSICFILE = 1 << 4,    // ITE digital music, added by Wyrmkeep
-	GAME_MACBINARY        = 1 << 5,    // ITE Mac CD Guild
-	GAME_DEMOFILE         = 1 << 6,    // Early ITE demo
-	GAME_SWAPENDIAN       = 1 << 7,    // Used to identify the BE voice file in the ITE combined version
-	// IHNM specific
-	GAME_MUSICFILE_FM     = 1 << 8,    // IHNM
-	GAME_MUSICFILE_GM     = 1 << 9,    // IHNM, ITE Mac CD Guild
-	GAME_PATCHFILE        = 1 << 10,   // IHNM patch file (patch.re_/patch.res)
-	// SAGA 2 (Dinotopia, FTA2)
-	GAME_IMAGEFILE        = 1 << 11,   // Game images
-	GAME_OBJRESOURCEFILE  = 1 << 12    // Game object data
-};
-
-enum GameFeatures {
-	GF_ITE_FLOPPY        = 1 << 0,
-	GF_ITE_DOS_DEMO      = 1 << 1,
-	GF_EXTRA_ITE_CREDITS = 1 << 2,
-	GF_8BIT_UNSIGNED_PCM = 1 << 3,
-	GF_IHNM_COLOR_FIX    = 1 << 4
 };
 
 enum VerbTypeIds {
@@ -299,8 +251,6 @@ struct GamePatchDescription {
 	uint32 resourceId;
 };
 
-struct SAGAGameDescription;
-
 enum GameObjectTypes {
 	kGameObjectNone = 0,
 	kGameObjectActor = 1,
@@ -311,7 +261,6 @@ enum GameObjectTypes {
 
 enum ScriptTimings {
 	kScriptTimeTicksPerSecond = (728L/10L),
-	kScriptTimeTicksPerSecondIHNM = 72,
 	kRepeatSpeedTicks = (728L/10L)/3,
 	kNormalFadeDuration = 320, // 64 steps, 5 msec each
 	kQuickFadeDuration = 64,  // 64 steps, 1 msec each
@@ -379,22 +328,53 @@ struct StringsTable {
 typedef Common::Array<Point> PointList;
 
 enum ColorId {
-	kITEColorTransBlack = 0x00,
-	kITEColorBrightWhite = 0x01,
-	kITEColorWhite = 0x02,
-	kITEColorLightGrey = 0x04,
-	kITEColorGrey = 0x0a,
-	kITEColorDarkGrey = 0x0b,
-	kITEColorDarkGrey0C = 0x0C,
-	kITEColorBlack = 0x0f,
-	kITEColorRed = 0x65,
-	kITEColorDarkBlue8a = 0x8a,
-	kITEColorBlue89 = 0x89,
-	kITEColorLightBlue92 = 0x92,
-	kITEColorBlue = 0x93,
-	kITEColorLightBlue94 = 0x94,
-	kITEColorLightBlue96 = 0x96,
-	kITEColorGreen = 0xba
+	// DOS and AGA palettes
+	kITEDOSColorTransBlack = 0x00,
+	kITEDOSColorBrightWhite = 0x01,
+	kITEDOSColorWhite = 0x02,
+	kITEDOSColorLightGrey = 0x04,
+	kITEDOSColorGrey = 0x0a,
+	kITEDOSColorDarkGrey = 0x0b,
+	kITEDOSColorDarkGrey0C = 0x0C,
+	kITEDOSColorBlack = 0x0f,
+	kITEDOSColorYellow60 = 0x60,
+	kITEDOSColorRed = 0x65,
+	kITEDOSColorDarkBlue8a = 0x8a,
+	kITEDOSColorBlue89 = 0x89,
+	kITEDOSColorLightBlue92 = 0x92,
+	kITEDOSColorBlue = 0x93,
+	kITEDOSColorLightBlue94 = 0x94,
+	kITEDOSColorLightBlue96 = 0x96,
+	kITEDOSColorGreen = 0xba,
+
+        // ECS palette
+
+	// Constant colors
+	kITEECSColorTransBlack = 0x00,
+	kITEECSColorBrightWhite = 0x4f,
+	kITEECSColorWhite = kITEECSColorBrightWhite,
+	kITEECSColorBlack = 0x50,
+
+	// ECS palette after the palette switch
+	kITEECSBottomColorGreen = 0x25,
+	kITEECSBottomColorLightBlue96 = 0x28,
+	kITEECSBottomColorWhite = 0x2f,
+	kITEECSBottomColorBrightWhite = 0x2f,
+	kITEECSBottomColorDarkGrey = 0x32,
+	kITEECSBottomColorGrey = 0x36,
+	kITEECSBottomColorBlue = 0x3b,
+	kITEECSBottomColorYellow60 = 0x3e,
+
+	// ECS palette for options
+	kITEECSOptionsColorLightBlue94 = 0x48,
+	kITEECSOptionsColorBlue = 0x48,
+	kITEECSOptionsColorDarkBlue8a = 0x48,
+	kITEECSOptionsColorLightBlue92 = 0x48,
+	kITEECSOptionsColorLightBlue96 = 0x48,
+	kITEECSOptionsColorDarkGrey0C = 0x49,
+	kITEECSOptionsColorBlack = kITEECSColorBlack,
+	kITEECSOptionsColorBrightWhite = kITEECSColorBrightWhite,
+	kITEECSOptionsColorDarkGrey = 0x52,
 };
 
 enum KnownColor {
@@ -404,6 +384,7 @@ enum KnownColor {
 	kKnownColorBlack,
 
 	kKnownColorSubtitleTextColor,
+	kKnownColorSubtitleEffectColorPC98,
 	kKnownColorVerbText,
 	kKnownColorVerbTextShadow,
 	kKnownColorVerbTextActive
@@ -453,12 +434,16 @@ public:
 			memcpy(&front(), &src.front(), size());
 		}
 	}
+
+	ByteArray() : Common::Array<byte>() {}
+	ByteArray(const byte *array, size_type n) : Common::Array<byte>(array, n) {}
 };
 
 class ByteArrayReadStreamEndian : public Common::MemoryReadStreamEndian {
 public:
 	ByteArrayReadStreamEndian(const ByteArray & byteArray, bool bigEndian = false)
-		: Common::MemoryReadStreamEndian(byteArray.getBuffer(), byteArray.size(), bigEndian) {
+		: Common::MemoryReadStreamEndian(byteArray.getBuffer(), byteArray.size(), bigEndian),
+		ReadStreamEndian(bigEndian) {
 	}
 };
 
@@ -467,15 +452,13 @@ class SagaEngine : public Engine {
 
 public:
 	// Engine APIs
-	virtual Common::Error run();
-	bool hasFeature(EngineFeature f) const;
-	void syncSoundSettings();
-	void pauseEngineIntern(bool pause);
-
-	GUI::Debugger *getDebugger();
+	Common::Error run() override;
+	bool hasFeature(EngineFeature f) const override;
+	void syncSoundSettings() override;
+	void pauseEngineIntern(bool pause) override;
 
 	SagaEngine(OSystem *syst, const SAGAGameDescription *gameDesc);
-	~SagaEngine();
+	~SagaEngine() override;
 
 	void save(const char *fileName, const char *saveName);
 	void load(const char *fileName);
@@ -484,6 +467,9 @@ public:
 	}
 	void fillSaveList();
 	char *calcSaveFileName(uint slotNumber);
+	Common::String getSaveStateName(int slot) const override {
+		return Common::String::format("%s.s%02u", _targetName.c_str(), slot);
+	}
 
 	SaveFileData *getSaveFile(uint idx);
 	uint getNewSaveSlotNumber() const;
@@ -497,6 +483,12 @@ public:
 
 	bool isIHNMDemo() const { return _isIHNMDemo; }
 
+	bool isITEAmiga() const { return getPlatform() == Common::kPlatformAmiga && getGameId() == GID_ITE; }
+	bool isAGA() const { return _gameDescription->features & GF_AGA_GRAPHICS; }
+	bool isECS() const { return _gameDescription->features & GF_ECS_GRAPHICS; }
+	unsigned getPalNumEntries() const { return isECS() ? 32 : 256; }
+	GameIntroList getIntroList() const { return _gameDescription->introList; }
+
 	int16 _framesEsc;
 
 	uint32 _globalFlags;
@@ -504,7 +496,6 @@ public:
 	int _spiritualBarometer;
 
 	int _soundVolume;
-	int _musicVolume;
 	int _speechVolume;
 	bool _subtitlesEnabled;
 	bool _voicesEnabled;
@@ -547,6 +538,7 @@ private:
 
 public:
 	bool decodeBGImage(const ByteArray &imageData, ByteArray &outputBuffer, int *w, int *h, bool flip = false);
+  	bool decodeBGImageMask(const ByteArray &imageData, ByteArray &outputBuffer, int *w, int *h, bool flip = false);
 	const byte *getImagePal(const ByteArray &imageData) {
 		if (imageData.size() <= SAGA_IMAGE_HEADER_LEN) {
 			return NULL;
@@ -554,7 +546,7 @@ public:
 
 		return &imageData.front() + SAGA_IMAGE_HEADER_LEN;
 	}
-	void loadStrings(StringsTable &stringsTable, const ByteArray &stringsData);
+	void loadStrings(StringsTable &stringsTable, const ByteArray &stringsData, bool isBigEndian);
 
 	const char *getObjectName(uint16 objectId) const;
 public:
@@ -586,10 +578,7 @@ public:
 	}
 
 	inline int ticksToMSec(int tick) const {
-		if (getGameId() == GID_ITE)
-			return tick * 1000 / kScriptTimeTicksPerSecond;
-		else
-			return tick * 1000 / kScriptTimeTicksPerSecondIHNM;
+		return tick * 1000 / kScriptTimeTicksPerSecond;
 	}
 
  private:
@@ -615,11 +604,11 @@ public:
 
 	bool isBigEndian() const;
 	bool isMacResources() const;
-	bool isSaga2() const { return getGameId() == GID_DINO || getGameId() == GID_FTA2; }
 	const GameResourceDescription *getResourceDescription() const;
 
-	const GameFontDescription *getFontDescription(int index) const;
-	int getFontsCount() const;
+	GameResourceList getResourceList() const;
+	GameFontList getFontList() const;
+	GamePatchList getPatchList() const;
 
 	int getGameId() const;
 	uint32 getFeatures() const;
@@ -628,17 +617,17 @@ public:
 	int getGameNumber() const;
 	int getStartSceneNumber() const;
 
-	const GamePatchDescription *getPatchDescriptions() const;
-
 	const ADGameFileDescription *getFilesDescriptions() const;
+	const ADGameFileDescription *getArchivesDescriptions() const;
 
 	const Common::Rect &getDisplayClip() const { return _displayClip;}
-	Common::Error loadGameState(int slot);
-	Common::Error saveGameState(int slot, const Common::String &desc);
-	bool canLoadGameStateCurrently();
-	bool canSaveGameStateCurrently();
+	Common::Error loadGameState(int slot) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	bool canLoadGameStateCurrently() override;
+	bool canSaveGameStateCurrently() override;
 	const GameDisplayInfo &getDisplayInfo();
 
+	int getLanguageIndex();
 	const char *getTextString(int textStringId);
 	void getExcuseInfo(int verb, const char *&textString, int &soundResourceId);
 
@@ -648,7 +637,39 @@ public:
 	ColorId KnownColor2ColorId(KnownColor knownColor);
 	void setTalkspeed(int talkspeed);
 	int getTalkspeed() const;
+
+#define ITE_COLOR_DISPATCHER_TYPE(NAME, TYPE)				\
+	ColorId iteColor ## TYPE ## NAME() const { return isECS() ? kITEECS ## TYPE ## Color ## NAME : kITEDOSColor ## NAME; }
+#define ITE_COLOR_DISPATCHER_BOTTOM(NAME) ITE_COLOR_DISPATCHER_TYPE(NAME, Bottom)
+#define ITE_COLOR_DISPATCHER_OPTIONS(NAME) ITE_COLOR_DISPATCHER_TYPE(NAME, Options)
+#define ITE_COLOR_DISPATCHER(NAME) ITE_COLOR_DISPATCHER_TYPE(NAME, )
+
+	ITE_COLOR_DISPATCHER(Black)
+	ITE_COLOR_DISPATCHER(TransBlack)
+	ITE_COLOR_DISPATCHER(BrightWhite)
+	ITE_COLOR_DISPATCHER(White)
+
+	ITE_COLOR_DISPATCHER_BOTTOM(DarkGrey)
+	ITE_COLOR_DISPATCHER_BOTTOM(Blue)
+	ITE_COLOR_DISPATCHER_BOTTOM(Grey)
+	ITE_COLOR_DISPATCHER_BOTTOM(White)
+	ITE_COLOR_DISPATCHER_BOTTOM(BrightWhite)
+	ITE_COLOR_DISPATCHER_BOTTOM(Green)
+
+	ITE_COLOR_DISPATCHER_OPTIONS(DarkGrey)
+	ITE_COLOR_DISPATCHER_OPTIONS(LightBlue92)
+	ITE_COLOR_DISPATCHER_OPTIONS(LightBlue94)
+	ITE_COLOR_DISPATCHER_OPTIONS(LightBlue96)
+	ITE_COLOR_DISPATCHER_OPTIONS(DarkBlue8a)
+	ITE_COLOR_DISPATCHER_OPTIONS(DarkGrey0C)
+	ITE_COLOR_DISPATCHER_OPTIONS(Blue)
+	ITE_COLOR_DISPATCHER_OPTIONS(BrightWhite)
+#undef ITE_COLOR_DISPATCHER
+#undef ITE_COLOR_DISPATCHER_BOTTOM
+#undef ITE_COLOR_DISPATCHER_OPTIONS
+#undef ITE_COLOR_DISPATCHER_TYPE
 };
+
 
 } // End of namespace Saga
 

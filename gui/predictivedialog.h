@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,13 +15,12 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
-#ifndef GLOBAL_DIALOGS_H
-#define GLOBAL_DIALOGS_H
+#ifndef GUI_PREDICTIVEDIALOG_H
+#define GUI_PREDICTIVEDIALOG_H
 
 #include "gui/dialog.h"
 #include "common/str.h"
@@ -36,13 +35,13 @@ class PicButtonWidget;
 class PredictiveDialog : public GUI::Dialog {
 public:
 	PredictiveDialog();
-	~PredictiveDialog();
+	~PredictiveDialog() override;
 
-	virtual void reflowLayout();
+	void reflowLayout() override;
 
-	virtual void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data);
-	virtual void handleKeyUp(Common::KeyState state);
-	virtual void handleKeyDown(Common::KeyState state);
+	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
+	void handleKeyUp(Common::KeyState state) override;
+	void handleKeyDown(Common::KeyState state) override;
 
 	const char *getResult() const { return _predictiveResult; }
 
@@ -143,6 +142,8 @@ private:
 
 	bool _navigationWithKeys;
 	bool _needRefresh;
+	bool _isPressed;
+
 private:
 	EditTextWidget *_editText;
 	ButtonWidget   *_button[kButtonCount];

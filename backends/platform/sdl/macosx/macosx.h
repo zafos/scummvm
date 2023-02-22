@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,31 +26,39 @@
 
 class OSystem_MacOSX : public OSystem_POSIX {
 public:
-	OSystem_MacOSX();
+	~OSystem_MacOSX();
 
-	virtual bool hasFeature(Feature f);
+	bool hasFeature(Feature f) override;
 
-	virtual bool displayLogFile();
+	bool displayLogFile() override;
 
-	virtual bool hasTextInClipboard();
-	virtual Common::String getTextFromClipboard();
-	virtual bool setTextInClipboard(const Common::String &text);
+	bool hasTextInClipboard() override;
+	Common::U32String getTextFromClipboard() override;
+	bool setTextInClipboard(const Common::U32String &text) override;
 
-	virtual bool openUrl(const Common::String &url);
+	bool openUrl(const Common::String &url) override;
 
-	virtual Common::String getSystemLanguage() const;
+	Common::String getSystemLanguage() const override;
 
-	virtual void init();
-	virtual void initBackend();
-	virtual void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0);
+	void init() override;
+	void initBackend() override;
+	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0) override;
 
-	//Screenshots
-	virtual Common::String getScreenshotsPath();
+#ifdef USE_OPENGL
+	GraphicsManagerType getDefaultGraphicsManager() const override;
+#endif
+
+	// Default paths
+	Common::String getDefaultIconsPath() override;
+	Common::String getScreenshotsPath() override;
 
 protected:
+	Common::String getDefaultConfigFileName() override;
+	Common::String getDefaultLogFileName() override;
+
 	// Override createAudioCDManager() to get our Mac-specific
 	// version.
-	virtual AudioCDManager *createAudioCDManager();
+	AudioCDManager *createAudioCDManager() override;
 };
 
 #endif

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -401,6 +400,7 @@ private:
 #pragma mark Text input control
 public:
 	reg_t kernelEditText(const reg_t controlObject);
+	reg_t kernelInputText(const reg_t textObject, const reg_t titleTextObject, const int16 maxTextLength);
 
 private:
 	/**
@@ -429,6 +429,12 @@ private:
 	 * erased.
 	 */
 	void flashCursor(TextEditor &editor);
+
+	/**
+	* Processes an edit text event during a text box event loop. Returns true if
+	* the event changed the text.
+	*/
+	bool processEditTextEvent(const SciEvent &event, TextEditor &editor, ScreenItem *screenItem, bool &clearTextOnInput);
 
 #pragma mark -
 #pragma mark Scrollable window control
@@ -474,7 +480,7 @@ private:
 	/**
 	 * Convenience function for creating and showing a message box.
 	 */
-	int16 showMessageBox(const Common::String &message, const char *const okLabel, const char *const altLabel, const int16 okValue, const int16 altValue);
+	int16 showMessageBox(const Common::U32String &message, const Common::U32String &okLabel, const Common::U32String &altLabel, const int16 okValue, const int16 altValue);
 };
 
 } // End of namespace Sci

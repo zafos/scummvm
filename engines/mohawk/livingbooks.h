@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -29,7 +28,7 @@
 #include "mohawk/sound.h"
 #include "mohawk/video.h"
 
-#include "common/ini-file.h"
+#include "common/formats/ini-file.h"
 #include "common/rect.h"
 #include "common/queue.h"
 #include "common/random.h"
@@ -37,7 +36,7 @@
 #include "livingbooks_code.h"
 
 namespace Common {
-	class SeekableSubReadStreamEndian;
+	class SeekableReadStreamEndian;
 	class MemoryReadStreamEndian;
 }
 
@@ -386,7 +385,7 @@ public:
 	LBItem(MohawkEngine_LivingBooks *vm, LBPage *page, Common::Rect rect);
 	virtual ~LBItem();
 
-	void readFrom(Common::SeekableSubReadStreamEndian *stream);
+	void readFrom(Common::SeekableReadStreamEndian *stream);
 	void readData(uint16 type, uint16 size, byte *data);
 	virtual void readData(uint16 type, uint16 size, Common::MemoryReadStreamEndian *stream);
 
@@ -470,14 +469,14 @@ protected:
 class LBSoundItem : public LBItem {
 public:
 	LBSoundItem(MohawkEngine_LivingBooks *_vm, LBPage *page, Common::Rect rect);
-	~LBSoundItem();
+	~LBSoundItem() override;
 
-	void update();
-	bool togglePlaying(bool playing, bool restart);
-	void stop();
+	void update() override;
+	bool togglePlaying(bool playing, bool restart) override;
+	void stop() override;
 
 protected:
-	LBItem *createClone();
+	LBItem *createClone() override;
 
 	bool _running;
 };
@@ -491,26 +490,26 @@ class LBGroupItem : public LBItem {
 public:
 	LBGroupItem(MohawkEngine_LivingBooks *_vm, LBPage *page, Common::Rect rect);
 
-	void readData(uint16 type, uint16 size, Common::MemoryReadStreamEndian *stream);
+	void readData(uint16 type, uint16 size, Common::MemoryReadStreamEndian *stream) override;
 
-	void destroySelf();
-	void setEnabled(bool enabled);
-	void setGlobalEnabled(bool enabled);
-	bool contains(Common::Point point);
-	bool togglePlaying(bool playing, bool restart);
+	void destroySelf() override;
+	void setEnabled(bool enabled) override;
+	void setGlobalEnabled(bool enabled) override;
+	bool contains(Common::Point point) override;
+	bool togglePlaying(bool playing, bool restart) override;
 	// 0x12
-	void seek(uint16 pos);
-	void setVisible(bool visible);
-	void setGlobalVisible(bool visible);
-	void startPhase(uint phase);
-	void stop();
-	void load();
-	void unload();
-	void moveBy(const Common::Point &pos);
-	void moveTo(const Common::Point &pos);
+	void seek(uint16 pos) override;
+	void setVisible(bool visible) override;
+	void setGlobalVisible(bool visible) override;
+	void startPhase(uint phase) override;
+	void stop() override;
+	void load() override;
+	void unload() override;
+	void moveBy(const Common::Point &pos) override;
+	void moveTo(const Common::Point &pos) override;
 
 protected:
-	LBItem *createClone();
+	LBItem *createClone() override;
 
 	bool _starting;
 
@@ -520,15 +519,15 @@ protected:
 class LBPaletteItem : public LBItem {
 public:
 	LBPaletteItem(MohawkEngine_LivingBooks *_vm, LBPage *page, Common::Rect rect);
-	~LBPaletteItem();
+	~LBPaletteItem() override;
 
-	void readData(uint16 type, uint16 size, Common::MemoryReadStreamEndian *stream);
+	void readData(uint16 type, uint16 size, Common::MemoryReadStreamEndian *stream) override;
 
-	bool togglePlaying(bool playing, bool restart);
-	void update();
+	bool togglePlaying(bool playing, bool restart) override;
+	void update() override;
 
 protected:
-	LBItem *createClone();
+	LBItem *createClone() override;
 
 	uint16 _fadeInPeriod, _fadeInStep, _drawStart, _drawCount;
 	uint32 _fadeInStart, _fadeInCurrent;
@@ -553,18 +552,18 @@ class LBLiveTextItem : public LBItem {
 public:
 	LBLiveTextItem(MohawkEngine_LivingBooks *_vm, LBPage *page, Common::Rect rect);
 
-	void readData(uint16 type, uint16 size, Common::MemoryReadStreamEndian *stream);
+	void readData(uint16 type, uint16 size, Common::MemoryReadStreamEndian *stream) override;
 
-	bool contains(Common::Point point);
-	void update();
-	void draw();
-	void handleMouseDown(Common::Point pos);
-	bool togglePlaying(bool playing, bool restart);
-	void stop();
-	void notify(uint16 data, uint16 from);
+	bool contains(Common::Point point) override;
+	void update() override;
+	void draw() override;
+	void handleMouseDown(Common::Point pos) override;
+	bool togglePlaying(bool playing, bool restart) override;
+	void stop() override;
+	void notify(uint16 data, uint16 from) override;
 
 protected:
-	LBItem *createClone();
+	LBItem *createClone() override;
 
 	void paletteUpdate(uint16 word, bool on);
 	void drawWord(uint word, uint yPos);
@@ -584,35 +583,35 @@ class LBPictureItem : public LBItem {
 public:
 	LBPictureItem(MohawkEngine_LivingBooks *_vm, LBPage *page, Common::Rect rect);
 
-	void readData(uint16 type, uint16 size, Common::MemoryReadStreamEndian *stream);
+	void readData(uint16 type, uint16 size, Common::MemoryReadStreamEndian *stream) override;
 
-	bool contains(Common::Point point);
-	void draw();
-	void init();
+	bool contains(Common::Point point) override;
+	void draw() override;
+	void init() override;
 
 protected:
-	LBItem *createClone();
+	LBItem *createClone() override;
 };
 
 class LBAnimationItem : public LBItem {
 public:
 	LBAnimationItem(MohawkEngine_LivingBooks *_vm, LBPage *page, Common::Rect rect);
-	~LBAnimationItem();
+	~LBAnimationItem() override;
 
-	void setEnabled(bool enabled);
-	bool contains(Common::Point point);
-	void update();
-	void draw();
-	bool togglePlaying(bool playing, bool restart);
-	void done(bool onlyNotify);
-	void init();
-	void seek(uint16 pos);
-	void seekToTime(uint32 time);
-	void startPhase(uint phase);
-	void stop();
+	void setEnabled(bool enabled) override;
+	bool contains(Common::Point point) override;
+	void update() override;
+	void draw() override;
+	bool togglePlaying(bool playing, bool restart) override;
+	void done(bool onlyNotify) override;
+	void init() override;
+	void seek(uint16 pos) override;
+	void seekToTime(uint32 time) override;
+	void startPhase(uint phase) override;
+	void stop() override;
 
 protected:
-	LBItem *createClone();
+	LBItem *createClone() override;
 
 	LBAnimation *_anim;
 	bool _running;
@@ -621,36 +620,36 @@ protected:
 class LBMovieItem : public LBItem {
 public:
 	LBMovieItem(MohawkEngine_LivingBooks *_vm, LBPage *page, Common::Rect rect);
-	~LBMovieItem();
+	~LBMovieItem() override;
 
-	void update();
-	bool togglePlaying(bool playing, bool restart);
+	void update() override;
+	bool togglePlaying(bool playing, bool restart) override;
 
 protected:
-	LBItem *createClone();
+	LBItem *createClone() override;
 };
 
 class LBMiniGameItem : public LBItem {
 public:
 	LBMiniGameItem(MohawkEngine_LivingBooks *_vm, LBPage *page, Common::Rect rect);
-	~LBMiniGameItem();
+	~LBMiniGameItem() override;
 
-	bool togglePlaying(bool playing, bool restart);
+	bool togglePlaying(bool playing, bool restart) override;
 
 protected:
-	LBItem *createClone();
+	LBItem *createClone() override;
 };
 
 class LBProxyItem : public LBItem {
 public:
 	LBProxyItem(MohawkEngine_LivingBooks *_vm, LBPage *page, Common::Rect rect);
-	~LBProxyItem();
+	~LBProxyItem() override;
 
-	void load();
-	void unload();
+	void load() override;
+	void unload() override;
 
 protected:
-	LBItem *createClone();
+	LBItem *createClone() override;
 
 	class LBPage *_page;
 };
@@ -711,7 +710,7 @@ protected:
 
 public:
 	MohawkEngine_LivingBooks(OSystem *syst, const MohawkGameDescription *gamedesc);
-	virtual ~MohawkEngine_LivingBooks();
+	~MohawkEngine_LivingBooks() override;
 
 	Common::RandomSource *_rnd;
 
@@ -722,10 +721,9 @@ public:
 
 	void addNotifyEvent(NotifyEvent event);
 
-	Common::SeekableSubReadStreamEndian *wrapStreamEndian(uint32 tag, uint16 id);
+	Common::SeekableReadStreamEndian *wrapStreamEndian(uint32 tag, uint16 id);
 	Common::String readString(Common::ReadStream *stream);
 	Common::Rect readRect(Common::ReadStreamEndian *stream);
-	GUI::Debugger *getDebugger() override { return _console; }
 
 	void addArchive(Archive *archive);
 	void removeArchive(Archive *archive);
@@ -761,7 +759,6 @@ public:
 	Archive *createArchive() const;
 
 private:
-	LivingBooksConsole *_console;
 	Common::INIFile _bookInfoFile;
 
 	Common::String getBookInfoFileName() const;

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,6 +40,7 @@ bool readDataFromFile(Common::FSDirectory *directory, const char *file);
 // will contain function declarations for FS tests
 TestExitStatus testReadFile();
 TestExitStatus testWriteFile();
+TestExitStatus testCreateDir();
 TestExitStatus testOpeningSaveFile();
 // add more here
 
@@ -57,14 +57,14 @@ public:
 	 * @see addTest()
 	 */
 	FSTestSuite();
-	~FSTestSuite() {}
-	const char *getName() const {
+	~FSTestSuite() override {}
+	const char *getName() const override {
 		return "FS";
 	}
-	const char *getDescription() const {
+	const char *getDescription() const override {
 		return "File system tests (Navigation, Read/Write)";
 	}
-	void enable(bool flag);
+	void enable(bool flag) override;
 };
 
 } // End of namespace Testbed

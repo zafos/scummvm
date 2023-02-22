@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,13 +15,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "sherlock/surface.h"
 #include "sherlock/fonts.h"
+#include "sherlock/sherlock.h"
 
 namespace Sherlock {
 
@@ -32,6 +32,10 @@ BaseSurface::BaseSurface() : Graphics::Screen(0, 0), Fonts() {
 BaseSurface::BaseSurface(int width_, int height_) : Graphics::Screen(width_, height_),
 		Fonts() {
 	create(width_, height_);
+}
+
+BaseSurface::BaseSurface(int width_, int height_, const Graphics::PixelFormat &pf) :
+		Graphics::Screen(width_, height_, pf), Fonts() {
 }
 
 void BaseSurface::writeString(const Common::String &str, const Common::Point &pt, uint overrideColor) {
@@ -62,9 +66,32 @@ void BaseSurface::SHtransBlitFrom(const Graphics::Surface &src, const Common::Po
 	Common::Rect destRect(pt.x, pt.y, pt.x + src.w * SCALE_THRESHOLD / scaleVal,
 		pt.y + src.h * SCALE_THRESHOLD / scaleVal);
 
-	Graphics::Screen::transBlitFrom(src, srcRect, destRect, TRANSPARENCY,
+	Graphics::Screen::transBlitFrom(src, srcRect, destRect, IS_3DO ? 0 : TRANSPARENCY,
 		flipped, overrideColor);
 }
 
+void BaseSurface::SHbitmapBlitFrom(const byte *src, int widthSrc, int heightSrc, int pitchSrc, const Common::Point &pt,
+				   int overrideColor) {
+	const byte *ptr = src;
+	int yin = 0, yout = pt.y;
+	int xin = 0, xout = pt.x;
+	byte bit = 0x80;
+	int ymax = MIN(heightSrc, h - pt.y);
+	int xmax = MIN(widthSrc, w - pt.x);
+	int pitchskip = pitchSrc - (xmax / 8);
+	for (yin = 0; yin < ymax; yin++, yout++) {
+		bit = 0x80;
+		for (xin = 0, xout = pt.x; xin < xmax; xin++, xout++) {
+			if (*ptr & bit)
+				setPixel(xout, yout, overrideColor);
+			bit >>= 1;
+			if (!bit) {
+				bit = 0x80;
+				ptr++;
+			}
+		}
+		ptr += pitchskip;
+	}
+}
 
 } // End of namespace Sherlock

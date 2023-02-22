@@ -1,208 +1,48 @@
 /* ScummVM - Graphic Adventure Engine
-*
-* ScummVM is the legal property of its developers, whose names
-* are too numerous to list here. Please refer to the COPYRIGHT
-* file distributed with this source distribution.
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-*/
+ *
+ * ScummVM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
 
-#include "common/events.h"
-#include "common/macresman.h"
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 #include "common/system.h"
-#include "engines/util.h"
-
-#include "graphics/palette.h"
-#include "graphics/fonts/macfont.h"
-#include "graphics/macgui/macfontmanager.h"
+#include "common/memstream.h"
 #include "graphics/macgui/macwindowmanager.h"
 
 #include "director/director.h"
+#include "director/cast.h"
+#include "director/castmember.h"
+#include "director/movie.h"
+#include "director/images.h"
+#include "director/window.h"
 
 namespace Director {
 
-// Referred as extern
-byte defaultPalette[768] = {
-	  0,   0,   0,  17,  17,  17,  34,  34,  34,  68,  68,  68,  85,  85,  85, 119,
-	119, 119, 136, 136, 136, 170, 170, 170, 187, 187, 187, 221, 221, 221, 238, 238,
-	238,   0,   0,  17,   0,   0,  34,   0,   0,  68,   0,   0,  85,   0,   0, 119,
-	  0,   0, 136,   0,   0, 170,   0,   0, 187,   0,   0, 221,   0,   0, 238,   0,
-	 17,   0,   0,  34,   0,   0,  68,   0,   0,  85,   0,   0, 119,   0,   0, 136,
-	  0,   0, 170,   0,   0, 187,   0,   0, 221,   0,   0, 238,   0,  17,   0,   0,
-	 34,   0,   0,  68,   0,   0,  85,   0,   0, 119,   0,   0, 136,   0,   0, 170,
-	  0,   0, 187,   0,   0, 221,   0,   0, 238,   0,   0,   0,   0,  51,   0,   0,
-	102,   0,   0, 153,   0,   0, 204,   0,   0, 255,   0,  51,   0,   0,  51,  51,
-	  0,  51, 102,   0,  51, 153,   0,  51, 204,   0,  51, 255,   0, 102,   0,   0,
-	102,  51,   0, 102, 102,   0, 102, 153,   0, 102, 204,   0, 102, 255,   0, 153,
-	  0,   0, 153,  51,   0, 153, 102,   0, 153, 153,   0, 153, 204,   0, 153, 255,
-	  0, 204,   0,   0, 204,  51,   0, 204, 102,   0, 204, 153,   0, 204, 204,   0,
-	204, 255,   0, 255,   0,   0, 255,  51,   0, 255, 102,   0, 255, 153,   0, 255,
-	204,   0, 255, 255,  51,   0,   0,  51,   0,  51,  51,   0, 102,  51,   0, 153,
-	 51,   0, 204,  51,   0, 255,  51,  51,   0,  51,  51,  51,  51,  51, 102,  51,
-	 51, 153,  51,  51, 204,  51,  51, 255,  51, 102,   0,  51, 102,  51,  51, 102,
-	102,  51, 102, 153,  51, 102, 204,  51, 102, 255,  51, 153,   0,  51, 153,  51,
-	 51, 153, 102,  51, 153, 153,  51, 153, 204,  51, 153, 255,  51, 204,   0,  51,
-	204,  51,  51, 204, 102,  51, 204, 153,  51, 204, 204,  51, 204, 255,  51, 255,
-	  0,  51, 255,  51,  51, 255, 102,  51, 255, 153,  51, 255, 204,  51, 255, 255,
-	102,   0,   0, 102,   0,  51, 102,   0, 102, 102,   0, 153, 102,   0, 204, 102,
-	  0, 255, 102,  51,   0, 102,  51,  51, 102,  51, 102, 102,  51, 153, 102,  51,
-	204, 102,  51, 255, 102, 102,   0, 102, 102,  51, 102, 102, 102, 102, 102, 153,
-	102, 102, 204, 102, 102, 255, 102, 153,   0, 102, 153,  51, 102, 153, 102, 102,
-	153, 153, 102, 153, 204, 102, 153, 255, 102, 204,   0, 102, 204,  51, 102, 204,
-	102, 102, 204, 153, 102, 204, 204, 102, 204, 255, 102, 255,   0, 102, 255,  51,
-	102, 255, 102, 102, 255, 153, 102, 255, 204, 102, 255, 255, 153,   0,   0, 153,
-	  0,  51, 153,   0, 102, 153,   0, 153, 153,   0, 204, 153,   0, 255, 153,  51,
-	  0, 153,  51,  51, 153,  51, 102, 153,  51, 153, 153,  51, 204, 153,  51, 255,
-	153, 102,   0, 153, 102,  51, 153, 102, 102, 153, 102, 153, 153, 102, 204, 153,
-	102, 255, 153, 153,   0, 153, 153,  51, 153, 153, 102, 153, 153, 153, 153, 153,
-	204, 153, 153, 255, 153, 204,   0, 153, 204,  51, 153, 204, 102, 153, 204, 153,
-	153, 204, 204, 153, 204, 255, 153, 255,   0, 153, 255,  51, 153, 255, 102, 153,
-	255, 153, 153, 255, 204, 153, 255, 255, 204,   0,   0, 204,   0,  51, 204,   0,
-	102, 204,   0, 153, 204,   0, 204, 204,   0, 255, 204,  51,   0, 204,  51,  51,
-	204,  51, 102, 204,  51, 153, 204,  51, 204, 204,  51, 255, 204, 102,   0, 204,
-	102,  51, 204, 102, 102, 204, 102, 153, 204, 102, 204, 204, 102, 255, 204, 153,
-	  0, 204, 153,  51, 204, 153, 102, 204, 153, 153, 204, 153, 204, 204, 153, 255,
-	204, 204,   0, 204, 204,  51, 204, 204, 102, 204, 204, 153, 204, 204, 204, 204,
-	204, 255, 204, 255,   0, 204, 255,  51, 204, 255, 102, 204, 255, 153, 204, 255,
-	204, 204, 255, 255, 255,   0,   0, 255,   0,  51, 255,   0, 102, 255,   0, 153,
-	255,   0, 204, 255,   0, 255, 255,  51,   0, 255,  51,  51, 255,  51, 102, 255,
-	 51, 153, 255,  51, 204, 255,  51, 255, 255, 102,   0, 255, 102,  51, 255, 102,
-	102, 255, 102, 153, 255, 102, 204, 255, 102, 255, 255, 153,   0, 255, 153,  51,
-	255, 153, 102, 255, 153, 153, 255, 153, 204, 255, 153, 255, 255, 204,   0, 255,
-	204,  51, 255, 204, 102, 255, 204, 153, 255, 204, 204, 255, 204, 255, 255, 255,
-	  0, 255, 255,  51, 255, 255, 102, 255, 255, 153, 255, 255, 204, 255, 255, 255
-};
+#include "director/graphics-data.h"
 
+/**
+ * Used to upgrade to 32-bit color if required.
+ **/
+uint32 DirectorEngine::transformColor(uint32 color) {
+	if (_pixelformat.bytesPerPixel == 1)
+		return color;
 
-static byte director3Patterns[][8] = {
-	{ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF },
-	{ 0xFF, 0xFF, 0x77, 0xFF, 0xFF, 0xFF, 0x77, 0xFF },
-	{ 0x77, 0xFF, 0xDD, 0xFF, 0x77, 0xFF, 0xDD, 0xFF },
-	{ 0xFF, 0xDD, 0xFF, 0x55, 0xFF, 0xDD, 0xFF, 0x55 },
-	{ 0xFF, 0xD5, 0xFF, 0x55, 0xFF, 0x5D, 0xFF, 0x55 },
-	{ 0xFF, 0xAA, 0xFF, 0xAA, 0xFF, 0xAA, 0xFF, 0xAA },
-	{ 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA },
-	{ 0xAA, 0x44, 0xAA, 0x11, 0xAA, 0x44, 0xAA, 0x11 },
-	{ 0xAA, 0x44, 0xAA, 0x00, 0xAA, 0x44, 0xAA, 0x00 },
-	{ 0xAA, 0x00, 0xAA, 0x00, 0xAA, 0x00, 0xAA, 0x00 },
-	{ 0x00, 0x22, 0x00, 0x88, 0x00, 0x22, 0x00, 0x88 },
-	{ 0x88, 0x00, 0x00, 0x00, 0x88, 0x00, 0x00, 0x00 },
-	{ 0x80, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00 },
-	{ 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-	{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-	{ 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80 },
-	{ 0x21, 0x42, 0x84, 0x09, 0x12, 0x24, 0x48, 0x90 },
-	{ 0x11, 0x22, 0x44, 0x88, 0x11, 0x22, 0x44, 0x88 },
-	{ 0xEE, 0xDD, 0xBB, 0x77, 0xEE, 0xDD, 0xBB, 0x77 },
-	{ 0xF6, 0xED, 0xDB, 0xB7, 0x6F, 0xDE, 0xBD, 0x7B },
-	{ 0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F },
-	{ 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF },
-	{ 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0xFF },
-	{ 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0xFF },
-	{ 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0xFF, 0x00, 0xFF },
-	{ 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00 },
-	{ 0xFF, 0x00, 0x00, 0xFF, 0x00, 0x00, 0xFF, 0x00 },
-	{ 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00 },
-	{ 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00 },
-	{ 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-	{ 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80 },
-	{ 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82, 0x82 },
-	{ 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88 },
-	{ 0x94, 0x94, 0x94, 0x94, 0x94, 0x94, 0x94, 0x94 },
-	{ 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA },
-	{ 0xAD, 0xAD, 0xAD, 0xAD, 0xAD, 0xAD, 0xAD, 0xAD },
-	{ 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB },
-	{ 0xB7, 0xB7, 0xB7, 0xB7, 0xB7, 0xB7, 0xB7, 0xB7 },
-	{ 0xBF, 0xBF, 0xBF, 0xBF, 0xBF, 0xBF, 0xBF, 0xBF },
-	{ 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x7F, 0x00 },
-	{ 0x7F, 0x7F, 0x7F, 0x00, 0x7F, 0x7F, 0x7F, 0x00 },
-	{ 0x77, 0x77, 0x77, 0x00, 0x77, 0x77, 0x77, 0x00 },
-	{ 0x88, 0x88, 0x88, 0xFF, 0x88, 0x88, 0x88, 0xFF },
-	{ 0x80, 0x80, 0x80, 0xFF, 0x80, 0x80, 0x80, 0xFF },
-	{ 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0xFF },
-	{ 0x01, 0x82, 0x44, 0x28, 0x10, 0x28, 0x44, 0x82 },
-	{ 0x11, 0x82, 0x45, 0xAB, 0xD7, 0xAB, 0x45, 0x82 },
-	{ 0xF7, 0x7F, 0xBE, 0x5D, 0x2A, 0x5D, 0xBE, 0x7F },
-	{ 0xFE, 0x7D, 0xBB, 0xD7, 0xEF, 0xD7, 0xBB, 0x7D },
-	{ 0xFE, 0x7F, 0xBF, 0xDF, 0xEF, 0xDF, 0xBF, 0x7F },
-	{ 0xEE, 0x77, 0xBB, 0xDD, 0xEE, 0xDD, 0xBB, 0x77 },
-	{ 0x11, 0x88, 0x44, 0x22, 0x11, 0x22, 0x44, 0x88 },
-	{ 0x01, 0x80, 0x40, 0x20, 0x10, 0x20, 0x40, 0x80 },
-	{ 0x22, 0x00, 0x01, 0x22, 0x54, 0x88, 0x01, 0x00 },
-	{ 0xBF, 0xAF, 0xAB, 0xAA, 0xEA, 0xFA, 0xFE, 0xFF },
-	{ 0xFF, 0xFF, 0xBE, 0x9C, 0xAA, 0xB6, 0xBE, 0xFF }
-};
-
-static byte director3QuickDrawPatterns[][8] = {
-	{ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF },
-	{ 0xDD, 0xFF, 0x77, 0xFF, 0xDD, 0xFF, 0x77, 0xFF },
-	{ 0xDD, 0x77, 0xDD, 0x77, 0xDD, 0x77, 0xDD, 0x77 },
-	{ 0xEE, 0xDD, 0xBB, 0x77, 0xEE, 0xDD, 0xBB, 0x77 },
-	{ 0xFF, 0xAA, 0xFF, 0xAA, 0xFF, 0xAA, 0xFF, 0xAA },
-	{ 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55 },
-	{ 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55 },
-	{ 0x11, 0x22, 0x44, 0x88, 0x11, 0x22, 0x44, 0x88 },
-	{ 0xAA, 0x00, 0xAA, 0x00, 0xAA, 0x00, 0xAA, 0x00 },
-	{ 0x88, 0x22, 0x88, 0x22, 0x88, 0x22, 0x88, 0x22 },
-	{ 0x00, 0x22, 0x00, 0x88, 0x00, 0x22, 0x00, 0x88 },
-	{ 0x10, 0x20, 0x40, 0x80, 0x01, 0x02, 0x04, 0x08 },
-	{ 0x80, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00 },
-	{ 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-	{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-	{ 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88 },
-	{ 0x58, 0xDF, 0x00, 0xDF, 0xDF, 0x58, 0x58, 0x58 },
-	{ 0xB1, 0x36, 0x06, 0x60, 0x63, 0x1B, 0x18, 0x81 },
-	{ 0x08, 0xFF, 0x01, 0x01, 0x01, 0xFF, 0x08, 0x08 },
-	{ 0x00, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00 },
-	{ 0x80, 0x80, 0x80, 0xFF, 0x80, 0x80, 0x80, 0x80 },
-	{ 0x80, 0x10, 0x02, 0x40, 0x04, 0x20, 0x09, 0x00 },
-	{ 0x80, 0x01, 0x82, 0x44, 0x38, 0x10, 0x20, 0x40 },
-	{ 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00 },
-	{ 0x22, 0xFF, 0x22, 0x22, 0x22, 0xFF, 0x22, 0x22 },
-	{ 0x00, 0x08, 0x14, 0x2A, 0x55, 0x2A, 0x14, 0x08 },
-	{ 0x81, 0xAA, 0x14, 0x08, 0x08, 0xAA, 0x41, 0x80 },
-	{ 0x3E, 0x1D, 0x88, 0xD1, 0xE3, 0xC5, 0x88, 0x5C },
-	{ 0xAA, 0x00, 0x80, 0x00, 0x88, 0x00, 0x80, 0x00 },
-	{ 0x00, 0x11, 0x82, 0x44, 0x28, 0x11, 0x00, 0x55 },
-	{ 0x7C, 0x10, 0x10, 0x28, 0xC7, 0x01, 0x01, 0x82 },
-	{ 0xEE, 0x31, 0xF1, 0xF1, 0xEE, 0x13, 0x1F, 0x1F },
-	{ 0x00, 0x40, 0x20, 0x10, 0x00, 0x01, 0x02, 0x04 },
-	{ 0x00, 0x00, 0x40, 0xA0, 0x00, 0x04, 0x0A, 0x00 },
-	{ 0x20, 0x60, 0x90, 0x09, 0x06, 0x81, 0x40, 0x20 },
-	{ 0x00, 0x7F, 0x43, 0x5F, 0x5F, 0x5F, 0x7F, 0x7F },
-	{ 0x01, 0x02, 0x45, 0xAA, 0xFF, 0x20, 0x40, 0x80 },
-	{ 0x00, 0x44, 0x0A, 0x11, 0x11, 0x11, 0x51, 0x24 },
-	{ 0x0F, 0x0F, 0x0F, 0x0F, 0xF0, 0xF0, 0xF0, 0xF0 },
-	{ 0xF8, 0xFC, 0xFA, 0xFC, 0xFA, 0x54, 0x2A, 0x00 },
-	{ 0x42, 0xC3, 0x3C, 0x3C, 0x3C, 0x3C, 0xC3, 0x42 },
-	{ 0x10, 0x38, 0x7C, 0xFE, 0x7D, 0x3A, 0x14, 0x08 },
-	{ 0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF },
-	{ 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC },
-	{ 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00 },
-	{ 0xBB, 0xDD, 0xAE, 0x77, 0xEE, 0xDD, 0xAB, 0x77 },
-	{ 0x80, 0x40, 0x40, 0x20, 0x20, 0x18, 0x06, 0x01 },
-	{ 0x01, 0x82, 0x44, 0x28, 0x10, 0x28, 0x44, 0x82 },
-	{ 0xC0, 0xC0, 0xC0, 0xC0, 0xC0, 0xC0, 0xFF, 0xFF },
-	{ 0xE0, 0xE0, 0xE0, 0xE0, 0xE0, 0xFF, 0xFF, 0xFF },
-	{ 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0x00, 0x00, 0x00 },
-	{ 0xC3, 0x87, 0x0F, 0x1E, 0x3C, 0x78, 0xF0, 0xE1 },
-	{ 0xF0, 0xF0, 0x0F, 0x0F, 0x0F, 0xF0, 0xF0, 0xF0 },
-	{ 0xFF, 0xFF, 0xE7, 0xC3, 0x81, 0x18, 0x3C, 0x7E },
-	{ 0x1F, 0x8F, 0xC7, 0xE3, 0xC7, 0x8F, 0x1F, 0x3E },
-	{ 0xFF, 0x2A, 0xFF, 0xC8, 0xFF, 0x65, 0xFF, 0x9D }
-};
+	return _wm->findBestColor(_currentPalette[color * 3], _currentPalette[color * 3 + 1], _currentPalette[color * 3 + 2]);
+}
 
 void DirectorEngine::loadPatterns() {
 	for (int i = 0; i < ARRAYSIZE(director3Patterns); i++)
@@ -210,6 +50,19 @@ void DirectorEngine::loadPatterns() {
 
 	for (int i = 0; i < ARRAYSIZE(director3QuickDrawPatterns); i++)
 		_director3QuickDrawPatterns.push_back(director3QuickDrawPatterns[i]);
+
+	// We must set it here for correct work of BITDDecoder.
+	// It is set later in Director properly
+	_pixelformat = Graphics::PixelFormat::createFormatCLUT8();
+
+	for (int i = 0; i < ARRAYSIZE(builtinTiles); i++) {
+		Common::MemoryReadStream stream(builtinTiles[i].ptr, builtinTiles[i].size);
+
+		_builtinTiles[i].img = new BITDDecoder(builtinTiles[i].w, builtinTiles[i].h, 8, builtinTiles[i].w, macPalette, kFileVer300);
+		_builtinTiles[i].img->loadStream(stream);
+
+		_builtinTiles[i].rect = Common::Rect(0, 0, builtinTiles[i].w, builtinTiles[i].h);
+	}
 }
 
 Graphics::MacPatterns &DirectorEngine::getPatterns() {
@@ -217,90 +70,600 @@ Graphics::MacPatterns &DirectorEngine::getPatterns() {
 	return _director3QuickDrawPatterns;
 }
 
+Image::ImageDecoder *DirectorEngine::getTile(int num) {
+	TilePatternEntry *tile = &getCurrentMovie()->getCast()->_tiles[num];
+
+	if (tile->bitmapId.isNull())
+		return _builtinTiles[num].img;
+
+	CastMember *member = getCurrentMovie()->getCastMember(tile->bitmapId);
+
+	if (!member) {
+		warning("BUILDBOT: DirectorEngine::getTile(%d) VWTL refers to non-existing cast %s", num,
+				tile->bitmapId.asString().c_str());
+
+		return _builtinTiles[num].img;
+	}
+
+	if (member->_type != kCastBitmap) {
+		warning("BUILDBOT: DirectorEngine::getTile(%d) VWTL refers to incorrect cast %s type %s", num,
+				tile->bitmapId.asString().c_str(), castType2str(member->_type));
+
+		return _builtinTiles[num].img;
+	}
+
+	return ((BitmapCastMember *)member)->_img;
+}
+
+const Common::Rect &DirectorEngine::getTileRect(int num) {
+	TilePatternEntry *tile = &getCurrentMovie()->getCast()->_tiles[num];
+
+	if (tile->bitmapId.isNull())
+		return _builtinTiles[num].rect;
+
+	return tile->rect;
+}
+
+void DirectorEngine::loadDefaultPalettes() {
+	_loadedPalettes[kClutSystemMac] = PaletteV4(kClutSystemMac, macPalette, 256);
+	_loadedPalettes[kClutRainbow] = PaletteV4(kClutRainbow, rainbowPalette, 256);
+	_loadedPalettes[kClutGrayscale] = PaletteV4(kClutGrayscale, grayscalePalette, 256);
+	_loadedPalettes[kClutPastels] = PaletteV4(kClutPastels, pastelsPalette, 256);
+	_loadedPalettes[kClutVivid] = PaletteV4(kClutVivid, vividPalette, 256);
+	_loadedPalettes[kClutNTSC] = PaletteV4(kClutNTSC, ntscPalette, 256);
+	_loadedPalettes[kClutMetallic] = PaletteV4(kClutMetallic, metallicPalette, 256);
+	_loadedPalettes[kClutSystemWin] = PaletteV4(kClutSystemWin, winPalette, 256);
+
+	_loaded16Palettes[kClutSystemMac] = PaletteV4(kClutSystemMac, mac16Palette, 16);
+	_loaded16Palettes[kClutRainbow] = PaletteV4(kClutRainbow, rainbow16Palette, 16);
+	_loaded16Palettes[kClutGrayscale] = PaletteV4(kClutGrayscale, grayscale16Palette, 16);
+	_loaded16Palettes[kClutPastels] = PaletteV4(kClutPastels, pastels16Palette, 16);
+	_loaded16Palettes[kClutVivid] = PaletteV4(kClutVivid, vivid16Palette, 16);
+	_loaded16Palettes[kClutNTSC] = PaletteV4(kClutNTSC, ntsc16Palette, 16);
+	_loaded16Palettes[kClutMetallic] = PaletteV4(kClutMetallic, metallic16Palette, 16);
+	_loaded16Palettes[kClutSystemWin] = PaletteV4(kClutSystemWin, win16Palette, 16);
+
+	_loaded4Palette = PaletteV4(kClutGrayscale, grayscale4Palette, 4);
+}
+
+PaletteV4 *DirectorEngine::getPalette(int id) {
+	if (!_loadedPalettes.contains(id)) {
+		warning("DirectorEngine::getPalette(): Palette %d not found", id);
+		return nullptr;
+	}
+
+	return &_loadedPalettes[id];
+}
+
+void DirectorEngine::addPalette(int id, byte *palette, int length) {
+	if (id < 0) {
+		warning("DirectorEngine::addPalette(): Negative palette ids reserved for default palettes");
+		return;
+	} else if (_loadedPalettes.contains(id)) {
+		delete[] _loadedPalettes[id].palette;
+	}
+
+	_loadedPalettes[id] = PaletteV4(id, palette, length);
+}
+
+bool DirectorEngine::setPalette(int id) {
+	if (id == 0) {
+		// Palette id of 0 is unused
+		return false;
+	} else if (!_loadedPalettes.contains(id)) {
+		warning("setPalette(): no palette with matching id %d", id);
+		return false;
+	}
+
+	PaletteV4 pal = _loadedPalettes[id];
+	setPalette(pal.palette, pal.length);
+
+	return true;
+}
+
 void DirectorEngine::setPalette(byte *palette, uint16 count) {
-	_currentPalette = palette;
+
+	memset(_currentPalette, 0, 768);
+	memmove(_currentPalette, palette, count * 3);
 	_currentPaletteLength = count;
+
+	// Pass the palette to OSystem only for 8bpp mode
+	if (_pixelformat.bytesPerPixel == 1)
+		_system->getPaletteManager()->setPalette(_currentPalette, 0, _currentPaletteLength);
+
+	_wm->passPalette(_currentPalette, _currentPaletteLength);
 }
 
-void DirectorEngine::testFontScaling() {
-	int x = 10;
-	int y = 10;
-	int w = 640;
-	int h = 480;
+void DirectorEngine::shiftPalette(int startIndex, int endIndex, bool reverse) {
+	if (startIndex == endIndex)
+		return;
 
-	initGraphics(w, h);
-	_system->getPaletteManager()->setPalette(defaultPalette, 0, 256);
+	if (startIndex > endIndex)
+		return;
 
-	Graphics::ManagedSurface surface;
-
-	surface.create(w, h);
-	surface.clear(255);
-
-	Graphics::MacFont origFont(Graphics::kMacFontNewYork, 18);
-
-	const Graphics::MacFONTFont *font1 = (const Graphics::MacFONTFont *)_wm->_fontMan->getFont(origFont);
-
-	Graphics::MacFONTFont::testBlit(font1, &surface, 0, x, y + 200, 500);
-
-	Graphics::MacFont bigFont(Graphics::kMacFontNewYork, 15);
-
-	font1 = (const Graphics::MacFONTFont *)_wm->_fontMan->getFont(bigFont);
-
-	Graphics::MacFONTFont::testBlit(font1, &surface, 0, x, y + 50 + 200, 500);
-
-	const char *text = "d";
-
-	for (int i = 9; i <= 20; i++) {
-		Graphics::MacFont macFont(Graphics::kMacFontNewYork, i);
-
-		const Graphics::Font *font = _wm->_fontMan->getFont(macFont);
-
-		int width = font->getStringWidth(text);
-
-		Common::Rect bbox = font->getBoundingBox(text, x, y, w);
-		surface.frameRect(bbox, 15);
-
-		font->drawString(&surface, text, x, y, width, 0);
-
-		x += width + 1;
+	byte temp[3] = { 0, 0, 0 };
+	int span = endIndex - startIndex + 1;
+	if (reverse) {
+		memcpy(temp, _currentPalette + 3 * startIndex, 3);
+		memmove(_currentPalette + 3 * startIndex,
+			_currentPalette + 3 * startIndex + 3,
+			(span - 1) * 3);
+		memcpy(_currentPalette + 3 * endIndex, temp, 3);
+	} else {
+		memcpy(temp, _currentPalette + 3 * endIndex, 3);
+		memmove(_currentPalette + 3 * startIndex + 3,
+			_currentPalette + 3 * startIndex,
+			(span - 1) * 3);
+		memcpy(_currentPalette + 3 * startIndex, temp, 3);
 	}
 
-	g_system->copyRectToScreen(surface.getPixels(), surface.pitch, 0, 0, w, h);
+	// Pass the palette to OSystem only for 8bpp mode
+	if (_pixelformat.bytesPerPixel == 1)
+		_system->getPaletteManager()->setPalette(_currentPalette, 0, _currentPaletteLength);
 
-	Common::Event event;
+	_wm->passPalette(_currentPalette, _currentPaletteLength);
+}
 
-	while (true) {
-		if (g_system->getEventManager()->pollEvent(event))
-			if (event.type == Common::EVENT_QUIT)
-				break;
-
-		g_system->updateScreen();
-		g_system->delayMillis(10);
+void DirectorEngine::clearPalettes() {
+	for (Common::HashMap<int, PaletteV4>::iterator it = _loadedPalettes.begin(); it != _loadedPalettes.end(); ++it) {
+		if (it->_value.id > 0)
+			delete[] it->_value.palette;
 	}
 }
 
-void DirectorEngine::testFonts() {
-	Common::String fontName("Helvetica");
+void DirectorEngine::setCursor(DirectorCursor type) {
+	switch (type) {
+	case kCursorMouseDown:
+		_wm->replaceCustomCursor(mouseDown, 16, 16, 0, 0, 3);
+		break;
+	case kCursorMouseUp:
+		_wm->replaceCustomCursor(mouseUp, 16, 16, 0, 0, 3);
+		break;
+	}
+}
 
-	Common::MacResManager *fontFile = new Common::MacResManager();
-	if (!fontFile->open(fontName))
-		error("Could not open %s as a resource fork", fontName.c_str());
+void DirectorEngine::draw() {
+	_wm->renderZoomBox(true);
+	_wm->draw();
+	g_system->updateScreen();
+}
 
-	Common::MacResIDArray fonds = fontFile->getResIDArray(MKTAG('F','O','N','D'));
-	if (fonds.size() > 0) {
-		for (Common::Array<uint16>::iterator iterator = fonds.begin(); iterator != fonds.end(); ++iterator) {
-			Common::SeekableReadStream *stream = fontFile->getResource(MKTAG('F', 'O', 'N', 'D'), *iterator);
-			Common::String name = fontFile->getResName(MKTAG('F', 'O', 'N', 'D'), *iterator);
+template <typename T>
+void inkDrawPixel(int x, int y, int src, void *data) {
+	DirectorPlotData *p = (DirectorPlotData *)data;
+	Graphics::MacWindowManager *wm = p->d->_wm;
 
-			debug("Font: %s", name.c_str());
+	if (!p->destRect.contains(x, y))
+		return;
 
-			Graphics::MacFontFamily font;
-			font.load(*stream);
+	T *dst;
+	uint32 tmpDst;
+
+	dst = (T *)p->dst->getBasePtr(x, y);
+
+	if (p->ms) {
+		if (p->ms->pd->thickness > 1) {
+			int prevThickness = p->ms->pd->thickness;
+			int x1 = x;
+			int x2 = x1 + prevThickness;
+			int y1 = y;
+			int y2 = y1 + prevThickness;
+
+			p->ms->pd->thickness = 1;	// We do not want recursive loops
+
+			for (y = y1; y < y2; y++)
+				for (x = x1; x < x2; x++)
+					if (x >= 0 && x < p->ms->pd->surface->w && y >= 0 && y < p->ms->pd->surface->h) {
+						inkDrawPixel<T>(x, y, src, data);
+					}
+
+			p->ms->pd->thickness = prevThickness;
+			return;
+		}
+
+		if (p->ms->tile) {
+			int x1 = p->ms->tileRect->left + (p->ms->pd->fillOriginX + x) % p->ms->tileRect->width();
+			int y1 = p->ms->tileRect->top  + (p->ms->pd->fillOriginY + y) % p->ms->tileRect->height();
+
+			src = p->ms->tile->getSurface()->getPixel(x1, y1);
+		} else {
+			// Get the pixel that macDrawPixel will give us, but store it to apply the
+			// ink later
+			tmpDst = *dst;
+			(wm->getDrawPixel())(x, y, src, p->ms->pd);
+			src = *dst;
+
+			*dst = tmpDst;
+		}
+	} else if (p->alpha) {
+		// Sprite blend does not respect colourization; defaults to matte ink
+		byte rSrc, gSrc, bSrc;
+		byte rDst, gDst, bDst;
+
+		wm->decomposeColor<T>(src, rSrc, gSrc, bSrc);
+		wm->decomposeColor<T>(*dst, rDst, gDst, bDst);
+
+		double alpha = (double)p->alpha / 100.0;
+		rDst = static_cast<byte>((rSrc * alpha) + (rDst * (1.0 - alpha)));
+		gDst = static_cast<byte>((gSrc * alpha) + (gDst * (1.0 - alpha)));
+		bDst = static_cast<byte>((bSrc * alpha) + (bDst * (1.0 - alpha)));
+
+		*dst = wm->findBestColor(rDst, gDst, bDst);
+		return;
+	}
+
+ 	switch (p->ink) {
+	case kInkTypeBackgndTrans:
+		if (p->oneBitImage) {
+			// One-bit images have a slightly different rendering algorithm for BackgndTrans.
+			// Foreground colour is used, and background colour is ignored.
+			*dst = (src == (int)p->colorBlack) ? p->foreColor : *dst;
+		} else {
+			*dst = (src == (int)p->backColor) ? *dst : src;
+		}
+		break;
+	case kInkTypeMatte:
+		// fall through
+	case kInkTypeMask:
+		// Only unmasked pixels make it here, so copy them straight
+	case kInkTypeCopy: {
+		if (p->applyColor) {
+			if (sizeof(T) == 1) {
+				*dst = src == 0xff ? p->foreColor : (src == 0x00 ? p->backColor : *dst);
+			} else {
+				// TODO: Improve the efficiency of this composition
+				byte rSrc, gSrc, bSrc;
+				byte rDst, gDst, bDst;
+				byte rFor, gFor, bFor;
+				byte rBak, gBak, bBak;
+
+				wm->decomposeColor<T>(src, rSrc, gSrc, bSrc);
+				wm->decomposeColor<T>(*dst, rDst, gDst, bDst);
+				wm->decomposeColor<T>(p->foreColor, rFor, gFor, bFor);
+				wm->decomposeColor<T>(p->backColor, rBak, gBak, bBak);
+
+				*dst = wm->findBestColor((rSrc | rFor) & (~rSrc | rBak),
+										(gSrc | gFor) & (~gSrc | gBak),
+										(bSrc | bFor) & (~bSrc | bBak));
+			}
+		} else {
+			*dst = src;
+		}
+		break;
+	}
+	case kInkTypeNotCopy:
+		if (p->applyColor) {
+			if (sizeof(T) == 1) {
+				*dst = src == 0xff ? p->backColor : (src == 0x00 ? p->foreColor : src);
+			} else {
+				// TODO: Improve the efficiency of this composition
+				byte rSrc, gSrc, bSrc;
+				byte rDst, gDst, bDst;
+				byte rFor, gFor, bFor;
+				byte rBak, gBak, bBak;
+
+				wm->decomposeColor<T>(src, rSrc, gSrc, bSrc);
+				wm->decomposeColor<T>(*dst, rDst, gDst, bDst);
+				wm->decomposeColor<T>(p->foreColor, rFor, gFor, bFor);
+				wm->decomposeColor<T>(p->backColor, rBak, gBak, bBak);
+
+				*dst = wm->findBestColor((~rSrc | rFor) & (rSrc | rBak),
+										(~gSrc | gFor) & (gSrc | gBak),
+										(~bSrc | bFor) & (bSrc | bBak));
+			}
+		} else {
+			// Find the inverse of the colour and match it back to the palette if required
+			byte rSrc, gSrc, bSrc;
+			wm->decomposeColor<T>(src, rSrc, gSrc, bSrc);
+
+			*dst = wm->findBestColor(~rSrc, ~gSrc, ~bSrc);
+		}
+		break;
+	case kInkTypeTransparent:
+		*dst = p->applyColor ? (~src | p->backColor) & (*dst | src) : *dst | src;
+		break;
+	case kInkTypeNotTrans:
+		*dst = p->applyColor ? (src | p->backColor) & (*dst | ~src) : (*dst | ~src);
+		break;
+	case kInkTypeReverse:
+		*dst ^= src;
+		break;
+	case kInkTypeNotReverse:
+		*dst ^= ~(src);
+		break;
+	case kInkTypeGhost:
+		*dst = p->applyColor ? (src & p->foreColor) | (*dst & ~src) : (*dst & ~src);
+		break;
+	case kInkTypeNotGhost:
+		*dst = p->applyColor ? (~src & p->foreColor) | (*dst & src) : (*dst & src);
+		break;
+		// Arithmetic ink types
+	default: {
+		byte rSrc, gSrc, bSrc;
+		byte rDst, gDst, bDst;
+
+		wm->decomposeColor<T>(src, rSrc, gSrc, bSrc);
+		wm->decomposeColor<T>(*dst, rDst, gDst, bDst);
+
+		switch (p->ink) {
+		case kInkTypeBlend:
+				*dst = wm->findBestColor((rSrc + rDst) / 2, (gSrc + gDst) / 2, (bSrc + bDst) / 2);
+			break;
+		case kInkTypeAddPin:
+				*dst = wm->findBestColor(MIN((rSrc + rDst), 0xff), MIN((gSrc + gDst), 0xff), MIN((bSrc + bDst), 0xff));
+			break;
+		case kInkTypeAdd:
+			// in basilisk, D3.1 is exactly using this method, adding color directly without preventing the overflow.
+			// but i think min(src + dst, 255) will give us a better visual effect
+				*dst = wm->findBestColor(rSrc + rDst, gSrc + gDst, bSrc + bDst);
+			break;
+		case kInkTypeSubPin:
+				*dst = wm->findBestColor(MAX(rSrc - rDst, 0), MAX(gSrc - gDst, 0), MAX(bSrc - bDst, 0));
+			break;
+		case kInkTypeLight:
+				*dst = wm->findBestColor(MAX(rSrc, rDst), MAX(gSrc, gDst), MAX(bSrc, bDst));
+			break;
+		case kInkTypeSub:
+				*dst = wm->findBestColor(abs(rSrc - rDst) % 0xff + 1, abs(gSrc - gDst) % 0xff + 1, abs(bSrc - bDst) % 0xff + 1);
+			break;
+		case kInkTypeDark:
+				*dst = wm->findBestColor(MIN(rSrc, rDst), MIN(gSrc, gDst), MIN(bSrc, bDst));
+			break;
+		default:
+			break;
+		}
+	}
+	}
+}
+
+Graphics::MacDrawPixPtr DirectorEngine::getInkDrawPixel() {
+	if (_pixelformat.bytesPerPixel == 1)
+		return &inkDrawPixel<byte>;
+	else
+		return &inkDrawPixel<uint32>;
+}
+
+void DirectorPlotData::setApplyColor() {
+	applyColor = false;
+
+	if (foreColor != colorBlack) {
+		if (ink != kInkTypeGhost && ink != kInkTypeNotGhost)
+			applyColor = true;
+	}
+
+	if (backColor != colorWhite) {
+		if (ink != kInkTypeTransparent && ink != kInkTypeNotTrans && ink != kInkTypeBackgndTrans)
+			applyColor = true;
+	}
+}
+
+uint32 DirectorPlotData::preprocessColor(uint32 src) {
+	// HACK: Right now this method is just used for adjusting the colourization on text
+	// sprites, as it would be costly to colourize the chunks on the fly each
+	// time a section needs drawing. It's ugly but mostly works.
+	if (sprite == kTextSprite) {
+		switch(ink) {
+		case kInkTypeMask:
+			src = (src == backColor ? foreColor : 0xff);
+			break;
+		case kInkTypeReverse:
+			src = (src == foreColor ? 0 : colorWhite);
+			break;
+		case kInkTypeNotReverse:
+			src = (src == backColor ? colorWhite : 0);
+			break;
+			// looks like this part is wrong, maybe it's very same as reverse?
+			// check warlock/DATA/WARLOCKSHIP/ENG/ABOUT to see more detail.
+//		case kInkTypeGhost:
+//			src = (src == foreColor ? backColor : colorWhite);
+//			break;
+		case kInkTypeNotGhost:
+			src = (src == backColor ? colorWhite : backColor);
+			break;
+		case kInkTypeNotCopy:
+			src = (src == foreColor ? backColor : foreColor);
+			break;
+		case kInkTypeNotTrans:
+			src = (src == foreColor ? backColor : colorWhite);
+			break;
+		default:
+			break;
 		}
 	}
 
-	delete fontFile;
+	return src;
 }
 
+void DirectorPlotData::inkBlitShape(Common::Rect &srcRect) {
+	if (!ms)
+		return;
+
+	// Preprocess shape colours
+	switch (ink) {
+	case kInkTypeNotTrans:
+	case kInkTypeNotReverse:
+	case kInkTypeNotGhost:
+		return;
+	case kInkTypeReverse:
+		ms->foreColor = 0;
+		ms->backColor = 0;
+		break;
+	default:
+		break;
+	}
+
+	Common::Point wpos;
+	Movie *movie = g_director->getCurrentMovie();
+
+	if (g_director->_wm->_mode & Graphics::kWMModeNoDesktop)
+		wpos = Common::Point(movie->getCast()->_movieRect.left, movie->getCast()->_movieRect.top);
+	else
+		wpos = movie->getWindow()->getAbsolutePos();
+
+	Common::Rect fillAreaRect((int)srcRect.width(), (int)srcRect.height());
+	fillAreaRect.moveTo(srcRect.left, srcRect.top);
+	Graphics::MacPlotData plotFill(dst, nullptr, &d->getPatterns(), ms->pattern, srcRect.left + wpos.x, srcRect.top + wpos.y, 1, ms->backColor);
+
+	uint strokePattern = 1;
+
+	bool outline = (ms->spriteType == kOutlinedRectangleSprite || ms->spriteType == kOutlinedRoundedRectangleSprite
+			|| ms->spriteType == kOutlinedOvalSprite);
+
+	if (outline)
+		strokePattern = ms->pattern;
+
+	Common::Rect strokeRect(MAX((int)srcRect.width() - ms->lineSize, 0), MAX((int)srcRect.height() - ms->lineSize, 0));
+	strokeRect.moveTo(srcRect.left, srcRect.top);
+	Graphics::MacPlotData plotStroke(dst, nullptr, &d->getPatterns(), strokePattern, strokeRect.left + wpos.x, strokeRect.top + wpos.y, ms->lineSize, ms->backColor);
+
+	switch (ms->spriteType) {
+	case kRectangleSprite:
+		ms->pd = &plotFill;
+		Graphics::drawFilledRect1(fillAreaRect, ms->foreColor, d->getInkDrawPixel(), this);
+		// fall through
+	case kOutlinedRectangleSprite:
+		// if we have lineSize <= 0, means we are not drawing anything. so we may return directly.
+		if (ms->lineSize <= 0)
+			break;
+		ms->pd = &plotStroke;
+
+		if (!outline)
+			ms->tile = nullptr;
+
+		Graphics::drawRect1(strokeRect, ms->foreColor, d->getInkDrawPixel(), this);
+		break;
+	case kRoundedRectangleSprite:
+		ms->pd = &plotFill;
+		Graphics::drawRoundRect1(fillAreaRect, 12, ms->foreColor, true, d->getInkDrawPixel(), this);
+		// fall through
+	case kOutlinedRoundedRectangleSprite:
+		if (ms->lineSize <= 0)
+			break;
+		ms->pd = &plotStroke;
+
+		if (!outline)
+			ms->tile = nullptr;
+
+		Graphics::drawRoundRect1(strokeRect, 12, ms->foreColor, false, d->getInkDrawPixel(), this);
+		break;
+	case kOvalSprite:
+		ms->pd = &plotFill;
+		Graphics::drawEllipse(fillAreaRect.left, fillAreaRect.top, fillAreaRect.right, fillAreaRect.bottom, ms->foreColor, true, d->getInkDrawPixel(), this);
+		// fall through
+	case kOutlinedOvalSprite:
+		if (ms->lineSize <= 0)
+			break;
+		ms->pd = &plotStroke;
+
+		if (!outline)
+			ms->tile = nullptr;
+
+		Graphics::drawEllipse(strokeRect.left, strokeRect.top, strokeRect.right, strokeRect.bottom, ms->foreColor, false, d->getInkDrawPixel(), this);
+		break;
+	case kLineTopBottomSprite:
+		ms->pd = &plotStroke;
+		Graphics::drawLine(strokeRect.left, strokeRect.top, strokeRect.right, strokeRect.bottom, ms->foreColor, d->getInkDrawPixel(), this);
+		break;
+	case kLineBottomTopSprite:
+		ms->pd = &plotStroke;
+		Graphics::drawLine(strokeRect.left, strokeRect.bottom, strokeRect.right, strokeRect.top, ms->foreColor, d->getInkDrawPixel(), this);
+		break;
+	default:
+		warning("DirectorPlotData::inkBlitShape: Expected shape type but got type %d", ms->spriteType);
+	}
+}
+
+void DirectorPlotData::inkBlitSurface(Common::Rect &srcRect, const Graphics::Surface *mask) {
+	if (!srf)
+		return;
+
+	// TODO: Determine why colourization causes problems in Warlock
+	if (sprite == kTextSprite)
+		applyColor = false;
+
+	Common::Rect srfClip = srf->getBounds();
+	bool failedBoundsCheck = false;
+
+	srcPoint.y = abs(srcRect.top - destRect.top);
+	for (int i = 0; i < destRect.height(); i++, srcPoint.y++) {
+		if (d->_wm->_pixelformat.bytesPerPixel == 1) {
+			srcPoint.x = abs(srcRect.left - destRect.left);
+			const byte *msk = mask ? (const byte *)mask->getBasePtr(srcPoint.x, srcPoint.y) : nullptr;
+
+			for (int j = 0; j < destRect.width(); j++, srcPoint.x++) {
+				if (!srfClip.contains(srcPoint)) {
+					failedBoundsCheck = true;
+					continue;
+				}
+
+				if (!mask || (msk && !(*msk++))) {
+					(d->getInkDrawPixel())(destRect.left + j, destRect.top + i,
+											preprocessColor(*((byte *)srf->getBasePtr(srcPoint.x, srcPoint.y))), this);
+				}
+			}
+		} else {
+			srcPoint.x = abs(srcRect.left - destRect.left);
+			const uint32 *msk = mask ? (const uint32 *)mask->getBasePtr(srcPoint.x, srcPoint.y) : nullptr;
+
+			for (int j = 0; j < destRect.width(); j++, srcPoint.x++) {
+				if (!srfClip.contains(srcPoint)) {
+					failedBoundsCheck = true;
+					continue;
+				}
+
+				if (!mask || (msk && !(*msk++))) {
+					(d->getInkDrawPixel())(destRect.left + j, destRect.top + i,
+											preprocessColor(*((uint32 *)srf->getBasePtr(srcPoint.x, srcPoint.y))), this);
+				}
+			}
+		}
+	}
+
+	if (failedBoundsCheck) {
+		warning("DirectorPlotData::inkBlitSurface: Out of bounds - srfClip: %d,%d,%d,%d, srcRect: %d,%d,%d,%d, dstRect: %d,%d,%d,%d",
+				srfClip.left, srfClip.top, srfClip.right, srfClip.bottom,
+				srcRect.left, srcRect.top, srcRect.right, srcRect.bottom,
+				destRect.left, destRect.top, destRect.right, destRect.bottom);
+	}
 
 }
+
+void DirectorPlotData::inkBlitStretchSurface(Common::Rect &srcRect, const Graphics::Surface *mask) {
+	if (!srf)
+		return;
+
+	// TODO: Determine why colourization causes problems in Warlock
+	if (sprite == kTextSprite)
+		applyColor = false;
+
+	int scaleX = SCALE_THRESHOLD * srcRect.width() / destRect.width();
+	int scaleY = SCALE_THRESHOLD * srcRect.height() / destRect.height();
+
+	srcPoint.y = abs(srcRect.top - destRect.top);
+
+	for (int i = 0, scaleYCtr = 0; i < destRect.height(); i++, scaleYCtr += scaleY, srcPoint.y++) {
+		if (d->_wm->_pixelformat.bytesPerPixel == 1) {
+			srcPoint.x = abs(srcRect.left - destRect.left);
+			const byte *msk = mask ? (const byte *)mask->getBasePtr(srcPoint.x, srcPoint.y) : nullptr;
+
+			for (int xCtr = 0, scaleXCtr = 0; xCtr < destRect.width(); xCtr++, scaleXCtr += scaleX, srcPoint.x++) {
+				if (!mask || !(*msk++)) {
+				(d->getInkDrawPixel())(destRect.left + xCtr, destRect.top + i,
+										preprocessColor(*((byte *)srf->getBasePtr(scaleXCtr / SCALE_THRESHOLD, scaleYCtr / SCALE_THRESHOLD))), this);
+				}
+			}
+		} else {
+			srcPoint.x = abs(srcRect.left - destRect.left);
+			const uint32 *msk = mask ? (const uint32 *)mask->getBasePtr(srcPoint.x, srcPoint.y) : nullptr;
+
+			for (int xCtr = 0, scaleXCtr = 0; xCtr < destRect.width(); xCtr++, scaleXCtr += scaleX, srcPoint.x++) {
+				if (!mask || !(*msk++)) {
+				(d->getInkDrawPixel())(destRect.left + xCtr, destRect.top + i,
+										preprocessColor(*((int *)srf->getBasePtr(scaleXCtr / SCALE_THRESHOLD, scaleYCtr / SCALE_THRESHOLD))), this);
+				}
+			}
+		}
+	}
+}
+
+} // End of namespace Director

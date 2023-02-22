@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,15 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "titanic/star_control/fpose.h"
 #include "titanic/star_control/matrix_transform.h"
 #include "titanic/star_control/matrix_inv.h"
+
+#include "common/math.h"
 
 namespace Titanic {
 
@@ -51,10 +52,6 @@ FPose::FPose() {
 
 FPose::FPose(Axis axis, float amount) {
 	setRotationMatrix(axis, amount);
-}
-
-FPose::FPose(const FPose &src) : FMatrix() {
-	copyFrom(src);
 }
 
 FPose::FPose(const FPose &s1, const FPose &s2) {
@@ -91,9 +88,8 @@ void FPose::identity() {
 
 // Source: https://en.wikipedia.org/wiki/Rotation_matrix
 void FPose::setRotationMatrix(Axis axis, float amount) {
-	const float ROTATION = (float)(2 * M_PI / 360.0);
-	float sinVal = sin(amount * ROTATION);
-	float cosVal = cos(amount * ROTATION);
+	float sinVal = sin(Common::deg2rad<float>(amount));
+	float cosVal = cos(Common::deg2rad<float>(amount));
 
 	switch (axis) {
 	case X_AXIS:
@@ -180,7 +176,7 @@ FPose FPose::inverseTransform() const {
 	float B[16]={};
 
 	// B contains inverse of A
-	matrix4Inverse<float>(A,B);	
+	matrix4Inverse<float>(A,B);
 	matrix_inv._vector._x=B[12];
 	matrix_inv._vector._y=B[13];
 	matrix_inv._vector._z=B[14];

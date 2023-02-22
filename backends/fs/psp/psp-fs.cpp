@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -231,17 +230,31 @@ Common::SeekableReadStream *PSPFilesystemNode::createReadStream() {
 	return Common::wrapBufferedSeekableReadStream(stream, READ_BUFFER_SIZE, DisposeAfterUse::YES);
 }
 
-Common::WriteStream *PSPFilesystemNode::createWriteStream() {
+Common::SeekableWriteStream *PSPFilesystemNode::createWriteStream() {
 	const uint32 WRITE_BUFFER_SIZE = 1024;
 
-	Common::WriteStream *stream = PspIoStream::makeFromPath(getPath(), true);
+	Common::SeekableWriteStream *stream = PspIoStream::makeFromPath(getPath(), true);
 
 	return Common::wrapBufferedWriteStream(stream, WRITE_BUFFER_SIZE);
 }
 
-bool PSPFilesystemNode::create(bool isDirectoryFlag) {
-	error("Not supported");
-	return false;
+bool PSPFilesystemNode::createDirectory() {
+	DEBUG_ENTER_FUNC();
+
+	if (PowerMan.beginCriticalSection() == PowerManager::Blocked)
+		PSP_DEBUG_PRINT_FUNC("Suspended\n");	// Make sure to block in case of suspend
+
+	PSP_DEBUG_PRINT_FUNC("path [%s]\n", _path.c_str());
+
+	if (sceIoMkdir(_path.c_str(), 0777) == 0) {
+		struct stat st;
+		_isValid = (0 == stat(_path.c_str(), &st));
+		_isDirectory = S_ISDIR(st.st_mode);
+	}
+
+	PowerMan.endCriticalSection();
+
+	return _isValid && _isDirectory;
 }
 
 #endif //#ifdef __PSP__

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -131,7 +130,8 @@ Common::Error Saver::save(int slot, const Common::String &saveName) {
 	_macroSaveFlag = true;
 
 	// Try and create the save file
-	Common::OutSaveFile *saveFile = g_system->getSavefileManager()->openForSaving(g_vm->generateSaveName(slot));
+	Common::OutSaveFile *saveFile = g_system->getSavefileManager()->openForSaving(
+		g_vm->getSaveStateName(slot));
 	if (!saveFile)
 		return Common::kCreatingFileFailed;
 
@@ -181,7 +181,8 @@ Common::Error Saver::restore(int slot) {
 	_unresolvedPtrs.clear();
 
 	// Set up the serializer
-	Common::InSaveFile *saveFile = g_system->getSavefileManager()->openForLoading(g_vm->generateSaveName(slot));
+	Common::InSaveFile *saveFile = g_system->getSavefileManager()->openForLoading(
+		g_vm->getSaveStateName(slot));
 	if (!saveFile)
 		return Common::kReadingFailed;
 
@@ -352,7 +353,7 @@ void Saver::removeObject(SavedObject *obj) {
  * Returns true if any savegames exist
  */
 bool Saver::savegamesExist() const {
-	Common::String slot1Name = g_vm->generateSaveName(1);
+	Common::String slot1Name = g_vm->getSaveStateName(1);
 
 	Common::InSaveFile *saveFile = g_system->getSavefileManager()->openForLoading(slot1Name);
 	bool result = saveFile != NULL;

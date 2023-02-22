@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -60,13 +59,15 @@ ResultAction::ResultAction(ZVision *engine, int32 slotKey) :
 ActionAdd::ActionAdd(ZVision *engine, int32 slotKey, const Common::String &line) :
 	ResultAction(engine, slotKey) {
 	_key = 0;
-	_value = 0;
 
-	sscanf(line.c_str(), "%u,%d", &_key, &_value);
+	char buf[64];
+	memset(buf, 0, 64);
+	sscanf(line.c_str(), "%u,%s", &_key, buf);
+	_value = new ValueSlot(_scriptManager, buf);
 }
 
 bool ActionAdd::execute() {
-	_scriptManager->setStateValue(_key, _scriptManager->getStateValue(_key) + _value);
+	_scriptManager->setStateValue(_key, _scriptManager->getStateValue(_key) + _value->getValue());
 	return true;
 }
 
@@ -130,10 +131,9 @@ ActionChangeLocation::ActionChangeLocation(ZVision *engine, int32 slotKey, const
 }
 
 bool ActionChangeLocation::execute() {
-	// We can't directly call ScriptManager::ChangeLocationIntern() because doing so clears all the Puzzles, and thus would corrupt the current puzzle checking
+	// We can't directly call ScriptManager::ChangeLocationReal() because doing so clears all the Puzzles, and thus would corrupt the current puzzle checking
 	_scriptManager->changeLocation(_world, _room, _node, _view, _offset);
-	// Tell the puzzle system to stop checking any more puzzles
-	return false;
+	return true;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -462,7 +462,7 @@ ActionMusic::ActionMusic(ZVision *engine, int32 slotKey, const Common::String &l
 	char volumeBuffer[15];
 
 	// Volume is optional. If it doesn't appear, assume full volume
-	strcpy(volumeBuffer, "100");
+	Common::strcpy_s(volumeBuffer, "100");
 
 	sscanf(line.c_str(), "%u %24s %u %14s", &type, fileNameBuffer, &loop, volumeBuffer);
 
@@ -485,7 +485,7 @@ ActionMusic::ActionMusic(ZVision *engine, int32 slotKey, const Common::String &l
 			// I thought I saw a case like this in Zork Nemesis, so
 			// let's guard against it.
 			warning("ActionMusic: Adjusting volume for %s from %s to 100", _fileName.c_str(), volumeBuffer);
-			strcpy(volumeBuffer, "100");
+			Common::strcpy_s(volumeBuffer, "100");
 		}
 		_volume = new ValueSlot(_scriptManager, volumeBuffer);
 	}
@@ -967,9 +967,9 @@ bool ActionStreamVideo::execute() {
 	bool subtitleExists = _engine->getSearchManager()->hasFile(subname);
 	bool switchToHires = false;
 
-// NOTE: We only show the hires MPEG2 videos when libmpeg2 is compiled in,
+// NOTE: We only show the hires MPEG2 videos when libmpeg2 and liba52 are compiled in,
 // otherwise we fall back to the lowres ones
-#ifdef USE_MPEG2
+#if defined(USE_MPEG2) && defined(USE_A52)
 	Common::String hiresFileName = _fileName;
 	hiresFileName.setChar('d', hiresFileName.size() - 8);
 	hiresFileName.setChar('v', hiresFileName.size() - 3);
@@ -977,12 +977,8 @@ bool ActionStreamVideo::execute() {
 	hiresFileName.setChar('b', hiresFileName.size() - 1);
 
 	if (_scriptManager->getStateValue(StateKey_MPEGMovies) == 1 &&_engine->getSearchManager()->hasFile(hiresFileName)) {
-		// TODO: Enable once AC3 support is implemented
-		if (!_engine->getSearchManager()->hasFile(_fileName))	// Check for the regular video
-			return true;
-		warning("The hires videos of the DVD version of ZGI aren't supported yet, using lowres");
-		//_fileName = hiresFileName;
-		//switchToHires = true;
+		_fileName = hiresFileName;
+		switchToHires = true;
 	} else if (!_engine->getSearchManager()->hasFile(_fileName))
 		return true;
 #else
@@ -1003,7 +999,27 @@ bool ActionStreamVideo::execute() {
 		_engine->getRenderManager()->initSubArea(HIRES_WINDOW_WIDTH, HIRES_WINDOW_HEIGHT, workingWindow);
 	}
 
+	// WORKAROUND for what appears to be a script bug. When riding with
+	// Charon in one direction, the game issues a command to kill the
+	// universe_hades_sound_task. When going in the other direction (either
+	// as yourself or as the two-headed beast) it does not. Since the
+	// cutscene plays music, there may be two pieces of music playing
+	// simultaneously during the ride.
+	//
+	// Rather than mucking about with killing and restarting the sound,
+	// simply pause the ScummVM mixer during the ride.
+
+	bool pauseBackgroundMusic = _engine->getGameId() == GID_GRANDINQUISITOR && (_fileName == "hp3ea021.avi" || _fileName == "hp4ea051.avi");
+
+	if (pauseBackgroundMusic) {
+		_engine->_mixer->pauseAll(true);
+	}
+
 	_engine->playVideo(*decoder, destRect, _skippable, sub);
+
+	if (pauseBackgroundMusic) {
+		_engine->_mixer->pauseAll(false);
+	}
 
 	if (switchToHires) {
 		_engine->initScreen();

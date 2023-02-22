@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -2481,7 +2480,7 @@ void TuckerEngine::updateSprite_locationNum58(int i) {
 }
 
 void TuckerEngine::execData3PreUpdate_locationNum58() {
-	// workaround original game glitch #2872348: do not change position on location change
+	// workaround original game glitch #4638: do not change position on location change
 	if (_nextLocation == kLocationNone && _flagsTable[190] < 3 && _xPosCurrent > 310) {
 		_xPosCurrent = 310;
 		_panelLockedFlag = false;
@@ -2814,14 +2813,14 @@ void TuckerEngine::updateSprite_locationNum65(int i) {
 		_spritesTable[i]._gfxBackgroundOffset = 100;
 	} else if (_flagsTable[188] > 0 && _flagsTable[189] > 0) {
 		state = -1;
-		if (_xPosCurrent < 150 || _yPosCurrent > 240) {
+		if (_xPosCurrent < 150 || _xPosCurrent > 240) {
 			_flagsTable[189] = 0;
 		}
 	} else {
-		if (_xPosCurrent >= 150 && _yPosCurrent < 240) { // FIXME: bug
+		if (_xPosCurrent >= 150 && _xPosCurrent < 240) {
 			if (getRandomNumber() > 32000) {
 				state = 2;
-				_flagsTable[189] = 1;
+				_flagsTable[189] = 1; // animate manhole
 			} else {
 				state = -1;
 			}

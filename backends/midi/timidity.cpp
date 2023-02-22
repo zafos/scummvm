@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -84,18 +83,18 @@ class MidiDriver_TIMIDITY : public MidiDriver_MPU401 {
 public:
 	MidiDriver_TIMIDITY();
 
-	int open();
-	bool isOpen() const { return _isOpen; }
-	void close();
-	void send(uint32 b);
-	void sysEx(const byte *msg, uint16 length);
+	int open() override;
+	bool isOpen() const override { return _isOpen; }
+	void close() override;
+	void send(uint32 b) override;
+	void sysEx(const byte *msg, uint16 length) override;
 
 private:
 	/* creates a tcp connection to TiMidity server, returns filedesc (like open()) */
 	int connect_to_server(const char* hostname, const char* tcp_port);
 
 	/* send command to the server; printf-like; returns reply string */
-	char *timidity_ctl_command(const char *fmt, ...) GCC_PRINTF(2, 3);
+	char *timidity_ctl_command(MSVC_PRINTF const char *fmt, ...) GCC_PRINTF(2, 3);
 
 	/* timidity data socket-related stuff */
 	void timidity_meta_seq(int p1, int p2, int p3);
@@ -142,7 +141,6 @@ int MidiDriver_TIMIDITY::open() {
 	char *res;
 	char timidity_host[NI_MAXHOST];
 	char timidity_port[6], data_port[6];
-	int num;
 
 	/* count ourselves open */
 	if (_isOpen)
@@ -205,13 +203,13 @@ int MidiDriver_TIMIDITY::open() {
 	/*
 	 * open data connection
 	 */
-	num = atoi(res + 4);
+	uint num = atoi(res + 4);
 	if (num > 65535) {
 		warning("TiMidity: Invalid port %d given.\n", num);
 		close_all();
 		return -1;
 	}
-	snprintf(data_port, sizeof(data_port), "%d", num);
+	snprintf(data_port, sizeof(data_port), "%.5d", (uint16)num);
 	if ((_data_fd = connect_to_server(timidity_host, data_port)) < 0) {
 		warning("TiMidity: can't open data connection (host=%s, port=%s)", timidity_host, data_port);
 		close_all();
@@ -332,7 +330,7 @@ char *MidiDriver_TIMIDITY::timidity_ctl_command(const char *fmt, ...) {
 	while (1) {
 		/* read reply */
 		if (fdgets(buff, sizeof(buff)) <= 0) {
-			strcpy(buff, "Read error\n");
+			Common::strcpy_s(buff, "Read error\n");
 			break;
 		}
 
@@ -352,7 +350,7 @@ void MidiDriver_TIMIDITY::timidity_meta_seq(int p1, int p2, int p3) {
 	/* see _CHN_COMMON from soundcard.h; this is simplified
 	 * to just send seq to the server without any buffers,
 	 * delays and extra functions/macros */
-	u_char seqbuf[8];
+	unsigned char seqbuf[8];
 
 	seqbuf[0] = 0x92;
 	seqbuf[1] = 0;
@@ -445,6 +443,8 @@ void MidiDriver_TIMIDITY::send(uint32 b) {
 	unsigned char buf[256];
 	int position = 0;
 
+	midiDriverCommonSend(b);
+
 	switch (b & 0xF0) {
 	case 0x80:
 	case 0x90:
@@ -490,6 +490,8 @@ void MidiDriver_TIMIDITY::sysEx(const byte *msg, uint16 length) {
 	const byte *chr = msg;
 
 	assert(length + 2 <= 266);
+
+	midiDriverCommonSysEx(msg, length);
 
 	buf[position++] = SEQ_MIDIPUTC;
 	buf[position++] = 0xF0;

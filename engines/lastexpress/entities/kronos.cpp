@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -63,11 +62,11 @@ static const struct {
 
 Kronos::Kronos(LastExpressEngine *engine) : Entity(engine, kEntityKronos) {
 	ADD_CALLBACK_FUNCTION(Kronos, reset);
-	ADD_CALLBACK_FUNCTION(Kronos, savegame);
-	ADD_CALLBACK_FUNCTION(Kronos, updateEntity);
-	ADD_CALLBACK_FUNCTION(Kronos, playSound);
-	ADD_CALLBACK_FUNCTION(Kronos, updateFromTime);
-	ADD_CALLBACK_FUNCTION(Kronos, updateFromTicks);
+	ADD_CALLBACK_FUNCTION_II(Kronos, savegame);
+	ADD_CALLBACK_FUNCTION_II(Kronos, updateEntity);
+	ADD_CALLBACK_FUNCTION_S(Kronos, playSound);
+	ADD_CALLBACK_FUNCTION_I(Kronos, updateFromTime);
+	ADD_CALLBACK_FUNCTION_I(Kronos, updateFromTicks);
 	ADD_CALLBACK_FUNCTION(Kronos, chapter1);
 	ADD_CALLBACK_FUNCTION(Kronos, chapter1Handler);
 	ADD_CALLBACK_FUNCTION(Kronos, greetCath);
@@ -147,7 +146,16 @@ IMPLEMENT_FUNCTION(8, Kronos, chapter1Handler)
 		break;
 
 	case kActionNone:
-		Entity::timeCheck(kTime1489500, params->param2, WRAP_SETUP_FUNCTION(Kronos, setup_function11));
+		if (Entity::timeCheck(kTime1489500, params->param2, WRAP_SETUP_FUNCTION(Kronos, setup_function11)))
+			break;
+
+		if (params->param1 && getEntities()->isInsideTrainCar(kEntityPlayer, kCarKronos)) {
+			if (Entity::updateParameter(params->param3, getState()->timeTicks, 150)) {
+				setup_greetCath();
+				break;
+			}
+		}
+
 		break;
 
 	case kAction171849314:
@@ -260,7 +268,7 @@ IMPLEMENT_FUNCTION(14, Kronos, chapter3Handler)
 		break;
 
 	case kActionNone:
-		if (getState()->time > kTime1993500 && !params->param1 && !params->param2 && !params->param3)
+		if (getState()->time > kTime1993500 && params->param1 && params->param2 && params->param3)
 			setup_function15();
 		break;
 
@@ -301,7 +309,7 @@ IMPLEMENT_FUNCTION(15, Kronos, function15)
 
 		if (params->param3 != kTimeInvalid && getState()->time > kTime2002500) {
 			if (getState()->time <= kTime2052000) {
-				if (!getEntities()->isInSalon(kEntityPlayer) || getEntities()->isInSalon(kEntityPlayer) || !params->param3)
+				if (!getEntities()->isInSalon(kEntityPlayer) || getEntities()->isInSalon(kEntityBoutarel) || !params->param3)
 					params->param3 = (uint)getState()->time + 900;
 
 				if (params->param3 >= getState()->time)
@@ -381,7 +389,7 @@ IMPLEMENT_FUNCTION(17, Kronos, returnCompartment)
 		getData()->car = kCarRedSleeping;
 
 		setCallback(1);
-		setup_updateEntity(kCarGreenSleeping, kPosition_9270);
+		setup_updateEntity(kCarKronos, kPosition_9270);
 		break;
 
 	case kActionCallback:
@@ -435,6 +443,19 @@ IMPLEMENT_FUNCTION(19, Kronos, startConcert)
 		break;
 
 	case kActionNone:
+		if (getState()->time > kTime2115000 && !params->param1) {
+			params->param1 = 1;
+			getSound()->playSound(kEntityKronos, "1917.lnk");
+			setup_duringConcert();
+			break;
+		}
+
+		if (getEntities()->isInKronosSanctum(kEntityPlayer)) {
+			setCallback(1);
+			setup_savegame(kSavegameTypeEvent, kEventKahinaPunchSuite4);
+			break;
+		}
+
 		break;
 
 	case kActionDefault:
@@ -442,6 +463,14 @@ IMPLEMENT_FUNCTION(19, Kronos, startConcert)
 		break;
 
 	case kActionDrawScene:
+		if (getEntities()->isInsideTrainCar(kEntityPlayer, kCarKronos)
+		 && !getEntities()->isInKronosSanctum(kEntityPlayer)
+		 && !getInventory()->hasItem(kItemFirebird)
+		 && !getEvent(kEventConcertStart)) {
+			getEntities()->drawSequenceLeft(kEntityKronos, "201a");
+			setCallback(2);
+			setup_savegame(kSavegameTypeEvent, kEventConcertStart);
+		}
 		break;
 
 	case kActionCallback:
@@ -456,7 +485,7 @@ IMPLEMENT_FUNCTION(19, Kronos, startConcert)
 
 		case 2:
 			getAction()->playAnimation(kEventConcertStart);
-			getSoundQueue()->setupEntry(kSoundType7, kEntityKronos);
+			getSoundQueue()->assignNISLink(kEntityKronos);
 			getScenes()->loadSceneFromPosition(kCarKronos, 83);
 
 			RESET_ENTITY_STATE(kEntityRebecca, Rebecca, setup_function39);
@@ -479,6 +508,7 @@ IMPLEMENT_FUNCTION(20, Kronos, duringConcert)
 		break;
 
 	case kActionNone:
+		// TODO: should *2 really be there? should it be /2?
 		params->param5 = getSoundQueue()->getEntryTime(kEntityKronos)* 2;
 
 		if (params->param6 < ARRAYSIZE(concertData) && params->param5 > concertData[params->param6].time) {
@@ -558,6 +588,7 @@ IMPLEMENT_FUNCTION(20, Kronos, duringConcert)
 
 			case 3:
 				getAction()->playAnimation(kEventCathFallingAsleep);
+				// TODO: fade to black screen
 
 				while (getSoundQueue()->isBuffered("1919.LNK"))
 					getSoundQueue()->updateQueue();
@@ -665,7 +696,7 @@ IMPLEMENT_FUNCTION(20, Kronos, duringConcert)
 			break;
 
 		case 2:
-			getData()->entityPosition = kPosition_6000;
+			getEntityData(kEntityPlayer)->entityPosition = kPosition_6000;
 			getAction()->playAnimation(kEventConcertLeaveWithBriefcase);
 
 			RESET_ENTITY_STATE(kEntityKahina, Kahina, setup_concert);
@@ -734,12 +765,14 @@ IMPLEMENT_FUNCTION(22, Kronos, awaitingCath)
 		break;
 
 	case kActionNone:
-		if (getProgress().field_44) {
-			setCallback(5);
-			setup_savegame(kSavegameTypeEvent, kEventKahinaPunchBaggageCarEntrance);
-		} else {
-			setCallback(6);
-			setup_savegame(kSavegameTypeEvent, kEventKahinaWrongDoor);
+		if (getEntities()->isInKronosSanctum(kEntityPlayer)) {
+			if (getProgress().field_44) {
+				setCallback(5);
+				setup_savegame(kSavegameTypeEvent, kEventKahinaPunchBaggageCarEntrance);
+			} else {
+				setCallback(6);
+				setup_savegame(kSavegameTypeEvent, kEventKahinaWrongDoor);
+			}
 		}
 		break;
 
@@ -788,7 +821,7 @@ IMPLEMENT_FUNCTION(22, Kronos, awaitingCath)
 		case 1:
 			getAction()->playAnimation(kEventKronosReturnBriefcase);
 			getScenes()->loadSceneFromPosition(kCarKronos, 87);
-			getInventory()->removeItem(kItemFirebird);
+			getInventory()->removeItem(kItemBriefcase);
 			getInventory()->removeItem(kItemScarf);
 
 			setup_finished();

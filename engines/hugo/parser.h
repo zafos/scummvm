@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -133,11 +132,11 @@ private:
 class Parser_v1d : public Parser {
 public:
 	Parser_v1d(HugoEngine *vm);
-	~Parser_v1d();
+	~Parser_v1d() override;
 
-	virtual void lineHandler();
-	virtual void showInventory() const;
-	virtual void takeObject(Object *obj);
+	void lineHandler() override;
+	void showInventory() const override;
+	void takeObject(Object *obj) override;
 
 protected:
 	virtual void dropObject(Object *obj);
@@ -153,35 +152,35 @@ protected:
 class Parser_v2d : public Parser_v1d {
 public:
 	Parser_v2d(HugoEngine *vm);
-	~Parser_v2d();
+	~Parser_v2d() override;
 
-	void lineHandler();
+	void lineHandler() override;
 };
 
 class Parser_v3d : public Parser_v1d {
 public:
 	Parser_v3d(HugoEngine *vm);
-	~Parser_v3d();
+	~Parser_v3d() override;
 
-	virtual void lineHandler();
+	void lineHandler() override;
 protected:
-	void  dropObject(Object *obj);
+	void  dropObject(Object *obj) override;
 	bool  isBackgroundWord_v3(ObjectList obj) const;
 	bool  isCatchallVerb_v3(ObjectList obj) const;
 	bool  isGenericVerb_v3(Object *obj, char *comment);
 	bool  isNear_v3(Object *obj, const char *verb, char *comment) const;
 	bool  isObjectVerb_v3(Object *obj, char *comment);
-	void  takeObject(Object *obj);
+	void  takeObject(Object *obj) override;
 };
 
 class Parser_v1w : public Parser_v3d {
 public:
 	Parser_v1w(HugoEngine *vm);
-	~Parser_v1w();
+	~Parser_v1w() override;
 
-	virtual void showInventory() const;
+	void showInventory() const override;
 
-	void  lineHandler();
+	void  lineHandler() override;
 };
 
 } // End of namespace Hugo

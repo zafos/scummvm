@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -54,21 +53,23 @@ public:
 
 	void clearFlashlight();
 
-	virtual void resetCursors();
+	void resetCursors() override;
 
 protected:
-	virtual void setupOpcodes();
+	void setupOpcodes() override;
 
-	virtual void scummLoop_handleActors();
-	virtual void scummLoop_handleSaveLoad();
+	void scummLoop_handleActors() override;
+	void scummLoop_handleSaveLoad() override;
 
-	virtual void setupScummVars();
-	virtual void resetScummVars();
+	void setupScummVars() override;
+	void resetScummVars() override;
 	virtual void decodeParseString();
+	void decodeParseStringTextString(int textSlot);
+	void printPatchedMI1CannibalString(int textSlot, const byte *ptr);
 
-	virtual void saveLoadWithSerializer(Common::Serializer &s);
+	void saveLoadWithSerializer(Common::Serializer &s) override;
 
-	virtual void readMAXS(int blockSize);
+	void readMAXS(int blockSize) override;
 
 	int getWordVararg(int *ptr);
 
@@ -79,9 +80,9 @@ protected:
 	virtual void getResultPos();
 	void setResult(int result);
 
-	virtual void animateCursor();
+	void animateCursor() override;
 
-	virtual void setBuiltinCursor(int index);
+	void setBuiltinCursor(int index) override;
 	void redefineBuiltinCursorFromChar(int index, int chr);
 	void redefineBuiltinCursorHotspot(int index, int x, int y);
 

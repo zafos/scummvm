@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -76,34 +75,34 @@ protected:
 	 * The _misc field of the structures contains the number of the graphic image
 	 * that it should point to after loading; _misc is then set to 0.
 	 */
-	virtual bool loadScene(const Common::String &filename);
+	bool loadScene(const Common::String &filename) override;
 
 	/**
 	 * Checks all the background shapes. If a background shape is animating,
 	 * it will flag it as needing to be drawn. If a non-animating shape is
 	 * colliding with another shape, it will also flag it as needing drawing
 	 */
-	virtual void checkBgShapes();
+	void checkBgShapes() override;
 
 	/**
 	 * Draw all the shapes, people and NPCs in the correct order
 	 */
-	virtual void drawAllShapes();
+	void drawAllShapes() override;
 
 	/**
 	 * Called by loadScene when the palette is loaded for Rose Tattoo
 	 */
-	virtual void paletteLoaded();
+	void paletteLoaded() override;
 
 	/**
 	 * Synchronize the data for a savegame
 	 */
-	virtual void synchronize(Serializer &s);
+	void synchronize(Serializer &s) override;
 
 	/**
 	 * Returns the index of the closest zone to a given point.
 	 */
-	virtual int closestZone(const Common::Point &pt);
+	int closestZone(const Common::Point &pt) override;
 public:
 	StreamingImageFile _activeCAnim;
 	Common::Array<SceneTripEntry> _sceneTripCounters;
@@ -120,18 +119,18 @@ public:
 	/**
 	 * Fres all the graphics and other dynamically allocated data for the scene
 	 */
-	virtual void freeScene();
+	void freeScene() override;
 
 	/**
 	 * Draw all objects and characters.
 	 */
-	virtual void doBgAnim();
+	void doBgAnim() override;
 
 	/**
 	 * Update the screen back buffer with all of the scene objects which need
 	 * to be drawn
 	 */
-	virtual void updateBackground();
+	void updateBackground() override;
 
 	/**
 	 * Attempt to start a canimation sequence. It will load the requisite graphics, and
@@ -141,13 +140,13 @@ public:
 	 * @param playRate		Play rate. 0 is invalid; 1=normal speed, 2=1/2 speed, etc.
 	 *		A negative playRate can also be specified to play the animation in reverse
 	 */
-	virtual int startCAnim(int cAnimNum, int playRate = 1);
+	int startCAnim(int cAnimNum, int playRate = 1) override;
 
 	/**
 	 * Attempts to find a background shape within the passed bounds. If found,
 	 * it will return the shape number, or -1 on failure.
 	 */
-	virtual int findBgShape(const Common::Point &pt);
+	int findBgShape(const Common::Point &pt) override;
 };
 
 } // End of namespace Tattoo

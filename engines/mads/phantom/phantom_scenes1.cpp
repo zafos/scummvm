@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,12 +15,12 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
-#include "common/scummsys.h"
+#ifdef ENABLE_MADSV2
+
 #include "mads/mads.h"
 #include "mads/conversations.h"
 #include "mads/scene.h"
@@ -271,6 +271,7 @@ void Scene101::step() {
 		_talkCounter = 0;
 	}
 
+	// Monsieur Brie beckons Raul
 	if (_game._trigger == 50) {
 		_vm->_gameConv->run(0);
 		_callingStatus = 1;
@@ -485,6 +486,9 @@ void Scene101::handleAnimation0() {
 	case 66:
 		resetFrame = 24;
 		break;
+
+	default:
+		break;
 	}
 
 	if (resetFrame >= 0) {
@@ -561,6 +565,10 @@ void Scene101::handleAnimation1() {
 
 				case 3:
 					resetFrame = 17;
+					break;
+
+				default:
+					break;
 				}
 			} else {
 				_chandelierStatus = 4;
@@ -589,6 +597,9 @@ void Scene101::handleAnimation1() {
 
 	case 315:
 		_scene->freeAnimation(1);
+		break;
+
+	default:
 		break;
 	}
 
@@ -2234,6 +2245,9 @@ void Scene103::handleJacquesAnim() {
 			break;
 		}
 		break;
+
+	default:
+		break;
 	}
 
 	if (resetFrame >= 0) {
@@ -3855,6 +3869,9 @@ void Scene105::actions() {
 				_vm->_dialogs->showItem(OBJ_RED_FRAME, 802, 0);
 
 			_game._player._stepEnabled = true;
+			break;
+
+		default:
 			break;
 		}
 		_action._inProgress = false;
@@ -8472,7 +8489,9 @@ void Scene113::handleFlorentAnimation() {
 	case 42:
 		if (_florentStatus == 3)
 			resetFrame = 41;
+		break;
 
+	default:
 		break;
 	}
 
@@ -8842,6 +8861,8 @@ void Scene113::handleJulieAnimation() {
 			break;
 		}
 		break;
+	default:
+		break;
 	}
 
 	if (resetFrame >= 0) {
@@ -9042,6 +9063,9 @@ void Scene113::handleLoveConversation() {
 			_scene->setDynamicAnim(_christineHotspotId1, _globals._animationIndexes[0], 14);
 			_scene->setDynamicAnim(_christineHotspotId1, _globals._animationIndexes[0], 16);
 		}
+		break;
+
+	default:
 		break;
 	}
 
@@ -9551,3 +9575,5 @@ void Scene150::preActions() {
 
 } // End of namespace Phantom
 } // End of namespace MADS
+
+#endif

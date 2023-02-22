@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -44,6 +43,8 @@ uint32 AsScene1001Door::handleMessage(int messageNum, const MessageParam &param,
 		break;
 	case NM_ANIMATION_STOP:
 		gotoNextState();
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -129,6 +130,8 @@ uint32 AsScene1001Hammer::handleMessage(int messageNum, const MessageParam &para
 		playSound(0, 0xE741020A);
 		_newStickFrameIndex = STICK_LAST_FRAME;
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -156,9 +159,11 @@ uint32 AsScene1001Window::handleMessage(int messageNum, const MessageParam &para
 		startAnimation(0xC68C2299, 0, -1);
 		break;
 	case NM_ANIMATION_STOP:
-		SetMessageHandler(NULL);
+		SetMessageHandler(nullptr);
 		setGlobalVar(V_WINDOW_OPEN, 1);
 		setVisible(false);
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -203,6 +208,8 @@ uint32 AsScene1001Lever::handleMessage(int messageNum, const MessageParam &param
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -230,6 +237,8 @@ uint32 SsCommonButtonSprite::handleMessage(int messageNum, const MessageParam &p
 		setVisible(true);
 		_countdown = 8;
 		playSound(0, _soundFileHash);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -290,6 +299,8 @@ uint32 AsScene1002Ring::hmRingIdle(int messageNum, const MessageParam &param, En
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -313,6 +324,8 @@ uint32 AsScene1002Ring::hmRingPulled1(int messageNum, const MessageParam &param,
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -329,6 +342,8 @@ uint32 AsScene1002Ring::hmRingPulled2(int messageNum, const MessageParam &param,
 		break;
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -348,6 +363,8 @@ uint32 AsScene1002Ring::hmRingHangingLow(int messageNum, const MessageParam &par
 		break;
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -369,6 +386,8 @@ uint32 AsScene1002Ring::hmRingReleased(int messageNum, const MessageParam &param
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1010);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -380,7 +399,7 @@ AsScene1002Door::AsScene1002Door(NeverhoodEngine *vm, NRect &clipRect)
 	setClipRect(clipRect);
 	SetUpdateHandler(&AsScene1002Door::update);
 	SetMessageHandler(&AsScene1002Door::handleMessage);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 }
 
 void AsScene1002Door::update() {
@@ -399,6 +418,8 @@ uint32 AsScene1002Door::handleMessage(int messageNum, const MessageParam &param,
 		setGlobalVar(V_FLYTRAP_RING_DOOR, 0);
 		SetSpriteUpdate(&AsScene1002Door::suCloseDoor);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -407,7 +428,7 @@ void AsScene1002Door::suOpenDoor() {
 	if (_y > 49) {
 		_y -= 8;
 		if (_y < 49) {
-			SetSpriteUpdate(NULL);
+			SetSpriteUpdate(nullptr);
 			_y = 49;
 		}
 		_needRefresh = true;
@@ -418,7 +439,7 @@ void AsScene1002Door::suCloseDoor() {
 	if (_y < 239) {
 		_y += 8;
 		if (_y > 239) {
-			SetSpriteUpdate(NULL);
+			SetSpriteUpdate(nullptr);
 			_y = 239;
 		}
 		_needRefresh = true;
@@ -446,6 +467,8 @@ uint32 AsScene1002BoxingGloveHitEffect::handleMessage(int messageNum, const Mess
 	case NM_ANIMATION_STOP:
 		stopAnimation();
 		setVisible(false);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -476,6 +499,8 @@ uint32 AsScene1002DoorSpy::handleMessage(int messageNum, const MessageParam &par
 	case 0x2003:
 		stDoorSpyBoxingGlove();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -485,6 +510,8 @@ uint32 AsScene1002DoorSpy::hmDoorSpyAnimation(int messageNum, const MessageParam
 	switch (messageNum) {
 	case NM_ANIMATION_STOP:
 		gotoNextState();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -555,6 +582,8 @@ uint32 SsCommonPressButton::handleMessage(int messageNum, const MessageParam &pa
 		_countdown = 4;
 		setVisible(true);
 		playSound(0, _soundFileHash);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -666,6 +695,8 @@ uint32 AsScene1002VenusFlyTrap::handleMessage(int messageNum, const MessageParam
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1015);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -675,6 +706,8 @@ uint32 AsScene1002VenusFlyTrap::hmAnimationSimple(int messageNum, const MessageP
 	switch (messageNum) {
 	case NM_ANIMATION_STOP:
 		gotoNextState();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -706,6 +739,8 @@ uint32 AsScene1002VenusFlyTrap::hmAnimationExt(int messageNum, const MessagePara
 		break;
 	case NM_MOVE_TO_FRONT:
 		sendMessage(_parentScene, NM_PRIORITY_CHANGE, 1015);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -751,7 +786,7 @@ void AsScene1002VenusFlyTrap::stRingGrabbed() {
 void AsScene1002VenusFlyTrap::stKlaymenInside() {
 	startAnimation(0x31303094, 0, -1);
 	SetUpdateHandler(&AsScene1002VenusFlyTrap::update);
-	SetMessageHandler(NULL);
+	SetMessageHandler(nullptr);
 	NextState(&AsScene1002VenusFlyTrap::stKlaymenInsideMoving);
 	_countdown = 24;
 }
@@ -841,6 +876,8 @@ uint32 AsScene1002OutsideDoorBackground::handleMessage(int messageNum, const Mes
 		_isDoorClosed = true;
 		_countdown = 2;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -850,6 +887,8 @@ uint32 AsScene1002OutsideDoorBackground::hmAnimation(int messageNum, const Messa
 	switch (messageResult) {
 	case NM_ANIMATION_STOP:
 		gotoNextState();
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -942,6 +981,8 @@ uint32 AsScene1002KlaymenPeekHand::handleMessage(int messageNum, const MessagePa
 				setClipRect(_savedClipRect);
 		}
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -971,6 +1012,8 @@ uint32 AsScene1004TrashCan::handleMessage(int messageNum, const MessageParam &pa
 	case NM_ANIMATION_STOP:
 		stopAnimation();
 		setVisible(false);
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -1050,6 +1093,8 @@ uint32 KmScene1001::xHandleMessage(int messageNum, const MessageParam &param) {
 	case 0x4840:
 		startSpecialWalkLeft(param.asInteger());
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -1060,7 +1105,7 @@ void KmScene1001::stWakeUp() {
 	startAnimation(0x527AC970, 0, -1);
 	SetUpdateHandler(&Klaymen::update);
 	SetMessageHandler(&Klaymen::hmLowLevelAnimation);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 }
 
 void KmScene1001::stSleeping() {
@@ -1069,7 +1114,7 @@ void KmScene1001::stSleeping() {
 	startAnimation(0x5A38C110, 0, -1);
 	SetUpdateHandler(&Klaymen::update);
 	SetMessageHandler(&KmScene1001::hmSleeping);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 }
 
 uint32 KmScene1001::hmSleeping(int messageNum, const MessageParam &param, Entity *sender) {
@@ -1079,6 +1124,8 @@ uint32 KmScene1001::hmSleeping(int messageNum, const MessageParam &param, Entity
 		if (param.asInteger() == 0x03060012) {
 			playSound(0, 0xC0238244);
 		}
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -1101,6 +1148,8 @@ uint32 KmScene1001::hmPullHammerLever(int messageNum, const MessageParam &param,
 	case NM_ANIMATION_START:
 		if (param.asInteger() == 0x4AB28209)
 			sendMessage(_attachedSprite, NM_KLAYMEN_LOWER_LEVER, 0);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -1162,6 +1211,8 @@ uint32 KmScene1002::xHandleMessage(int messageNum, const MessageParam &param) {
 		case 4:
 			GotoState(&KmScene1002::stJumpToRing4);
 			break;
+		default:
+			break;
 		}
 		break;
 	case NM_KLAYMEN_MOVE_OBJECT:
@@ -1217,6 +1268,8 @@ uint32 KmScene1002::xHandleMessage(int messageNum, const MessageParam &param) {
 	case 0x4840:
 		startSpecialWalkLeft(param.asInteger());
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -1245,6 +1298,8 @@ uint32 KmScene1002::hmJumpToRing(int messageNum, const MessageParam &param, Enti
 			sendMessage(_attachedSprite, NM_MOVE_TO_FRONT, 0);
 		}
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1255,7 +1310,7 @@ void KmScene1002::stHangOnRing() {
 	startAnimation(0x4829E0B8, 0, -1);
 	SetUpdateHandler(&Klaymen::update);
 	SetMessageHandler(&Klaymen::hmLowLevel);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 }
 
 void KmScene1002::stJumpToRing1() {
@@ -1301,6 +1356,8 @@ uint32 KmScene1002::hmJumpToRing3(int messageNum, const MessageParam &param, Ent
 			sendMessage(_attachedSprite, NM_MOVE_TO_FRONT, 0);
 		}
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1311,7 +1368,7 @@ void KmScene1002::stHoldRing3() {
 	startAnimation(0x4A293FB0, 0, -1);
 	SetUpdateHandler(&Klaymen::update);
 	SetMessageHandler(&KmScene1002::hmHoldRing3);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 }
 
 uint32 KmScene1002::hmHoldRing3(int messageNum, const MessageParam &param, Entity *sender) {
@@ -1357,6 +1414,8 @@ uint32 KmScene1002::hmJumpToRingVenusFlyTrap(int messageNum, const MessageParam 
 			sendMessage(_attachedSprite, NM_MOVE_TO_FRONT, 0);
 		}
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1378,7 +1437,7 @@ void KmScene1002::stDropFromRing() {
 	if (_attachedSprite) {
 		_x = _attachedSprite->getX();
 		sendMessage(_attachedSprite, NM_KLAYMEN_RAISE_LEVER, 0);
-		_attachedSprite = NULL;
+		_attachedSprite = nullptr;
 	}
 	_busyStatus = 2;
 	_acceptInput = false;
@@ -1396,6 +1455,8 @@ uint32 KmScene1002::hmJumpAndFall(int messageNum, const MessageParam &param, Ent
 		if (param.asInteger() == 0x1307050A) {
 			playSound(0, 0x40428A09);
 		}
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -1454,6 +1515,8 @@ uint32 KmScene1002::hmMoveVenusFlyTrap(int messageNum, const MessageParam &param
 	case NM_KLAYMEN_MOVE_OBJECT:
 		_isMoveObjectRequested = true;
 		return 0;
+	default:
+		break;
 	}
 	return hmLowLevelAnimation(messageNum, param, sender);
 }
@@ -1471,6 +1534,8 @@ uint32 KmScene1002::hmFirstMoveVenusFlyTrap(int messageNum, const MessageParam &
 		} else if (param.asInteger() == 0x0A2A9098) {
 			playSound(0, 0x0460E2FA);
 		}
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -1514,6 +1579,8 @@ uint32 KmScene1002::hmPressDoorButton(int messageNum, const MessageParam &param,
 			sendMessage(_attachedSprite, 0x480B, 0);
 		}
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -1536,6 +1603,8 @@ uint32 KmScene1002::hmHitByBoxingGlove(int messageNum, const MessageParam &param
 		} else if (param.asInteger() == 0x60428026) {
 			playSound(0, 0x40608A59);
 		}
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -1603,6 +1672,8 @@ uint32 KmScene1004::xHandleMessage(int messageNum, const MessageParam &param) {
 	case 0x4840:
 		startSpecialWalkLeft(param.asInteger());
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -1615,6 +1686,8 @@ uint32 KmScene1004::hmReadNote(int messageNum, const MessageParam &param, Entity
 			_acceptInput = true;
 			sendMessage(_parentScene, NM_POSITION_CHANGE, 0);
 		}
+		break;
+	default:
 		break;
 	}
 	return messageResult;

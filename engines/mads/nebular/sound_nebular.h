@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -421,7 +420,7 @@ private:
 public:
 	ASound1(Audio::Mixer *mixer, OPL::OPL *opl);
 
-	virtual int command(int commandId, int param);
+	int command(int commandId, int param) override;
 };
 
 class ASound2 : public ASound {
@@ -431,7 +430,7 @@ private:
 	typedef int (ASound2::*CommandPtr)();
 	static const CommandPtr _commandList[44];
 
-	virtual int command0();
+	int command0() override;
 	int command9();
 	int command10();
 	int command11();
@@ -473,7 +472,7 @@ private:
 public:
 	ASound2(Audio::Mixer *mixer, OPL::OPL *opl);
 
-	virtual int command(int commandId, int param);
+	int command(int commandId, int param) override;
 };
 
 class ASound3 : public ASound {
@@ -533,7 +532,7 @@ private:
 public:
 	ASound3(Audio::Mixer *mixer, OPL::OPL *opl);
 
-	virtual int command(int commandId, int param);
+	int command(int commandId, int param) override;
 };
 
 class ASound4 : public ASound {
@@ -571,7 +570,7 @@ private:
 public:
 	ASound4(Audio::Mixer *mixer, OPL::OPL *opl);
 
-	virtual int command(int commandId, int param);
+	int command(int commandId, int param) override;
 };
 
 class ASound5 : public ASound {
@@ -617,7 +616,7 @@ private:
 public:
 	ASound5(Audio::Mixer *mixer, OPL::OPL *opl);
 
-	virtual int command(int commandId, int param);
+	int command(int commandId, int param) override;
 };
 
 class ASound6 : public ASound {
@@ -646,7 +645,7 @@ private:
 public:
 	ASound6(Audio::Mixer *mixer, OPL::OPL *opl);
 
-	virtual int command(int commandId, int param);
+	int command(int commandId, int param) override;
 };
 
 class ASound7 : public ASound {
@@ -678,7 +677,7 @@ private:
 public:
 	ASound7(Audio::Mixer *mixer, OPL::OPL *opl);
 
-	virtual int command(int commandId, int param);
+	int command(int commandId, int param) override;
 };
 
 class ASound8 : public ASound {
@@ -721,7 +720,7 @@ private:
 public:
 	ASound8(Audio::Mixer *mixer, OPL::OPL *opl);
 
-	virtual int command(int commandId, int param);
+	int command(int commandId, int param) override;
 };
 
 class ASound9 : public ASound {
@@ -780,7 +779,7 @@ private:
 public:
 	ASound9(Audio::Mixer *mixer, OPL::OPL *opl);
 
-	virtual int command(int commandId, int param);
+	int command(int commandId, int param) override;
 };
 
 } // End of namespace Nebular

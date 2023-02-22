@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -63,6 +62,8 @@ void Module1900::createScene(int sceneNum, int which) {
 		_vm->gameState().sceneNum = 6;
 		_childObject = new Scene1907(_vm, this);
 		break;
+	default:
+		break;
 	}
 	SetUpdateHandler(&Module1900::updateScene);
 	_childObject->handleUpdate();
@@ -79,6 +80,8 @@ void Module1900::updateScene() {
 			break;
 		case 6:
 			createScene(0, 1);
+			break;
+		default:
 			break;
 		}
 	}
@@ -227,6 +230,8 @@ uint32 Scene1907::handleMessage(int messageNum, const MessageParam &param, Entit
 	case 0x2001:
 		playSound(3);
 		setGlobalVar(V_STAIRS_PUZZLE_SOLVED, 1);
+		break;
+	default:
 		break;
 	}
 	return 0;

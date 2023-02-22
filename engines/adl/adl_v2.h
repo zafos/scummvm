@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,34 +24,30 @@
 
 #include "adl/adl.h"
 
-namespace Common {
-class RandomSource;
-}
-
 namespace Adl {
 
 class AdlEngine_v2 : public AdlEngine {
 public:
-	virtual ~AdlEngine_v2();
+	~AdlEngine_v2() override;
 
 protected:
 	AdlEngine_v2(OSystem *syst, const AdlGameDescription *gd);
 
 	// AdlEngine
-	virtual void setupOpcodeTables();
-	virtual void initState();
-	byte roomArg(byte room) const;
-	void advanceClock();
-	virtual void printString(const Common::String &str);
-	virtual Common::String loadMessage(uint idx) const;
-	void drawItems();
-	void drawItem(Item &item, const Common::Point &pos);
-	void loadRoom(byte roomNr);
-	virtual void showRoom();
-	void takeItem(byte noun);
+	void setupOpcodeTables() override;
+	void initState() override;
+	byte roomArg(byte room) const override;
+	void advanceClock() override;
+	void printString(const Common::String &str) override;
+	Common::String loadMessage(uint idx) const override;
+	void drawItems() override;
+	void drawItem(Item &item, const Common::Point &pos) override;
+	void loadRoom(byte roomNr) override;
+	void showRoom() override;
+	void takeItem(byte noun) override;
 
 	// Engine
-	bool canSaveGameStateCurrently();
+	bool canSaveGameStateCurrently() override;
 
 	void insertDisk(byte volume);
 	virtual DataBlockPtr readDataBlockPtr(Common::ReadStream &f) const;
@@ -68,21 +63,21 @@ protected:
 	void checkTextOverflow(char c);
 	void handleTextOverflow();
 
-	int o2_isFirstTime(ScriptEnv &e);
-	int o2_isRandomGT(ScriptEnv &e);
-	int o2_isNounNotInRoom(ScriptEnv &e);
-	int o2_isCarryingSomething(ScriptEnv &e);
+	virtual int o_isFirstTime(ScriptEnv &e);
+	virtual int o_isRandomGT(ScriptEnv &e);
+	virtual int o_isNounNotInRoom(ScriptEnv &e);
+	virtual int o_isCarryingSomething(ScriptEnv &e);
 
-	int o2_moveItem(ScriptEnv &e);
-	int o2_setCurPic(ScriptEnv &e);
-	int o2_setPic(ScriptEnv &e);
-	int o2_moveAllItems(ScriptEnv &e);
-	int o2_save(ScriptEnv &e);
-	int o2_restore(ScriptEnv &e);
-	int o2_placeItem(ScriptEnv &e);
-	int o2_tellTime(ScriptEnv &e);
-	int o2_setRoomFromVar(ScriptEnv &e);
-	int o2_initDisk(ScriptEnv &e);
+	int o_moveItem(ScriptEnv &e) override;
+	int o_setCurPic(ScriptEnv &e) override;
+	int o_setPic(ScriptEnv &e) override;
+	virtual int o_moveAllItems(ScriptEnv &e);
+	int o_save(ScriptEnv &e) override;
+	int o_restore(ScriptEnv &e) override ;
+	int o_placeItem(ScriptEnv &e) override;
+	virtual int o_tellTime(ScriptEnv &e);
+	virtual int o_setRoomFromVar(ScriptEnv &e);
+	virtual int o_initDisk(ScriptEnv &e);
 
 	struct {
 		Common::String time;
@@ -97,9 +92,6 @@ protected:
 	bool _itemRemoved;
 	byte _roomOnScreen, _picOnScreen, _itemsOnScreen;
 	Common::Array<byte> _brokenRooms;
-
-private:
-	Common::RandomSource *_random;
 };
 
 } // End of namespace Adl

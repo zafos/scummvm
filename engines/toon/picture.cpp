@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,6 +24,7 @@
 
 #include "common/debug.h"
 #include "common/rect.h"
+#include "common/compression/rnc_deco.h"
 #include "common/stack.h"
 
 namespace Toon {
@@ -62,7 +62,7 @@ bool Picture::loadPicture(const Common::String &file) {
 			memcpy(_palette, _data + dstsize - (dstsize & 0x7ff), _paletteEntries * 3);
 			_vm->fixPaletteEntries(_palette, _paletteEntries);
 		} else {
-			_palette = 0;
+			_palette = NULL;
 		}
 		return true;
 	}
@@ -76,6 +76,8 @@ bool Picture::loadPicture(const Common::String &file) {
 			_palette = new uint8[_paletteEntries * 3];
 			memcpy(_palette, fileData + 16, _paletteEntries * 3);
 			_vm->fixPaletteEntries(_palette, _paletteEntries);
+		} else {
+			_palette = NULL;
 		}
 
 		// size can only be 640x400 or 1280x400
@@ -91,7 +93,7 @@ bool Picture::loadPicture(const Common::String &file) {
 		return true;
 	}
 	case kCompRNC1: {
-		Toon::RncDecoder rnc;
+		Common::RncDecoder rnc;
 
 		// allocate enough place
 		uint32 decSize = READ_BE_UINT32(fileData + 4);
@@ -110,7 +112,7 @@ bool Picture::loadPicture(const Common::String &file) {
 		return true;
 	}
 	case kCompRNC2: {
-		Toon::RncDecoder rnc;
+		Common::RncDecoder rnc;
 
 		// allocate enough place
 		uint32 decSize = READ_BE_UINT32(fileData + 4);
@@ -127,6 +129,8 @@ bool Picture::loadPicture(const Common::String &file) {
 		_height = TOON_SCREEN_HEIGHT;
 		return true;
 	}
+	default:
+		break;
 	}
 	return false;
 }
@@ -149,10 +153,12 @@ Picture::~Picture() {
 void Picture::setupPalette() {
 	debugC(1, kDebugPicture, "setupPalette()");
 
-	if (_useFullPalette)
-		_vm->setPaletteEntries(_palette, 0, 256);
-	else
-		_vm->setPaletteEntries(_palette, 1, 128);
+	if (_palette != NULL) {
+		if (_useFullPalette)
+			_vm->setPaletteEntries(_palette, 0, 256);
+		else
+			_vm->setPaletteEntries(_palette, 1, 128);
+	}
 }
 
 void Picture::drawMask(Graphics::Surface &surface, int16 x, int16 y, int16 dx, int16 dy) {
@@ -266,7 +272,7 @@ uint8 Picture::getData(int16 x, int16 y) {
 void Picture::floodFillNotWalkableOnMask(int16 x, int16 y) {
 	debugC(1, kDebugPicture, "floodFillNotWalkableOnMask(%d, %d)", x, y);
 	// Stack-based floodFill algorithm based on
-	// http://student.kuleuven.be/~m0216922/CG/files/floodfill.cpp
+	// https://web.archive.org/web/20100825020453/http://student.kuleuven.be/~m0216922/CG/files/floodfill.cpp
 	Common::Stack<Common::Point> stack;
 	stack.push(Common::Point(x, y));
 	while (!stack.empty()) {

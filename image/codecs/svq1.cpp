@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -56,16 +55,16 @@ SVQ1Decoder::SVQ1Decoder(uint16 width, uint16 height) {
 	_last[2] = 0;
 
 	// Setup Variable Length Code Tables
-	_blockType = new Common::Huffman(0, 4, s_svq1BlockTypeCodes, s_svq1BlockTypeLengths);
+	_blockType = new HuffmanDecoder(0, 4, s_svq1BlockTypeCodes, s_svq1BlockTypeLengths);
 
 	for (int i = 0; i < 6; i++) {
-		_intraMultistage[i] = new Common::Huffman(0, 8, s_svq1IntraMultistageCodes[i], s_svq1IntraMultistageLengths[i]);
-		_interMultistage[i] = new Common::Huffman(0, 8, s_svq1InterMultistageCodes[i], s_svq1InterMultistageLengths[i]);
+		_intraMultistage[i] = new HuffmanDecoder(0, 8, s_svq1IntraMultistageCodes[i], s_svq1IntraMultistageLengths[i]);
+		_interMultistage[i] = new HuffmanDecoder(0, 8, s_svq1InterMultistageCodes[i], s_svq1InterMultistageLengths[i]);
 	}
 
-	_intraMean = new Common::Huffman(0, 256, s_svq1IntraMeanCodes, s_svq1IntraMeanLengths);
-	_interMean = new Common::Huffman(0, 512, s_svq1InterMeanCodes, s_svq1InterMeanLengths);
-	_motionComponent = new Common::Huffman(0, 33, s_svq1MotionComponentCodes, s_svq1MotionComponentLengths);
+	_intraMean = new HuffmanDecoder(0, 256, s_svq1IntraMeanCodes, s_svq1IntraMeanLengths);
+	_interMean = new HuffmanDecoder(0, 512, s_svq1InterMeanCodes, s_svq1InterMeanLengths);
+	_motionComponent = new HuffmanDecoder(0, 33, s_svq1MotionComponentCodes, s_svq1MotionComponentLengths);
 }
 
 SVQ1Decoder::~SVQ1Decoder() {
@@ -96,7 +95,7 @@ const Graphics::Surface *SVQ1Decoder::decodeFrame(Common::SeekableReadStream &st
 
 	Common::BitStream32BEMSB frameData(stream);
 
-	uint32 frameCode = frameData.getBits(22);
+	uint32 frameCode = frameData.getBits<22>();
 	debug(1, " frameCode: %d", frameCode);
 
 	if ((frameCode & ~0x70) || !(frameCode & 0x60)) { // Invalid
@@ -104,23 +103,23 @@ const Graphics::Surface *SVQ1Decoder::decodeFrame(Common::SeekableReadStream &st
 		return _surface;
 	}
 
-	byte temporalReference = frameData.getBits(8);
+	byte temporalReference = frameData.getBits<8>();
 	debug(1, " temporalReference: %d", temporalReference);
 	static const char *const types[4] = { "I (Key)", "P (Delta from Previous)", "B (Delta from Next)", "Invalid" };
-	byte frameType = frameData.getBits(2);
+	byte frameType = frameData.getBits<2>();
 	debug(1, " frameType: %d = %s Frame", frameType, types[frameType]);
 
 	if (frameType == 0) { // I Frame
 		// TODO: Validate checksum if present
 		if (frameCode == 0x50 || frameCode == 0x60) {
-			uint32 checksum = frameData.getBits(16);
+			uint32 checksum = frameData.getBits<16>();
 			debug(1, " checksum:0x%02x", checksum);
 			// We're currently just ignoring the checksum
 		}
 
 		if ((frameCode ^ 0x10) >= 0x50) {
 			// Skip embedded string
-			byte stringLen = frameData.getBits(8);
+			byte stringLen = frameData.getBits<8>();
 			for (uint16 i = 0; i < stringLen-1; i++)
 				frameData.skip(8);
 		}
@@ -137,12 +136,12 @@ const Graphics::Surface *SVQ1Decoder::decodeFrame(Common::SeekableReadStream &st
 			{ 320, 240 }  // 6
 		};
 
-		byte frameSizeCode = frameData.getBits(3);
+		byte frameSizeCode = frameData.getBits<3>();
 		debug(1, " frameSizeCode: %d", frameSizeCode);
 
 		if (frameSizeCode == 7) {
-			_frameWidth = frameData.getBits(12);
-			_frameHeight = frameData.getBits(12);
+			_frameWidth = frameData.getBits<12>();
+			_frameHeight = frameData.getBits<12>();
 		} else {
 			_frameWidth = standardFrameSizes[frameSizeCode].w;
 			_frameHeight = standardFrameSizes[frameSizeCode].h;
@@ -165,7 +164,7 @@ const Graphics::Surface *SVQ1Decoder::decodeFrame(Common::SeekableReadStream &st
 		debug(1, " usePacketChecksum: %d", usePacketChecksum);
 		bool componentChecksumsAfterImageData = frameData.getBit() != 0;
 		debug(1, " componentChecksumsAfterImageData: %d", componentChecksumsAfterImageData);
-		byte unk4 = frameData.getBits(2);
+		byte unk4 = frameData.getBits<2>();
 		debug(1, " unk4: %d", unk4);
 		if (unk4 != 0)
 			warning("Invalid Frame Header in SVQ1 Frame Decode");
@@ -657,6 +656,8 @@ bool SVQ1Decoder::svq1MotionInterBlock(Common::BitStream32BEMSB *ss, byte *curre
 	case 3:
 		putPixels16XY2C(dst, src, pitch, 16);
 		break;
+	default:
+		break;
 	}
 
 	return true;
@@ -737,6 +738,8 @@ bool SVQ1Decoder::svq1MotionInter4vBlock(Common::BitStream32BEMSB *ss, byte *cur
 		case 3:
 			putPixels8XY2C(dst, src, pitch, 8);
 			break;
+		default:
+			break;
 		}
 
 		// select next block
@@ -788,6 +791,8 @@ bool SVQ1Decoder::svq1DecodeDeltaBlock(Common::BitStream32BEMSB *ss, byte *curre
 		break;
 	case SVQ1_BLOCK_INTRA:
 		resultValid = svq1DecodeBlockIntra(ss, current, pitch);
+		break;
+	default:
 		break;
 	}
 

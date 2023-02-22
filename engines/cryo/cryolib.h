@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,22 +30,6 @@
 namespace Cryo {
 
 class CryoEngine;
-
-#define SW16(n) ( (((n) & 0xFF) << 8) | (((n) >> 8) & 0xFF) )
-#define SW32(n) ( (((n) & 0xFF) << 24) | (((n) >> 24) & 0xFF) | (((n) & 0xFF00) << 8) | (((n) >> 8) & 0xFF00))
-#ifdef SCUMM_BIG_ENDIAN
-//big-endian host
-#define LE16(n) SW16(n)
-#define LE32(n) SW32(n)
-#define BE16(n) (n)
-#define BE32(n) (n)
-#else
-//little-endian host
-#define LE16(n) (n)
-#define LE32(n) (n)
-#define BE16(n) SW16(n)
-#define BE32(n) SW32(n)
-#endif
 
 enum {
 	fsFromStart = 1
@@ -87,70 +70,15 @@ struct color_t {
 	uint16   a, r, g, b;
 };
 
-struct HNMHeader {
-	int32   _signature;
-	uint16  _width;
-	uint16  _height;
-	int32   _numbFrame;
-	int32   _bufferSize;
-};
-
-class Sound {
-private:
-	int32  _headerOffset;
-	int16  _mode;
-	int16  _volume;
-
-public:
-	Sound(int16 length, float rate, int16 sampleSize, int16 mode);
-	~Sound();
-
-	void assignBuffer(void *buffer, int bufferOffs, int length);
-	void prepareSample(int16 mode);
-	void setWantsDesigned(int16 designed);
-
-	char  *_sndHandle;
-	char  *_buffer;
-
-	float  _rate;
-
-	int16  _maxLength;
-	int16  _headerLen;
-	int16  _sampleSize;
-
-	int    _length;
-};
-
-#define kCryoMaxChSounds 10
-
-class SoundChannel {
-private:
-	int16   _volumeLeft;
-	int16   _volumeRight;
-	int16   _numSounds;
-
-	Sound *_sounds[kCryoMaxChSounds];
-
-public:
-	SoundChannel(int arg1);
-	~SoundChannel();
-
-	void stop();
-	void play(Sound *sound);
-	int16 getVolume();
-	void setVolume(int16 volume);
-	void setVolumeRight(int16 volume);
-	void setVolumeLeft(int16 volume);
-};
-
 void SysBeep(int x);
 void FlushEvents(int16 arg1, int16 arg2);
 
+void CLBlitter_Init();
 void CLBlitter_CopyViewRect(View *view1, View *view2, Common::Rect *rect1, Common::Rect *rect2);
 void CLBlitter_Send2ScreenNextCopy(color_t *palette, uint16 first, uint16 count);
 void CLBlitter_OneBlackFlash();
 void CLBlitter_CopyView2ViewSimpleSize(byte *src, int16 srcw, int16 srcp, int16 srch,
-                                       byte *dst, int16 dstw, int16 dstp, int16 dsth);
+									   byte *dst, int16 dstw, int16 dstp, int16 dsth);
 void CLBlitter_CopyView2ScreenCUSTOM(View *view);
 void CLBlitter_CopyView2Screen(View *view);
 void CLBlitter_UpdateScreen();

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,28 +26,27 @@
 #include "common/system.h"
 #include "common/textconsole.h"
 
+#include "parallaction/detection.h"
 #include "parallaction/parallaction.h"
 
-namespace Parallaction {
-
-struct PARALLACTIONGameDescription {
-	ADGameDescription desc;
-
-	int gameType;
-	uint32 features;
+static const PlainGameDescriptor parallactionGames[] = {
+	{"nippon", "Nippon Safes, Inc."},
+	{"bra", "The Big Red Adventure"},
+	{nullptr, nullptr}
 };
 
-int Parallaction::getGameType() const { return _gameDescription->gameType; }
-uint32 Parallaction::getFeatures() const { return _gameDescription->features; }
-Common::Language Parallaction::getLanguage() const { return _gameDescription->desc.language; }
-Common::Platform Parallaction::getPlatform() const { return _gameDescription->desc.platform; }
-}
-
-static const PlainGameDescriptor parallactionGames[] = {
-	{"parallaction", "Parallaction engine game"},
-	{"nippon", "Nippon Safes Inc."},
-	{"bra", "The Big Red Adventure"},
-	{0, 0}
+static const DebugChannelDef debugFlagList[] = {
+	{Parallaction::kDebugDialogue, "dialogue", "Dialogues debug level"},
+	{Parallaction::kDebugParser, "parser", "Parser debug level"},
+	{Parallaction::kDebugDisk, "disk", "Disk debug level"},
+	{Parallaction::kDebugWalk, "walk", "Walk debug level"},
+	{Parallaction::kDebugGraphics, "gfx", "Gfx debug level"},
+	{Parallaction::kDebugExec, "exec", "Execution debug level"},
+	{Parallaction::kDebugInput, "input", "Input debug level"},
+	{Parallaction::kDebugAudio, "audio", "Audio debug level"},
+	{Parallaction::kDebugMenu, "menu", "Menu debug level"},
+	{Parallaction::kDebugInventory, "inventory", "Inventory debug level"},
+	DEBUG_CHANNEL_END
 };
 
 namespace Parallaction {
@@ -67,7 +65,7 @@ static const PARALLACTIONGameDescription gameDescriptions[] = {
 				{ "fr",		0, "ac20c743ea10f2cb4491f76c5644582c", 410624},
 				{ "ge",		0, "50916bfa34aee1380e0e959b37eceb5a", 410624},
 				{ "it",		0, "89964aef04d2c53a615ee8983caf2775", 410624},
-				{ NULL, 0, NULL, 0}
+				AD_LISTEND
 			},
 			Common::UNK_LANG,
 			Common::kPlatformDOS,
@@ -91,7 +89,7 @@ static const PARALLACTIONGameDescription gameDescriptions[] = {
 				{ "en",		0, "c9ec4f2267d736eef4877c5133e1c6e1", 174074},
 				{ "ge",		0, "42d6f10a4ebdadb25a6161d53ea4f450", 182298},
 				{ "fr",		0, "cf17defc24f143d1a9acb52eaa5c2406", 179958},
-				{ NULL, 0, NULL, 0}
+				AD_LISTEND
 			},
 			Common::UNK_LANG,
 			Common::kPlatformAmiga,
@@ -106,11 +104,8 @@ static const PARALLACTIONGameDescription gameDescriptions[] = {
 		{
 			"nippon",
 			"Demo",
-			{
-				{ "disk0",	0, "6fed2e18a6bfe5e8bb49144fcc95fd11", 624640},
-				{ "fr",		0, "72f04be4320dfac719431419ec2b9a0d", 12778},
-				{ NULL, 0, NULL, 0}
-			},
+			AD_ENTRY2s("disk0",	"6fed2e18a6bfe5e8bb49144fcc95fd11", 624640,
+					   "fr",	"72f04be4320dfac719431419ec2b9a0d", 12778),
 			Common::EN_ANY,
 			Common::kPlatformAmiga,
 			ADGF_DEMO,
@@ -132,7 +127,7 @@ static const PARALLACTIONGameDescription gameDescriptions[] = {
 				{ "disk3",	0, "0486972962b2bfc230e789b9f88f9ec8", 901120},
 				{ "disk4",	0, "6f625e7f05da4a2f57d6b62d57013614", 901120},
 				{ "it",		0, "746088eb8de2b2713685d243a4e4678f", 185344},
-				{ NULL, 0, NULL, 0}
+				AD_LISTEND
 			},
 			Common::IT_ITA,
 			Common::kPlatformAmiga,
@@ -147,14 +142,11 @@ static const PARALLACTIONGameDescription gameDescriptions[] = {
 		{
 			"bra",
 			"Multi-lingual",
-			{
-				{ "tbra.bmp",	0, "3174c095a0e1a4eaf05c403445711e9b", 80972 },
-				{ "russia.fnt",	0, "57f85ff62aeca6334fdcaf718e313b49", 18344 },
-				{ NULL, 0, NULL, 0}
-			},
+			AD_ENTRY2s("tbra.bmp",	 "3174c095a0e1a4eaf05c403445711e9b", 80972,
+					   "russia.fnt", "57f85ff62aeca6334fdcaf718e313b49", 18344),
 			Common::UNK_LANG,
 			Common::kPlatformDOS,
-			ADGF_NO_FLAGS,
+			ADGF_UNSTABLE,
 			GUIO1(GUIO_NOSPEECH)
 		},
 		GType_BRA,
@@ -165,13 +157,10 @@ static const PARALLACTIONGameDescription gameDescriptions[] = {
 		{
 			"bra",
 			"Demo",
-			{
-				{ "russia.fnt",	0, "0dd55251d2886d6783718df2b184bf97", 10649 },
-				{ NULL, 0, NULL, 0}
-			},
+			AD_ENTRY1s("russia.fnt", "0dd55251d2886d6783718df2b184bf97", 10649),
 			Common::UNK_LANG,
 			Common::kPlatformDOS,
-			ADGF_DEMO,
+			ADGF_DEMO | ADGF_UNSTABLE,
 			GUIO1(GUIO_NOSPEECH)
 		},
 		GType_BRA,
@@ -181,31 +170,25 @@ static const PARALLACTIONGameDescription gameDescriptions[] = {
 	{
 		{
 			"bra",
-			"Multi-lingual",
-			{
-				{ "request.win", 0, "7a844b9518310e4cc72eabb9c0340314", 6497 },
-				{ NULL, 0, NULL, 0}
-			},
+			"En/Fr/De",
+			AD_ENTRY1s("request.win", "7a844b9518310e4cc72eabb9c0340314", 6497),
 			Common::UNK_LANG,
 			Common::kPlatformAmiga,
-			ADGF_NO_FLAGS,
+			ADGF_UNSTABLE,
 			GUIO1(GUIO_NOSPEECH)
 		},
 		GType_BRA,
-		GF_LANG_EN | GF_LANG_FR | GF_LANG_DE | GF_LANG_IT | GF_LANG_MULT,
+		GF_LANG_EN | GF_LANG_FR | GF_LANG_DE | GF_LANG_MULT,
 	},
 
 	{
 		{
 			"bra",
 			"Demo",
-			{
-				{ "request.win", 0, "3b6a99ffd626e324b663839bbad59cb3", 5326 },
-				{ NULL, 0, NULL, 0}
-			},
+			AD_ENTRY1s("request.win", "3b6a99ffd626e324b663839bbad59cb3", 5326),
 			Common::UNK_LANG,
 			Common::kPlatformAmiga,
-			ADGF_DEMO,
+			ADGF_DEMO | ADGF_UNSTABLE,
 			GUIO1(GUIO_NOSPEECH)
 		},
 		GType_BRA,
@@ -217,94 +200,27 @@ static const PARALLACTIONGameDescription gameDescriptions[] = {
 
 }
 
-class ParallactionMetaEngine : public AdvancedMetaEngine {
+class ParallactionMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	ParallactionMetaEngine() : AdvancedMetaEngine(Parallaction::gameDescriptions, sizeof(Parallaction::PARALLACTIONGameDescription), parallactionGames) {
+	ParallactionMetaEngineDetection() : AdvancedMetaEngineDetection(Parallaction::gameDescriptions, sizeof(Parallaction::PARALLACTIONGameDescription), parallactionGames) {
 		_guiOptions = GUIO1(GUIO_NOLAUNCHLOAD);
 	}
 
-	virtual const char *getName() const {
+	const char *getName() const override {
+		return "parallaction";
+	}
+
+	const char *getEngineName() const override {
 		return "Parallaction";
 	}
 
-	virtual const char *getOriginalCopyright() const {
-		return "Nippon Safes Inc. (C) Dynabyte";
+	const char *getOriginalCopyright() const override {
+		return "Nippon Safes, Inc. (C) Dynabyte";
 	}
 
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
-	virtual SaveStateList listSaves(const char *target) const;
-	virtual int getMaximumSaveSlot() const;
-	virtual void removeSaveState(const char *target, int slot) const;
+	const DebugChannelDef *getDebugChannels() const override {
+		return debugFlagList;
+	}
 };
 
-bool ParallactionMetaEngine::hasFeature(MetaEngineFeature f) const {
-	return
-		(f == kSupportsListSaves) ||
-		(f == kSupportsDeleteSave);
-}
-
-bool Parallaction::Parallaction::hasFeature(EngineFeature f) const {
-	return
-		(f == kSupportsRTL);
-}
-
-bool ParallactionMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	const Parallaction::PARALLACTIONGameDescription *gd = (const Parallaction::PARALLACTIONGameDescription *)desc;
-	bool res = true;
-
-	switch (gd->gameType) {
-	case Parallaction::GType_Nippon:
-		*engine = new Parallaction::Parallaction_ns(syst, gd);
-		break;
-	case Parallaction::GType_BRA:
-		*engine = new Parallaction::Parallaction_br(syst, gd);
-		break;
-	default:
-		res = false;
-		error("Parallaction engine: unknown gameType");
-	}
-
-	return res;
-}
-
-SaveStateList ParallactionMetaEngine::listSaves(const char *target) const {
-	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
-
-	Common::String pattern(ConfMan.getDomain(target)->getVal("gameid") + ".0##");
-	Common::StringArray filenames = saveFileMan->listSavefiles(pattern);
-
-	SaveStateList saveList;
-	for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
-		// Obtain the last 2 digits of the filename, since they correspond to the save slot
-		int slotNum = atoi(file->c_str() + file->size() - 2);
-
-		if (slotNum >= 0 && slotNum <= 99) {
-			Common::InSaveFile *in = saveFileMan->openForLoading(*file);
-			if (in) {
-				Common::String saveDesc = in->readLine();
-				saveList.push_back(SaveStateDescriptor(slotNum, saveDesc));
-				delete in;
-			}
-		}
-	}
-
-	// Sort saves based on slot number.
-	Common::sort(saveList.begin(), saveList.end(), SaveStateDescriptorSlotComparator());
-	return saveList;
-}
-
-int ParallactionMetaEngine::getMaximumSaveSlot() const { return 99; }
-
-void ParallactionMetaEngine::removeSaveState(const char *target, int slot) const {
-	Common::String filename = ConfMan.getDomain(target)->getVal("gameid");
-	filename += Common::String::format(".0%02d", slot);
-
-	g_system->getSavefileManager()->removeSavefile(filename);
-}
-
-#if PLUGIN_ENABLED_DYNAMIC(PARALLACTION)
-	REGISTER_PLUGIN_DYNAMIC(PARALLACTION, PLUGIN_TYPE_ENGINE, ParallactionMetaEngine);
-#else
-	REGISTER_PLUGIN_STATIC(PARALLACTION, PLUGIN_TYPE_ENGINE, ParallactionMetaEngine);
-#endif
+REGISTER_PLUGIN_STATIC(PARALLACTION_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, ParallactionMetaEngineDetection);

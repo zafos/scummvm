@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,7 +30,6 @@
 #include "base/main.h"
 
 #include "graphics/surface.h"
-#include "graphics/colormasks.h"
 #include "graphics/palette.h"
 #include "graphics/pixelformat.h"
 
@@ -97,7 +95,8 @@ protected:
 	uint8 _offscrPixels; // Pixels to skip on each line before start drawing, used to center image
 	uint8 _maxFps; // Max frames-per-second which can be shown on screen
 
-	int _shakeOffset;
+	int _shakeXOffset;
+	int _shakeYOffset;
 
 	uint8 *_cursor_pal; // Cursor buffer, palettized
 	uint16 *_cursor_hic; // Cursor buffer, 16bit
@@ -110,6 +109,7 @@ protected:
 
 	uint16	_overlayHeight, _overlayWidth;
 	bool	_overlayVisible;
+	bool	_overlayInGUI;
 
 	bool	_disableFpsLimit; // When this is enabled, the system doesn't limit screen updates
 
@@ -146,8 +146,7 @@ public:
 	virtual bool getFeatureState(Feature f);
 	virtual const GraphicsMode *getSupportedGraphicsModes() const;
 	virtual int getDefaultGraphicsMode() const;
-	bool setGraphicsMode(const char *name);
-	virtual bool setGraphicsMode(int mode);
+	virtual bool setGraphicsMode(int mode, uint flags = OSystem::kGfxModeNoFlags);
 	virtual int getGraphicsMode() const;
 	virtual void initSize(uint width, uint height, const Graphics::PixelFormat *format);
 	virtual int16 getHeight();
@@ -164,38 +163,36 @@ public:
 	virtual void updateScreen();
 	virtual Graphics::Surface *lockScreen();
 	virtual void unlockScreen();
-	virtual void setShakePos(int shakeOffset);
+	virtual void setShakePos(int shakeXOffset, int shakeYOffset);
 
-	virtual void showOverlay();
+	virtual void showOverlay(bool inGUI);
 	virtual void hideOverlay();
+	virtual bool isOverlayVisible() const { return _overlayVisible; }
 	virtual void clearOverlay();
-	virtual void grabOverlay(void *buf, int pitch);
+	virtual void grabOverlay(Graphics::Surface &surface);
 	virtual void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h);
 	virtual int16 getOverlayHeight();
 	virtual int16 getOverlayWidth();
 	virtual Graphics::PixelFormat getOverlayFormat() const {
-		return Graphics::createPixelFormat<555>();
+		return Graphics::PixelFormat(2, 5, 5, 5, 0, 11, 6, 1, 0);
 	}
 
 	virtual bool showMouse(bool visible);
 
 	virtual void warpMouse(int x, int y);
-	virtual void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format);
+	virtual void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask);
 	virtual void setCursorPalette(const byte *colors, uint start, uint num);
 
 	virtual bool pollEvent(Common::Event &event);
 	virtual uint32 getMillis(bool skipRecord = false);
 	virtual void delayMillis(uint msecs);
 
-	virtual MutexRef createMutex(void);
-	virtual void lockMutex(MutexRef mutex);
-	virtual void unlockMutex(MutexRef mutex);
-	virtual void deleteMutex(MutexRef mutex);
+	virtual Common::MutexInternal *createMutex(void);
 
 	virtual void quit();
 
 	virtual Audio::Mixer *getMixer();
-	virtual void getTimeAndDate(TimeDate &t) const;
+	virtual void getTimeAndDate(TimeDate &t, bool skipRecord = false) const;
 	virtual void setTimerCallback(TimerProc callback, int interval);
 	virtual void logMessage(LogMessageType::Type type, const char *message);
 

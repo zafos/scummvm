@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -59,10 +58,12 @@ public:
 	void stop() const;
 	virtual bool isFinished() = 0;
 
+	uint32 getTimeMS();
+
 protected:
 	void loadHeader(Common::SeekableReadStream *in);
-	LastExpress_ADPCMStream *makeDecoder(Common::SeekableReadStream *in, uint32 size, int32 filterId = -1) const;
-	void play(Audio::AudioStream *as);
+	LastExpress_ADPCMStream *makeDecoder(Common::SeekableReadStream *in, uint32 size, uint32 volume, bool looped) const;
+	void play(Audio::AudioStream *as, DisposeAfterUse::Flag autofreeStream);
 
 	uint32 _size;   ///< data size
 	                ///<  - NIS: size of all blocks, including those located in the matching LNK file
@@ -76,12 +77,13 @@ protected:
 class StreamedSound : public SimpleSound {
 public:
 	StreamedSound();
-	~StreamedSound();
+	~StreamedSound() override;
 
-	bool load(Common::SeekableReadStream *stream, int32 filterId = -1);
-	virtual bool isFinished();
+	bool load(Common::SeekableReadStream *stream, uint32 volume, bool looped, uint32 startBlock = 0);
+	bool isFinished() override;
 
-	void setFilterId(int32 filterId);
+	void setVolume(uint32 newVolume);
+	void setVolumeSmoothly(uint32 newVolume);
 
 private:
 	LastExpress_ADPCMStream *_as;
@@ -91,13 +93,13 @@ private:
 class AppendableSound : public SimpleSound {
 public:
 	AppendableSound();
-	~AppendableSound();
+	~AppendableSound() override;
 
 	void queueBuffer(const byte *data, uint32 size);
 	void queueBuffer(Common::SeekableReadStream *bufferIn);
 	void finish();
 
-	virtual bool isFinished();
+	bool isFinished() override;
 
 private:
 	Audio::QueuingAudioStream *_as;

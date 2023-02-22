@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -237,7 +236,7 @@ Control::Control(Common::SaveFileManager *saveFileMan, ResMan *pResMan, ObjectMa
 	_mouse = pMouse;
 	_music = pMusic;
 	_sound = pSound;
-	_lStrings = _languageStrings + SwordEngine::_systemVars.language * 20;
+	_lStrings = loadCustomStrings("strings.txt") ? _customStrings : _languageStrings + SwordEngine::_systemVars.language * 20;
 	_selectedButton = 255;
 	_panelShown = false;
 	_tempThumbnail = 0;
@@ -263,8 +262,8 @@ void Control::askForCd() {
 
 	char fName[10];
 	uint8 textA[50];
-	sprintf(fName, "cd%d.id", SwordEngine::_systemVars.currentCD);
-	sprintf((char *)textA, "%s%d", _lStrings[STR_INSERT_CD_A], SwordEngine::_systemVars.currentCD);
+	Common::sprintf_s(fName, "cd%d.id", SwordEngine::_systemVars.currentCD);
+	Common::sprintf_s(textA, "%s%d", _lStrings[STR_INSERT_CD_A], SwordEngine::_systemVars.currentCD);
 	bool notAccepted = true;
 	bool refreshText = true;
 	do {
@@ -548,6 +547,8 @@ uint8 Control::handleButtonClick(uint8 id, uint8 mode, uint8 *retVal) {
 		break;
 	case BUTTON_VOLUME_PANEL:
 		return id;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -633,7 +634,7 @@ void Control::setupVolumePanel() {
 
 	renderText(_lStrings[STR_MUSIC], 149, 39 + 40, TEXT_LEFT_ALIGN);
 	renderText(_lStrings[STR_SPEECH], 320, 39 + 40, TEXT_CENTER);
-	renderText(_lStrings[STR_FX], 438, 39 + 40, TEXT_LEFT_ALIGN);
+	renderText(_lStrings[STR_FX], 449, 39 + 40, TEXT_CENTER);
 
 	createButtons(_volumeButtons, 4);
 	renderText(_lStrings[STR_DONE], _volumeButtons[0].x - 10, _volumeButtons[0].y, TEXT_RIGHT_ALIGN);
@@ -887,7 +888,7 @@ void Control::checkForOldSaveGames() {
 	      "Press OK to convert them now, otherwise you will be asked again the next time you start the game.\n"), _("OK"), _("Cancel"));
 
 	int choice = dialog0.runModal();
-	if (choice == GUI::kMessageCancel) {
+	if (choice != GUI::kMessageOK) {
 		// user pressed cancel
 		return;
 	}
@@ -927,15 +928,15 @@ void Control::showSavegameNames() {
 		_buttons[cnt]->draw();
 		uint8 textMode = TEXT_LEFT_ALIGN;
 		uint16 ycoord = _saveButtons[cnt].y + 2;
-		uint8 str[40];
-		sprintf((char *)str, "%d. %s", cnt + _saveScrollPos + 1, _saveNames[cnt + _saveScrollPos].c_str());
+		Common::String savegameNameStr = Common::String::format("%d. %s", cnt + _saveScrollPos + 1, _saveNames[cnt + _saveScrollPos].c_str());
 		if (cnt + _saveScrollPos == _selectedSavegame) {
 			textMode |= TEXT_RED_FONT;
 			ycoord += 2;
-			if (_cursorVisible)
-				strcat((char *)str, "_");
+			if (_cursorVisible) {
+				savegameNameStr += "_";
+			}
 		}
-		renderText(str, _saveButtons[cnt].x + 6, ycoord, textMode);
+		renderText((const uint8*)savegameNameStr.c_str(), _saveButtons[cnt].x + 6, ycoord, textMode);
 	}
 }
 
@@ -1113,7 +1114,7 @@ void Control::renderVolumeBar(uint8 id, uint8 volL, uint8 volR) {
 void Control::saveGameToFile(uint8 slot) {
 	char fName[15];
 	uint16 cnt;
-	sprintf(fName, "sword1.%03d", slot);
+	Common::sprintf_s(fName, "sword1.%03d", slot);
 	uint16 liveBuf[TOTAL_SECTIONS];
 	Common::OutSaveFile *outf;
 	outf = _saveFileMan->openForSaving(fName);
@@ -1174,7 +1175,7 @@ void Control::saveGameToFile(uint8 slot) {
 bool Control::restoreGameFromFile(uint8 slot) {
 	char fName[15];
 	uint16 cnt;
-	sprintf(fName, "sword1.%03d", slot);
+	Common::sprintf_s(fName, "sword1.%03d", slot);
 	Common::InSaveFile *inf;
 	inf = _saveFileMan->openForLoading(fName);
 	if (!inf) {
@@ -1245,8 +1246,8 @@ bool Control::restoreGameFromFile(uint8 slot) {
 bool Control::convertSaveGame(uint8 slot, char *desc) {
 	char oldFileName[15];
 	char newFileName[40];
-	sprintf(oldFileName, "SAVEGAME.%03d", slot);
-	sprintf(newFileName, "sword1.%03d", slot);
+	Common::sprintf_s(oldFileName, "SAVEGAME.%03d", slot);
+	Common::sprintf_s(newFileName, "sword1.%03d", slot);
 	uint8 *saveData;
 	int dataSize;
 
@@ -1256,13 +1257,13 @@ bool Control::convertSaveGame(uint8 slot, char *desc) {
 	if (testSave) {
 		delete testSave;
 
-		Common::String msg = Common::String::format(_("Target new saved game already exists!\n"
+		Common::U32String msg = Common::U32String::format(_("Target new saved game already exists!\n"
 		                     "Would you like to keep the old saved game (%s) or the new one (%s)?\n"),
 		                     oldFileName, newFileName);
 		GUI::MessageDialog dialog0(msg, _("Keep the old one"), _("Keep the new one"));
 
 		int choice = dialog0.runModal();
-		if (choice == GUI::kMessageCancel) {
+		if (choice == GUI::kMessageAlt) {
 			// User chose to keep the new game, so delete the old one
 			_saveFileMan->removeSavefile(oldFileName);
 			return true;
@@ -1442,6 +1443,26 @@ const ButtonInfo Control::_volumeButtons[4] = {
 	{ 404, 135, SR_VKNOB, 0, 0 },
 };
 
+bool Control::loadCustomStrings(const char *filename) {
+	Common::File f;
+
+	if (f.open(filename)) {
+		Common::String line;
+
+		for (int lineNo = 0; lineNo < 20; lineNo++) {
+			line = f.readLine();
+
+			if (f.eos())
+				return false;
+
+			memset((void*)_customStrings[lineNo], 0, 43);
+			strncpy((char*)_customStrings[lineNo], line.c_str(), 42);
+		}
+		return true;
+	}
+	return false;
+}
+
 const uint8 Control::_languageStrings[8 * 20][43] = {
 	// BS1_ENGLISH:
 	"PAUSED",
@@ -1488,7 +1509,7 @@ const uint8 Control::_languageStrings[8 * 20][43] = {
 //BS1_GERMAN:
 	"PAUSE",
 	"BITTE LEGEN SIE CD-",
-	"EIN UND DR\xDC""CKEN SIE EINE BELIEBIGE TASTE",
+	("EIN UND DR\xDC""CKEN SIE EINE BELIEBIGE TASTE"),
 	"FALSCHE CD",
 	"Speichern",
 	"Laden",

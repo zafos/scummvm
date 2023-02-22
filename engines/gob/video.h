@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -163,29 +162,29 @@ protected:
 
 class Video_v1 : public Video {
 public:
-	virtual char spriteUncompressor(byte *sprBuf, int16 srcWidth, int16 srcHeight,
-			int16 x, int16 y, int16 transp, Surface &destDesc);
+	char spriteUncompressor(byte *sprBuf, int16 srcWidth, int16 srcHeight,
+			int16 x, int16 y, int16 transp, Surface &destDesc) override;
 
 	Video_v1(GobEngine *vm);
-	virtual ~Video_v1() {}
+	~Video_v1() override {}
 };
 
 class Video_v2 : public Video_v1 {
 public:
-	virtual char spriteUncompressor(byte *sprBuf, int16 srcWidth, int16 srcHeight,
-			int16 x, int16 y, int16 transp, Surface &destDesc);
+	char spriteUncompressor(byte *sprBuf, int16 srcWidth, int16 srcHeight,
+			int16 x, int16 y, int16 transp, Surface &destDesc) override;
 
 	Video_v2(GobEngine *vm);
-	virtual ~Video_v2() {}
+	~Video_v2() override {}
 };
 
 class Video_v6 : public Video_v2 {
 public:
-	virtual char spriteUncompressor(byte *sprBuf, int16 srcWidth, int16 srcHeight,
-			int16 x, int16 y, int16 transp, Surface &destDesc);
+	char spriteUncompressor(byte *sprBuf, int16 srcWidth, int16 srcHeight,
+			int16 x, int16 y, int16 transp, Surface &destDesc) override;
 
 	Video_v6(GobEngine *vm);
-	virtual ~Video_v6() {}
+	~Video_v6() override {}
 
 private:
 	void drawPacked(const byte *sprBuf, int16 x, int16 y, Surface &surfDesc);

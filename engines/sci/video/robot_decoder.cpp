@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,8 +27,7 @@
 #include "common/platform.h"         // for Platform::kPlatformMacintosh
 #include "common/rational.h"         // for operator*, Rational
 #include "common/str.h"              // for String
-#include "common/stream.h"           // for SeekableReadStream
-#include "common/substream.h"        // for SeekableSubReadStreamEndian
+#include "common/stream.h"           // for SeekableReadStream, SeekableReadStreamEndianWrapper
 #include "common/textconsole.h"      // for error, warning
 #include "common/types.h"            // for Flag::NO, Flag::YES
 #include "sci/engine/seg_manager.h"  // for SegManager
@@ -378,8 +376,15 @@ void RobotDecoder::initStream(const GuiResourceId robotId) {
 		error("Invalid robot file %s", fileName.c_str());
 	}
 
-	// TODO: Mac version not tested, so this could be totally wrong
-	_stream = new Common::SeekableSubReadStreamEndian(stream, 0, stream->size(), g_sci->getPlatform() == Common::kPlatformMacintosh, DisposeAfterUse::YES);
+	// Determine the robot file's endianness by examining the version field.
+	//  Some games such as Lighthouse were distributed as dual PC/Mac CDs
+	//  that shared the same little endian robot files, so endianness doesn't
+	//  always correspond to platform.
+	stream->seek(6, SEEK_SET);
+	const uint16 version = stream->readUint16BE();
+	const bool bigEndian = (0 < version && version <= 0x00ff);
+
+	_stream = new Common::SeekableReadStreamEndianWrapper(stream, bigEndian, DisposeAfterUse::YES);
 	_stream->seek(2, SEEK_SET);
 	if (_stream->readUint32BE() != MKTAG('S', 'O', 'L', 0)) {
 		error("Resource %s is not Robot type!", fileName.c_str());
@@ -1169,8 +1174,14 @@ bool RobotDecoder::readPartialAudioRecordAndSubmit(const int startFrame, const i
 
 uint16 RobotDecoder::getFrameSize(Common::Rect &outRect) const {
 	assert(_plane != nullptr);
-	outRect.clip(0, 0);
-	for (RobotScreenItemList::size_type i = 0; i < _screenItemList.size(); ++i) {
+
+	if (_screenItemList.size() == 0) {
+		outRect.clip(0, 0);
+		return _numFramesTotal;
+	}
+
+	outRect = _screenItemList[0]->getNowSeenRect(*_plane);
+	for (RobotScreenItemList::size_type i = 1; i < _screenItemList.size(); ++i) {
 		ScreenItem &screenItem = *_screenItemList[i];
 		outRect.extend(screenItem.getNowSeenRect(*_plane));
 	}

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -38,12 +37,12 @@ namespace Scumm {
 /* Start executing script 'script' with the given parameters */
 void ScummEngine::runScript(int script, bool freezeResistant, bool recursive, int *lvarptr, int cycle) {
 	ScriptSlot *s;
-	//byte *scriptPtr;
+
 	uint32 scriptOffs;
 	byte scriptType;
 	int slot;
 
-	if (!script)
+ 	if (!script)
 		return;
 
 	if (!recursive)
@@ -152,7 +151,7 @@ int ScummEngine::getVerbEntrypoint(int obj, int entry) {
 	const byte *objptr, *verbptr;
 	int verboffs;
 
-	// WORKAROUND for bug #1555938: Disallow pulling the rope if it's
+	// WORKAROUND for bug #2826: Disallow pulling the rope if it's
 	// already in the player's inventory.
 	if (_game.id == GID_MONKEY2 && obj == 1047 && entry == 6 && whereIsObject(obj) == WIO_INVENTORY) {
 		return 0;
@@ -428,8 +427,8 @@ void ScummEngine::getScriptBaseAddress() {
 		error("Bad type while getting base address");
 	}
 
-	// The following fixes bug #1202487. Confirmed against disasm.
-	if (_game.version <= 2 && _scriptOrgPointer == NULL) {
+	// The following fixes bug #2028. Confirmed against disasm.
+	if (_game.version <= 2 && _scriptOrgPointer == nullptr) {
 		ss->status = ssDead;
 		_currentScript = 0xFF;
 	}
@@ -636,20 +635,74 @@ void ScummEngine::writeVar(uint var, int value) {
 		}
 
 		if (var == VAR_CHARINC) {
-			// Did the user override the talkspeed manually? Then use that.
-			// Otherwise, use the value specified by the game script.
+			// Use the value specified by the game script, everywhere except
+			// at game boot-up: if there was a user override, then use that.
+			//
 			// Note: To determine whether there was a user override, we only
 			// look at the target specific settings, assuming that any global
-			// value is likely to be bogus. See also bug #2251765.
-			if (ConfMan.hasKey("talkspeed", _targetName)) {
-				value = getTalkSpeed();
+			// value is likely to be bogus. See also bug #4008.
+			if (_currentRoom == 0 && ConfMan.hasKey("talkspeed", _targetName)) {
+				value = 9 - getTalkSpeed();
 			} else {
 				// Save the new talkspeed value to ConfMan
-				setTalkSpeed(value);
+				setTalkSpeed(9 - value);
+			}
+		}
+
+		// WORKAROUND bug #13378: For whatever reason, the German and
+		// Italian talkie versions (I can't check the floppy versions)
+		// set the game to run much too fast in some parts of the intro.
+		// Some differences are natural because of the different lengths
+		// of the spoken lines, but 1 or 2 is too fast.
+		//
+		// Any modifications here depend on knowing if the script will
+		// set the timer value back to something sensible afterwards.
+
+		if (_game.id == GID_SAMNMAX && vm.slot[_currentScript].number == 65 && var == VAR_TIMER_NEXT && _enableEnhancements) {
+			// "Wirst Du brutzeln, wie eine grobe Bratwurst!"
+			if (value == 1 && _language == Common::DE_DEU)
+				value = 4;
+
+			// Max beats up the scientist. This was probably to
+			// match the subtitles to the speech better, but this
+			// is just too much! The floppy version doesn't do this
+			// but there's no need to explicitly test this since
+			// the script never sets the value to 2 there.
+			if (value == 2 && _language == Common::IT_ITA)
+				value = 3;
+		}
+
+		// WORKAROUND: When the Loom messenger nymph flies to wake up
+		// Bobbin, the whole game is sped up. Slow down the fire
+		// animation so that it appears to run at constant speed
+		// throughout the intro. This does not apply to the VGA talkie
+		// version, because there the fire isn't animated.
+
+		else if (_game.id == GID_LOOM && !(_game.features & GF_DEMO) && _game.version < 4 && vm.slot[_currentScript].number == 44 && var == VAR_TIMER_NEXT && _enableEnhancements) {
+			Actor *a = derefActorSafe(4, "writeVar");
+			if (a) {
+				a->setAnimSpeed((value == 0) ? 6 : 0);
 			}
 		}
 
 		_scummVars[var] = value;
+
+		// Unlike the PC version, the Macintosh version of Loom appears
+		// to hard-code the drawing of the practice mode box. This is
+		// handled by script 27 in both versions, but whereas the PC
+		// version draws the notes, the Mac version just sets
+		// variables 50 and 54.
+		//
+		// In this script, the variables are set to the same value but
+		// it appears that only variable 50 is cleared when the box is
+		// supposed to disappear. I don't know what the purpose of
+		// variable 54 is.
+
+		if (_game.id == GID_LOOM && _game.platform == Common::kPlatformMacintosh) {
+			if (VAR(128) == 0 && var == 50) {
+				mac_drawLoomPracticeMode();
+			}
+		}
 
 		if ((_varwatch == (int)var || _varwatch == 0) && _currentScript < NUM_SCRIPT_SLOT) {
 			if (vm.slot[_currentScript].number < 100)
@@ -844,8 +897,9 @@ void ScummEngine::freezeScripts(int flag) {
 		return;
 	}
 
+	bool flagCondition = _game.version >= 7 ? flag == 2 : flag >= 0x80;
 	for (i = 0; i < NUM_SCRIPT_SLOT; i++) {
-		if (_currentScript != i && vm.slot[i].status != ssDead && (!vm.slot[i].freezeResistant || flag >= 0x80)) {
+		if (_currentScript != i && vm.slot[i].status != ssDead && (!vm.slot[i].freezeResistant || flagCondition)) {
 			vm.slot[i].status |= 0x80;
 			vm.slot[i].freezeCount++;
 		}
@@ -908,7 +962,7 @@ void ScummEngine::runAllScripts() {
 
 void ScummEngine::runExitScript() {
 	if (VAR_EXIT_SCRIPT != 0xFF && VAR(VAR_EXIT_SCRIPT))
-		runScript(VAR(VAR_EXIT_SCRIPT), 0, 0, 0);
+		runScript(VAR(VAR_EXIT_SCRIPT), 0, 0, nullptr);
 	if (_EXCD_offs) {
 		int slot = getScriptSlot();
 		vm.slot[slot].status = ssRunning;
@@ -933,27 +987,33 @@ void ScummEngine::runExitScript() {
 			}
 		}
 
-		initializeLocals(slot, 0);
+		initializeLocals(slot, nullptr);
 		runScriptNested(slot);
 	}
 	if (VAR_EXIT_SCRIPT2 != 0xFF && VAR(VAR_EXIT_SCRIPT2))
-		runScript(VAR(VAR_EXIT_SCRIPT2), 0, 0, 0);
+		runScript(VAR(VAR_EXIT_SCRIPT2), 0, 0, nullptr);
 
-#ifdef ENABLE_SCUMM_7_8
-	// WORKAROUND: The spider lair (room 44) will optionally play the sound
-	// of trickling water (sound 215), but it never stops it. The same sound
-	// effect is also used in room 33, so let's do the same fade out that it
-	// does in that room's exit script.
-	if (_game.id == GID_DIG && _currentRoom == 44) {
+	// WORKAROUND: Once the water has been diverted to the grate, but
+	// before Maggie has been freed, the spider lair (room 44) will play
+	// the sound of trickling water (sound 215). It doesn't seem to trigger
+	// the first time you enter the room, only but if you leave and
+	// re-enter it. Which is probably why it's so rarely noticed.
+	//
+	// The sound is not stopped when you leave the room, so it will keep
+	// playing even where it makes no sense. This also happens with the
+	// original interpreter.
+	//
+	// The same sound effect is also used in the underwater cavern (room
+	// 33), so we do the same fade out as in that room's exit script.
+	if (_game.id == GID_DIG && _currentRoom == 44 && _enableEnhancements) {
 		int scriptCmds[] = { 14, 215, 0x600, 0, 30, 0, 0, 0 };
 		_sound->soundKludge(scriptCmds, ARRAYSIZE(scriptCmds));
 	}
-#endif
 }
 
 void ScummEngine::runEntryScript() {
 	if (VAR_ENTRY_SCRIPT != 0xFF && VAR(VAR_ENTRY_SCRIPT))
-		runScript(VAR(VAR_ENTRY_SCRIPT), 0, 0, 0);
+		runScript(VAR(VAR_ENTRY_SCRIPT), 0, 0, nullptr);
 	if (_ENCD_offs) {
 		int slot = getScriptSlot();
 		vm.slot[slot].status = ssRunning;
@@ -965,11 +1025,11 @@ void ScummEngine::runEntryScript() {
 		vm.slot[slot].freezeCount = 0;
 		vm.slot[slot].delayFrameCount = 0;
 		vm.slot[slot].cycle = 1;
-		initializeLocals(slot, 0);
+		initializeLocals(slot, nullptr);
 		runScriptNested(slot);
 	}
 	if (VAR_ENTRY_SCRIPT2 != 0xFF && VAR(VAR_ENTRY_SCRIPT2))
-		runScript(VAR(VAR_ENTRY_SCRIPT2), 0, 0, 0);
+		runScript(VAR(VAR_ENTRY_SCRIPT2), 0, 0, nullptr);
 }
 
 void ScummEngine::runQuitScript() {
@@ -1019,7 +1079,7 @@ void ScummEngine::killScriptsAndResources() {
 				// no longer in use (i.e. not owned by anyone anymore); or if
 				// it is an object which is owned by a room.
 				if (owner == 0 || (_game.version < 7 && owner == OF_OWNER_ROOM)) {
-					// WORKAROUND for a problem mentioned in bug report #941275:
+					// WORKAROUND for a problem mentioned in bug report #1607:
 					// In FOA in the sentry room, in the chest plate of the statue,
 					// the pegs may be renamed to mouth: this custom name is lost
 					// when leaving the room; this hack prevents this).
@@ -1113,7 +1173,7 @@ void ScummEngine::checkAndRunSentenceScript() {
 
 
 		if (_game.id == GID_FT && !isValidActor(localParamList[1]) && !isValidActor(localParamList[2])) {
-			// WORKAROUND for bug #1407789. The buggy script clearly
+			// WORKAROUND for bug #2466. The buggy script clearly
 			// assumes that one of the two objects is an actor. If that's
 			// not the case, fall back on the default sentence script.
 
@@ -1303,7 +1363,7 @@ void ScummEngine_v0::runSentenceScript() {
 		// do not read in the dark
 		if (!(_cmdVerb == kVerbRead && _currentLights == 0)) {
 			VAR(VAR_ACTIVE_OBJECT2) = OBJECT_V0_ID(_cmdObject2);
-			runObjectScript(_cmdObject, _cmdVerb, false, false, NULL);
+			runObjectScript(_cmdObject, _cmdVerb, false, false, nullptr);
 			return;
 		}
 	} else {
@@ -1319,7 +1379,7 @@ void ScummEngine_v0::runSentenceScript() {
 	if (_cmdVerb != kVerbWalkTo) {
 		// perform verb's fallback action
 		VAR(VAR_ACTIVE_VERB) = _cmdVerb;
-		runScript(3, 0, 0, 0);
+		runScript(3, 0, 0, nullptr);
 	}
 }
 
@@ -1335,6 +1395,8 @@ void ScummEngine_v2::runInputScript(int clickArea, int val, int mode) {
 		break;
 	case kInventoryClickArea:		// Inventory clicked
 		VAR(VAR_CLICK_OBJECT) = val;
+		break;
+	default:
 		break;
 	}
 
@@ -1393,8 +1455,26 @@ void ScummEngine::runInputScript(int clickArea, int val, int mode) {
 		_lastInputScriptTime = time;
 	}
 
-	if (verbScript)
-		runScript(verbScript, 0, 0, args);
+	if (verbScript) {
+		// It seems that script 18 expects to be called twice: Once
+		// with parameter 1 (kVerbClickArea) to clear all the verbs,
+		// and once with 3 (kInventoryClickArea) to print the "Take
+		// this <something>" message.
+		//
+		// In the 256-color DOS version, this is all done in the same
+		// call to the script.
+		//
+		// Should this workaround apply to other input scripts
+		// as well? I don't know.
+		if (_game.id == GID_INDY3 && _game.platform == Common::kPlatformMacintosh && verbScript == 18 && val >= 101 && val <= 106) {
+			args[0] = kVerbClickArea;
+			runScript(verbScript, 0, 0, args);
+
+			args[0] = kInventoryClickArea;
+			runScript(verbScript, 0, 0, args);
+		} else
+			runScript(verbScript, 0, 0, args);
+	}
 }
 
 void ScummEngine::decreaseScriptDelay(int amount) {
@@ -1404,6 +1484,20 @@ void ScummEngine::decreaseScriptDelay(int amount) {
 		if (ss->status == ssPaused) {
 			ss->delay -= amount;
 			if (ss->delay < 0) {
+				if (_game.id == GID_INDY3 && _game.platform == Common::kPlatformMacintosh && ss->number == 134) {
+					// Unlike the DOS version, there doesn't
+					// appear to be anything in the credits
+					// script to clear the credits between
+					// the text screens. I don't know how
+					// the original did it, but the only
+					// reliable way I can think of is to
+					// trigger on the end of each delay
+					// throughout the script.
+					//
+					// Since this is at the very end of the
+					// game, it should be safe enough.
+					mac_undrawIndy3CreditsText();
+				}
 				ss->status = ssRunning;
 				ss->delay = 0;
 			}
@@ -1456,30 +1550,28 @@ void ScummEngine::copyScriptString(byte *dst) {
 int ScummEngine::resStrLen(const byte *src) {
 	int num = 0;
 	byte chr;
-	if (src == NULL) {
+	if (src == nullptr) {
 		refreshScriptPointer();
 		src = _scriptPointer;
 	}
 	while ((chr = *src++) != 0) {
 		num++;
-		if (_game.heversion <= 71 && chr == 0xFF) {
+		if (_game.version == 8 && chr == 0xFF) {
+			src += 5;
+			num += 5;
+		} else if (_game.heversion <= 71 && chr == 0xFF) {
 			chr = *src++;
 			num++;
 
-			// WORKAROUND for bug #985948, a script bug in Indy3. See also
+			// WORKAROUND for bug #1675, a script bug in Indy3. See also
 			// the corresponding code in ScummEngine::convertMessageToString().
 			if (_game.id == GID_INDY3 && chr == 0x2E) {
 				continue;
 			}
 
 			if (chr != 1 && chr != 2 && chr != 3 && chr != 8) {
-				if (_game.version == 8) {
-					src += 4;
-					num += 4;
-				} else {
-					src += 2;
-					num += 2;
-				}
+				src += 2;
+				num += 2;
 			}
 		}
 	}
@@ -1522,8 +1614,16 @@ void ScummEngine::endCutscene() {
 	vm.cutSceneScript[vm.cutSceneStackPointer] = 0;
 	vm.cutScenePtr[vm.cutSceneStackPointer] = 0;
 
-	if (0 == vm.cutSceneStackPointer)
+	if (0 == vm.cutSceneStackPointer) {
+		// WORKAROUND bug #5624: Due to poor translation of the v2 script to
+		// v5 an if statement jumps in the middle of a cutscene causing a
+		// endCutscene() without a begin cutscene()
+		if (_game.id == GID_ZAK && _game.platform == Common::kPlatformFMTowns &&
+			vm.slot[_currentScript].number == 205 && _currentRoom == 185) {
+			return;
+		}
 		error("Cutscene stack underflow");
+	}
 	vm.cutSceneStackPointer--;
 
 	if (VAR(VAR_CUTSCENE_END_SCRIPT))

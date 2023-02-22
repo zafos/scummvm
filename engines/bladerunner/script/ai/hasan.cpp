@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,10 +26,11 @@ namespace BladeRunner {
 AIScriptHasan::AIScriptHasan(BladeRunnerEngine *vm) : AIScriptBase(vm) {
 	_var1 = 6;
 	_var2 = 1;
-	_var3 = 0;
+	_varNumOfTimesToHoldCurrentFrame = 0;
 	_var4 = 0;
 	_var5 = 0;
-	_var6 = 0;
+	// _varChooseIdleAnimation can have valid values: 0, 1, 2
+	_varChooseIdleAnimation = 0;
 }
 
 void AIScriptHasan::Initialize() {
@@ -41,22 +41,43 @@ void AIScriptHasan::Initialize() {
 
 	_var1 = 6;
 	_var2 = 1;
-	_var3 = 0;
+	_varNumOfTimesToHoldCurrentFrame = 0;
 	_var4 = 0;
 	_var5 = 0;
-	_var6 = 0;
+	_varChooseIdleAnimation = 0;
 
-	Actor_Put_In_Set(kActorHasan, 0);
+	Actor_Put_In_Set(kActorHasan, kSetAR01_AR02);
 	Actor_Set_At_XYZ(kActorHasan, -214.0f, 0.0f, -1379.0f, 371);
-	Actor_Set_Goal_Number(kActorHasan, 0);
+	Actor_Set_Goal_Number(kActorHasan, kGoalHasanDefault);
 }
 
 bool AIScriptHasan::Update() {
-	if (Global_Variable_Query(kVariableChapter) != 3 || Actor_Query_Goal_Number(kActorHasan) >= 300)
+	if (_vm->_cutContent) {
+		if (Global_Variable_Query(kVariableChapter) == 1
+		    && Actor_Query_Goal_Number(kActorHasan) != kGoalHasanIsAway)
+		{
+			// use this goal to put Hasan in a FreeSlot set for Act 1
+			Actor_Set_Goal_Number(kActorHasan, kGoalHasanIsAway);
+			return true;
+		} else if (Global_Variable_Query(kVariableChapter) == 2
+		           && Actor_Query_Goal_Number(kActorHasan) != kGoalHasanDefault
+		) {
+			Actor_Set_Goal_Number(kActorHasan, kGoalHasanDefault);
+			return true;
+		} else if (Global_Variable_Query(kVariableChapter) > 2
+		           && Actor_Query_Goal_Number(kActorHasan) < kGoalHasanIsWalkingAroundIsAtAR02) {
+			Actor_Set_Goal_Number(kActorHasan, kGoalHasanIsWalkingAroundIsAtAR02);
+			return true;
+		}
 		return false;
+	} else {
+		// original behavior results in Hasan going away when chapter 3 begins
+		if (Global_Variable_Query(kVariableChapter) != 3 || Actor_Query_Goal_Number(kActorHasan) >= kGoalHasanIsAway)
+			return false;
 
-	Actor_Set_Goal_Number(kActorHasan, 300);
-	return true;
+		Actor_Set_Goal_Number(kActorHasan, kGoalHasanIsAway);
+		return true;
+	}
 }
 
 void AIScriptHasan::TimerExpired(int timer) {
@@ -64,6 +85,51 @@ void AIScriptHasan::TimerExpired(int timer) {
 }
 
 void AIScriptHasan::CompletedMovementTrack() {
+	if (_vm->_cutContent) {
+		//
+		// *after Act 2* Hasan will be leaving Animoid Row for sometime
+		if (Global_Variable_Query(kVariableChapter) > 2) {
+			int maxHasanLeaveProb = 4;
+			// if Bullet Bob is dead or McCoy reprimanded Bob about Hasan,
+			// then Hasan is less likely to leave at Animoid Row, *after Act 2*
+			if (Game_Flag_Query(kFlagMcCoyTalkedToBulletBobAboutHasan)
+			    || Actor_Query_Goal_Number(kGoalBulletBobDead)
+			    || Actor_Query_Goal_Number(kGoalBulletBobGone)
+			) {
+				maxHasanLeaveProb = 10;
+			}
+
+			if (Actor_Query_Goal_Number(kActorHasan) == kGoalHasanIsWalkingAroundIsAtAR02) {
+				if (Random_Query(1, maxHasanLeaveProb) == 1
+				    && Player_Query_Current_Scene() != kSceneAR01
+					&& Player_Query_Current_Scene() != kSceneAR02
+				) {
+					// Hasan leaves Animoid Row
+					Actor_Set_Goal_Number(kActorHasan, kGoalHasanIsWalkingAroundIsAway);
+					return; // true;
+				} else {
+					// stay (change goal to a temp one to trigger GoalChanged() (so that we can reset the "track")
+					Actor_Set_Goal_Number(kActorHasan, kGoalHasanIsWalkingAroundStaysAtAR02);
+					return; // true;
+				}
+			}
+
+			if (Actor_Query_Goal_Number(kActorHasan) == kGoalHasanIsWalkingAroundIsAway) {
+				if (Random_Query(1, 2) == 1
+				    && Player_Query_Current_Scene() != kSceneAR01
+					&& Player_Query_Current_Scene() != kSceneAR02
+				) {
+					// Hasan returns tp Animoid Row
+					Actor_Set_Goal_Number(kActorHasan, kGoalHasanIsWalkingAroundIsAtAR02);
+					return; // true;
+				} else {
+					// stay away (change goal to a temp one to trigger GoalChanged() (so that we can reset the "track")
+					Actor_Set_Goal_Number(kActorHasan, kGoalHasanIsWalkingAroundStayAwayFromAR02);
+					return; // true;
+				}
+			}
+		}
+	}
 	//return false;
 }
 
@@ -75,15 +141,15 @@ void AIScriptHasan::ClickedByPlayer() {
 	//return false;
 }
 
-void AIScriptHasan::EnteredScene(int sceneId) {
+void AIScriptHasan::EnteredSet(int setId) {
 	// return false;
 }
 
-void AIScriptHasan::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptHasan::OtherAgentEnteredThisSet(int otherActorId) {
 	// return false;
 }
 
-void AIScriptHasan::OtherAgentExitedThisScene(int otherActorId) {
+void AIScriptHasan::OtherAgentExitedThisSet(int otherActorId) {
 	// return false;
 }
 
@@ -108,147 +174,184 @@ int AIScriptHasan::GetFriendlinessModifierIfGetsClue(int otherActorId, int clueI
 }
 
 bool AIScriptHasan::GoalChanged(int currentGoalNumber, int newGoalNumber) {
-	if (newGoalNumber == 300) {
-		Actor_Put_In_Set(kActorHasan, kSetFreeSlotH);
-		Actor_Set_At_Waypoint(kActorHasan, 40, 0);
+	if (_vm->_cutContent) {
+		switch (newGoalNumber) {
+		case kGoalHasanDefault:
+			Actor_Put_In_Set(kActorHasan, kSetAR01_AR02);
+			Actor_Set_At_XYZ(kActorHasan, -214.0f, 0.0f, -1379.0f, 371);
+			break;
+
+		case kGoalHasanIsAway:
+			Actor_Put_In_Set(kActorHasan, kSetFreeSlotH);
+			Actor_Set_At_Waypoint(kActorHasan, 40, 0); // kSetFreeSlotH
+			break;
+
+		case kGoalHasanIsWalkingAroundIsAtAR02:
+			AI_Movement_Track_Flush(kActorHasan);
+			World_Waypoint_Set(554, kSetAR01_AR02, -214.0f, 0.0f, -1379.0f);
+			AI_Movement_Track_Append(kActorHasan, 554, Random_Query(60, 180)); // kSetAR01_AR02
+			Actor_Face_Heading(kActorHasan, 371, false);
+			AI_Movement_Track_Repeat(kActorHasan);
+			break;
+
+		case kGoalHasanIsWalkingAroundIsAway:
+			AI_Movement_Track_Flush(kActorHasan);
+			AI_Movement_Track_Append(kActorHasan, 40, Random_Query(10, 40)); // kSetFreeSlotH
+			AI_Movement_Track_Repeat(kActorHasan);
+			break;
+
+		case kGoalHasanIsWalkingAroundStayAwayFromAR02:
+			Actor_Set_Goal_Number(kActorHasan, kGoalHasanIsWalkingAroundIsAway);
+			break;
+
+		case kGoalHasanIsWalkingAroundStaysAtAR02:
+			Actor_Set_Goal_Number(kActorHasan, kGoalHasanIsWalkingAroundIsAtAR02);
+			break;
+		}
+	} else {
+		// original behavior - Hasan leaves on Act 3
+		if (newGoalNumber == kGoalHasanIsAway) {
+			Actor_Put_In_Set(kActorHasan, kSetFreeSlotH);
+			Actor_Set_At_Waypoint(kActorHasan, 40, 0); // kSetFreeSlotH
+		}
 	}
 	return false;
 }
 
 bool AIScriptHasan::UpdateAnimation(int *animation, int *frame) {
 	if (_var4) {
-		_var4--;
+		--_var4;
 	}
 	if (_var5) {
-		_var5--;
+		--_var5;
 	}
 
 	switch (_animationState) {
 	case 0:
-		if (_var6 == 1) {
-			*animation = 922;
-			if (_var3) {
-				_var3--;
+		if (_varChooseIdleAnimation == 1) {
+			*animation = kModelAnimationHasanGestureSuggest;
+			if (_varNumOfTimesToHoldCurrentFrame > 0) {
+				--_varNumOfTimesToHoldCurrentFrame;
 			} else {
-				_animationFrame++;
-				if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(922)) {
+				++_animationFrame;
+				if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationHasanGestureSuggest)) {
 					_animationFrame = 0;
-					_var6 = 0;
-					*animation = 921;
+					_varChooseIdleAnimation = 0;
+					*animation = kModelAnimationHasanIdleSlightMovement;
 					_var1 = Random_Query(6, 14);
 					_var2 = 2 * Random_Query(0, 1) - 1;
 					_var4 = Random_Query(40, 60);
 				}
 				if (_animationFrame >= 10 && _animationFrame <= 14) {
-					_var3 = Random_Query(0, 1);
+					_varNumOfTimesToHoldCurrentFrame = Random_Query(0, 1);
 				}
 			}
-		} else if (_var6 == 2) {
-			*animation = 923;
-			if (_var3) {
-				_var3--;
+		} else if (_varChooseIdleAnimation == 2) {
+			*animation = kModelAnimationHasanTakingABiteSnakeMove;
+			if (_varNumOfTimesToHoldCurrentFrame > 0) {
+				--_varNumOfTimesToHoldCurrentFrame;
 			} else {
-				_animationFrame++;
-				if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(923)) {
+				++_animationFrame;
+				if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationHasanTakingABiteSnakeMove)) {
 					_animationFrame = 0;
-					_var6 = 0;
-					*animation = 921;
+					_varChooseIdleAnimation = 0;
+					*animation = kModelAnimationHasanIdleSlightMovement;
 					_var1 = Random_Query(6, 14);
 					_var2 = 2 * Random_Query(0, 1) - 1;
 					_var5 = Random_Query(40, 60);
 				}
 				if (_animationFrame == 14) {
-					_var3 = Random_Query(3, 10);
+					_varNumOfTimesToHoldCurrentFrame = Random_Query(3, 10);
 				}
 				if (_animationFrame == 23) {
-					_var3 = Random_Query(0, 4);
+					_varNumOfTimesToHoldCurrentFrame = Random_Query(0, 4);
 				}
 			}
-		} else if (_var6 == 0) {
-			*animation = 921;
-			if (_var3) {
-				_var3--;
+		} else if (_varChooseIdleAnimation == 0) {
+			*animation = kModelAnimationHasanIdleSlightMovement;
+			if (_varNumOfTimesToHoldCurrentFrame > 0) {
+				--_varNumOfTimesToHoldCurrentFrame;
 			} else {
 				_animationFrame += _var2;
-				if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(921)) {
+				if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationHasanIdleSlightMovement)) {
 					_animationFrame = 0;
 				}
 				if (_animationFrame < 0) {
-					_animationFrame = Slice_Animation_Query_Number_Of_Frames(921) - 1;
+					_animationFrame = Slice_Animation_Query_Number_Of_Frames(kModelAnimationHasanIdleSlightMovement) - 1;
 				}
 				if (!--_var1) {
 					_var2 = 2 * Random_Query(0, 1) - 1;
 					_var1 = Random_Query(6, 14);
-					_var3 = Random_Query(0, 4);
+					_varNumOfTimesToHoldCurrentFrame = Random_Query(0, 4);
 				}
-				if (!_animationFrame) {
-					_var6 = Random_Query(0, 2);
+				if (_animationFrame == 0) {
+					_varChooseIdleAnimation = Random_Query(0, 2);
 				}
-				if (_var6 == 1 && _var4) {
-					_var6 = 0;
+				if (_varChooseIdleAnimation == 1 && _var4) {
+					_varChooseIdleAnimation = 0;
 				}
-				if (_var6 == 2 && _var5) {
-					_var6 = 0;
+				if (_varChooseIdleAnimation == 2 && _var5) {
+					_varChooseIdleAnimation = 0;
 				}
 			}
 		}
 		break;
 
 	case 1:
-		*animation = 925;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(925)) {
+		*animation = kModelAnimationHasanTalkMovingBothHands;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationHasanTalkMovingBothHands)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 2:
-		*animation = 926;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(926)) {
+		*animation = kModelAnimationHasanTalkLeftRightLeftGesture;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationHasanTalkLeftRightLeftGesture)) {
 			_animationFrame = 0;
 			_animationState = 1;
-			*animation = 925;
+			*animation = kModelAnimationHasanTalkMovingBothHands;
 		}
 		break;
 
 	case 3:
-		*animation = 927;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(927)) {
+		*animation = kModelAnimationHasanTalkRaiseHandSnakeMove;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationHasanTalkRaiseHandSnakeMove)) {
 			_animationFrame = 0;
 			_animationState = 1;
-			*animation = 925;
+			*animation = kModelAnimationHasanTalkMovingBothHands;
 		}
 		break;
 
 	case 4:
-		*animation = 928;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(928)) {
+		*animation = kModelAnimationHasanTalkMovingBothHandsAndNod;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationHasanTalkMovingBothHandsAndNod)) {
 			_animationFrame = 0;
 			_animationState = 1;
-			*animation = 925;
+			*animation = kModelAnimationHasanTalkMovingBothHands;
 		}
 		break;
 
 	case 5:
-		*animation = 929;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(929)) {
+		*animation = kModelAnimationHasanTalkWipeFaceLeftHand02;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationHasanTalkWipeFaceLeftHand02)) {
 			_animationFrame = 0;
 			_animationState = 1;
-			*animation = 925;
+			*animation = kModelAnimationHasanTalkMovingBothHands;
 		}
 		break;
 
 	case 6:
-		*animation = 930;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(930)) {
+		*animation = kModelAnimationHasanTalkUpset;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationHasanTalkUpset)) {
 			_animationFrame = 0;
 			_animationState = 1;
-			*animation = 925;
+			*animation = kModelAnimationHasanTalkMovingBothHands;
 		}
 		break;
 
@@ -262,25 +365,29 @@ bool AIScriptHasan::UpdateAnimation(int *animation, int *frame) {
 
 bool AIScriptHasan::ChangeAnimationMode(int mode) {
 	switch (mode) {
-	case 0:
+	case kAnimationModeIdle:
 		_animationState = 0;
-		_var6 = 0;
+		_varChooseIdleAnimation = 0;
 		_animationFrame = 0;
 		break;
 
-	case 3:
+	case kAnimationModeTalk:
 		_animationState = 1;
-		_var6 = 0;
+		_varChooseIdleAnimation = 0;
 		_animationFrame = 0;
 		break;
 
 	case 12:
+		// fall through
 	case 13:
+		// fall through
 	case 14:
+		// fall through
 	case 15:
+		// fall through
 	case 16:
 		_animationState = 6;
-		_var6 = 0;
+		_varChooseIdleAnimation = 0;
 		_animationFrame = 0;
 		break;
 

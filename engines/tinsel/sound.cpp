@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * sound functionality
  */
@@ -100,7 +99,7 @@ bool SoundManager::playSample(int id, Audio::Mixer::SoundType type, Audio::Sound
 		error(FILE_IS_CORRUPT, _vm->getSampleFile(g_sampleLanguage));
 
 	// read the length of the sample
-	uint32 sampleLen = _sampleStream.readUint32LE();
+	uint32 sampleLen = _sampleStream.readUint32();
 	if (_sampleStream.eos() || _sampleStream.err())
 		error(FILE_IS_CORRUPT, _vm->getSampleFile(g_sampleLanguage));
 
@@ -115,6 +114,8 @@ bool SoundManager::playSample(int id, Audio::Mixer::SoundType type, Audio::Sound
 
 		// Play the audio stream
 		_vm->_mixer->playStream(type, &curChan.handle, xaStream);
+	} else if (TinselV1Saturn) {
+		// TODO: Sound format for the Saturn version - looks to be raw, but isn't
 	} else {
 		// allocate a buffer
 		byte *sampleBuf = (byte *)malloc(sampleLen);
@@ -301,7 +302,7 @@ bool SoundManager::playSample(int id, int sub, bool bLooped, int x, int y, int p
 	}
 
 	debugC(DEBUG_DETAILED, kTinselDebugSound, "Playing sound %d.%d, %d bytes at %d (pan %d)", id, sub, sampleLen,
-			_sampleStream.pos(), getPan(x));
+			(int)_sampleStream.pos(), getPan(x));
 
 	// allocate a buffer
 	byte *sampleBuf = (byte *) malloc(sampleLen);
@@ -373,7 +374,7 @@ bool SoundManager::offscreenChecks(int x, int &y) {
 		return true;
 
 	// convert x to offset from screen center
-	x -= PlayfieldGetCenterX(FIELD_WORLD);
+	x -= _vm->_bg->PlayfieldGetCenterX(FIELD_WORLD);
 
 	if (x < -SCREEN_WIDTH || x > SCREEN_WIDTH) {
 		// A long way offscreen, ignore it
@@ -392,7 +393,7 @@ int8 SoundManager::getPan(int x) {
 	if (x == -1)
 		return 0;
 
-	x -= PlayfieldGetCenterX(FIELD_WORLD);
+	x -= _vm->_bg->PlayfieldGetCenterX(FIELD_WORLD);
 
 	if (x == 0)
 		return 0;
@@ -436,7 +437,7 @@ bool SoundManager::sampleExists(int id) {
  * Returns true if a sample is currently playing.
  */
 bool SoundManager::sampleIsPlaying() {
-	if (!TinselV2)
+	if (TinselVersion <= 1)
 		return _vm->_mixer->isSoundHandleActive(_channels[kChannelTinsel1].handle);
 
 	for (int i = 0; i < kNumChannels; i++)
@@ -450,7 +451,7 @@ bool SoundManager::sampleIsPlaying() {
  * Stops any currently playing sample.
  */
 void SoundManager::stopAllSamples() {
-	if (!TinselV2) {
+	if (TinselVersion <= 1) {
 		_vm->_mixer->stopHandle(_channels[kChannelTinsel1].handle);
 		return;
 	}
@@ -462,7 +463,7 @@ void SoundManager::stopAllSamples() {
 void SoundManager::stopSpecSample(int id, int sub) {
 	debugC(DEBUG_DETAILED, kTinselDebugSound, "stopSpecSample(%d, %d)", id, sub);
 
-	if (!TinselV2) {
+	if (TinselVersion <= 1) {
 		if (_channels[kChannelTinsel1].sampleNum == id)
 			_vm->_mixer->stopHandle(_channels[kChannelTinsel1].handle);
 		return;
@@ -475,7 +476,7 @@ void SoundManager::stopSpecSample(int id, int sub) {
 }
 
 void SoundManager::setSFXVolumes(uint8 volume) {
-	if (!TinselV2)
+	if (TinselVersion <= 1)
 		return;
 
 	for (int i = kChannelSFX; i < kNumChannels; i++)
@@ -485,7 +486,7 @@ void SoundManager::setSFXVolumes(uint8 volume) {
 void SoundManager::showSoundError(const char *errorMsg, const char *soundFile) {
 	Common::String msg;
 	msg = Common::String::format(errorMsg, soundFile);
-	GUI::MessageDialog dialog(msg, "OK");
+	GUI::MessageDialog dialog(msg.c_str(), "OK");
 	dialog.runModal();
 
 	error("%s", msg.c_str());
@@ -496,10 +497,10 @@ void SoundManager::showSoundError(const char *errorMsg, const char *soundFile) {
  */
 void SoundManager::openSampleFiles() {
 	// V1 Floppy and V0 demo versions have no sample files
-	if (TinselV0 || (TinselV1 && !_vm->isV1CD()))
+	if ((TinselVersion == 0) || ((TinselVersion == 1) && !_vm->isV1CD()))
 		return;
 
-	TinselFile f;
+	TinselFile f(TinselV1Saturn);
 
 	if (_sampleIndex)
 		// already allocated
@@ -518,7 +519,7 @@ void SoundManager::openSampleFiles() {
 
 		// Load data
 		for (int i = 0; i < _sampleIndexLen; ++i) {
-			_sampleIndex[i] = f.readUint32LE();
+			_sampleIndex[i] = f.readUint32();
 			if (f.err()) {
 				showSoundError(FILE_READ_ERROR, _vm->getSampleIndex(g_sampleLanguage));
 			}
@@ -542,6 +543,10 @@ void SoundManager::openSampleFiles() {
 			break;
 		default:
 			debugC(DEBUG_DETAILED, kTinselDebugSound, "Detected original sound-data");
+			if (TinselVersion == 3) {
+				// And in Noir, the data is MP3
+				_soundMode = kMP3Mode;
+			}
 			break;
 		}
 

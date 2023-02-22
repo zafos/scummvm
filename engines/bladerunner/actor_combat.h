@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,10 +42,10 @@ class ActorCombat {
 	int _damage;
 	int _fleeRatio;
 	int _coverRatio;
-	int _actionRatio;
+	int _attackRatio;
 	int _fleeRatioConst;
 	int _coverRatioConst;
-	int _actionRatioConst;
+	int _attackRatioConst;
 	int _actorHp;
 	int _range;
 	bool _unstoppable;
@@ -62,11 +61,11 @@ public:
 
 	void setup();
 
-	void combatOn(int actorId, int initialState, bool rangedAttack, int enemyId, int waypointType, int fleeRatio, int coverRatio, int actionRatio, int damage, int range, bool unstoppable);
+	void combatOn(int actorId, int initialState, bool rangedAttack, int enemyId, int waypointType, int fleeRatio, int coverRatio, int attackRatio, int damage, int range, bool unstoppable);
 	void combatOff();
 
 	void tick();
-	
+
 	void hitAttempt();
 
 	void save(SaveFileWriteStream &f);
@@ -86,13 +85,13 @@ private:
 
 	void faceEnemy();
 
-	int getaggressivenessCloseAttack() const;
-	int getaggressivenessRangedAttack() const;
+	int getCoefficientCloseAttack() const;
+	int getCoefficientRangedAttack() const;
 
 	int getDamageCloseAttack(int min, int max) const;
 	int getDamageRangedAttack(int min, int max) const;
 
-	int calculateActionRatio() const;
+	int calculateAttackRatio() const;
 	int calculateCoverRatio() const;
 	int calculateFleeRatio() const;
 

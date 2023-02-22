@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -56,9 +55,9 @@ uint16 Player::_active_notes[128];
 //////////////////////////////////////////////////
 
 Player::Player() :
-	_midi(NULL),
-	_parser(NULL),
-	_parts(NULL),
+	_midi(nullptr),
+	_parser(nullptr),
+	_parts(nullptr),
 	_active(false),
 	_scanning(false),
 	_id(0),
@@ -79,16 +78,17 @@ Player::Player() :
 	_isMT32(false),
 	_isMIDI(false),
 	_supportsPercussion(false),
-	_se(0),
+	_se(nullptr),
 	_vol_chan(0),
 	_abort(false),
-	_music_tick(0) {
+	_music_tick(0),
+	_parserType(kParserTypeNone) {
 }
 
 Player::~Player() {
 	if (_parser) {
 		delete _parser;
-		_parser = 0;
+		_parser = nullptr;
 	}
 }
 
@@ -108,7 +108,7 @@ bool Player::startSound(int sound, MidiDriver *midi) {
 	_isMIDI = _se->isMIDI(sound);
 	_supportsPercussion = _se->supportsPercussion(sound);
 
-	_parts = NULL;
+	_parts = nullptr;
 	_active = true;
 	_midi = midi;
 	_id = sound;
@@ -121,7 +121,7 @@ bool Player::startSound(int sound, MidiDriver *midi) {
 
 	if (start_seq_sound(sound) != 0) {
 		_active = false;
-		_midi = NULL;
+		_midi = nullptr;
 		return false;
 	}
 
@@ -151,19 +151,19 @@ void Player::clear() {
 
 	if (_parser) {
 		_parser->unloadMusic();
-		delete _parser;
-		_parser = 0;
+		_parser->setMidiDriver(nullptr);
 	}
+
 	uninit_parts();
 	_se->ImFireAllTriggers(_id);
 	_active = false;
-	_midi = NULL;
+	_midi = nullptr;
 	_id = 0;
 	_note_offset = 0;
 }
 
 void Player::hook_clear() {
-	memset(&_hook, 0, sizeof(_hook));
+	_hook.reset();
 }
 
 int Player::start_seq_sound(int sound, bool reset_vars) {
@@ -179,19 +179,30 @@ int Player::start_seq_sound(int sound, bool reset_vars) {
 	}
 
 	ptr = _se->findStartOfSound(sound);
-	if (ptr == NULL)
+	if (ptr == nullptr)
 		return -1;
-	delete _parser;
 
 	if (!memcmp(ptr, "RO", 2)) {
 		// Old style 'RO' resource
-		_parser = MidiParser_createRO();
+		if (_parserType != kParserTypeRO) {
+			delete _parser;
+			_parser = MidiParser_createRO();
+			_parserType = kParserTypeRO;
+		}
 	} else if (!memcmp(ptr, "FORM", 4)) {
 		// Humongous Games XMIDI resource
-		_parser = MidiParser::createParser_XMIDI();
+		if (_parserType != kParserTypeXMI) {
+			delete _parser;
+			_parser = MidiParser::createParser_XMIDI();
+			_parserType = kParserTypeXMI;
+		}
 	} else {
 		// SCUMM SMF resource
-		_parser = MidiParser::createParser_SMF();
+		if (_parserType != kParserTypeSMF) {
+			delete _parser;
+			_parser = MidiParser::createParser_SMF();
+			_parserType = kParserTypeSMF;
+		}
 	}
 
 	_parser->setMidiDriver(this);
@@ -206,7 +217,7 @@ int Player::start_seq_sound(int sound, bool reset_vars) {
 }
 
 void Player::loadStartParameters(int sound) {
-	_priority = 0x80;
+	_priority = _se->_newSystem ? 0x40 : 0x80;
 	_volume = 0x7F;
 	_vol_chan = 0xFFFF;
 	_vol_eff = (_se->get_channel_volume(0xFFFF) << 7) >> 7;
@@ -262,7 +273,7 @@ void Player::send(uint32 b) {
 	switch (cmd >> 4) {
 	case 0x8: // Key Off
 		if (!_scanning) {
-			if ((part = getPart(chan)) != 0)
+			if ((part = getPart(chan)) != nullptr)
 				part->noteOff(param1);
 		} else {
 			_active_notes[param1] &= ~(1 << chan);
@@ -274,7 +285,7 @@ void Player::send(uint32 b) {
 		if (!_scanning) {
 			if (_isMT32 && !_se->isNativeMT32())
 				param2 = (((param2 * 3) >> 2) + 32) & 0x7F;
-			if ((part = getPart(chan)) != 0)
+			if ((part = getPart(chan)) != nullptr)
 				part->noteOn(param1, param2);
 		} else {
 			_active_notes[param1] |= (1 << chan);
@@ -302,10 +313,15 @@ void Player::send(uint32 b) {
 			part->pitchBendFactor(param2);
 			break;
 		case 17: // GP Slider 2
-			part->set_detune(param2 - 0x40);
+			if (_se->_newSystem)
+				part->set_polyphony(param2);
+			else
+				part->set_detune(param2 - 0x40);
 			break;
 		case 18: // GP Slider 3
-			part->set_pri(param2 - 0x40);
+			if (!_se->_newSystem)
+				param2 -= 0x40;
+			part->set_pri(param2);
 			_se->reallocateMidiChannels(_midi);
 			break;
 		case 64: // Sustain Pedal
@@ -344,7 +360,7 @@ void Player::send(uint32 b) {
 		}
 		break;
 
-	case 0xE: // Pitch Bend
+	case 0xE: // Pitch Bend (or also volume fade for Samnmax)
 		part = getPart(chan);
 		if (part)
 			part->pitchBend(((param2 << 7) | param1) - 0x2000);
@@ -375,7 +391,8 @@ void Player::sysEx(const byte *p, uint16 len) {
 	if (a != IMUSE_SYSEX_ID) {
 		if (a == ROLAND_SYSEX_ID) {
 			// Roland custom instrument definition.
-			if (_isMIDI || _isMT32) {
+			// There is at least one (pointless) attempt in INDY4 Amiga to send this, too.
+			if ((_isMIDI && _se->_soundType != MDT_AMIGA) || _isMT32) {
 				part = getPart(p[0] & 0x0F);
 				if (part) {
 					part->_instrument.roland(p - 1);
@@ -383,13 +400,10 @@ void Player::sysEx(const byte *p, uint16 len) {
 						part->_instrument.send(part->_mc);
 				}
 			}
-		} else if (a == YM2612_SYSEX_ID) {
-			// FM-TOWNS custom instrument definition
-			_midi->sysEx_customInstrument(p[0], 'EUP ', p + 1);
 		} else {
 			// SysEx manufacturer 0x97 has been spotted in the
 			// Monkey Island 2 AdLib music, so don't make this a
-			// fatal error. See bug #1481383.
+			// fatal error. See bug #2595.
 			// The Macintosh version of Monkey Island 2 simply
 			// ignores these SysEx events too.
 			if (a == 0)
@@ -407,18 +421,45 @@ void Player::sysEx(const byte *p, uint16 len) {
 
 	if (!_scanning) {
 		for (a = 0; a < len + 1 && a < 19; ++a) {
-			sprintf((char *)&buf[a * 3], " %02X", p[a]);
-		} // next for
+			snprintf((char *)&buf[a * 3], 3 * sizeof(char) + 1, " %02X", (int)p[a]);
+		}
 		if (a < len + 1) {
 			buf[a * 3] = buf[a * 3 + 1] = buf[a * 3 + 2] = '.';
 			++a;
-		} // end if
+		}
 		buf[a * 3] = '\0';
 		debugC(DEBUG_IMUSE, "[%02d] SysEx:%s", _id, buf);
 	}
 
 	if (_se->_sysex)
 		(*_se->_sysex)(this, p, len);
+}
+
+uint16 Player::sysExNoDelay(const byte *msg, uint16 length) {
+	sysEx(msg, length);
+
+	// The reason for adding this delay was the music track in the MI2 start scene (on the bridge, with Largo) when
+	// played on real hardware (in my case a Roland CM32L). The track starts with several sysex messages (mostly
+	// iMuse control messages, but also a Roland custom timbre sysex message). When played through the Munt emulator
+	// this works totally fine, but the real hardware seems to still "choke" on the sysex data, when the actual song
+	// playback has already started. This will cause a skipping of the first couple of notes, since the midi parser
+	// will not wait, but strictly enforce sync on the next time stamps.
+	// My tests with the dreamm emulator on that scene did sometimes show the same issue (although to a weaker extent),
+	// but most of the time not. So it seems to be rather a delicate and race-condition prone matter. The original
+	// parser handles the timing differently than our general purpose parser and the code execution is also expected
+	// to be much slower, so that might make all the difference here. It is really a flaw of the track. The time stamps
+	// after the sysex messages should have been made a bit more generous. 
+	// Now, I have added some delays here that I have taken from the original DOTT MT-32 driver's sysex function which
+	// are supposed to handle the situation when _scanning is enabled. For non-_scanning situations there is no delay in
+	// the original driver, since apparently is wasn't necessary.
+	// We only need to intercept actual hardware sysex messages here. So, for the iMuse control messages, we intercept
+	// just type 0, since that one leads to hardware messages. This is not a perfect solution, but it seems to work
+	// as intended.
+
+	if (_isMT32 && ((msg[0] == IMUSE_SYSEX_ID && msg[1] == 0) || msg[0] == ROLAND_SYSEX_ID))
+		return length >= 25 ? 70 : 20;
+
+	return 0;
 }
 
 void Player::decode_sysex_bytes(const byte *src, byte *dst, int len) {
@@ -555,13 +596,14 @@ int Player::setTranspose(byte relative, int b) {
 	if (b > 24 || b < -24 || relative > 1)
 		return -1;
 	if (relative)
-		b = transpose_clamp(_transpose + b, -24, 24);
+		b = transpose_clamp(_transpose + b, -7, 7);	
 
 	_transpose = b;
 
-	for (part = _parts; part; part = part->_next) {
-		part->set_transpose(part->_transpose);
-	}
+	// MI2 and INDY4 use boundaries of -12/12 for MT-32 and -24/24 for AdLib and PC Speaker, DOTT uses -12/12 for everything.
+	int lim = (_se->_game_id == GID_TENTACLE || _se->isNativeMT32()) ? 12 : 24;
+	for (part = _parts; part; part = part->_next)
+		part->set_transpose(part->_transpose, -lim, lim);
 
 	return 0;
 }
@@ -577,7 +619,10 @@ void Player::part_set_transpose(uint8 chan, byte relative, int8 b) {
 		return;
 	if (relative)
 		b = transpose_clamp(b + part->_transpose, -7, 7);
-	part->set_transpose(b);
+
+	// MI2 and INDY4 use boundaries of -12/12 for MT-32 and -24/24 for AdLib and PC Speaker, DOTT uses -12/12 for everything.
+	int lim = (_se->_game_id == GID_TENTACLE || _se->isNativeMT32()) ? 12 : 24;
+	part->set_transpose(b, -lim, lim);
 }
 
 bool Player::jump(uint track, uint beat, uint tick) {
@@ -629,7 +674,7 @@ Part *Player::getActivePart(uint8 chan) {
 			return part;
 		part = part->_next;
 	}
-	return 0;
+	return nullptr;
 }
 
 Part *Player::getPart(uint8 chan) {
@@ -640,11 +685,11 @@ Part *Player::getPart(uint8 chan) {
 	part = _se->allocate_part(_priority, _midi);
 	if (!part) {
 		debug(1, "No parts available");
-		return NULL;
+		return nullptr;
 	}
 
 	// Insert part into front of parts list
-	part->_prev = NULL;
+	part->_prev = nullptr;
 	part->_next = _parts;
 	if (_parts)
 		_parts->_prev = part;
@@ -915,7 +960,7 @@ int Player::addParameterFader(int param, int target, int time) {
 	}
 
 	ParameterFader *ptr = &_parameterFaders[0];
-	ParameterFader *best = 0;
+	ParameterFader *best = nullptr;
 	int i;
 	for (i = ARRAYSIZE(_parameterFaders); i; --i, ++ptr) {
 		if (ptr->param == param) {
@@ -1001,14 +1046,14 @@ void Player::removePart(Part *part) {
 		part->_prev->_next = part->_next;
 	else
 		_parts = part->_next;
-	part->_next = part->_prev = 0;
+	part->_next = part->_prev = nullptr;
 }
 
 void Player::fixAfterLoad() {
 	_midi = _se->getBestMidiDriver(_id);
 	if (!_midi) {
 		clear();
-	} else {
+	} else {		
 		start_seq_sound(_id, false);
 		setSpeed(_speed);
 		if (_parser)
@@ -1043,7 +1088,8 @@ static void syncWithSerializer(Common::Serializer &s, ParameterFader &pf) {
 void Player::saveLoadWithSerializer(Common::Serializer &s) {
 	if (!s.isSaving() && _parser) {
 		delete _parser;
-		_parser = 0;
+		_parser = nullptr;
+		_parserType = kParserTypeNone;
 	}
 	_music_tick = _parser ? _parser->getTick() : 0;
 
@@ -1053,7 +1099,7 @@ void Player::saveLoadWithSerializer(Common::Serializer &s) {
 		s.syncAsUint16LE(num);
 	} else {
 		s.syncAsUint16LE(num);
-		_parts = (num ? &_se->_parts[num - 1] : 0);
+		_parts = (num ? &_se->_parts[num - 1] : nullptr);
 	}
 
 	s.syncAsByte(_active, VER(8));

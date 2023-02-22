@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -95,14 +94,18 @@ void View::centerIn(View *parent) {
 }
 
 ///// CLPalette
-uint16 gIntervalLast, gIntervalFirst, gIntervalSet;
-int16 gMacintize = 0;
-color_t black_palette[256];
-color_t last_palette[256];
+static uint16 gIntervalLast, gIntervalFirst, gIntervalSet;
+static int16 gMacintize;
+static color_t last_palette[256];
 
 void CLPalette_Init() {
+	gIntervalLast = 0;
+	gIntervalFirst = 0;
+	gIntervalSet = 0;
+	gMacintize = 0;
+
 	for (int16 i = 0; i < 256; i++)
-		black_palette[i].r = black_palette[i].g = black_palette[i].b = 0;
+		last_palette[i].r = last_palette[i].g = last_palette[i].b = 0;
 }
 
 void CLPalette_SetLastPalette(color_t *palette, int16 first, int16 count) {
@@ -169,6 +172,13 @@ static uint16 newPaletteCount, newPaletteFirst;
 static color_t *pNewPalette;
 static bool useNewPalette;
 
+void CLBlitter_Init() {
+	newPaletteCount = 0;
+	newPaletteFirst = 0;
+	pNewPalette = nullptr;
+	useNewPalette = false;
+}
+
 void CLBlitter_CopyViewRect(View *view1, View *view2, Common::Rect *rect1, Common::Rect *rect2) {
 	int dy = rect2->top;
 	int w = rect1->right - rect1->left + 1;
@@ -196,7 +206,7 @@ void CLBlitter_OneBlackFlash() {
 }
 
 void CLBlitter_CopyView2ViewSimpleSize(byte *src, int16 srcw, int16 srcp, int16 srch,
-                                       byte *dst, int16 dstw, int16 dstp, int16 dsth) {
+									   byte *dst, int16 dstw, int16 dstp, int16 dsth) {
 	for (int16 y = 0; y < srch; y++) {
 		for (int16 x = 0; x < srcw; x++)
 			*dst++ = *src++;
@@ -252,8 +262,6 @@ void CLBlitter_FillScreenView(unsigned int fill) {
 }
 
 ///// events wrapper
-int _mouseButton;
-byte _keyState[256];
 
 void CryoEngine::pollEvents() {
 	g_system->delayMillis(10);
@@ -263,19 +271,12 @@ void CryoEngine::pollEvents() {
 		// Handle keypress
 		switch (event.type) {
 		case Common::EVENT_QUIT:
-		case Common::EVENT_RTL:
+		case Common::EVENT_RETURN_TO_LAUNCHER:
 			return;
 
 		case Common::EVENT_KEYDOWN:
-			// Check for debugger
-			if ((event.kbd.keycode == Common::KEYCODE_d) && (event.kbd.flags & Common::KBD_CTRL)) {
-				// Attach to the debugger
-				_debugger->attach();
-				_debugger->onFrame();
-			}
 			return;
 		case Common::EVENT_KEYUP:
-			//          _keyState[(byte)toupper(event.kbd.ascii)] = false;
 			return;
 		case Common::EVENT_LBUTTONDOWN:
 			_mouseButton = 1;
@@ -313,96 +314,6 @@ bool CryoEngine::isMouseButtonDown() {
 	return _mouseButton != 0;
 }
 
-///// CLSound
-// base sound
-
-Sound::Sound(int16 length, float rate, int16 sampleSize, int16 mode) {
-	_sndHandle = nullptr;
-	_headerLen = 0;
-	_headerOffset = 0;
-
-	_length = 0;
-	_mode = 0;
-	_volume = 0;
-
-	_maxLength = length;
-	_rate = rate;
-	_sampleSize = sampleSize;
-	_buffer = nullptr;
-	//		sndHandle = CLMemory_AllocHandle(arg1 + 100);
-	//		if(!sndHandle)
-	//			error("CLSoundRaw_New - Not enough memory");
-	//		else
-	prepareSample(mode);
-}
-
-Sound::~Sound() {
-}
-
-void CLSoundRaw_AssignBuffer(Sound *sound, void *buffer, int bufferOffs, int length) {
-	sound->_length = length;
-	char *buf = bufferOffs + (char *)buffer;
-	//	if(CLSound_GetWantsDesigned())
-	//		CLSound_Signed2NonSigned(buf, length);
-	sound->_buffer = buf;
-	//	if(sound->reversed && sound->sampleSize == 16)
-	//		ReverseBlock16(buf, length);
-}
-
-void Sound::prepareSample(int16 mode) {
-	_mode = mode;
-	_volume = 255;
-}
-
-void Sound::setWantsDesigned(int16 designed) {
-}
-
-///// CLSoundChannel
-/// sound output device that plays queue of sounds
-SoundChannel::SoundChannel(int arg1) {
-	_volumeLeft = _volumeRight = 255;
-	_numSounds = 0;
-
-	for (int16 i = 0; i < kCryoMaxChSounds; i++)
-		_sounds[i] = nullptr;
-}
-
-SoundChannel::~SoundChannel() {
-}
-
-void SoundChannel::stop() {
-	//  _vm->_mixer->stopHandle(this);
-}
-
-void SoundChannel::play(Sound *sound) {
-}
-
-int16 SoundChannel::getVolume() {
-	return (_volumeLeft + _volumeRight) / 2;
-}
-
-void SoundChannel::setVolume(int16 volume) {
-	if (volume < 0 || volume > 255)
-		return;
-
-	_volumeLeft = volume;
-	_volumeRight = volume;
-}
-
-void SoundChannel::setVolumeRight(int16 volume) {
-	if (volume < 0 || volume > 255)
-		return;
-
-	_volumeRight = volume;
-}
-
-void SoundChannel::setVolumeLeft(int16 volume) {
-	if (volume < 0 || volume > 255)
-		return;
-
-	_volumeLeft = volume;
-}
-
 ///// CLTimer
 void CLTimer_Action(void *arg) {
 	//  long& counter = *((long*)arg);
@@ -412,6 +323,8 @@ void CLTimer_Action(void *arg) {
 
 ///// CRYOLib
 void CRYOLib_ManagersInit() {
+	CLPalette_Init();
+	CLBlitter_Init();
 	g_system->getTimerManager()->installTimerProc(CLTimer_Action, 10000, nullptr, "100hz timer");
 	g_ed->_screenView->initDatas(g_ed->_screen.w, g_ed->_screen.h, g_ed->_screen.getPixels());
 }

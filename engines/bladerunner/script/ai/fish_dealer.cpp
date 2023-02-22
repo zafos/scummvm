@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,7 +24,7 @@
 namespace BladeRunner {
 
 AIScriptFishDealer::AIScriptFishDealer(BladeRunnerEngine *vm) : AIScriptBase(vm) {
-	_flag = false;
+	_resumeIdleAfterFramesetCompletesFlag = false;
 }
 
 void AIScriptFishDealer::Initialize() {
@@ -34,27 +33,50 @@ void AIScriptFishDealer::Initialize() {
 	_animationStateNext = 0;
 	_animationNext = 0;
 
-	_flag = false;
-	Actor_Put_In_Set(kActorFishDealer, 0);
+	_resumeIdleAfterFramesetCompletesFlag = false;
+	Actor_Put_In_Set(kActorFishDealer, kSetAR01_AR02);
 	Actor_Set_At_Waypoint(kActorFishDealer, 120, 424);
 	Actor_Set_Goal_Number(kActorFishDealer, 0);
 }
 
 bool AIScriptFishDealer::Update() {
-	if (Global_Variable_Query(kVariableChapter) == 5 && Actor_Query_Goal_Number(kActorFishDealer) < 400) {
+#if BLADERUNNER_ORIGINAL_BUGS
+	if (Global_Variable_Query(kVariableChapter) == 5
+	 && Actor_Query_Goal_Number(kActorFishDealer) < 400
+	) {
 		Actor_Set_Goal_Number(kActorFishDealer, 400);
-
 		return true;
-	} else if (Player_Query_Current_Scene()
-			|| Actor_Query_Goal_Number(kActorFishDealer) == 2
-			|| Actor_Query_Goal_Number(kActorFishDealer) == 1
-			|| Actor_Query_Goal_Number(kActorFishDealer) == 400) {
-		return false;
-	} else {
-		Actor_Set_Goal_Number(kActorFishDealer, 1);
 
+	} else if (Player_Query_Current_Scene() == kSceneAR01
+	        && Actor_Query_Goal_Number(kActorFishDealer) != 1
+	        && Actor_Query_Goal_Number(kActorFishDealer) != 2
+	        && Actor_Query_Goal_Number(kActorFishDealer) != 400
+	) {
+		Actor_Set_Goal_Number(kActorFishDealer, 1);
 		return true;
 	}
+	return false;
+#else
+	if (Global_Variable_Query(kVariableChapter) < 5) {
+		// prevent Fish Dealer from blinking out while McCoy is flying out from Animoid
+		if (Player_Query_Current_Scene() == kSceneAR01
+		 && Actor_Query_Goal_Number(kActorFishDealer) == 3
+		) {
+			Actor_Set_Goal_Number(kActorFishDealer, 1);
+			return true;
+		}
+	} else {
+		if (Actor_Query_Goal_Number(kActorFishDealer) < 400) {
+			Actor_Set_Goal_Number(kActorFishDealer, 400);
+		} else if (Actor_Query_In_Set(kActorFishDealer, kSetAR01_AR02)) {
+			// Remove the fish dealer from AR01 if she is still there in chapter 5,
+			// this can happen only with older save games.
+			GoalChanged(400, 400);
+		}
+		return true;
+	}
+	return false;
+#endif // BLADERUNNER_ORIGINAL_BUGS
 }
 
 void AIScriptFishDealer::TimerExpired(int timer) {
@@ -65,7 +87,7 @@ void AIScriptFishDealer::CompletedMovementTrack() {
 	if (Actor_Query_Goal_Number(kActorFishDealer) != 1)
 		return; // false
 
-	Actor_Set_Goal_Number(kActorFishDealer, 99);
+	Actor_Set_Goal_Number(kActorFishDealer, 99); // A bug?
 	Actor_Set_Goal_Number(kActorFishDealer, 1);
 
 	//return true;
@@ -79,15 +101,15 @@ void AIScriptFishDealer::ClickedByPlayer() {
 	//return false;
 }
 
-void AIScriptFishDealer::EnteredScene(int sceneId) {
+void AIScriptFishDealer::EnteredSet(int setId) {
 	// return false;
 }
 
-void AIScriptFishDealer::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptFishDealer::OtherAgentEnteredThisSet(int otherActorId) {
 	// return false;
 }
 
-void AIScriptFishDealer::OtherAgentExitedThisScene(int otherActorId) {
+void AIScriptFishDealer::OtherAgentExitedThisSet(int otherActorId) {
 	// return false;
 }
 
@@ -151,6 +173,11 @@ bool AIScriptFishDealer::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 		return true;
 
 	case 400:
+#if !BLADERUNNER_ORIGINAL_BUGS
+		// Movement truck is not reset and she might end-up showing up in AR01 after all.
+		// This will lead to a issue with CDFRAMES in chapter 5
+		AI_Movement_Track_Flush(kActorFishDealer);
+#endif
 		Actor_Put_In_Set(kActorFishDealer, kSetFreeSlotH);
 		Actor_Set_At_Waypoint(kActorFishDealer, 40, 0);
 		return true;
@@ -165,64 +192,64 @@ bool AIScriptFishDealer::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 bool AIScriptFishDealer::UpdateAnimation(int *animation, int *frame) {
 	switch (_animationState) {
 	case 0:
-		*animation = 683;
-		_animationFrame++;
+		*animation = kModelAnimationFishDealerIdle;
+		++_animationFrame;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(683))
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationFishDealerIdle))
 			_animationFrame = 0;
 
 		break;
 
 	case 1:
-		if (!_animationFrame && _flag) {
-			*animation = 683;
+		if (_animationFrame == 0 && _resumeIdleAfterFramesetCompletesFlag) {
+			*animation = kModelAnimationFishDealerIdle;
 			_animationState = 0;
-			_flag = 0;
+			_resumeIdleAfterFramesetCompletesFlag = false;
 		} else {
-			*animation = 685;
-			_animationFrame++;
+			*animation = kModelAnimationFishDealerCalmTalk;
+			++_animationFrame;
 
-			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(685))
+			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationFishDealerCalmTalk))
 				_animationFrame = 0;
 		}
 		break;
 
 	case 2:
-		*animation = 686;
-		_animationFrame++;
+		*animation = kModelAnimationFishDealerExplainTalk;
+		++_animationFrame;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(686)) {
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationFishDealerExplainTalk)) {
 			_animationFrame = 0;
 			_animationState = 2;
 		}
 		break;
 
 	case 3:
-		*animation = 687;
-		_animationFrame++;
+		*animation = kModelAnimationFishDealerNoTroubleTalk;
+		++_animationFrame;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(687)) {
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationFishDealerNoTroubleTalk)) {
 			_animationFrame = 0;
 			_animationState = 3;
 		}
 		break;
 
 	case 4:
-		*animation = 684;
-		_animationFrame++;
+		*animation = kModelAnimationFishDealerGestureGive;
+		++_animationFrame;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(684)) {
-			*animation = 683;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationFishDealerGestureGive)) {
+			*animation = kModelAnimationFishDealerIdle;
 			_animationFrame = 0;
 			_animationState = 0;
 		}
 		break;
 
 	case 5:
-		*animation = 682;
-		_animationFrame++;
+		*animation = kModelAnimationFishDealerWalking;
+		++_animationFrame;
 
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(682))
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationFishDealerWalking))
 			_animationFrame = 0;
 
 		break;
@@ -243,7 +270,7 @@ bool AIScriptFishDealer::ChangeAnimationMode(int mode) {
 			_animationState = 0;
 			_animationFrame = 0;
 		} else {
-			_flag = 1;
+			_resumeIdleAfterFramesetCompletesFlag = true;
 		}
 		break;
 
@@ -253,11 +280,17 @@ bool AIScriptFishDealer::ChangeAnimationMode(int mode) {
 		break;
 
 	case 3:
+		// fall through
 	case 14:
+		// fall through
 	case 15:
+		// fall through
 	case 16:
+		// fall through
 	case 17:
+		// fall through
 	case 18:
+		// fall through
 	case 19:
 		_animationState = Random_Query(0, 2) + 1;
 		_animationFrame = 0;

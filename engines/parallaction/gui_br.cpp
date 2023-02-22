@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,7 +46,7 @@ public:
 			_timeOut(0), _startTime(0), _fadeSteps(0) {
 	}
 
-	virtual MenuInputState* run() {
+	MenuInputState* run() override {
 		if (_fadeSteps > 0) {
 			pal.fadeTo(blackPal, 1);
 			_vm->_gfx->setPalette(pal);
@@ -67,7 +66,7 @@ public:
 		return this;
 	}
 
-	virtual void enter() {
+	void enter() override {
 		_vm->_gfx->clearScreen();
 		_vm->showSlide(_slideName.c_str(), CENTER_LABEL_HORIZONTAL, CENTER_LABEL_VERTICAL);
 		_vm->_input->setMouseState(MOUSE_DISABLED);
@@ -117,8 +116,8 @@ class MainMenuInputState_BR : public MenuInputState {
 		// one is in normal color, the other is inverted.
 		// the two 'frames' are used to display selected/unselected menu items
 
-		byte *data = new byte[MENUITEM_WIDTH * MENUITEM_HEIGHT * 2];
-		memset(data, 0, MENUITEM_WIDTH * MENUITEM_HEIGHT * 2);
+		Graphics::Surface *surf = new Graphics::Surface();
+		surf->create(MENUITEM_WIDTH, MENUITEM_HEIGHT * 2, Graphics::PixelFormat::createFormatCLUT8());
 
 		// build first frame to be displayed when item is not selected
 		if (_vm->getPlatform() == Common::kPlatformDOS) {
@@ -126,20 +125,18 @@ class MainMenuInputState_BR : public MenuInputState {
 		} else {
 			_vm->_menuFont->setColor(23);
 		}
-		byte *dst = data + 5 + 2 * MENUITEM_WIDTH;
-		_vm->_menuFont->drawString(dst, MENUITEM_WIDTH, text);
+		_vm->_menuFont->drawString(surf, 5, 2, text);
 
 		// build second frame to be displayed when item is selected
-		dst = dst + MENUITEM_WIDTH * MENUITEM_HEIGHT;
-		_vm->_menuFont->drawString(dst, MENUITEM_WIDTH, text);
+		_vm->_menuFont->drawString(surf, 5, 2 + MENUITEM_HEIGHT, text);
 
-		dst = data + MENUITEM_WIDTH * MENUITEM_HEIGHT;
+		byte *dst = (byte *)surf->getPixels() + MENUITEM_WIDTH * MENUITEM_HEIGHT;
 		for (int i = 0; i < MENUITEM_WIDTH * MENUITEM_HEIGHT; i++) {
 			*dst++ ^= 0xD;
 		}
 
 		// wrap the surface into the suitable Frames adapter
-		return new Cnv(2, MENUITEM_WIDTH, MENUITEM_HEIGHT, data, true);
+		return new Cnv(2, MENUITEM_WIDTH, MENUITEM_HEIGHT, surf);
 	}
 
 	enum MenuOptions {
@@ -173,7 +170,7 @@ class MainMenuInputState_BR : public MenuInputState {
 
 		for (int i = 0; i < _availItems; i++) {
 			delete _lines[i];
-			_lines[i] = 0;
+			_lines[i] = nullptr;
 		}
 	}
 
@@ -198,17 +195,17 @@ public:
 	MainMenuInputState_BR(Parallaction_br *vm, MenuInputHelper *helper) : MenuInputState("mainmenu", helper), _vm(vm)  {
 	    memset(_lines, 0, sizeof(_lines));
 
-		_menuStrings = 0;
-		_options = 0;
+		_menuStrings = nullptr;
+		_options = nullptr;
 		_availItems = 0;
 		_selection = 0;
 	}
 
-	~MainMenuInputState_BR() {
+	~MainMenuInputState_BR() override {
 		cleanup();
 	}
 
-	virtual MenuInputState* run() {
+	MenuInputState* run() override {
 		int event = _vm->_input->getLastButtonEvent();
 		if (!((event == kMouseLeftUp) && _selection >= 0)) {
 			redrawMenu();
@@ -238,10 +235,10 @@ public:
 		_vm->_system->showMouse(false);
 		cleanup();
 
-		return 0;
+		return nullptr;
 	}
 
-	virtual void enter() {
+	void enter() override {
 		_vm->_gfx->clearScreen();
 		int x = 0, y = 0, i = 0;
 		if (_vm->getPlatform() == Common::kPlatformDOS) {
@@ -388,13 +385,13 @@ public:
 		_sfxStatus = _mscStatus = 0;
 	}
 
-	~IngameMenuInputState_BR() {
+	~IngameMenuInputState_BR() override {
 		delete _menuObj;
 		delete _mscMenuObj;
 		delete _sfxMenuObj;
 	}
 
-	MenuInputState *run() {
+	MenuInputState *run() override {
 		if (_vm->_input->getLastButtonEvent() != kMouseLeftUp) {
 			return this;
 		}
@@ -443,18 +440,21 @@ public:
 
 		case 5:	// quit
 			return _helper->getState("quitdialog");
+
+		default:
+			break;
 		}
 
 		if (close) {
 			_vm->_gfx->freeDialogueObjects();
-			return 0;
+			return nullptr;
 		}
 
 		_vm->_input->setArrowCursor();
 		return this;
 	}
 
-	void enter() {
+	void enter() override {
 		// TODO: find the right position of the menu object
 		_menuObjId = _vm->_gfx->setItem(_menuObj, 0, 0, 0);
 		_vm->_gfx->setItemFrame(_menuObjId, 0);
@@ -497,20 +497,20 @@ public:
 		_font->setColor(0);
 		int x = (w - questionW)/2;
 		int y = 13;
-		_font->drawString((byte *)surf->getBasePtr(x, y), surf->pitch, question);
+		_font->drawString(surf, x, y, question);
 		x = (w - optionW)/2;
 		y = 13 + _font->height()*2;
-		_font->drawString((byte *)surf->getBasePtr(x,y), surf->pitch, option);
+		_font->drawString(surf, x, y, option);
 
 		_obj = new GfxObj(kGfxObjTypeMenu, new SurfaceToFrames(surf), "quitdialog");
 		assert(_obj);
 	}
 
-	~QuitDialogInputState_BR() {
+	~QuitDialogInputState_BR() override {
 		delete _obj;
 	}
 
-	MenuInputState *run() {
+	MenuInputState *run() override {
 		uint16 key;
 		bool e = _vm->_input->getLastKeyDown(key);
 		if (!e) {
@@ -519,7 +519,7 @@ public:
 
 		if (key == 'y' || key == 'Y') {
 			_vm->quitGame();
-			return 0;
+			return nullptr;
 		} else
 		if (key == 'n' || key == 'N') {
 			// NOTE: when the quit dialog is hidden, the in-game menu is
@@ -534,7 +534,7 @@ public:
 	}
 
 
-	void enter() {
+	void enter() override {
 	//	setPaletteEntry(1, 0, 0, 0);	// text color
 	//	setPaletteEntry(15, 255, 255, 255);	// background color
 		int id = _vm->_gfx->setItem(_obj, _x, _y, 0);

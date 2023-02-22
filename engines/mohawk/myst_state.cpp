@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,6 +23,7 @@
 #include "mohawk/myst.h"
 #include "mohawk/myst_state.h"
 
+#include "common/config-manager.h"
 #include "common/debug.h"
 #include "common/serializer.h"
 #include "common/system.h"
@@ -65,7 +65,14 @@ bool MystSaveMetadata::sync(Common::Serializer &s) {
 
 const int MystGameState::kAutoSaveSlot = 0;
 
-MystGameState::MystGameState(MohawkEngine_Myst *vm, Common::SaveFileManager *saveFileMan) : _vm(vm), _saveFileMan(saveFileMan) {
+MystGameState::MystGameState(MohawkEngine_Myst *vm, Common::SaveFileManager *saveFileMan) :
+		_vm(vm),
+		_saveFileMan(saveFileMan) {
+
+	reset();
+}
+
+void MystGameState::reset() {
 	// Most of the variables are zero at game start.
 	memset(&_globals, 0, sizeof(_globals));
 	memset(&_myst, 0, sizeof(_myst));
@@ -184,14 +191,14 @@ void MystGameState::loadMetadata(int slot) {
 	delete metadataFile;
 }
 
-bool MystGameState::save(int slot, const Common::String &desc, bool autoSave) {
+bool MystGameState::save(int slot, const Common::String &desc, const Graphics::Surface *thumbnail, bool autoSave) {
 	if (!saveState(slot)) {
 		return false;
 	}
 
 	updateMetadateForSaving(desc, autoSave);
 
-	return saveMetadata(slot);
+	return saveMetadata(slot, thumbnail);
 }
 
 bool MystGameState::saveState(int slot) {
@@ -205,7 +212,7 @@ bool MystGameState::saveState(int slot) {
 	debugC(kDebugSaveLoad, "Saving game to '%s'", filename.c_str());
 
 	Common::Serializer s(nullptr, saveFile);
-	syncGameState(s, _vm->getFeatures() & GF_ME);
+	syncGameState(s, _vm->isGameVariant(GF_ME));
 	saveFile->finalize();
 	delete saveFile;
 
@@ -234,7 +241,7 @@ void MystGameState::updateMetadateForSaving(const Common::String &desc, bool aut
 	_metadata.autoSave = autoSave;
 }
 
-bool MystGameState::saveMetadata(int slot) {
+bool MystGameState::saveMetadata(int slot, const Graphics::Surface *thumbnail) {
 	// Write the metadata to a separate file so that the save files
 	// are still compatible with the original engine
 	Common::String metadataFilename = buildMetadataFilename(slot);
@@ -248,7 +255,11 @@ bool MystGameState::saveMetadata(int slot) {
 	_metadata.sync(m);
 
 	// Append a thumbnail
-	Graphics::saveThumbnail(*metadataFile);
+	if (thumbnail) {
+		Graphics::saveThumbnail(*metadataFile, *thumbnail);
+	} else {
+		Graphics::saveThumbnail(*metadataFile);
+	}
 
 	metadataFile->finalize();
 	delete metadataFile;
@@ -256,34 +267,21 @@ bool MystGameState::saveMetadata(int slot) {
 	return true;
 }
 
-bool MystGameState::isAutoSaveAllowed() {
-	// Open autosave slot and see if it an autosave
-	// Autosaving will be enabled if it is an autosave or if there is no save in that slot
-	Common::String filename = buildMetadataFilename(kAutoSaveSlot);
-	Common::ScopedPtr<Common::InSaveFile> metadataFile(g_system->getSavefileManager()->openForLoading(filename));
-	if (!metadataFile) { // There is no save in the autosave slot, enable autosave
-		return true;
+SaveStateDescriptor MystGameState::querySaveMetaInfos(const MetaEngine *metaEngine, int slot) {
+	SaveStateDescriptor desc(metaEngine, slot, Common::U32String());
+
+	// Open the save file
+	Common::String filename = buildSaveFilename(slot);
+	Common::InSaveFile *saveFile = g_system->getSavefileManager()->openForLoading(filename);
+	if (!saveFile) {
+		return desc;
 	}
+	delete saveFile;
 
-	Common::Serializer m(metadataFile.get(), nullptr);
-
-	// Read the metadata file
-	Mohawk::MystSaveMetadata metadata;
-	if (!metadata.sync(m)) { // the save in the autosave slot is corrupted, enable autosave
-		return true;
-	}
-
-	return metadata.autoSave;
-}
-
-SaveStateDescriptor MystGameState::querySaveMetaInfos(int slot) {
+	// There is a save in the slot
 	// Open the metadata file
-	Common::String filename = buildMetadataFilename(slot);
+	filename = buildMetadataFilename(slot);
 	Common::InSaveFile *metadataFile = g_system->getSavefileManager()->openForLoading(filename);
-
-	SaveStateDescriptor desc;
-	desc.setWriteProtectedFlag(slot == kAutoSaveSlot);
-
 	if (!metadataFile) {
 		return desc;
 	}
@@ -302,7 +300,9 @@ SaveStateDescriptor MystGameState::querySaveMetaInfos(int slot) {
 	desc.setSaveDate(metadata.saveYear, metadata.saveMonth, metadata.saveDay);
 	desc.setSaveTime(metadata.saveHour, metadata.saveMinute);
 	desc.setPlayTime(metadata.totalPlayTime);
-	desc.setDeletableFlag(slot != kAutoSaveSlot);
+	desc.setAutosave(metadata.autoSave);
+	if (metadata.autoSave) // Allow non-saves to be deleted, but not autosaves
+		desc.setDeletableFlag(slot != kAutoSaveSlot);
 
 	Graphics::Surface *thumbnail;
 	if (!Graphics::loadThumbnail(*metadataFile, thumbnail)) {
@@ -524,11 +524,11 @@ void MystGameState::deleteSave(int slot) {
 	g_system->getSavefileManager()->removeSavefile(metadataFilename);
 }
 
-void MystGameState::addZipDest(uint16 stack, uint16 view) {
+void MystGameState::addZipDest(MystStack stack, uint16 view) {
 	ZipDests *zipDests = nullptr;
 
 	// The demo has no zip dest storage
-	if (_vm->getFeatures() & GF_DEMO)
+	if (_vm->isGameVariant(GF_DEMO))
 		return;
 
 	// Select stack
@@ -568,13 +568,13 @@ void MystGameState::addZipDest(uint16 stack, uint16 view) {
 		(*zipDests)[firstEmpty] = view;
 }
 
-bool MystGameState::isReachableZipDest(uint16 stack, uint16 view) {
+bool MystGameState::isReachableZipDest(MystStack stack, uint16 view) {
 	// Zip mode enabled
-	if (!_globals.zipMode)
+	if (!ConfMan.getBool("zip_mode"))
 		return false;
 
 	// The demo has no zip dest storage
-	if (_vm->getFeatures() & GF_DEMO)
+	if (_vm->isGameVariant(GF_DEMO))
 		return false;
 
 	// Select stack

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,6 +26,7 @@
 #include "mohawk/riven_scripts.h"
 #include "mohawk/riven_sound.h"
 #include "mohawk/riven_stack.h"
+#include "mohawk/riven_stacks/aspit.h"
 #include "mohawk/riven_video.h"
 #include "common/memstream.h"
 
@@ -167,7 +167,7 @@ RivenScriptPtr RivenScriptManager::createScriptFromData(uint commandCount, ...) 
 		uint16 argumentCount = va_arg(args, int);
 		writeStream.writeUint16BE(argumentCount);
 
-		for (uint j = 0; j < commandCount; j++) {
+		for (uint j = 0; j < argumentCount; j++) {
 			uint16 argument = va_arg(args, int);
 			writeStream.writeUint16BE(argument);
 		}
@@ -312,7 +312,7 @@ void RivenScript::applyCardPatches(MohawkEngine_Riven *vm, uint32 cardGlobalId, 
 	// switchCard(534);
 	// playSound(112, 256, 0);
 	if (cardGlobalId == 0x2E900 && scriptType == kMouseDownScript && hotspotId == 3
-			&& !(vm->getFeatures() & GF_DVD)) {
+			&& !vm->isGameVariant(GF_DVD)) {
 		shouldApplyPatches = true;
 		RivenSimpleCommand::ArgumentArray arguments;
 		arguments.push_back(112);
@@ -324,7 +324,7 @@ void RivenScript::applyCardPatches(MohawkEngine_Riven *vm, uint32 cardGlobalId, 
 
 	// Second part of the patch to fix the invalid card change when entering Gehn's office
 	// The first part is in the card patches.
-	if (cardGlobalId == 0x2E76 && scriptType == kCardUpdateScript && !(vm->getFeatures() & GF_DVD)) {
+	if (cardGlobalId == 0x2E76 && scriptType == kCardUpdateScript && !vm->isGameVariant(GF_DVD)) {
 		shouldApplyPatches = true;
 
 		for (uint i = 0; i < _commands.size(); i++) {
@@ -361,6 +361,20 @@ void RivenScript::applyCardPatches(MohawkEngine_Riven *vm, uint32 cardGlobalId, 
 		}
 
 		debugC(kRivenDebugPatches, "Applied incorrect steam sounds (1/2) to card %x", cardGlobalId);
+	}
+
+	// Override the main menu new game script to call an external command.
+	// This way we can reset all the state when starting a new game while a game is already started.
+	if (cardGlobalId == 0xE2E && scriptType == kMouseDownScript && hotspotId == 16
+			&& vm->isGameVariant(GF_25TH)) {
+		shouldApplyPatches = true;
+		_commands.clear();
+
+		RivenSimpleCommand::ArgumentArray arguments;
+		arguments.push_back(RivenStacks::ASpit::kExternalNewGame);
+		arguments.push_back(0);
+		_commands.push_back(RivenCommandPtr(new RivenSimpleCommand(vm, kRivenCommandRunExternal, arguments)));
+		debugC(kRivenDebugPatches, "Applied override new game script patch to card %x", cardGlobalId);
 	}
 
 	if (shouldApplyPatches) {
@@ -903,11 +917,13 @@ void RivenSwitchCommand::applyCardPatches(uint32 globalId, int scriptType, uint1
 	}
 }
 
-RivenStackChangeCommand::RivenStackChangeCommand(MohawkEngine_Riven *vm, uint16 stackId, uint32 globalCardId, bool byStackId) :
+RivenStackChangeCommand::RivenStackChangeCommand(MohawkEngine_Riven *vm, uint16 stackId, uint32 globalCardId,
+												 bool byStackId, bool byStackCardId) :
 		RivenCommand(vm),
 		_stackId(stackId),
 		_cardId(globalCardId),
-		_byStackId(byStackId) {
+		_byStackId(byStackId),
+		_byStackCardId(byStackCardId) {
 
 }
 
@@ -920,7 +936,7 @@ RivenStackChangeCommand *RivenStackChangeCommand::createFromStream(MohawkEngine_
 	uint16 stackId = stream->readUint16BE();
 	uint32 globalCardId = stream->readUint32BE();
 
-	return new RivenStackChangeCommand(vm, stackId, globalCardId, false);
+	return new RivenStackChangeCommand(vm, stackId, globalCardId, false, false);
 }
 
 void RivenStackChangeCommand::execute() {
@@ -939,7 +955,14 @@ void RivenStackChangeCommand::execute() {
 	}
 
 	_vm->changeToStack(stackID);
-	uint16 cardID = _vm->getStack()->getCardStackId(_cardId);
+
+	uint16 cardID;
+	if (_byStackCardId) {
+		cardID = _cardId;
+	} else {
+		cardID = _vm->getStack()->getCardStackId(_cardId);
+	}
+
 	_vm->changeToCard(cardID);
 }
 

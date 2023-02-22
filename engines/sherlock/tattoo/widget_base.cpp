@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -125,11 +124,11 @@ void WidgetBase::drawBackground() {
 	TattooUserInterface &ui = *(TattooUserInterface *)_vm->_ui;
 
 	Common::Rect bounds = _bounds;
+	bounds.grow(-3);
 
 	if (vm._transparentMenus) {
 		ui.makeBGArea(bounds);
 	} else {
-		bounds.grow(-3);
 		screen._backBuffer1.fillRect(bounds, MENU_BACKGROUND);
 	}
 }
@@ -137,32 +136,94 @@ void WidgetBase::drawBackground() {
 Common::String WidgetBase::splitLines(const Common::String &str, Common::StringArray &lines, int maxWidth, uint maxLines) {
 	Talk &talk = *_vm->_talk;
 	const char *strP = str.c_str();
+	bool isModifiedEucCn = Fonts::isModifiedEucCn();
+
+	bool isInEucEscape = false;
 
 	// Loop counting up lines
 	lines.clear();
 	do {
 		int width = 0;
 		const char *spaceP = nullptr;
+		bool spacePNeedsEndEscape = false;
+		bool spacePNeedsBeginEscape = false;
 		const char *lineStartP = strP;
+		// Invariant: lastCharP is either nullptr
+		// or is exactly one character behind strP
+		// and in the same escape state.
+		const char *lastCharP = nullptr;
+		bool isLineStartPInEucEscape = isInEucEscape;
 
 		// Find how many characters will fit on the next line
 		while (width < maxWidth && *strP && ((byte)*strP < talk._opcodes[OP_SWITCH_SPEAKER] ||
 				(byte)*strP == talk._opcodes[OP_NULL])) {
+			if (isModifiedEucCn) {
+				byte curChar = *strP;
+				byte nextChar = strP[1];
+				if (!isInEucEscape && curChar == '@' && nextChar == '$') {
+					width += _surface.charWidth(' ');
+					if (lineStartP != strP) {
+						spaceP = strP;
+						spacePNeedsEndEscape = isInEucEscape;
+						spacePNeedsBeginEscape = true;
+					}
+					lastCharP = nullptr;
+					strP += 2;
+					isInEucEscape = true;
+					continue;
+				}
+				
+				if (isInEucEscape && curChar == '$' && nextChar == '@') {
+					width += _surface.charWidth(' ');
+					spaceP = strP;
+					lastCharP = nullptr;
+					strP += 2;
+					spacePNeedsEndEscape = isInEucEscape;
+					spacePNeedsBeginEscape = false;
+					isInEucEscape = false;
+					continue;
+				}
+
+				if (curChar >= 0x41 && nextChar >= 0x41 && (isInEucEscape || ((curChar >= 0xa1) && (nextChar >= 0xa1)))) {
+					width += Fonts::kChineseWidth;
+					lastCharP = strP;
+					strP += 2;
+					continue;
+				}
+			}
 			width += _surface.charWidth(*strP);
 
 			// Keep track of the last space
-			if (*strP == ' ')
+			if (*strP == ' ') {
+				spacePNeedsEndEscape = isInEucEscape;
+				spacePNeedsBeginEscape = isInEucEscape;
 				spaceP = strP;
+			}
+			lastCharP = strP;
 			++strP;
 		}
 
+		bool previousEucEscape = isInEucEscape;
+
 		// If the line was too wide to fit on a single line, go back to the last space
 		// if there was one, or otherwise simply break the line at this point
-		if (width >= maxWidth && spaceP != nullptr)
+		if (width >= maxWidth && spaceP != nullptr) {
+			previousEucEscape = spacePNeedsEndEscape;
+			isInEucEscape = spacePNeedsBeginEscape;
 			strP = spaceP;
+		} else if (width >= maxWidth && lastCharP != nullptr && lastCharP != lineStartP) {
+			strP = lastCharP;
+		}
+
+		Common::String line(lineStartP, strP);
+		if (!line.hasPrefix("@$") && isLineStartPInEucEscape)
+			line = "@$" + line;
+
+		if (!line.hasSuffix("$@") && previousEucEscape)
+			line = line + "$@";		
 
 		// Add the line to the output array
-		lines.push_back(Common::String(lineStartP, strP));
+		lines.push_back(line);
 
 		// Move the string ahead to the next line
 		if (*strP == ' ' || *strP == 13)
@@ -195,7 +256,7 @@ void WidgetBase::makeInfoArea(Surface &s) {
 	s.SHtransBlitFrom(images[0], Common::Point(0, 0));
 	s.SHtransBlitFrom(images[1], Common::Point(s.width() - images[1]._width, 0));
 	s.SHtransBlitFrom(images[2], Common::Point(0, s.height() - images[2]._height));
-	s.SHtransBlitFrom(images[3], Common::Point(s.width() - images[3]._width, s.height()));
+	s.SHtransBlitFrom(images[3], Common::Point(s.width() - images[3]._width, s.height() - images[3]._height));
 
 	// Draw the top of the Info Box
 	s.hLine(images[0]._width, 0, s.width() - images[1]._width, INFO_TOP);
@@ -269,7 +330,7 @@ void WidgetBase::drawScrollBar(int index, int pageSize, int count) {
 	int barY = (count <= pageSize) ? r.top + BUTTON_SIZE : r.top + BUTTON_SIZE +
 		(r.height() - BUTTON_SIZE * 2 - barHeight) * index / (count - pageSize);
 
-	_surface.fillRect(Common::Rect(r.left + 2, barY + 2, r.right - 2, barY + barHeight - 3), INFO_MIDDLE);
+	_surface.fillRect(Common::Rect(r.left + 2, barY + 2, r.right - 2, barY + barHeight - 2), INFO_MIDDLE);
 	ui.drawDialogRect(_surface, Common::Rect(r.left, barY, r.right, barY + barHeight), true);
 }
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,7 +25,7 @@
 /* VM and kernel declarations */
 
 #include "sci/engine/vm_types.h"	// for reg_t
-#include "sci/resource.h"	// for SciVersion
+#include "sci/resource/resource.h"	// for SciVersion
 
 #include "common/util.h"
 
@@ -83,7 +82,7 @@ struct ExecStack {
 
 	union {
 		ObjVarRef varp; // Variable pointer for r/w access
-		reg32_t pc;       // Pointer to the initial program counter. Not accurate for the TOS element
+		reg_t pc;       // Pointer to the initial program counter. Not accurate for the TOS element
 	} addr;
 
 	StackPtr fp; // Frame pointer
@@ -91,6 +90,8 @@ struct ExecStack {
 
 	int argc;
 	StackPtr variables_argp; // Argument pointer
+
+	int tempCount;           // Number of temp variables allocated by link opcode
 
 	SegmentId local_segment; // local variables etc
 
@@ -105,7 +106,7 @@ struct ExecStack {
 	reg_t* getVarPointer(SegManager *segMan) const;
 
 	ExecStack(reg_t objp_, reg_t sendp_, StackPtr sp_, int argc_, StackPtr argp_,
-				SegmentId localsSegment_, reg32_t pc_, Selector debugSelector_,
+				SegmentId localsSegment_, reg_t pc_, Selector debugSelector_,
 				int debugKernelFunction_, int debugKernelSubFunction_,
 				int debugExportId_, int debugLocalCallOffset_, int debugOrigin_,
 				ExecStackType type_) {
@@ -116,6 +117,7 @@ struct ExecStack {
 		fp = sp = sp_;
 		argc = argc_;
 		variables_argp = argp_;
+		tempCount = 0;
 		if (localsSegment_ != kUninitializedSegment)
 			local_segment = localsSegment_;
 		else
@@ -149,8 +151,11 @@ enum GlobalVar {
 	kGlobalVarPreviousRoomNo = 12,
 	kGlobalVarNewRoomNo      = 13,
 	kGlobalVarScore          = 15,
+	kGlobalVarVersionNew     = 27, // version string or object in later games
+	kGlobalVarVersionOld     = 28, // version string in earlier games
 	kGlobalVarGK2MusicVolume = 76, // 0 to 127
 	kGlobalVarPhant2SecondaryVolume = 76, // 0 to 127
+	kGlobalVarUser                 = 80,
 	kGlobalVarFastCast             = 84, // SCI16
 	kGlobalVarMessageType          = 90,
 	kGlobalVarTextSpeed            = 94, // SCI32; 0 is fastest, 8 is slowest
@@ -158,11 +163,12 @@ enum GlobalVar {
 	kGlobalVarGK1Music2            = 103, // 0 to 127
 	kGlobalVarRamaCatalogFile      = 130,
 	kGlobalVarLSL6HiresGameFlags   = 137,
+	kGlobalVarKQ7UpscaleVideos     = 160,
 	kGlobalVarGK1NarratorMode      = 166, // 0 for text, 1 for speech
 	kGlobalVarRamaMusicVolume      = 176, // 0 to 16
 	kGlobalVarPhant1MusicVolume    = 187, // 0 to 15
 	kGlobalVarPhant1DACVolume      = 188, // 0 to 127
-	kGlobalVarLSL6HiresMusicVolume = 194, // 0 to 13
+	kGlobalVarLSL6MusicVolume      = 194, // 0 to 13
 	kGlobalVarGK1DAC1              = 207, // 0 to 127
 	kGlobalVarPhant2CensorshipFlag = 207,
 	kGlobalVarGK1DAC2              = 208, // 0 to 127
@@ -176,7 +182,9 @@ enum GlobalVar {
 	// a master volume that affects both music *and* sound effects
 	kGlobalVarPhant2MasterVolume   = 236, // 0 to 127
 	kGlobalVarPhant2ControlPanel   = 250,
-	kGlobalVarShivers1Score        = 349
+	kGlobalVarShivers1Score        = 349,
+	kGlobalVarQFG4Flags            = 500,
+	kGlobalVarHoyle5MusicVolume    = 897
 };
 
 /** Number of kernel calls in between gcs; should be < 50000 */

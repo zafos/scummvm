@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -80,13 +79,13 @@ protected:
 class PlayerGnap : public Character {
 public:
 	PlayerGnap(GnapEngine *vm);
-	virtual int getSequenceId(int kind, Common::Point gridPos);
-	virtual void initPos(int gridX, int gridY, Facing facing);
-	virtual void playSequence(int sequenceId);
-	virtual void updateIdleSequence();
-	virtual void updateIdleSequence2();
-	virtual int getWalkSequenceId(int deltaX, int deltaY);
-	virtual bool walkTo(Common::Point gridPos, int animationIndex, int sequenceId, int flags);
+	int getSequenceId(int kind, Common::Point gridPos) override;
+	void initPos(int gridX, int gridY, Facing facing) override;
+	void playSequence(int sequenceId) override;
+	void updateIdleSequence() override;
+	void updateIdleSequence2() override;
+	int getWalkSequenceId(int deltaX, int deltaY) override;
+	bool walkTo(Common::Point gridPos, int animationIndex, int sequenceId, int flags) override;
 
 	void actionIdle(int sequenceId);
 	bool doPlatypusAction(int gridX, int gridY, int platSequenceId, int callback);
@@ -124,14 +123,14 @@ private:
 class PlayerPlat : public Character {
 public:
 	PlayerPlat(GnapEngine *vm);
-	virtual ~PlayerPlat() {}
-	virtual int getSequenceId(int kind = 0, Common::Point gridPos = Common::Point(0, 0));
-	virtual void initPos(int gridX, int gridY, Facing facing);
-	virtual void playSequence(int sequenceId);
-	virtual void updateIdleSequence();
-	virtual void updateIdleSequence2();
-	virtual int getWalkSequenceId(int deltaX, int deltaY);
-	virtual bool walkTo(Common::Point gridPos, int animationIndex, int sequenceId, int flags);
+	~PlayerPlat() override {}
+	int getSequenceId(int kind = 0, Common::Point gridPos = Common::Point(0, 0)) override;
+	void initPos(int gridX, int gridY, Facing facing) override;
+	void playSequence(int sequenceId) override;
+	void updateIdleSequence() override;
+	void updateIdleSequence2() override;
+	int getWalkSequenceId(int deltaX, int deltaY) override;
+	bool walkTo(Common::Point gridPos, int animationIndex, int sequenceId, int flags) override;
 
 	void makeRoom();
 

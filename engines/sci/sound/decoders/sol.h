@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -64,13 +63,13 @@ private:
 	 */
 	Audio::Timestamp _length;
 
-	virtual bool seek(const Audio::Timestamp &where) override;
-	virtual Audio::Timestamp getLength() const override;
-	virtual int readBuffer(int16 *buffer, const int numSamples) override;
-	virtual bool isStereo() const override;
-	virtual int getRate() const override;
-	virtual bool endOfData() const override;
-	virtual bool rewind() override;
+	bool seek(const Audio::Timestamp &where) override;
+	Audio::Timestamp getLength() const override;
+	int readBuffer(int16 *buffer, const int numSamples) override;
+	bool isStereo() const override;
+	int getRate() const override;
+	bool endOfData() const override;
+	bool rewind() override;
 
 public:
 	SOLStream(Common::SeekableReadStream *stream, const DisposeAfterUse::Flag disposeAfterUse, const uint16 sampleRate, const int32 rawDataSize);

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -157,8 +156,8 @@ private:
 	void centerMansionView();
 protected:
 	// Engine APIs
-	virtual Common::Error run();
-	virtual bool hasFeature(EngineFeature f) const;
+	Common::Error run() override;
+	bool hasFeature(EngineFeature f) const override;
 public:
 	BoltFile *_bVoy;
 	Debugger *_debugger;
@@ -195,7 +194,7 @@ public:
 	int _loadGameSlot;
 public:
 	VoyeurEngine(OSystem *syst, const VoyeurGameDescription *gameDesc);
-	virtual ~VoyeurEngine();
+	~VoyeurEngine() override;
 	void GUIError(const Common::String &msg);
 
 	uint32 getFeatures() const;
@@ -205,11 +204,10 @@ public:
 	bool getIsDemo() const;
 
 	int getRandomNumber(int maxNumber);
-	Common::String generateSaveName(int slotNumber);
-	virtual bool canLoadGameStateCurrently();
-	virtual bool canSaveGameStateCurrently();
-	virtual Common::Error loadGameState(int slot);
-	virtual Common::Error saveGameState(int slot, const Common::String &desc);
+	bool canLoadGameStateCurrently() override;
+	bool canSaveGameStateCurrently() override;
+	Common::Error loadGameState(int slot) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
 	void loadGame(int slot);
 
 	void playRL2Video(const Common::String &filename);
@@ -232,10 +230,6 @@ public:
 	 */
 	void playAudio(int audioId);
 
-	/**
-	 * Saves the last time the game was played
-	 */
-	void saveLastInplay();
 	void makeViewFinder();
 	void makeViewFinderP();
 	void initIFace();
@@ -296,7 +290,7 @@ public:
 	void showEndingNews();
 };
 
-#define VOYEUR_SAVEGAME_VERSION 2
+#define VOYEUR_SAVEGAME_VERSION 3
 
 /**
  * Header for Voyeur savegame files

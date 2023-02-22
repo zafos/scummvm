@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -32,8 +31,13 @@
 #include "engines/wintermute/base/gfx/base_image.h"
 #include "engines/wintermute/base/base_sub_frame.h"
 #include "engines/wintermute/base/base_region.h"
+#include "engines/wintermute/base/base_engine.h"
 #include "engines/wintermute/platform_osystem.h"
 #include "engines/wintermute/base/base_persistence_manager.h"
+
+#ifdef ENABLE_WME3D
+#include "engines/wintermute/base/gfx/xmodel.h"
+#endif
 
 namespace Wintermute {
 
@@ -71,14 +75,12 @@ BaseRenderer::BaseRenderer(BaseGame *inGame) : BaseClass(inGame) {
 	_drawOffsetX = _drawOffsetY = 0;
 }
 
-
 //////////////////////////////////////////////////////////////////////
 BaseRenderer::~BaseRenderer() {
 	deleteRectList();
 	unclipCursor();
 	delete _saveLoadImage;
 }
-
 
 //////////////////////////////////////////////////////////////////////
 void BaseRenderer::initLoop() {
@@ -209,6 +211,14 @@ BaseObject *BaseRenderer::getObjectAt(int x, int y) {
 						return _rectList[i]->_owner;
 					}
 				}
+
+#ifdef ENABLE_WME3D
+				if (_rectList[i]->_xmodel) {
+					if (!_rectList[i]->_xmodel->isTransparentAt(x, y)) {
+						return _rectList[i]->_owner;
+					}
+				}
+#endif
 				// region
 				else if (_rectList[i]->_region) {
 					if (_rectList[i]->_region->pointInRegion(x + _rectList[i]->_offsetX, y + _rectList[i]->_offsetY)) {
@@ -224,7 +234,6 @@ BaseObject *BaseRenderer::getObjectAt(int x, int y) {
 	return (BaseObject *)nullptr;
 }
 
-
 //////////////////////////////////////////////////////////////////////////
 void BaseRenderer::deleteRectList() {
 	for (uint32 i = 0; i < _rectList.size(); i++) {
@@ -238,23 +247,26 @@ bool BaseRenderer::initRenderer(int width, int height, bool windowed) {
 	return STATUS_FAILED;
 }
 
-
 //////////////////////////////////////////////////////////////////////
 void BaseRenderer::onWindowChange() {
 }
-
 
 //////////////////////////////////////////////////////////////////////////
 bool BaseRenderer::windowedBlt() {
 	return STATUS_FAILED;
 }
 
-
 //////////////////////////////////////////////////////////////////////////
 bool BaseRenderer::setup2D(bool Force) {
 	return STATUS_FAILED;
 }
 
+#ifdef ENABLE_WME3D
+//////////////////////////////////////////////////////////////////////////
+bool BaseRenderer::setup3D(Camera3D *camera, bool force) {
+	return STATUS_FAILED;
+}
+#endif
 
 //////////////////////////////////////////////////////////////////////////
 bool BaseRenderer::setupLines() {
@@ -266,19 +278,17 @@ bool BaseRenderer::drawLine(int x1, int y1, int x2, int y2, uint32 color) {
 	return STATUS_FAILED;
 }
 
-
 //////////////////////////////////////////////////////////////////////////
 bool BaseRenderer::drawRect(int x1, int y1, int x2, int y2, uint32 color, int width) {
 	for (int i = 0; i < width; i++) {
-		drawLine(x1 + i, y1 + i, x2 - i,   y1 + i,   color); // up
+		drawLine(x1 + i, y1 + i, x2 - i,     y1 + i, color); // up
 		drawLine(x1 + i, y2 - i, x2 - i + 1, y2 - i, color); // down
 
-		drawLine(x1 + i, y1 + i, x1 + i, y2 - i,   color); // left
+		drawLine(x1 + i, y1 + i, x1 + i, y2 - i,     color); // left
 		drawLine(x2 - i, y1 + i, x2 - i, y2 - i + 1, color); // right
 	}
 	return STATUS_OK;
 }
-
 
 //////////////////////////////////////////////////////////////////////////
 bool BaseRenderer::setViewport(int left, int top, int right, int bottom) {
@@ -291,7 +301,6 @@ bool BaseRenderer::setScreenViewport() {
 	return setViewport(_drawOffsetX, _drawOffsetY, _width + _drawOffsetX, _height + _drawOffsetY);
 }
 
-
 //////////////////////////////////////////////////////////////////////////
 bool BaseRenderer::setViewport(Rect32 *rect) {
 	return setViewport(rect->left + _drawOffsetX,
@@ -299,7 +308,6 @@ bool BaseRenderer::setViewport(Rect32 *rect) {
 	                   rect->right + _drawOffsetX,
 	                   rect->bottom + _drawOffsetY);
 }
-
 
 //////////////////////////////////////////////////////////////////////////
 bool BaseRenderer::clipCursor() {
@@ -372,6 +380,26 @@ bool BaseRenderer::displayIndicator() {
 	if (!_indicatorDisplay || !_indicatorProgress) {
 		return STATUS_OK;
 	}
+
+#ifdef ENABLE_FOXTAIL
+	if (BaseEngine::instance().isFoxTail()) {
+		_hasDrawnSaveLoadImage = false;
+		fill(0, 0, 0);
+		displaySaveloadLines();
+		displaySaveloadImage();
+		forcedFlip();
+		return STATUS_OK;
+	}
+#endif
+
+	displaySaveloadImage();
+	displaySaveloadLines();
+	indicatorFlip();
+	return STATUS_OK;
+}
+
+//////////////////////////////////////////////////////////////////////////
+bool BaseRenderer::displaySaveloadImage() {
 	if (_saveLoadImage && !_hasDrawnSaveLoadImage) {
 		Rect32 rc;
 		rc.setRect(0, 0, _saveLoadImage->getWidth(), _saveLoadImage->getHeight());
@@ -384,6 +412,11 @@ bool BaseRenderer::displayIndicator() {
 		_hasDrawnSaveLoadImage = true;
 	}
 
+	return STATUS_OK;
+}
+
+//////////////////////////////////////////////////////////////////////////
+bool BaseRenderer::displaySaveloadLines() {
 	if ((!_indicatorDisplay && _indicatorWidth <= 0) || _indicatorHeight <= 0) {
 		return STATUS_OK;
 	}
@@ -395,9 +428,6 @@ bool BaseRenderer::displayIndicator() {
 
 	setup2D();
 	_indicatorWidthDrawn = curWidth;
-	if (_indicatorWidthDrawn) {
-		indicatorFlip();
-	}
 	return STATUS_OK;
 }
 

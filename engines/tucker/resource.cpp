@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -58,7 +57,7 @@ static const CompressedSoundFile compressedSoundFilesTable[] = {
 #ifdef USE_MAD
 	{ "TUCKER.SO3", Audio::makeMP3Stream },
 #endif
-	{ 0, 0 }
+	{ nullptr,      nullptr }
 };
 
 static void decodeData(uint8 *data, int dataSize) {
@@ -120,6 +119,8 @@ public:
 					state = 2;
 				}
 				break;
+			default:
+				break;
 			}
 			++_pos;
 		}
@@ -134,6 +135,8 @@ public:
 			break;
 		case kDataTokenEx:
 			token = "!!";
+			break;
+		default:
 			break;
 		}
 		int tokenLen = strlen(token);
@@ -166,7 +169,7 @@ public:
 uint8 *TuckerEngine::loadFile(const char *fname, uint8 *p) {
 	Common::String filename;
 	filename = fname;
-	if (_gameLang == Common::DE_DEU) {
+	if (_gameLang == Common::DE_DEU || _gameLang == Common::RU_RUS) {
 		if (filename == "bgtext.c") {
 			filename = "bgtextgr.c";
 		} else if (filename == "charname.c") {
@@ -195,7 +198,7 @@ uint8 *TuckerEngine::loadFile(const char *fname, uint8 *p) {
 	Common::File f;
 	if (!f.open(filename)) {
 		warning("Unable to open '%s'", filename.c_str());
-		return 0;
+		return nullptr;
 	}
 	const int sz = f.size();
 	if (!p) {
@@ -234,7 +237,7 @@ void CompressedSound::closeFile() {
 
 Audio::RewindableAudioStream *CompressedSound::load(CompressedSoundType type, int num) {
 	if (_compressedSoundType < 0) {
-		return 0;
+		return nullptr;
 	}
 	int offset = 0;
 	switch (type) {
@@ -252,11 +255,13 @@ Audio::RewindableAudioStream *CompressedSound::load(CompressedSoundType type, in
 			offset = kCompressedSoundDataFileHeaderSize + 24;
 		}
 		break;
+	default:
+		break;
 	}
 	if (offset == 0) {
-		return 0;
+		return nullptr;
 	}
-	Audio::SeekableAudioStream *stream = 0;
+	Audio::SeekableAudioStream *stream = nullptr;
 	_fCompressedSound.seek(offset);
 	int dirOffset = _fCompressedSound.readUint32LE();
 	int dirSize = _fCompressedSound.readUint32LE();
@@ -294,6 +299,8 @@ void TuckerEngine::loadImage(const char *fname, uint8 *dst, int type) {
 			case '_':
 				*p = '-';
 				tryOpen = true;
+				break;
+			default:
 				break;
 			}
 		}
@@ -558,10 +565,10 @@ void TuckerEngine::loadObj() {
 	Common::String filename;
 	filename = Common::String::format("objtxt%d.c", _part);
 	free(_objTxtBuf);
-	_objTxtBuf = loadFile(filename.c_str(), 0);
+	_objTxtBuf = loadFile(filename.c_str(), nullptr);
 	filename = Common::String::format("pt%dtext.c", _part);
 	free(_ptTextBuf);
-	_ptTextBuf = loadFile(filename.c_str(), 0);
+	_ptTextBuf = loadFile(filename.c_str(), nullptr);
 	_characterSpeechDataPtr = _ptTextBuf;
 	loadData();
 	loadPanObj();
@@ -818,7 +825,7 @@ void TuckerEngine::loadSprA02_01() {
 	const int count = _sprA02LookupTable[_location];
 	for (int i = 1; i < count + 1; ++i) {
 		Common::String filename = Common::String::format("sprites/a%02d_%02d.spr", _location, i);
-		_sprA02Table[i] = loadFile(filename.c_str(), 0);
+		_sprA02Table[i] = loadFile(filename.c_str(), nullptr);
 	}
 	_sprA02Table[0] = _sprA02Table[1];
 }
@@ -836,7 +843,7 @@ void TuckerEngine::loadSprC02_01() {
 	const int count = _sprC02LookupTable[_location];
 	for (int i = 1; i < count + 1; ++i) {
 		Common::String filename = Common::String::format("sprites/c%02d_%02d.spr", _location, i);
-		_sprC02Table[i] = loadFile(filename.c_str(), 0);
+		_sprC02Table[i] = loadFile(filename.c_str(), nullptr);
 	}
 	_sprC02Table[0] = _sprC02Table[1];
 	_spritesCount = _sprC02LookupTable2[_location];
@@ -890,6 +897,8 @@ void TuckerEngine::loadFx() {
 					s->_flagValueStopFx = t.getNextInteger();
 				}
 				break;
+			default:
+				break;
 			}
 			if (s->_type == 8) {
 				// type 8 is basically a pointer to another type 6 sample
@@ -935,7 +944,7 @@ void TuckerEngine::loadFx() {
 }
 
 void TuckerEngine::loadSound(Audio::Mixer::SoundType type, int num, int volume, bool loop, Audio::SoundHandle *handle) {
-	Audio::RewindableAudioStream *stream = 0;
+	Audio::RewindableAudioStream *stream = nullptr;
 	switch (type) {
 	case Audio::Mixer::kSFXSoundType:
 		stream = _compressedSound.load(kSoundTypeFx, num);

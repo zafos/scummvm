@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -110,7 +109,7 @@ protected:
 	/**
 	 * Overload of the allocation allocation of sprites
 	 */
-	virtual RMGfxSourceBuffer *newItemSpriteBuffer(int dimx, int dimy, bool bPreRLE);
+	RMGfxSourceBuffer *newItemSpriteBuffer(int dimx, int dimy, bool bPreRLE) override;
 
 	/**
 	 * Watch thread which waits for the end of an action
@@ -384,7 +383,7 @@ public:
 	/**
 	 * Draw method, which controls chararacter display
 	 */
-	virtual void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim);
+	void draw(CORO_PARAM, RMGfxTargetBuffer &bigBuf, RMGfxPrimitive *prim) override;
 
 	/**
 	 * Show or hide
@@ -400,18 +399,18 @@ public:
 	/**
 	 * Tony stops (on the right side with respect to any subject)
 	 */
-	virtual void stop(CORO_PARAM);
+	void stop(CORO_PARAM) override;
 	void stopNoAction(CORO_PARAM);
 
 	/**
 	 * Set a pattern
 	 */
-	void setPattern(int npatt, bool bPlayP0 = false);
+	void setPattern(int npatt, bool bPlayP0 = false) override;
 
 	/**
 	 * Reads the current pattern
 	 */
-	int getCurPattern();
+	int getCurPattern() override;
 
 	/**
 	 * Waits until the end of a pattern

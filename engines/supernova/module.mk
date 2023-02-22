@@ -2,13 +2,17 @@ MODULE := engines/supernova
 
 MODULE_OBJS := \
 	console.o \
-	detection.o \
 	graphics.o \
+	metaengine.o \
 	resman.o \
-	rooms.o \
+	room.o \
+	supernova1/rooms.o \
+	supernova2/rooms.o \
 	screen.o \
 	sound.o \
-	state.o \
+	game-manager.o \
+	supernova1/state.o \
+	supernova2/state.o \
 	supernova.o
 
 MODULE_DIRS += \
@@ -21,3 +25,6 @@ endif
 
 # Include common rules
 include $(srcdir)/rules.mk
+
+# Detection objects
+DETECT_OBJS += $(MODULE)/detection.o

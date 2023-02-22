@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -142,16 +141,20 @@ TestExitStatus EventTests::mouseEvents() {
 
 	Common::EventManager *eventMan = g_system->getEventManager();
 
-	Common::Point pt(0, 30);
+	Common::Point pt(0, 25);
 	Common::Rect rectInfo = Testsuite::writeOnScreen("Generate mouse events make L/R/M button clicks, move wheel", pt);
 	pt.y += 15;
 	Testsuite::writeOnScreen("Press X to exit", pt);
-	pt.y = 70;
+	pt.y = 55;
 	Common::Rect rectLB = Testsuite::writeOnScreen("Left-button click : Not tested", pt);
 	pt.y += 15;
 	Common::Rect rectRB = Testsuite::writeOnScreen("Right-button click : Not tested", pt);
 	pt.y += 15;
 	Common::Rect rectMB = Testsuite::writeOnScreen("Middle-button click : Not tested", pt);
+	pt.y += 15;
+	Common::Rect rectX1B = Testsuite::writeOnScreen("X1-button click : Not tested", pt);
+	pt.y += 15;
+	Common::Rect rectX2B = Testsuite::writeOnScreen("X2-button click : Not tested", pt);
 	pt.y += 15;
 	Common::Rect rectWheel = Testsuite::writeOnScreen("Wheel Movements : Not tested", pt);
 
@@ -195,6 +198,14 @@ TestExitStatus EventTests::mouseEvents() {
 				Testsuite::clearScreen(rectInfo);
 				Testsuite::writeOnScreen("Mouse middle-button pressed ", Common::Point(rectInfo.left, rectInfo.top));
 				break;
+			case Common::EVENT_X1BUTTONDOWN:
+				Testsuite::clearScreen(rectInfo);
+				Testsuite::writeOnScreen("Mouse X1-button pressed ", Common::Point(rectInfo.left, rectInfo.top));
+				break;
+			case Common::EVENT_X2BUTTONDOWN:
+				Testsuite::clearScreen(rectInfo);
+				Testsuite::writeOnScreen("Mouse X2-button pressed ", Common::Point(rectInfo.left, rectInfo.top));
+				break;
 			case Common::EVENT_LBUTTONUP:
 				Testsuite::clearScreen(rectInfo);
 				if (finishZone.contains(eventMan->getMousePos())) {
@@ -217,6 +228,16 @@ TestExitStatus EventTests::mouseEvents() {
 				Testsuite::clearScreen(rectInfo);
 				Testsuite::writeOnScreen("Mouse middle-button released ", Common::Point(rectInfo.left, rectInfo.top));
 				Testsuite::writeOnScreen("Middle-button clicks : Done!", Common::Point(rectMB.left, rectMB.top));
+				break;
+			case Common::EVENT_X1BUTTONUP:
+				Testsuite::clearScreen(rectInfo);
+				Testsuite::writeOnScreen("Mouse X1-button released ", Common::Point(rectInfo.left, rectInfo.top));
+				Testsuite::writeOnScreen("X1-button clicks : Done!", Common::Point(rectX1B.left, rectX1B.top));
+				break;
+			case Common::EVENT_X2BUTTONUP:
+				Testsuite::clearScreen(rectInfo);
+				Testsuite::writeOnScreen("Mouse X2-button released ", Common::Point(rectInfo.left, rectInfo.top));
+				Testsuite::writeOnScreen("X2-button clicks : Done!", Common::Point(rectX2B.left, rectX2B.top));
 				break;
 			case Common::EVENT_KEYDOWN:
 				if (event.kbd.keycode == Common::KEYCODE_x) {

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -57,15 +56,15 @@ void AIScriptHysteriaPatron1::ClickedByPlayer() {
 	//return false;
 }
 
-void AIScriptHysteriaPatron1::EnteredScene(int sceneId) {
+void AIScriptHysteriaPatron1::EnteredSet(int setId) {
 	// return false;
 }
 
-void AIScriptHysteriaPatron1::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptHysteriaPatron1::OtherAgentEnteredThisSet(int otherActorId) {
 	// return false;
 }
 
-void AIScriptHysteriaPatron1::OtherAgentExitedThisScene(int otherActorId) {
+void AIScriptHysteriaPatron1::OtherAgentExitedThisSet(int otherActorId) {
 	// return false;
 }
 
@@ -93,22 +92,46 @@ bool AIScriptHysteriaPatron1::GoalChanged(int currentGoalNumber, int newGoalNumb
 	return false;
 }
 
-const int animationList[27] = {
-	877, 878, 877, 883, 880, 881, 882, 884, 878, 877,
-	883, 881, 880, 884, 877, 877, 878, 883, 882, 884,
-	878, 877, 883, 882, 880, 881, 884
+const int kAnimationsCount = 27;
+const int animationList[kAnimationsCount] = {
+	kModelAnimationHysteriaPatron1DanceStandingUpSemiSitAndUp, kModelAnimationHysteriaPatron1DanceStandingUpLeftMotion, kModelAnimationHysteriaPatron1DanceStandingUpSemiSitAndUp,
+	kModelAnimationHysteriaPatron1DanceStandingUpToSplits,     kModelAnimationHysteriaPatron1DanceSplitsDuckAndDown,    kModelAnimationHysteriaPatron1DanceSplitsSemiUpAndDown,
+	kModelAnimationHysteriaPatron1DanceSplitsBackAndForth,     kModelAnimationHysteriaPatron1DanceSplitsToStandingUp,   kModelAnimationHysteriaPatron1DanceStandingUpLeftMotion,
+	kModelAnimationHysteriaPatron1DanceStandingUpSemiSitAndUp, kModelAnimationHysteriaPatron1DanceStandingUpToSplits,   kModelAnimationHysteriaPatron1DanceSplitsSemiUpAndDown,
+	kModelAnimationHysteriaPatron1DanceSplitsDuckAndDown,      kModelAnimationHysteriaPatron1DanceSplitsToStandingUp,   kModelAnimationHysteriaPatron1DanceStandingUpSemiSitAndUp,
+	kModelAnimationHysteriaPatron1DanceStandingUpSemiSitAndUp, kModelAnimationHysteriaPatron1DanceStandingUpLeftMotion, kModelAnimationHysteriaPatron1DanceStandingUpToSplits,
+	kModelAnimationHysteriaPatron1DanceSplitsBackAndForth,     kModelAnimationHysteriaPatron1DanceSplitsToStandingUp,   kModelAnimationHysteriaPatron1DanceStandingUpLeftMotion,
+	kModelAnimationHysteriaPatron1DanceStandingUpSemiSitAndUp, kModelAnimationHysteriaPatron1DanceStandingUpToSplits,   kModelAnimationHysteriaPatron1DanceSplitsBackAndForth,
+	kModelAnimationHysteriaPatron1DanceSplitsDuckAndDown,      kModelAnimationHysteriaPatron1DanceSplitsSemiUpAndDown,  kModelAnimationHysteriaPatron1DanceSplitsToStandingUp
 };
 
 bool AIScriptHysteriaPatron1::UpdateAnimation(int *animation, int *frame) {
-	*animation = animationList[_animationState];
+	if (_vm->_cutContent
+	    && (_animationState == 2 || _animationState == 16 || _animationState == 21)
+	) {
+		// replace a few of the repeated "standing up" animations
+		// with the cut animation kModelAnimationHysteriaPatron1DanceStandingUpStowingMoney
+		*animation = kModelAnimationHysteriaPatron1DanceStandingUpStowingMoney;
+	} else {
+		*animation = animationList[_animationState];
+	}
 
 	if (++_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 		_animationFrame = 0;
 
-		if (++_animationState >= 27)
+		if (++_animationState >= kAnimationsCount) {
 			_animationState = 0;
+		}
 
-		*animation = animationList[_animationState];
+		if (_vm->_cutContent
+		    && (_animationState == 2 || _animationState == 16 || _animationState == 21)
+		) {
+			// replace a few of the repeated "standing up" animations
+			// with the cut animation kModelAnimationHysteriaPatron1DanceStandingUpStowingMoney
+			*animation = kModelAnimationHysteriaPatron1DanceStandingUpStowingMoney;
+		} else {
+			*animation = animationList[_animationState];
+		}
 	}
 
 	*frame = _animationFrame;

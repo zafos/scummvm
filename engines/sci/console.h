@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -33,17 +32,23 @@ namespace Sci {
 class SciEngine;
 struct List;
 
-reg_t disassemble(EngineState *s, reg32_t pos, const Object *obj, bool printBWTag, bool printBytecode);
+reg_t disassemble(EngineState *s, reg_t pos, const Object *obj, bool printBWTag, bool printBytecode, bool printCSyntax);
 bool isJumpOpcode(EngineState *s, reg_t pos, reg_t& jumpOffset);
 
 class Console : public GUI::Debugger {
 public:
 	Console(SciEngine *engine);
-	virtual ~Console();
+	~Console() override;
+
+	/**
+	 * 'Attach' the debugger. This ensures that the next time onFrame()
+	 * is invoked, the debugger will activate and accept user input.
+	 */
+	void attach(const char *entry = nullptr) override;
 
 private:
-	virtual void preEnter();
-	virtual void postEnter();
+	void preEnter() override;
+	void postEnter() override;
 
 	// General
 	bool cmdHelp(int argc, const char **argv);
@@ -141,6 +146,10 @@ private:
 	bool cmdGo(int argc, const char **argv);
 	bool cmdLogKernel(int argc, const char **argv);
 	bool cmdMapVocab994(int argc, const char **argv);
+	bool cmdGameFlagsInit(int argc, const char **argv);
+	bool cmdGameFlagsTest(int argc, const char **argv);
+	bool cmdGameFlagsSet(int argc, const char **argv);
+	bool cmdGameFlagsClear(int argc, const char **argv);
 	// Breakpoints
 	bool cmdBreakpointList(int argc, const char **argv);
 	bool cmdBreakpointDelete(int argc, const char **argv);
@@ -166,6 +175,8 @@ private:
 	bool cmdViewObject(int argc, const char **argv);
 	bool cmdViewActiveObject(int argc, const char **argv);
 	bool cmdViewAccumulatorObject(int argc, const char **argv);
+	// Variables
+	bool cmdSpeedThrottle(int argc, const char **argv);
 
 	bool parseInteger(const char *argument, int &result);
 	bool parseResourceNumber36(const char *userParameter, uint16 &resourceNumber, uint32 &resourceTuple);
@@ -195,11 +206,19 @@ private:
 #endif
 
 	void writeIntegrityDumpLine(const Common::String &statusName, const Common::String &resourceName, Common::WriteStream &out, Common::ReadStream *const data, const int size, const bool writeHash);
+	
+	enum GameFlagsOperation {
+		kGameFlagsTest,
+		kGameFlagsSet,
+		kGameFlagsClear
+	};
+	bool processGameFlagsOperation(GameFlagsOperation operation, int argc, const char **argv);
 
 	SciEngine *_engine;
 	DebugState &_debugState;
 	Common::String _videoFile;
 	int _videoFrameDelay;
+	uint16 _gameFlagsGlobal;
 };
 
 } // End of namespace Sci

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,42 +15,57 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
-#if defined(POSIX) || defined(PLAYSTATION3) || defined(PSP2)
+#if defined(POSIX) || defined(PLAYSTATION3) || defined(PSP2) || defined(__DS__)
 
 // Re-enable some forbidden symbols to avoid clashes with stat.h and unistd.h.
-// Also with clock() in sys/time.h in some Mac OS X SDKs.
+// Also with clock() in sys/time.h in some macOS SDKs.
 #define FORBIDDEN_SYMBOL_EXCEPTION_time_h
 #define FORBIDDEN_SYMBOL_EXCEPTION_unistd_h
 #define FORBIDDEN_SYMBOL_EXCEPTION_mkdir
 #define FORBIDDEN_SYMBOL_EXCEPTION_getenv
 #define FORBIDDEN_SYMBOL_EXCEPTION_exit		//Needed for IRIX's unistd.h
+#define FORBIDDEN_SYMBOL_EXCEPTION_random
+#define FORBIDDEN_SYMBOL_EXCEPTION_srandom
 
 #include "backends/fs/posix/posix-fs.h"
-#include "backends/fs/stdiostream.h"
+#include "backends/fs/posix/posix-iostream.h"
 #include "common/algorithm.h"
 
 #include <sys/param.h>
 #include <sys/stat.h>
-#ifdef PSP2
-#include "backends/fs/psp2/psp2-dirent.h"
-#define mkdir sceIoMkdir
-#else
-#include <dirent.h>
+#ifdef MACOSX
+#include <sys/types.h>
 #endif
+#ifdef PSP2
+#include <psp2/io/stat.h>
+#define mkdir sceIoMkdir
+#endif
+#include <dirent.h>
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #ifdef __OS2__
 #define INCL_DOS
 #include <os2.h>
 #endif
 
+bool POSIXFilesystemNode::exists() const {
+	return access(_path.c_str(), F_OK) == 0;
+}
+
+bool POSIXFilesystemNode::isReadable() const {
+	return access(_path.c_str(), R_OK) == 0;
+}
+
+bool POSIXFilesystemNode::isWritable() const {
+	return access(_path.c_str(), W_OK) == 0;
+}
 
 void POSIXFilesystemNode::setFlags() {
 	struct stat st;
@@ -62,24 +77,14 @@ void POSIXFilesystemNode::setFlags() {
 POSIXFilesystemNode::POSIXFilesystemNode(const Common::String &p) {
 	assert(p.size() > 0);
 
-#ifdef PSP2
-	if (p == "/") {
-		_isDirectory = true;
-		_isValid = false;
-		_path = p;
-		_displayName = p;
-		return;
-	}
-#endif
-
 	// Expand "~/" to the value of the HOME env variable
-	if (p.hasPrefix("~/")) {
+	if (p.hasPrefix("~/") || p == "~") {
 		const char *home = getenv("HOME");
 		if (home != NULL && strlen(home) < MAXPATHLEN) {
 			_path = home;
-			// Skip over the tilda.  We know that p contains at least
-			// two chars, so this is safe:
-			_path += p.c_str() + 1;
+			// Skip over the tilda.
+			if (p.size() > 1)
+				_path += p.c_str() + 1;
 		}
 	} else {
 		_path = p;
@@ -105,7 +110,7 @@ POSIXFilesystemNode::POSIXFilesystemNode(const Common::String &p) {
 	if (!_path.hasPrefix("/")) {
 		char buf[MAXPATHLEN+1];
 		getcwd(buf, MAXPATHLEN);
-		strcat(buf, "/");
+		Common::strcat_s(buf, "/");
 		_path = buf + _path;
 	}
 #endif
@@ -148,7 +153,7 @@ bool POSIXFilesystemNode::getChildren(AbstractFSList &myList, ListMode mode, boo
 				char drive_root[] = "A:/";
 				drive_root[0] += i;
 
-                POSIXFilesystemNode *entry = new POSIXFilesystemNode();
+				POSIXFilesystemNode *entry = new POSIXFilesystemNode();
 				entry->_isDirectory = true;
 				entry->_isValid = true;
 				entry->_path = drive_root;
@@ -159,15 +164,6 @@ bool POSIXFilesystemNode::getChildren(AbstractFSList &myList, ListMode mode, boo
 			ulDrvMap >>= 1;
 		}
 
-		return true;
-	}
-#endif
-#ifdef PSP2
-	if (_path == "/") {
-		POSIXFilesystemNode *entry1 = new POSIXFilesystemNode("ux0:");
-		myList.push_back(entry1);
-		POSIXFilesystemNode *entry2 = new POSIXFilesystemNode("uma0:");
-		myList.push_back(entry2);
 		return true;
 	}
 #endif
@@ -245,13 +241,9 @@ AbstractFSNode *POSIXFilesystemNode::getParent() const {
 		return 0;	// The filesystem root has no parent
 
 #ifdef __OS2__
-    if (_path.size() == 3 && _path.hasSuffix(":/"))
-        // This is a root directory of a drive
-        return makeNode("/");   // return a virtual root for a list of drives
-#endif
-#ifdef PSP2
-	if (_path.hasSuffix(":"))
-		return makeNode("/");
+	if (_path.size() == 3 && _path.hasSuffix(":/"))
+		// This is a root directory of a drive
+		return makeNode("/");   // return a virtual root for a list of drives
 #endif
 
 	const char *start = _path.c_str();
@@ -274,40 +266,18 @@ AbstractFSNode *POSIXFilesystemNode::getParent() const {
 }
 
 Common::SeekableReadStream *POSIXFilesystemNode::createReadStream() {
-	return StdioStream::makeFromPath(getPath(), false);
+	return PosixIoStream::makeFromPath(getPath(), false);
 }
 
-Common::WriteStream *POSIXFilesystemNode::createWriteStream() {
-	return StdioStream::makeFromPath(getPath(), true);
+Common::SeekableWriteStream *POSIXFilesystemNode::createWriteStream() {
+	return PosixIoStream::makeFromPath(getPath(), true);
 }
 
-bool POSIXFilesystemNode::create(bool isDirectoryFlag) {
-	bool success;
-
-	if (isDirectoryFlag) {
-		success = mkdir(_path.c_str(), 0755) == 0;
-	} else {
-		int fd = open(_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0755);
-		success = fd >= 0;
-
-		if (fd >= 0) {
-			close(fd);
-		}
-	}
-
-	if (success) {
+bool POSIXFilesystemNode::createDirectory() {
+	if (mkdir(_path.c_str(), 0755) == 0)
 		setFlags();
-		if (_isValid) {
-			if (_isDirectory != isDirectoryFlag) warning("failed to create %s: got %s", isDirectoryFlag ? "directory" : "file", _isDirectory ? "directory" : "file");
-			return _isDirectory == isDirectoryFlag;
-		}
 
-		warning("POSIXFilesystemNode: %s() was a success, but stat indicates there is no such %s",
-			isDirectoryFlag ? "mkdir" : "creat", isDirectoryFlag ? "directory" : "file");
-		return false;
-	}
-
-	return false;
+	return _isValid && _isDirectory;
 }
 
 namespace Posix {

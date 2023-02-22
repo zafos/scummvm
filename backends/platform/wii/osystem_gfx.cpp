@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,7 +27,7 @@
 #include <gxflux/gfx_con.h>
 
 #include "common/config-manager.h"
-#include "graphics/conversion.h"
+#include "graphics/blit.h"
 #include "backends/fs/wii/wii-fs-factory.h"
 
 #include "osystem.h"
@@ -114,7 +113,7 @@ void OSystem_Wii::deinitGfx() {
 }
 
 void OSystem_Wii::updateScreenResolution() {
-	if (_overlayVisible) {
+	if (_overlayInGUI) {
 		_currentWidth = _overlayWidth;
 		_currentHeight = _overlayHeight;
 	} else {
@@ -198,7 +197,7 @@ int OSystem_Wii::getDefaultGraphicsMode() const {
 	return gmStandard;
 }
 
-bool OSystem_Wii::setGraphicsMode(int mode) {
+bool OSystem_Wii::setGraphicsMode(int mode, uint flags) {
 	_configGraphicsMode = mode;
 	return true;
 }
@@ -244,13 +243,18 @@ void OSystem_Wii::initSize(uint width, uint height,
 #endif
 
 	uint newWidth, newHeight;
+
+#ifdef USE_RGB_COLOR
 	if (_pfGame.bytesPerPixel > 1) {
 		newWidth = ROUNDUP(width, 4);
 		newHeight = ROUNDUP(height, 4);
 	} else {
+#endif
 		newWidth = ROUNDUP(width, 8);
 		newHeight = ROUNDUP(height, 4);
+#ifdef USE_RGB_COLOR
 	}
+#endif
 
 	if (_gameWidth != newWidth || _gameHeight != newHeight) {
 		assert((newWidth <= 640) && (newHeight <= 480));
@@ -331,7 +335,7 @@ void OSystem_Wii::setPalette(const byte *colors, uint start, uint num) {
 	u16 *d = _texGame.palette;
 
 	for (uint i = 0; i < num; ++i, s +=3)
-		d[start + i] = Graphics::RGBToColor<Graphics::ColorMasks<565> >(s[0], s[1], s[2]);
+		d[start + i] = _pfRGB565.RGBToColor(s[0], s[1], s[2]);
 
 	gfx_tex_flush_palette(&_texGame);
 
@@ -339,7 +343,7 @@ void OSystem_Wii::setPalette(const byte *colors, uint start, uint num) {
 	d = _cursorPalette;
 
 	for (uint i = 0; i < num; ++i, s += 3) {
-		d[start + i] = Graphics::ARGBToColor<Graphics::ColorMasks<3444> >(0xff, s[0], s[1], s[2]);
+		d[start + i] = _pfRGB3444.ARGBToColor(0xff, s[0], s[1], s[2]);
 	}
 
 	if (_cursorPaletteDisabled) {
@@ -362,7 +366,7 @@ void OSystem_Wii::grabPalette(byte *colors, uint start, uint num) const {
 
 	u8 r, g, b;
 	for (uint i = 0; i < num; ++i, d += 3) {
-		Graphics::colorToRGB<Graphics::ColorMasks<565> >(s[start + i], r, g, b);
+		_pfRGB565.colorToRGB(s[start + i], r, g, b);
 		d[0] = r;
 		d[1] = g;
 		d[2] = b;
@@ -391,7 +395,7 @@ void OSystem_Wii::setCursorPalette(const byte *colors, uint start, uint num) {
 	u16 *d = _texMouse.palette;
 
 	for (uint i = 0; i < num; ++i, s += 3)
-		d[start + i] = Graphics::ARGBToColor<Graphics::ColorMasks<3444> >(0xff, s[0], s[1], s[2]);
+		d[start + i] = _pfRGB3444.ARGBToColor(0xff, s[0], s[1], s[2]);
 
 	_cursorPaletteDirty = true;
 }
@@ -544,22 +548,29 @@ void OSystem_Wii::unlockScreen() {
 	_gameDirty = true;
 }
 
-void OSystem_Wii::setShakePos(int shakeOffset) {
+void OSystem_Wii::setShakePos(int shakeXOffset, int shakeYOffset) {
 	gfx_coords(&_coordsGame, &_texGame, GFX_COORD_FULLSCREEN);
-	_coordsGame.y -= f32(shakeOffset) * _currentYScale;
+	_coordsGame.x -= f32(shakeXOffset) * _currentXScale;
+	_coordsGame.y -= f32(shakeYOffset) * _currentYScale;
 }
 
-void OSystem_Wii::showOverlay() {
-	_mouseX = _overlayWidth / 2;
-	_mouseY = _overlayHeight / 2;
+void OSystem_Wii::showOverlay(bool inGUI) {
+	if (inGUI) {
+		_mouseX = _overlayWidth / 2;
+		_mouseY = _overlayHeight / 2;
+	}
+	_overlayInGUI = inGUI;
 	_overlayVisible = true;
 	updateScreenResolution();
 	gfx_tex_set_bilinear_filter(&_texMouse, true);
 }
 
 void OSystem_Wii::hideOverlay() {
-	_mouseX = _gameWidth / 2;
-	_mouseY = _gameHeight / 2;
+	if (_overlayInGUI) {
+		_mouseX = _gameWidth / 2;
+		_mouseY = _gameHeight / 2;
+	}
+	_overlayInGUI = false;
 	_overlayVisible = false;
 	updateScreenResolution();
 	gfx_tex_set_bilinear_filter(&_texMouse, _bilinearFilter);
@@ -570,16 +581,15 @@ void OSystem_Wii::clearOverlay() {
 	_overlayDirty = true;
 }
 
-void OSystem_Wii::grabOverlay(void *buf, int pitch) {
-	int h = _overlayHeight;
-	uint16 *src = _overlayPixels;
-	byte *dst = (byte *)buf;
+void OSystem_Wii::grabOverlay(Graphics::Surface &surface) {
+	assert(surface.w >= _overlayWidth);
+	assert(surface.h >= _overlayHeight);
+	assert(surface.format.bytesPerPixel == sizeof(uint16));
 
-	do {
-		memcpy(dst, src, _overlayWidth * sizeof(uint16));
-		src += _overlayWidth;
-		dst += pitch;
-	} while (--h);
+	byte *src = (byte *)_overlayPixels;
+	byte *dst = (byte *)surface.getPixels();
+	Graphics::copyBlit(dst, src, surface.pitch, _overlayWidth * sizeof(uint16),
+		_overlayWidth, _overlayHeight, sizeof(uint16));
 }
 
 void OSystem_Wii::copyRectToOverlay(const void *buf, int pitch, int x,
@@ -629,7 +639,7 @@ int16 OSystem_Wii::getOverlayHeight() {
 }
 
 Graphics::PixelFormat OSystem_Wii::getOverlayFormat() const {
-	return Graphics::createPixelFormat<3444>();
+	return _pfRGB3444;
 }
 
 bool OSystem_Wii::showMouse(bool visible) {
@@ -647,10 +657,13 @@ void OSystem_Wii::warpMouse(int x, int y) {
 void OSystem_Wii::setMouseCursor(const void *buf, uint w, uint h, int hotspotX,
 									int hotspotY, uint32 keycolor,
 									bool dontScale,
-									const Graphics::PixelFormat *format) {
+									const Graphics::PixelFormat *format, const byte *mask) {
+
+	if (mask)
+		printf("OSystem_Wii::setMouseCursor: Masks are not supported\n");
+
 	gfx_tex_format_t tex_format = GFX_TF_PALETTE_RGB5A3;
 	uint tw, th;
-	bool tmpBuf = false;
 	uint32 oldKeycolor = _mouseKeyColor;
 
 #ifdef USE_RGB_COLOR
@@ -665,13 +678,12 @@ void OSystem_Wii::setMouseCursor(const void *buf, uint w, uint h, int hotspotX,
 		tw = ROUNDUP(w, 4);
 		th = ROUNDUP(h, 4);
 
-		if (_pfCursor != _pfRGB3444)
-			tmpBuf = true;
 	} else {
 #endif
 		_mouseKeyColor = keycolor & 0xff;
 		tw = ROUNDUP(w, 8);
 		th = ROUNDUP(h, 4);
+
 #ifdef USE_RGB_COLOR
 	}
 #endif
@@ -683,64 +695,60 @@ void OSystem_Wii::setMouseCursor(const void *buf, uint w, uint h, int hotspotX,
 
 	gfx_tex_set_bilinear_filter(&_texMouse, _bilinearFilter);
 
-	if ((tw != w) || (th != h))
-		tmpBuf = true;
+	u8 bpp = _texMouse.bpp >> 3;
+	byte *tmp = (byte *) malloc(tw * th * bpp);
 
-	if (!tmpBuf) {
-		gfx_tex_convert(&_texMouse, (const byte *)buf);
-	} else {
-		u8 bpp = _texMouse.bpp >> 3;
-		byte *tmp = (byte *) malloc(tw * th * bpp);
+	if (!tmp) {
+		printf("could not alloc temp cursor buffer\n");
+		::abort();
+	}
 
-		if (!tmp) {
-			printf("could not alloc temp cursor buffer\n");
+	if (bpp > 1)
+		memset(tmp, 0, tw * th * bpp);
+	else
+		memset(tmp, _mouseKeyColor, tw * th);
+
+#ifdef USE_RGB_COLOR
+	if (bpp > 1) {
+
+		if (!Graphics::crossBlit(tmp, (const byte *)buf,
+									tw * _pfRGB3444.bytesPerPixel,
+									w * _pfCursor.bytesPerPixel,
+									tw, th, _pfRGB3444, _pfCursor)) {
+			printf("crossBlit failed (cursor)\n");
 			::abort();
 		}
 
-		if (bpp > 1)
-			memset(tmp, 0, tw * th * bpp);
-		else
-			memset(tmp, _mouseKeyColor, tw * th);
-
-#ifdef USE_RGB_COLOR
-		if (bpp > 1) {
-			if (!Graphics::crossBlit(tmp, (const byte *)buf,
-										tw * _pfRGB3444.bytesPerPixel,
-										w * _pfCursor.bytesPerPixel,
-										tw, th, _pfRGB3444, _pfCursor)) {
-				printf("crossBlit failed (cursor)\n");
-				::abort();
+		// nasty, shouldn't the frontend set the alpha channel?
+		const u16 *s = (const u16 *) buf;
+		u16 *d = (u16 *) tmp;
+		for (u16 y = 0; y < h; ++y) {
+			for (u16 x = 0; x < w; ++x) {
+				if (*s++ == _mouseKeyColor)
+					*d++ &= ~(7 << 12);
+				else
+					d++;
 			}
 
-			// nasty, shouldn't the frontend set the alpha channel?
-			const u16 *s = (const u16 *) buf;
-			u16 *d = (u16 *) tmp;
-			for (u16 y = 0; y < h; ++y) {
-				for (u16 x = 0; x < w; ++x) {
-					if (*s++ == _mouseKeyColor)
-						*d++ &= ~(7 << 12);
-					else
-						d++;
-				}
-
-				d += tw - w;
-			}
-		} else {
-#endif
-			byte *dst = tmp;
-			const byte *src = (const byte *)buf;
-			do {
-				memcpy(dst, src, w * bpp);
-				src += w * bpp;
-				dst += tw * bpp;
-			} while (--h);
-#ifdef USE_RGB_COLOR
+			d += tw - w;
 		}
+	} else {
+#endif
+		const byte *s = (const byte *)buf;
+		byte *d = (byte *) tmp;
+		for (u16 y = 0; y < h; ++y) {
+			for (u16 x = 0; x < w; ++x) {
+				*d++ = *s++;
+			}
+			d += tw - w;
+		}
+
+#ifdef USE_RGB_COLOR
+	}
 #endif
 
-		gfx_tex_convert(&_texMouse, tmp);
-		free(tmp);
-	}
+	gfx_tex_convert(&_texMouse, tmp);
+	free(tmp);
 
 	_mouseHotspotX = hotspotX;
 	_mouseHotspotY = hotspotY;

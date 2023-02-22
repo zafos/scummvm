@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,6 +27,7 @@
 #include "bladerunner/audio_speech.h"
 #include "bladerunner/savefile.h"
 #include "bladerunner/scene.h"
+#include "bladerunner/time.h"
 
 #include "bladerunner/script/scene_script.h"
 
@@ -37,7 +37,7 @@ ActorDialogueQueue::Entry::Entry() {
 	isNotPause = false;
 	isPause = false;
 	actorId = -1;
-	delay = -1;
+	delayMillis = -1;
 	sentenceId = -1;
 	animationMode = -1;
 }
@@ -51,7 +51,7 @@ ActorDialogueQueue::~ActorDialogueQueue() {
 }
 
 void ActorDialogueQueue::add(int actorId, int sentenceId, int animationMode) {
-	if (actorId == 0 || actorId == BladeRunnerEngine::kActorVoiceOver) {
+	if (actorId == kActorMcCoy || actorId == kActorVoiceOver) {
 		animationMode = -1;
 	}
 	if (_entries.size() < kMaxEntries) {
@@ -61,13 +61,13 @@ void ActorDialogueQueue::add(int actorId, int sentenceId, int animationMode) {
 		entry.actorId = actorId;
 		entry.sentenceId = sentenceId;
 		entry.animationMode = animationMode;
-		entry.delay = -1;
+		entry.delayMillis = -1;
 
 		_entries.push_back(entry);
 	}
 }
 
-void ActorDialogueQueue::addPause(int delay) {
+void ActorDialogueQueue::addPause(int32 delayMillis) {
 	if (_entries.size() < kMaxEntries) {
 		Entry entry;
 		entry.isNotPause = false;
@@ -75,7 +75,7 @@ void ActorDialogueQueue::addPause(int delay) {
 		entry.actorId = -1;
 		entry.sentenceId = -1;
 		entry.animationMode = -1;
-		entry.delay = delay;
+		entry.delayMillis = delayMillis;
 
 		_entries.push_back(entry);
 	}
@@ -95,8 +95,8 @@ void ActorDialogueQueue::flush(int a1, bool callScript) {
 	}
 	if (_isPause) {
 		_isPause = false;
-		_delay = 0;
-		_timeLast = 0;
+		_delayMillis = 0;
+		_timeLast = 0u;
 	}
 	clear();
 	if (callScript) {
@@ -104,19 +104,34 @@ void ActorDialogueQueue::flush(int a1, bool callScript) {
 	}
 }
 
+/**
+* return true when queue is empty and object is flushed
+*/
+bool ActorDialogueQueue::isEmpty() {
+	return _entries.empty() \
+	        && !_isNotPause \
+	        && !_isPause \
+	        && _actorId == -1 \
+	        && _sentenceId == -1 \
+	        && _animationMode == -1 \
+	        && _animationModePrevious == -1 \
+	        && _delayMillis == 0 \
+	        && _timeLast == 0u;
+}
+
 void ActorDialogueQueue::tick() {
 	if (!_vm->_audioSpeech->isPlaying()) {
 		if (_isPause) {
-			int time = _vm->getTotalPlayTime();
-			int timeDiff = time - _timeLast;
+			uint32 time = _vm->_time->current();
+			uint32 timeDiff = time - _timeLast; // unsigned difference is intentional
 			_timeLast = time;
-			_delay -= timeDiff;
-			if (_delay > 0) {
+			_delayMillis = (_delayMillis < 0 || ((uint32)_delayMillis < timeDiff) ) ? 0 : ((uint32)_delayMillis - timeDiff);
+			if (_delayMillis > 0) {
 				return;
 			}
 			_isPause = false;
-			_delay = 0;
-			_timeLast = 0;
+			_delayMillis = 0;
+			_timeLast = 0u;
 			if (_entries.empty()) {
 				flush(0, true);
 			}
@@ -153,8 +168,8 @@ void ActorDialogueQueue::tick() {
 				}
 			} else if (firstEntry.isPause) {
 				_isPause = true;
-				_delay = firstEntry.delay;
-				_timeLast = _vm->getTotalPlayTime();
+				_delayMillis = firstEntry.delayMillis;
+				_timeLast = _vm->_time->current();
 			}
 		}
 	}
@@ -170,7 +185,7 @@ void ActorDialogueQueue::save(SaveFileWriteStream &f) {
 		f.writeInt(e.actorId);
 		f.writeInt(e.sentenceId);
 		f.writeInt(e.animationMode);
-		f.writeInt(e.delay);
+		f.writeInt(e.delayMillis);
 	}
 	f.padBytes((kMaxEntries - count) * 24);
 
@@ -180,23 +195,23 @@ void ActorDialogueQueue::save(SaveFileWriteStream &f) {
 	f.writeInt(_animationMode);
 	f.writeInt(_animationModePrevious);
 	f.writeBool(_isPause);
-	f.writeInt(_delay);
+	f.writeInt(_delayMillis);
 	// f.write(_timeLast);
 }
 
 void ActorDialogueQueue::load(SaveFileReadStream &f) {
 	_entries.clear();
-	int count = f.readInt();
+	uint count = f.readInt();
 	assert(count <= kMaxEntries);
 	_entries.resize(count);
-	for (int i = 0; i < count; ++i) {
+	for (uint i = 0; i < count; ++i) {
 		Entry &e = _entries[i];
 		e.isNotPause = f.readBool();
 		e.isPause = f.readBool();
 		e.actorId = f.readInt();
 		e.sentenceId = f.readInt();
 		e.animationMode = f.readInt();
-		e.delay = f.readInt();
+		e.delayMillis = f.readInt();
 	}
 
 	f.skip((kMaxEntries - count) * 24);
@@ -207,9 +222,8 @@ void ActorDialogueQueue::load(SaveFileReadStream &f) {
 	_animationMode = f.readInt();
 	_animationModePrevious = f.readInt();
 	_isPause = f.readBool();
-	_delay = f.readInt();
-
-	_timeLast = 0;
+	_delayMillis = f.readInt();
+	_timeLast = 0u;
 }
 
 void ActorDialogueQueue::clear() {
@@ -220,8 +234,8 @@ void ActorDialogueQueue::clear() {
 	_animationMode = -1;
 	_animationModePrevious = -1;
 	_isPause = false;
-	_delay = 0;
-	_timeLast = 0;
+	_delayMillis = 0;
+	_timeLast = 0u;
 }
 
 } // End of namespace BladeRunner

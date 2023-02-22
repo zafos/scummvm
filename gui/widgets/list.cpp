@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -33,18 +32,20 @@
 
 namespace GUI {
 
-ListWidget::ListWidget(Dialog *boss, const String &name, const char *tooltip, uint32 cmd)
+bool ListWidgetDefaultMatcher(void *, int, const Common::U32String &item, const Common::U32String &token) {
+	return item.contains(token);
+}
+
+ListWidget::ListWidget(Dialog *boss, const Common::String &name, const Common::U32String &tooltip, uint32 cmd)
 	: EditableWidget(boss, name, tooltip), _cmd(cmd) {
 
-	_scrollBar = NULL;
+	_entriesPerPage = 0;
+	_scrollBarWidth = 0;
 
-	// This ensures that _entriesPerPage is properly initialized.
-	reflowLayout();
-
-	_scrollBar = new ScrollBarWidget(this, _w - _scrollBarWidth + 1, 0, _scrollBarWidth, _h);
+	_scrollBar = new ScrollBarWidget(this, _w - _scrollBarWidth, 0, _scrollBarWidth, _h);
 	_scrollBar->setTarget(this);
 
-	setFlags(WIDGET_ENABLED | WIDGET_CLEARBG | WIDGET_RETAIN_FOCUS | WIDGET_WANT_TICKLE);
+	setFlags(WIDGET_ENABLED | WIDGET_CLEARBG | WIDGET_RETAIN_FOCUS | WIDGET_WANT_TICKLE | WIDGET_TRACK_MOUSE);
 	_type = kListWidget;
 	_editMode = false;
 	_numberingMode = kListNumberingOne;
@@ -62,17 +63,25 @@ ListWidget::ListWidget(Dialog *boss, const String &name, const char *tooltip, ui
 
 	_quickSelect = true;
 	_editColor = ThemeEngine::kFontColorNormal;
+	_dictionarySelect = false;
+
+	_filterMatcher = ListWidgetDefaultMatcher;
+	_filterMatcherArg = nullptr;
+
+	_lastRead = -1;
+
+	_hlLeftPadding = _hlRightPadding = 0;
+	_leftPadding = _rightPadding = 0;
+	_topPadding = _bottomPadding = 0;
 }
 
-ListWidget::ListWidget(Dialog *boss, int x, int y, int w, int h, const char *tooltip, uint32 cmd)
+ListWidget::ListWidget(Dialog *boss, int x, int y, int w, int h, const Common::U32String &tooltip, uint32 cmd)
 	: EditableWidget(boss, x, y, w, h, tooltip), _cmd(cmd) {
 
-	_scrollBar = NULL;
+	_entriesPerPage = 0;
+	_scrollBarWidth = 0;
 
-	// This ensures that _entriesPerPage is properly initialized.
-	reflowLayout();
-
-	_scrollBar = new ScrollBarWidget(this, _w - _scrollBarWidth + 1, 0, _scrollBarWidth, _h);
+	_scrollBar = new ScrollBarWidget(this, _w - _scrollBarWidth, 0, _scrollBarWidth, _h);
 	_scrollBar->setTarget(this);
 
 	setFlags(WIDGET_ENABLED | WIDGET_CLEARBG | WIDGET_RETAIN_FOCUS | WIDGET_WANT_TICKLE);
@@ -93,7 +102,34 @@ ListWidget::ListWidget(Dialog *boss, int x, int y, int w, int h, const char *too
 
 	_quickSelect = true;
 	_editColor = ThemeEngine::kFontColorNormal;
+	_dictionarySelect = false;
+
+	_filterMatcher = ListWidgetDefaultMatcher;
+	_filterMatcherArg = nullptr;
+
+	_lastRead = -1;
+
+	_hlLeftPadding = _hlRightPadding = 0;
+	_leftPadding = _rightPadding = 0;
+	_topPadding = _bottomPadding = 0;
+
+	_scrollBarWidth = 0;
 }
+
+void ListWidget::copyListData(const Common::U32StringArray &list) {
+	Common::U32String stripped;
+
+	_dataList.clear();
+	_cleanedList.clear();
+
+	for (uint i = 0; i < list.size(); ++i) {
+		stripped = stripGUIformatting(list[i]);
+
+		_dataList.push_back(ListData(list[i], stripped));
+		_cleanedList.push_back(stripped);
+	}
+}
+
 
 bool ListWidget::containsWidget(Widget *w) const {
 	if (w == _scrollBar || _scrollBar->containsWidget(w))
@@ -112,7 +148,7 @@ void ListWidget::setSelected(int item) {
 	// HACK/FIXME: If our _listIndex has a non zero size,
 	// we will need to look up, whether the user selected
 	// item is present in that list
-	if (_listIndex.size()) {
+	if (!_filter.empty()) {
 		int filteredItem = -1;
 
 		for (uint i = 0; i < _listIndex.size(); ++i) {
@@ -143,31 +179,15 @@ void ListWidget::setSelected(int item) {
 	}
 }
 
-ThemeEngine::FontColor ListWidget::getSelectionColor() const {
-	if (_listColors.empty())
-		return ThemeEngine::kFontColorNormal;
-
-	if (_filter.empty())
-		return _listColors[_selectedItem];
-	else
-		return _listColors[_listIndex[_selectedItem]];
-}
-
-void ListWidget::setList(const StringArray &list, const ColorList *colors) {
+void ListWidget::setList(const Common::U32StringArray &list) {
 	if (_editMode && _caretVisible)
 		drawCaret(true);
 
 	// Copy everything
-	_dataList = list;
+	copyListData(list);
 	_list = list;
 	_filter.clear();
 	_listIndex.clear();
-	_listColors.clear();
-
-	if (colors) {
-		_listColors = *colors;
-		assert(_listColors.size() == _dataList.size());
-	}
 
 	int size = list.size();
 	if (_currentPos >= size)
@@ -180,20 +200,10 @@ void ListWidget::setList(const StringArray &list, const ColorList *colors) {
 	scrollBarRecalc();
 }
 
-void ListWidget::append(const String &s, ThemeEngine::FontColor color) {
-	if (_dataList.size() == _listColors.size()) {
-		// If the color list has the size of the data list, we append the color.
-		_listColors.push_back(color);
-	} else if (!_listColors.size() && color != ThemeEngine::kFontColorNormal) {
-		// If it's the first entry to use a non default color, we will fill
-		// up all other entries of the color list with the default color and
-		// add the requested color for the new entry.
-		for (uint i = 0; i < _dataList.size(); ++i)
-			_listColors.push_back(ThemeEngine::kFontColorNormal);
-		_listColors.push_back(color);
-	}
-
-	_dataList.push_back(s);
+void ListWidget::append(const Common::String &s) {
+	Common::U32String stripped = stripGUIformatting(s);
+	_dataList.push_back(ListData(s, stripped));
+	_cleanedList.push_back(stripped);
 	_list.push_back(s);
 
 	setFilter(_filter, false);
@@ -262,6 +272,31 @@ void ListWidget::handleMouseWheel(int x, int y, int direction) {
 	_scrollBar->handleMouseWheel(x, y, direction);
 }
 
+void ListWidget::handleMouseMoved(int x, int y, int button) {
+	if (!isEnabled())
+		return;
+
+	// Determine if we are inside the widget
+	if (x < 0 || x > _w)
+		return;
+
+	// First check whether the selection changed
+	int item = findItem(x, y);
+
+	if (item != -1) {
+		if(_lastRead != item) {
+			read(stripGUIformatting(_list[item]));
+			_lastRead = item;
+		}
+	}
+	else
+		_lastRead = -1;
+}
+
+void ListWidget::handleMouseLeft(int button) {
+	_lastRead = -1;
+}
+
 
 int ListWidget::findItem(int x, int y) const {
 	if (y < _topPadding) return -1;
@@ -273,8 +308,12 @@ int ListWidget::findItem(int x, int y) const {
 		return -1;
 }
 
-static int matchingCharsIgnoringCase(const char *x, const char *y, bool &stop) {
+static int matchingCharsIgnoringCase(const char *x, const char *y, bool &stop, bool dictionary) {
 	int match = 0;
+	if (dictionary) {
+		x = scumm_skipArticle(x);
+		y = scumm_skipArticle(y);
+	}
 	while (*x && *y && tolower(*x) == tolower(*y)) {
 		++x;
 		++y;
@@ -309,8 +348,8 @@ bool ListWidget::handleKeyDown(Common::KeyState state) {
 			int newSelectedItem = 0;
 			int bestMatch = 0;
 			bool stop;
-			for (StringArray::const_iterator i = _list.begin(); i != _list.end(); ++i) {
-				const int match = matchingCharsIgnoringCase(i->c_str(), _quickSelectStr.c_str(), stop);
+			for (Common::U32StringArray::const_iterator i = _list.begin(); i != _list.end(); ++i) {
+				const int match = matchingCharsIgnoringCase(stripGUIformatting(*i).encode().c_str(), _quickSelectStr.c_str(), stop, _dictionarySelect);
 				if (match > bestMatch || stop) {
 					_selectedItem = newSelectedItem;
 					bestMatch = match;
@@ -487,21 +526,23 @@ void ListWidget::handleCommand(CommandSender *sender, uint32 cmd, uint32 data) {
 			((GUI::Dialog *)_boss)->setFocusWidget(this);
 		}
 		break;
+	default:
+		break;
 	}
 }
 
 void ListWidget::drawWidget() {
 	int i, pos, len = _list.size();
-	Common::String buffer;
+	Common::U32String buffer;
 
 	// Draw a thin frame around the list.
-	g_gui.theme()->drawWidgetBackground(Common::Rect(_x, _y, _x + _w, _y + _h), 0,
+	g_gui.theme()->drawWidgetBackground(Common::Rect(_x, _y, _x + _w, _y + _h),
 	                                    ThemeEngine::kWidgetBackgroundBorder);
 
 	// Draw the list items
 	for (i = 0, pos = _currentPos; i < _entriesPerPage && pos < len; i++, pos++) {
 		const int y = _y + _topPadding + kLineHeight * i;
-		const int fontHeight = kLineHeight;
+		const int fontHeight = g_gui.getFontHeight();
 		ThemeEngine::TextInversionState inverted = ThemeEngine::kTextInversionNone;
 
 		// Draw the selected item inverted, on a highlighted background.
@@ -510,41 +551,62 @@ void ListWidget::drawWidget() {
 
 		Common::Rect r(getEditRect());
 		int pad = _leftPadding;
+		int rtlPad = (_x + r.left + _leftPadding) - (_x + _hlLeftPadding);
 
-		// If in numbering mode, we first print a number prefix
-		if (_numberingMode != kListNumberingOff) {
+		// If in numbering mode & not in RTL based GUI, we first print a number prefix
+		if (_numberingMode != kListNumberingOff && g_gui.useRTL() == false) {
 			buffer = Common::String::format("%2d. ", (pos + _numberingMode));
-			g_gui.theme()->drawText(Common::Rect(_x + _hlLeftPadding, y, _x + r.left + _leftPadding, y + fontHeight - 2),
-			                        buffer, _state, Graphics::kTextAlignLeft, inverted, _leftPadding, true);
+			g_gui.theme()->drawText(Common::Rect(_x + _hlLeftPadding, y, _x + r.left + _leftPadding, y + fontHeight),
+									buffer, _state, _drawAlign, inverted, _leftPadding, true);
 			pad = 0;
 		}
 
-		ThemeEngine::FontColor color = ThemeEngine::kFontColorNormal;
+		Common::Rect r1(_x + r.left, y, _x + r.right, y + fontHeight);
 
-		if (!_listColors.empty()) {
-			if (_filter.empty() || _selectedItem == -1)
-				color = _listColors[pos];
-			else
-				color = _listColors[_listIndex[pos]];
+		if (g_gui.useRTL()) {
+			if (_scrollBar->isVisible()) {
+				r1.translate(_scrollBarWidth, 0);
+			}
+
+			if (_numberingMode != kListNumberingOff) {
+				r1.translate(-rtlPad, 0);
+			}
 		}
+
+		ThemeEngine::FontColor color = ThemeEngine::kFontColorFormatting;
 
 		if (_selectedItem == pos && _editMode) {
 			buffer = _editString;
 			color = _editColor;
 			adjustOffset();
-			g_gui.theme()->drawText(Common::Rect(_x + r.left, y, _x + r.right, y + fontHeight - 2), buffer, _state,
-			                        Graphics::kTextAlignLeft, inverted, pad, true, ThemeEngine::kFontStyleBold, color);
 		} else {
 			buffer = _list[pos];
-			g_gui.theme()->drawText(Common::Rect(_x + r.left, y, _x + r.right, y + fontHeight - 2), buffer, _state,
-			                        Graphics::kTextAlignLeft, inverted, pad, true, ThemeEngine::kFontStyleBold, color);
+		}
+
+		drawFormattedText(r1, buffer, _state, _drawAlign, inverted, pad, true, color);
+
+		// If in numbering mode & using RTL layout in GUI, we print a number suffix after drawing the text
+		if (_numberingMode != kListNumberingOff && g_gui.useRTL()) {
+			buffer = Common::String::format(" .%2d", (pos + _numberingMode));
+
+			Common::Rect r2 = r1;
+
+			r2.left = r1.right;
+			r2.right = r1.right + rtlPad;
+
+			g_gui.theme()->drawText(r2, buffer, _state, _drawAlign, inverted, _leftPadding, true);
 		}
 	}
 }
 
 Common::Rect ListWidget::getEditRect() const {
 	const int scrollbarW = (_scrollBar && _scrollBar->isVisible()) ? _scrollBarWidth : 0;
-	Common::Rect r(_hlLeftPadding, 0, _w - _hlRightPadding - scrollbarW, kLineHeight - 2);
+	int editWidth = _w - _hlLeftPadding - _hlRightPadding - scrollbarW;
+	// Ensure r will always be a valid rect
+	if (editWidth < 0) {
+		editWidth = 0;
+	}
+	Common::Rect r(_hlLeftPadding, 0, _hlLeftPadding + editWidth, g_gui.getFontHeight());
 	const int offset = (_selectedItem - _currentPos) * kLineHeight + _topPadding;
 	r.top += offset;
 	r.bottom += offset;
@@ -553,9 +615,19 @@ Common::Rect ListWidget::getEditRect() const {
 		// FIXME: Assumes that all digits have the same width.
 		Common::String temp = Common::String::format("%2d. ", (_list.size() - 1 + _numberingMode));
 		r.left += g_gui.getStringWidth(temp) + _leftPadding;
+		// Make sure we don't go farther than right
+		if (r.right < r.left) {
+			r.right = r.left;
+		}
 	}
 
 	return r;
+}
+
+int ListWidget::getCaretOffset() const {
+	Common::U32String substr(_editString.begin(), _editString.begin() + _caretPos);
+	Common::U32String stripped = stripGUIformatting(substr);
+	return g_gui.getStringWidth(stripped, _font) - _editScrollOffset;
 }
 
 void ListWidget::checkBounds() {
@@ -567,7 +639,7 @@ void ListWidget::checkBounds() {
 
 void ListWidget::scrollToCurrent() {
 	// Only do something if the current item is not in our view port
-	if (_selectedItem < _currentPos) {
+	if (_selectedItem != -1 && _selectedItem < _currentPos) {
 		// it's above our view
 		_currentPos = _selectedItem;
 	} else if (_selectedItem >= _currentPos + _entriesPerPage ) {
@@ -595,16 +667,9 @@ void ListWidget::scrollToEnd() {
 void ListWidget::startEditMode() {
 	if (_editable && !_editMode && _selectedItem >= 0) {
 		_editMode = true;
-		setEditString(_list[_selectedItem]);
+		setEditString(stripGUIformatting(_list[_selectedItem]));
 		_caretPos = _editString.size();	// Force caret to the *end* of the selection.
-		if (_listColors.empty()) {
-			_editColor = ThemeEngine::kFontColorNormal;
-		} else {
-			if (_filter.empty())
-				_editColor = _listColors[_selectedItem];
-			else
-				_editColor = _listColors[_listIndex[_selectedItem]];
-		}
+		_editColor = ThemeEngine::kFontColorNormal;
 		markAsDirty();
 		g_system->setFeatureState(OSystem::kFeatureVirtualKeyboard, true);
 	}
@@ -658,18 +723,18 @@ void ListWidget::reflowLayout() {
 	assert(_entriesPerPage > 0);
 
 	if (_scrollBar) {
-		_scrollBar->resize(_w - _scrollBarWidth + 1, 0, _scrollBarWidth, _h);
+		_scrollBar->resize(_w - _scrollBarWidth, 0, _scrollBarWidth, _h, false);
 		scrollBarRecalc();
 		scrollToCurrent();
 	}
 }
 
-void ListWidget::setFilter(const String &filter, bool redraw) {
+void ListWidget::setFilter(const Common::U32String &filter, bool redraw) {
 	// FIXME: This method does not deal correctly with edit mode!
 	// Until we fix that, let's make sure it isn't called while editing takes place
 	assert(!_editMode);
 
-	String filt = filter;
+	Common::U32String filt = filter;
 	filt.toLowercase();
 
 	if (_filter == filt) // Filter was not changed
@@ -679,33 +744,37 @@ void ListWidget::setFilter(const String &filter, bool redraw) {
 
 	if (_filter.empty()) {
 		// No filter -> display everything
-		_list = _dataList;
+
+		_list.clear();
+
+		for (uint i = 0; i < _dataList.size(); ++i)
+			_list.push_back(_dataList[i].orig);
+
 		_listIndex.clear();
 	} else {
-		// Restrict the list to everything which contains all words in _filter
-		// as substrings, ignoring case.
+		// Restrict the list to everything which matches all tokens in _filter, ignoring case.
 
-		Common::StringTokenizer tok(_filter);
-		String tmp;
+		Common::U32StringTokenizer tok(_filter);
+		Common::U32String tmp;
 		int n = 0;
 
 		_list.clear();
 		_listIndex.clear();
 
-		for (StringArray::iterator i = _dataList.begin(); i != _dataList.end(); ++i, ++n) {
-			tmp = *i;
+		for (auto i = _dataList.begin(); i != _dataList.end(); ++i, ++n) {
+			tmp = i->clean;
 			tmp.toLowercase();
 			bool matches = true;
 			tok.reset();
 			while (!tok.empty()) {
-				if (!tmp.contains(tok.nextToken())) {
+				if (!_filterMatcher(_filterMatcherArg, n, tmp, tok.nextToken())) {
 					matches = false;
 					break;
 				}
 			}
 
 			if (matches) {
-				_list.push_back(*i);
+				_list.push_back(i->orig);
 				_listIndex.push_back(n);
 			}
 		}
@@ -729,6 +798,141 @@ void ListWidget::setFilter(const String &filter, bool redraw) {
 		// (I am borrowing these "ideas" from the NSBox class in Cocoa :).
 		g_gui.scheduleTopDialogRedraw();
 	}
+}
+
+Common::U32String ListWidget::getThemeColor(byte r, byte g, byte b) {
+	return Common::U32String::format("\001c%02x%02x%02x", r, g, b);
+}
+
+Common::U32String ListWidget::getThemeColor(ThemeEngine::FontColor color) {
+	switch (color) {
+	case ThemeEngine::kFontColorNormal:
+		return Common::U32String("\001C{normal}");
+	case ThemeEngine::kFontColorAlternate:
+		return Common::U32String("\001C{alternate}");
+	default:
+		return Common::U32String("\001C{unknown}");
+	}
+}
+
+ThemeEngine::FontColor ListWidget::getThemeColor(const Common::U32String &color) {
+	if (color == "normal")
+		return ThemeEngine::kFontColorNormal;
+
+	if (color == "alternate")
+		return ThemeEngine::kFontColorAlternate;
+
+	warning("ListWidget::getThemeColor(): Malformed color (\"%s\")", color.encode().c_str());
+
+	return ThemeEngine::kFontColorNormal;
+}
+
+Common::U32String ListWidget::stripGUIformatting(const Common::U32String &str) {
+	Common::U32String stripped;
+	const uint32 *s = str.u32_str();
+
+	while (*s) {
+		if (*s != '\001') { // normal symbol
+			stripped += *s++;
+			continue;
+		}
+
+		s++; // skip \001
+		switch (*s) {
+		case '\001':  // \001\001 -> \001
+			stripped += *s++;
+			break;
+
+		case 'c': // \001cRRGGBB
+			s += 7; // check length?
+			break;
+
+		case 'C': // \001C{color-name}
+			while (*s && *s++ != '}')
+				;
+			break;
+
+		default:
+			error("Wrong string format (%c)", *s);
+		}
+	}
+
+	return stripped;
+}
+
+Common::U32String ListWidget::escapeString(const Common::U32String &str) {
+	Common::U32String escaped;
+	const uint32 *s = str.u32_str();
+
+	while (*s) {
+		if (*s == '\001')
+			escaped += '\001';
+		escaped += *s++;
+	}
+
+	return escaped;
+}
+
+void ListWidget::drawFormattedText(const Common::Rect &r, const Common::U32String &str, ThemeEngine::WidgetStateInfo state,
+				Graphics::TextAlign align, ThemeEngine::TextInversionState inverted, int deltax, bool useEllipsis,
+				ThemeEngine::FontColor color) {
+	Common::U32String chunk;
+	const uint32 *s = str.u32_str();
+	ThemeEngine::FontStyle curfont = ThemeEngine::kFontStyleBold;
+	ThemeEngine::FontColor curcolor = ThemeEngine::kFontColorNormal;
+	Common::U32String tmp;
+
+	while (*s) {
+		if (*s != '\001') { // normal symbol
+			chunk += *s++;
+			continue;
+		}
+
+		if (chunk.size()) {
+			g_gui.theme()->drawText(r, chunk, state, align, inverted, deltax, true, curfont, curcolor);
+
+			deltax += g_gui.theme()->getStringWidth(chunk, curfont);
+			chunk.clear();
+		}
+
+		s++; // skip \001
+		switch (*s) {
+		case '\001':  // \001\001 -> \001
+			chunk += *s++;
+			break;
+
+		case 'c': // \001cRRGGBB
+			s += 7; // check length?
+			break;
+
+		case 'C': // \001C{color-name}
+			tmp.clear();
+			s++;
+			if (*s == '{')
+				s++;
+			else
+				error("ListWidget::drawFormattedText(): Malformatted \\001C color (%c)", *s);
+
+			while (*s && *s != '}')
+				tmp += *s++;
+
+			if (*s == '}')	// skip the closing bracket
+				s++;
+
+			if (color == ThemeEngine::kFontColorFormatting)
+				curcolor = getThemeColor(tmp);
+			else
+				curcolor = color;	// Ignore color and use the requested one
+
+			break;
+
+		default:
+			error("ListWidget::drawFormattedText(): Wrong string format (\\001%c)", *s);
+		}
+	}
+
+	if (chunk.size() || str.empty())
+		g_gui.theme()->drawText(r, chunk, state, align, inverted, deltax, true, curfont, curcolor);
 }
 
 } // End of namespace GUI

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -54,12 +53,12 @@ Input::Input(Common::Language language, OSystem *system) :
 	_system(system), _eventMan(system->getEventManager()), _fastMode(false),
 	_keyVerb(VERB_NONE), _cutawayRunning(false), _canQuit(false),
 	_cutawayQuit(false), _dialogueRunning(false), _talkQuit(false),
-	_quickSave(false), _quickLoad(false), _debugger(false), _inKey(Common::KEYCODE_INVALID),
+	_quickSave(false), _quickLoad(false), _inKey(Common::KEYCODE_INVALID),
 	_mouseButton(0), _idleTime(0) {
 
 	switch (language) {
 	case Common::EN_ANY:
-	case Common::GR_GRE:
+	case Common::EL_GRC:
 	case Common::RU_RUS:
 		_currentCommandKeys = _commandKeys[0];
 		break;
@@ -99,9 +98,7 @@ void Input::delay(uint amount) {
 			switch (event.type) {
 			case Common::EVENT_KEYDOWN:
 				if (event.kbd.hasFlags(Common::KBD_CTRL)) {
-					if (event.kbd.keycode == Common::KEYCODE_d) {
-						_debugger = true;
-					} else if (event.kbd.keycode == Common::KEYCODE_f) {
+					if (event.kbd.keycode == Common::KEYCODE_f) {
 						_fastMode = !_fastMode;
 					}
 				} else {
@@ -115,11 +112,16 @@ void Input::delay(uint amount) {
 
 			case Common::EVENT_RBUTTONDOWN:
 				_mouseButton |= MOUSE_RBUTTON;
+				if (_dialogueRunning)
+					_talkQuit = true;
 				break;
-			case Common::EVENT_RTL:
+			case Common::EVENT_RETURN_TO_LAUNCHER:
 			case Common::EVENT_QUIT:
 				if (_cutawayRunning)
 					_cutawayQuit = true;
+				// Allow using close button while dialogue is running
+				if (_dialogueRunning)
+					_talkQuit = true;
 				return;
 
 			default:

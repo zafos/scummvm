@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,7 +39,7 @@ Image::~Image() {
 bool Image::open(const Common::String &name) {
 	Common::SeekableReadStream *stream = _vm->getResourceStream(name);
 	if (!stream) {
-		debug("Image::open failed to open '%s'\n", name.c_str());
+		warning("Image::open failed to open '%s'\n", name.c_str());
 		return false;
 	}
 
@@ -61,13 +60,20 @@ bool Image::open(const Common::String &name) {
 	assert(data);
 
 	if (strcmp(tag, "LZO") == 0) {
-		debug("LZO");
+		warning("LZO image decompression is not implemented");
 	} else if (strcmp(tag, "LCW") == 0) {
 		decompress_lcw(buf, bufSize, (uint8 *)data, dataSize);
+#ifdef SCUMM_BIG_ENDIAN
+		// As the compression is working with 8-bit data, on big-endian architectures we have to switch order of bytes in uncompressed data
+		uint8 *rawData = (uint8 *)data;
+		for (size_t i = 0; i < dataSize - 1; i += 2) {
+			SWAP(rawData[i], rawData[i + 1]);
+		}
+#endif
 	}
 
-	const Graphics::PixelFormat pixelFormat(2, 5, 5, 5, 0, 10, 5, 0, 0);
-	_surface.init(width, height, 2*width, data, pixelFormat);
+	_surface.init(width, height, 2*width, data, gameDataPixelFormat());
+	_surface.convertToInPlace(screenPixelFormat());
 
 	delete[] buf;
 	delete stream;

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,12 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "backends/base-backend.h"
 #include <graphics/surface.h>
-#include <graphics/colormasks.h>
 #include <graphics/palette.h>
 #include <ronin/soundcommon.h>
 #include "backends/timer/default/default-timer.h"
@@ -60,13 +58,14 @@ class DCCDManager : public DefaultAudioCDManager {
 public:
 	// Poll cdrom status
 	// Returns true if cd audio is playing
-	bool isPlaying() const;
+	bool isPlaying() const override;
 
 	// Play cdrom audio track
-	bool play(int track, int numLoops, int startFrame, int duration, bool onlyEmulate = false);
+	bool play(int track, int numLoops, int startFrame, int duration, bool onlyEmulate = false,
+		Audio::Mixer::SoundType soundType = Audio::Mixer::kMusicSoundType) override;
 
 	// Stop cdrom audio track
-	void stop();
+	void stop() override;
 };
 
 class OSystem_Dreamcast : private DCHardware, public EventsBaseBackend, public PaletteManager, public FilesystemFactory
@@ -88,18 +87,6 @@ class OSystem_Dreamcast : private DCHardware, public EventsBaseBackend, public P
 
   // Query the state of the specified feature.
   bool getFeatureState(Feature f);
-
-  // Retrieve a list of all graphics modes supported by this backend.
-  const GraphicsMode *getSupportedGraphicsModes() const;
-
-  // Return the ID of the 'default' graphics mode.
-  int getDefaultGraphicsMode() const;
-
-  // Switch to the specified graphics mode.
-  bool setGraphicsMode(int mode);
-
-  // Determine which graphics mode is currently active.
-  int getGraphicsMode() const;
 
   // Set colors of the palette
   PaletteManager *getPaletteManager() { return this; }
@@ -139,13 +126,13 @@ public:
   void warpMouse(int x, int y);
 
   // Set the bitmap that's used when drawing the cursor.
-  void setMouseCursor(const void *buf, uint w, uint h, int hotspot_x, int hotspot_y, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format);
+  void setMouseCursor(const void *buf, uint w, uint h, int hotspot_x, int hotspot_y, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask);
 
   // Replace the specified range of cursor the palette with new colors.
   void setCursorPalette(const byte *colors, uint start, uint num);
 
   // Shaking is used in SCUMM. Set current shake position.
-  void setShakePos(int shake_pos);
+  void setShakePos(int shake_x_pos, int shake_y_pos);
 
   // Get the number of milliseconds since the program was started.
   uint32 getMillis(bool skipRecord = false);
@@ -154,7 +141,7 @@ public:
   void delayMillis(uint msecs);
 
   // Get the current time and date. Correspond to time()+localtime().
-  void getTimeAndDate(TimeDate &t) const;
+  void getTimeAndDate(TimeDate &td, bool skipRecord = false) const;
 
   // Get the next event.
   // Returns true if an event was retrieved.
@@ -166,22 +153,20 @@ public:
   // Overlay
   int16 getOverlayHeight();
   int16 getOverlayWidth();
-  void showOverlay();
+  bool isOverlayVisible() const { return _overlay_visible; }
+  void showOverlay(bool inGUI);
   void hideOverlay();
   void clearOverlay();
-  void grabOverlay(void *buf, int pitch);
+  void grabOverlay(Graphics::Surface &surface);
   void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h);
-  virtual Graphics::PixelFormat getOverlayFormat() const { return Graphics::createPixelFormat<4444>(); }
+  virtual Graphics::PixelFormat getOverlayFormat() const { return Graphics::PixelFormat(2, 4, 4, 4, 4, 8, 4, 0, 12); }
 
   // Mutex handling
-  MutexRef createMutex();
-  void lockMutex(MutexRef mutex);
-  void unlockMutex(MutexRef mutex);
-  void deleteMutex(MutexRef mutex);
+  Common::MutexInternal *createMutex();
 
   // Set a window caption or any other comparable status display to the
   // given value.
-  void setWindowCaption(const char *caption);
+  void setWindowCaption(const Common::U32String &caption);
 
   // Modulatized backend
   Audio::Mixer *getMixer() { return _mixer; }
@@ -190,9 +175,9 @@ public:
   void mouseToSoftKbd(int x, int y, int &rx, int &ry) const;
 
   // Filesystem
-  AbstractFSNode *makeRootFileNode() const;
-  AbstractFSNode *makeCurrentDirectoryFileNode() const;
-  AbstractFSNode *makeFileNodePath(const Common::String &path) const;
+  AbstractFSNode *makeRootFileNode() const override;
+  AbstractFSNode *makeCurrentDirectoryFileNode() const override;
+  AbstractFSNode *makeFileNodePath(const Common::String &path) const override;
 
  private:
 
@@ -201,13 +186,14 @@ public:
 
   int _ms_cur_x, _ms_cur_y, _ms_cur_w, _ms_cur_h, _ms_old_x, _ms_old_y;
   int _ms_hotspot_x, _ms_hotspot_y, _ms_visible, _devpoll, _last_screen_refresh;
-  int _current_shake_pos, _screen_w, _screen_h;
+  int _current_shake_x_pos, _current_shake_y_pos, _screen_w, _screen_h;
   int _overlay_x, _overlay_y;
   unsigned char *_ms_buf;
   uint32 _ms_keycolor;
   bool _overlay_visible, _overlay_dirty, _screen_dirty;
   int _screen_buffer, _overlay_buffer, _mouse_buffer;
   bool _aspect_stretch, _softkbd_on, _enable_cursor_palette;
+  bool _overlay_in_gui;
   float _overlay_fade, _xscale, _yscale, _top_offset;
   int _softkbd_motion;
 
@@ -250,6 +236,11 @@ public:
  protected:
   Plugin* createPlugin(const Common::FSNode &node) const;
   bool isPluginFilename(const Common::FSNode &node) const;
+  void addCustomDirectories(Common::FSList &dirs) const;
+ public:
+  PluginList getPlugins();
+ private:
+  const char *pluginCustomDirectory;
 #endif
 };
 
@@ -257,4 +248,7 @@ public:
 extern int handleInput(struct mapledev *pad,
 		       int &mouse_x, int &mouse_y,
 		       byte &shiftFlags, Interactive *inter = NULL);
-extern bool selectGame(char *&, char *&, Common::Language &, Common::Platform &, class Icon &);
+extern bool selectGame(char *&, char *&, char *&, Common::Language &, Common::Platform &, class Icon &);
+#ifdef DYNAMIC_MODULES
+extern bool selectPluginDir(Common::String &selection, const Common::FSNode &base);
+#endif

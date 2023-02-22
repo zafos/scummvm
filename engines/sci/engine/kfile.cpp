@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -30,6 +29,7 @@
 #include "common/system.h"
 #include "common/translation.h"
 #include "common/memstream.h"
+#include "common/str-enc.h"
 
 #include "gui/saveload.h"
 
@@ -43,9 +43,9 @@
 #ifdef ENABLE_SCI32
 #include "graphics/thumbnail.h"
 #include "sci/engine/guest_additions.h"
-#include "sci/engine/message.h"
-#include "sci/resource.h"
 #endif
+#include "sci/engine/message.h"
+#include "sci/resource/resource.h"
 
 namespace Sci {
 
@@ -56,7 +56,7 @@ reg_t kGetCWD(EngineState *s, int argc, reg_t *argv) {
 	// We do not let the scripts see the file system, instead pretending
 	// we are always in the same directory.
 	// TODO/FIXME: Is "/" a good value? Maybe "" or "." or "C:\" are better?
-	s->_segMan->strcpy(argv[0], "/");
+	s->_segMan->strcpy_(argv[0], "/");
 
 	debugC(kDebugLevelFile, "kGetCWD() -> %s", "/");
 
@@ -78,7 +78,7 @@ reg_t kDeviceInfo(EngineState *s, int argc, reg_t *argv) {
 		// WORKAROUND: The fan game script library calls kDeviceInfo with one parameter.
 		// According to the scripts, it wants to call CurDevice. However, it fails to
 		// provide the subop to the function.
-		s->_segMan->strcpy(argv[0], "/");
+		s->_segMan->strcpy_(argv[0], "/");
 		return s->r_acc;
 	}
 
@@ -88,12 +88,12 @@ reg_t kDeviceInfo(EngineState *s, int argc, reg_t *argv) {
 	case K_DEVICE_INFO_GET_DEVICE: {
 		Common::String input_str = s->_segMan->getString(argv[1]);
 
-		s->_segMan->strcpy(argv[2], "/");
+		s->_segMan->strcpy_(argv[2], "/");
 		debug(3, "K_DEVICE_INFO_GET_DEVICE(%s) -> %s", input_str.c_str(), "/");
 		break;
 	}
 	case K_DEVICE_INFO_GET_CURRENT_DEVICE:
-		s->_segMan->strcpy(argv[1], "/");
+		s->_segMan->strcpy_(argv[1], "/");
 		debug(3, "K_DEVICE_INFO_GET_CURRENT_DEVICE() -> %s", "/");
 		break;
 
@@ -102,7 +102,7 @@ reg_t kDeviceInfo(EngineState *s, int argc, reg_t *argv) {
 		Common::String path2_s = s->_segMan->getString(argv[2]);
 		debug(3, "K_DEVICE_INFO_PATHS_EQUAL(%s,%s)", path1_s.c_str(), path2_s.c_str());
 
-		return make_reg(0, Common::matchString(path2_s.c_str(), path1_s.c_str(), false, true));
+		return make_reg(0, Common::matchString(path2_s.c_str(), path1_s.c_str(), false, "/"));
 		}
 		break;
 
@@ -117,12 +117,12 @@ reg_t kDeviceInfo(EngineState *s, int argc, reg_t *argv) {
 		return NULL_REG;
 	}
 	/* SCI uses these in a less-than-portable way to delete savegames.
-	** Read http://www-plan.cs.colorado.edu/creichen/freesci-logs/2005.10/log20051019.html
+	** Read https://web.archive.org/web/20060913122014/http://www-plan.cs.colorado.edu/creichen/freesci-logs/2005.10/log20051019.html
 	** for more information on our workaround for this.
 	*/
 	case K_DEVICE_INFO_GET_SAVECAT_NAME: {
 		Common::String game_prefix = s->_segMan->getString(argv[2]);
-		s->_segMan->strcpy(argv[1], "__throwaway");
+		s->_segMan->strcpy_(argv[1], "__throwaway");
 		debug(3, "K_DEVICE_INFO_GET_SAVECAT_NAME(%s) -> %s", game_prefix.c_str(), "__throwaway");
 		}
 
@@ -130,7 +130,7 @@ reg_t kDeviceInfo(EngineState *s, int argc, reg_t *argv) {
 	case K_DEVICE_INFO_GET_SAVEFILE_NAME: {
 		Common::String game_prefix = s->_segMan->getString(argv[2]);
 		uint virtualId = argv[3].toUint16();
-		s->_segMan->strcpy(argv[1], "__throwaway");
+		s->_segMan->strcpy_(argv[1], "__throwaway");
 		debug(3, "K_DEVICE_INFO_GET_SAVEFILE_NAME(%s,%d) -> %s", game_prefix.c_str(), virtualId, "__throwaway");
 		if ((virtualId < SAVEGAMEID_OFFICIALRANGE_START) || (virtualId > SAVEGAMEID_OFFICIALRANGE_END))
 			error("kDeviceInfo(deleteSave): invalid savegame ID specified");
@@ -206,6 +206,9 @@ reg_t kCD(EngineState *s, int argc, reg_t *argv) {
 }
 
 reg_t kCheckCD(EngineState *s, int argc, reg_t *argv) {
+	// Mac interpreters would display a dialog prompting for the disc.
+	//  kCheckCD took an optional second boolean parameter, which we
+	//  ignore, that affected the dialog's text.
 	const int16 cdNo = argc > 0 ? argv[0].toSint16() : 0;
 
 	if (cdNo) {
@@ -397,7 +400,7 @@ reg_t kFileIOOpen(EngineState *s, int argc, reg_t *argv) {
 			// of the filename
 			const int skip = name.firstChar() < '0' || name.firstChar() > '9';
 
-			if (sscanf(name.c_str() + skip, "%i.DTA", &saveNo) != 1) {
+			if (sscanf(name.c_str() + skip, "%d.DTA", &saveNo) != 1) {
 				warning("Could not parse game filename %s", name.c_str());
 			}
 
@@ -450,7 +453,7 @@ reg_t kFileIOOpen(EngineState *s, int argc, reg_t *argv) {
 		int saveNo = -1;
 		if (name == "911.sg" || name == "autorama.sg") {
 			saveNo = kAutoSaveId;
-		} else if (sscanf(name.c_str(), "ramasg.%i", &saveNo) == 1) {
+		} else if (sscanf(name.c_str(), "ramasg.%d", &saveNo) == 1) {
 			saveNo += kSaveIdShift;
 		}
 
@@ -566,7 +569,7 @@ reg_t kFileIOClose(EngineState *s, int argc, reg_t *argv) {
 
 	if (handle >= kVirtualFileHandleStart) {
 		// it's a virtual handle? ignore it
-		return getSciVersion() >= SCI_VERSION_2 ? TRUE_REG : SIGNAL_REG;
+		return TRUE_REG;
 	}
 
 	FileHandle *f = getFileFromHandle(s, handle);
@@ -574,7 +577,7 @@ reg_t kFileIOClose(EngineState *s, int argc, reg_t *argv) {
 		f->close();
 		if (getSciVersion() <= SCI_VERSION_0_LATE)
 			return s->r_acc;	// SCI0 semantics: no value returned
-		return getSciVersion() >= SCI_VERSION_2 ? TRUE_REG : SIGNAL_REG;
+		return TRUE_REG;
 	}
 
 	if (getSciVersion() <= SCI_VERSION_0_LATE)
@@ -584,20 +587,33 @@ reg_t kFileIOClose(EngineState *s, int argc, reg_t *argv) {
 
 reg_t kFileIOReadRaw(EngineState *s, int argc, reg_t *argv) {
 	uint16 handle = argv[0].toUint16();
+	reg_t dest = argv[1];
 	uint16 size = argv[2].toUint16();
 	int bytesRead = 0;
-	char *buf = new char[size];
+	byte *buf = new byte[size];
 	debugC(kDebugLevelFile, "kFileIO(readRaw): %d, %d", handle, size);
 
 	FileHandle *f = getFileFromHandle(s, handle);
-	if (f)
-		bytesRead = f->_in->read(buf, size);
+	if (f) {
+#ifdef ENABLE_SCI32
+		SegmentRef destReference = s->_segMan->dereference(dest);
+		SegmentObj *destObject = s->_segMan->getSegmentObj(dest.getSegment());
 
-	// TODO: What happens if less bytes are read than what has
-	// been requested? (i.e. if bytesRead is non-zero, but still
-	// less than size)
+		if (destReference.maxSize == size - 4 && destObject->getType() == SEG_TYPE_ARRAY) {
+			// This is an array structure, which starts with the number of
+			// elements in the array and the size of each element. Skip
+			// these bytes. These structures are stored in the ARC files of
+			// the Behind the Developer's Shield and Inside the Chest demos.
+			f->_in->skip(4);
+			size -= 4;
+		}
+#endif
+
+		bytesRead = f->_in->read(buf, size);
+	}
+
 	if (bytesRead > 0)
-		s->_segMan->memcpy(argv[1], (const byte*)buf, size);
+		s->_segMan->memcpy(dest, buf, bytesRead);
 
 	delete[] buf;
 	return make_reg(0, bytesRead);
@@ -628,19 +644,10 @@ reg_t kFileIOWriteRaw(EngineState *s, int argc, reg_t *argv) {
 
 	delete[] buf;
 
-#ifdef ENABLE_SCI32
-	if (getSciVersion() >= SCI_VERSION_2) {
-		if (!success) {
-			return SIGNAL_REG;
-		}
-
+	if (success) {
 		return make_reg(0, bytesWritten);
 	}
-#endif
-
-	if (success)
-		return NULL_REG;
-	return make_reg(0, 6); // DOS - invalid handle
+	return getSciVersion() >= SCI_VERSION_2 ? SIGNAL_REG : NULL_REG;
 }
 
 reg_t kFileIOUnlink(EngineState *s, int argc, reg_t *argv) {
@@ -654,26 +661,20 @@ reg_t kFileIOUnlink(EngineState *s, int argc, reg_t *argv) {
 		name.deleteChar(0);
 	}
 
-	// Special case for SQ4 floppy: This game has hardcoded names for all of
-	// its savegames, and they are all named "sq4sg.xxx", where xxx is the
-	// slot. We just take the slot number here, and delete the appropriate
-	// save game.
 	if (name.hasPrefix("sq4sg.")) {
-		// Special handling for SQ4... get the slot number and construct the
-		// save game name.
-		int slotNum = atoi(name.c_str() + name.size() - 3);
-		Common::Array<SavegameDesc> saves;
-		listSavegames(saves);
-		int savedir_nr = saves[slotNum].id;
-		name = g_sci->getSavegameName(savedir_nr);
+		// Special case for SQ4 floppy: This game has hardcoded save game names.
+		// They are named "sq4sg.xxx", where xxx is the virtual ID. We construct
+		// the appropriate save game name and delete it.
+		const int savegameId = atoi(name.c_str() + name.size() - 3) - SAVEGAMEID_OFFICIALRANGE_START;
+		name = g_sci->getSavegameName(savegameId);
 		result = saveFileMan->removeSavefile(name);
 #ifdef ENABLE_SCI32
 	} else if (getSciVersion() >= SCI_VERSION_2) {
 		// Special cases for KQ7 & RAMA, basically identical to the SQ4 case
 		// above, where the game hardcodes its save game names
 		int saveNo;
-		if (sscanf(name.c_str(), "kq7cdsg.%i", &saveNo) == 1 ||
-			sscanf(name.c_str(), "ramasg.%i", &saveNo) == 1) {
+		if (sscanf(name.c_str(), "kq7cdsg.%d", &saveNo) == 1 ||
+			sscanf(name.c_str(), "ramasg.%d", &saveNo) == 1) {
 
 			name = g_sci->getSavegameName(saveNo + kSaveIdShift);
 		} else if (g_sci->getGameId() == GID_RAMA && (name == "911.sg" || name == "autorama.sg")) {
@@ -694,15 +695,7 @@ reg_t kFileIOUnlink(EngineState *s, int argc, reg_t *argv) {
 
 	debugC(kDebugLevelFile, "kFileIO(unlink): %s", name.c_str());
 
-#ifdef ENABLE_SCI32
-	if (getSciVersion() >= SCI_VERSION_2) {
-		return make_reg(0, result);
-	}
-#endif
-
-	if (result)
-		return NULL_REG;
-	return make_reg(0, 2); // DOS - file not found error code
+	return make_reg(0, result);
 }
 
 reg_t kFileIOReadString(EngineState *s, int argc, reg_t *argv) {
@@ -721,11 +714,6 @@ reg_t kFileIOReadString(EngineState *s, int argc, reg_t *argv) {
 	} else if ((int)bytesRead > dest_r.maxSize) {
 		error("kFileIO(readString) attempting to read %u bytes into buffer of size %u", bytesRead, dest_r.maxSize);
 	} else if (maxsize > dest_r.maxSize) {
-		// This happens at least in the QfG4 character import.
-		// CHECKME: We zero the remainder of the dest buffer, while
-		// at least several (and maybe all) SSCI interpreters didn't do this.
-		// Therefore this warning is presumably no problem.
-		warning("kFileIO(readString) attempting to copy %u bytes into buffer of size %u (%u/%u bytes actually read)", maxsize, dest_r.maxSize, bytesRead, maxsize);
 		maxsize = dest_r.maxSize;
 	}
 
@@ -757,15 +745,11 @@ reg_t kFileIOWriteString(EngineState *s, int argc, reg_t *argv) {
 	FileHandle *f = getFileFromHandle(s, handle);
 
 	if (f && f->_out) {
-		f->_out->write(str.c_str(), str.size());
-		if (getSciVersion() <= SCI_VERSION_0_LATE)
-			return s->r_acc;	// SCI0 semantics: no value returned
-		return NULL_REG;
+		uint32 bytesWritten = f->_out->write(str.c_str(), str.size());
+		return make_reg(0, bytesWritten);
 	}
 
-	if (getSciVersion() <= SCI_VERSION_0_LATE)
-		return s->r_acc;	// SCI0 semantics: no value returned
-	return make_reg(0, 6); // DOS - invalid handle
+	return getSciVersion() >= SCI_VERSION_2 ? SIGNAL_REG : NULL_REG;
 }
 
 reg_t kFileIOSeek(EngineState *s, int argc, reg_t *argv) {
@@ -777,6 +761,7 @@ reg_t kFileIOSeek(EngineState *s, int argc, reg_t *argv) {
 	FileHandle *f = getFileFromHandle(s, handle);
 
 	if (f && f->_in) {
+		offset = MIN<int16>(offset, f->_in->size());
 		const bool success = f->_in->seek(offset, whence);
 		if (getSciVersion() >= SCI_VERSION_2) {
 			if (success) {
@@ -840,7 +825,7 @@ reg_t kFileIOExists(EngineState *s, int argc, reg_t *argv) {
 		// the native save/load dialogue
 		if (name == "autorama.sg") {
 			findSaveNo = kAutoSaveId;
-		} else if (sscanf(name.c_str(), "ramasg.%i", &findSaveNo) == 1) {
+		} else if (sscanf(name.c_str(), "ramasg.%d", &findSaveNo) == 1) {
 			findSaveNo += kSaveIdShift;
 		}
 	}
@@ -879,6 +864,15 @@ reg_t kFileIOExists(EngineState *s, int argc, reg_t *argv) {
 			exists = true;
 	}
 
+	// GK1 easter egg at the Voodoo Hounfour in script 805. In this easter
+	// egg, Gabriel draws a doodle of Jane Jensen in the whiteboard, if the
+	// player uses the operate action below the whiteboard's eraser. This
+	// easter egg looks for a file named "buster" to be present, so that it
+	// is enabled. We always report that this file exists, to unlock the
+	// easter egg.
+	if (!exists && name == "buster")
+		exists = true;
+	
 	// Special case for non-English versions of LSL5: The English version of
 	// LSL5 calls kFileIO(), case K_FILEIO_OPEN for reading to check if
 	// memory.drv exists (which is where the game's password is stored). If
@@ -924,9 +918,32 @@ reg_t kFileIORename(EngineState *s, int argc, reg_t *argv) {
 	oldName = g_sci->wrapFilename(oldName);
 	newName = g_sci->wrapFilename(newName);
 
+	// Phantasmagoria 1 files are small and interoperable with the
+	//  original interpreter so they aren't compressed, see file_open().
+	bool isCompressed = (g_sci->getGameId() != GID_PHANTASMAGORIA);
+
 	// SCI1.1 returns 0 on success and a DOS error code on fail. SCI32
 	// returns -1 on fail. We just return -1 for all versions.
-	if (g_sci->getSaveFileManager()->renameSavefile(oldName, newName))
+	if (g_sci->getSaveFileManager()->renameSavefile(oldName, newName, isCompressed))
+		return NULL_REG;
+	else
+		return SIGNAL_REG;
+}
+
+reg_t kFileIOCopy(EngineState *s, int argc, reg_t *argv) {
+	Common::String oldName = s->_segMan->getString(argv[0]);
+	Common::String newName = s->_segMan->getString(argv[1]);
+
+	oldName = g_sci->wrapFilename(oldName);
+	newName = g_sci->wrapFilename(newName);
+
+	// Phantasmagoria 1 files are small and interoperable with the
+	//  original interpreter so they aren't compressed, see file_open().
+	bool isCompressed = (g_sci->getGameId() != GID_PHANTASMAGORIA);
+
+	// SCI1.1 returns 0 on success and a DOS error code on fail. SCI32
+	// returns -1 on fail. We just return -1 for all versions.
+	if (g_sci->getSaveFileManager()->copySavefile(oldName, newName, isCompressed))
 		return NULL_REG;
 	else
 		return SIGNAL_REG;
@@ -943,9 +960,11 @@ reg_t kFileIOReadByte(EngineState *s, int argc, reg_t *argv) {
 
 reg_t kFileIOWriteByte(EngineState *s, int argc, reg_t *argv) {
 	FileHandle *f = getFileFromHandle(s, argv[0].toUint16());
-	if (f)
+	if (f) {
 		f->_out->writeByte(argv[1].toUint16() & 0xff);
-	return s->r_acc;
+		return make_reg(0, 1); // bytesWritten
+	}
+	return SIGNAL_REG;
 }
 
 reg_t kFileIOReadWord(EngineState *s, int argc, reg_t *argv) {
@@ -972,12 +991,12 @@ reg_t kFileIOWriteWord(EngineState *s, int argc, reg_t *argv) {
 	const uint16 handle = argv[0].toUint16();
 
 	if (handle == kVirtualFileHandleSci32Save) {
-		return s->r_acc;
+		return make_reg(0, 2); // bytesWritten
 	}
 
 	FileHandle *f = getFileFromHandle(s, handle);
 	if (!f) {
-		return s->r_acc;
+		return SIGNAL_REG;
 	}
 
 	if (f->_name == "-scummvm-save-") {
@@ -990,7 +1009,7 @@ reg_t kFileIOWriteWord(EngineState *s, int argc, reg_t *argv) {
 		f->_out->writeUint16LE(argv[1].toUint16());
 	}
 
-	return s->r_acc;
+	return make_reg(0, 2); // bytesWritten
 }
 
 reg_t kFileIOGetCWD(EngineState *s, int argc, reg_t *argv) {
@@ -1067,6 +1086,11 @@ reg_t kSaveGame(EngineState *s, int argc, reg_t *argv) {
 		if (argv[2].isNull())
 			error("kSaveGame: called with description being NULL");
 		game_description = s->_segMan->getString(argv[2]);
+		if (g_sci->getLanguage() == Common::HE_ISR) {
+			Common::U32String u32string = game_description.decode(Common::kWindows1255);
+			game_description = u32string.encode(Common::kUtf8);
+		};
+
 
 		debug(3, "kSaveGame(%s,%d,%s,%s)", game_id.c_str(), virtualId, game_description.c_str(), version.c_str());
 
@@ -1085,6 +1109,20 @@ reg_t kSaveGame(EngineState *s, int argc, reg_t *argv) {
 				// Jones has one save slot only
 				savegameId = 0;
 				break;
+			case GID_QFG3: {
+				// Auto-save system used by QFG3
+				reg_t autoSaveNameId;
+				s->_segMan->allocDynmem(kMaxSaveNameLength, "kSaveGame", &autoSaveNameId);
+				MessageTuple autoSaveNameTuple(0, 0, 16, 1);
+				s->_msgState->getMessage(0, autoSaveNameTuple, autoSaveNameId);
+				Common::String autoSaveName = s->_segMan->getString(autoSaveNameId);
+				if (game_description == autoSaveName) {
+					savegameId = kAutoSaveId;
+				}
+
+				s->_segMan->freeDynmem(autoSaveNameId);
+				break;
+			}
 			case GID_FANMADE: {
 				// Fanmade game, try to identify the game
 				const char *gameName = g_sci->getGameObjectName();
@@ -1122,6 +1160,16 @@ reg_t kSaveGame(EngineState *s, int argc, reg_t *argv) {
 						error("kSavegame: no more savegame slots available");
 				}
 			}
+
+			// WORKAROUND: Mothergoose256 has a unique scheme for calculating the current save id
+			// and storing it in a global. The SCI1.1 floppy version uses this to auto-save and
+			// auto-delete at the end of the game. This is incompatible with our virtual id system
+			// so we work around this by setting the game's save global to the virtual id here and
+			// also when restoring so that it's always correct. See gamestate_afterRestoreFixUp().
+			// Fixes bug #5294
+			if (g_sci->getGameId() == GID_MOTHERGOOSE256) {
+				s->variables[VAR_GLOBAL][0xB3].setOffset(SAVEGAMEID_OFFICIALRANGE_START + savegameId);
+			}
 		} else {
 			error("kSaveGame: invalid savegameId used");
 		}
@@ -1131,31 +1179,10 @@ reg_t kSaveGame(EngineState *s, int argc, reg_t *argv) {
 		s->_lastSaveNewId = savegameId;
 	}
 
-	s->r_acc = NULL_REG;
-
-	Common::String filename = g_sci->getSavegameName(savegameId);
-	Common::SaveFileManager *saveFileMan = g_sci->getSaveFileManager();
-	Common::OutSaveFile *out;
-
-	out = saveFileMan->openForSaving(filename);
-	if (!out) {
-		warning("Error opening savegame \"%s\" for writing", filename.c_str());
-	} else {
-		if (!gamestate_save(s, out, game_description, version)) {
-			warning("Saving the game failed");
-		} else {
-			s->r_acc = TRUE_REG; // save successful
-		}
-
-		out->finalize();
-		if (out->err()) {
-			warning("Writing the savegame failed");
-			s->r_acc = NULL_REG; // write failure
-		}
-		delete out;
+	if (gamestate_save(s, savegameId, game_description, version)) {
+		return TRUE_REG;
 	}
-
-	return s->r_acc;
+	return NULL_REG;
 }
 
 reg_t kRestoreGame(EngineState *s, int argc, reg_t *argv) {
@@ -1168,8 +1195,11 @@ reg_t kRestoreGame(EngineState *s, int argc, reg_t *argv) {
 	if (argv[0].isNull()) {
 		// Direct call, either from launcher or from a patched Game::restore
 		if (savegameId == -1) {
-			// we are supposed to show a dialog for the user and let him choose a saved game
-			g_sci->_soundCmd->pauseAll(true); // pause music
+			// We are supposed to show a dialog for the user and let him choose a saved game.
+			// Pause music if necessary. There are script situations where the pause does not
+			// get properly released. In that case we don't add another pause here.
+			if (!g_sci->_soundCmd->isGlobalPauseActive()) 
+				g_sci->_soundCmd->pauseAll(true); 
 			GUI::SaveLoadChooser *dialog = new GUI::SaveLoadChooser(_("Restore game:"), _("Restore"), false);
 			savegameId = dialog->runModalWithCurrentTarget();
 			delete dialog;
@@ -1201,29 +1231,15 @@ reg_t kRestoreGame(EngineState *s, int argc, reg_t *argv) {
 	if (findSavegame(saves, savegameId) == -1) {
 		s->r_acc = TRUE_REG;
 		warning("Savegame ID %d not found", savegameId);
-	} else {
-		Common::SaveFileManager *saveFileMan = g_sci->getSaveFileManager();
-		Common::String filename = g_sci->getSavegameName(savegameId);
-		Common::SeekableReadStream *in;
-
-		in = saveFileMan->openForLoading(filename);
-		if (in) {
-			// found a savegame file
-			gamestate_restore(s, in);
-			delete in;
-
-			gamestate_afterRestoreFixUp(s, savegameId);
-
-		} else {
-			s->r_acc = TRUE_REG;
-			warning("Savegame #%d not found", savegameId);
-		}
+	} else if (!gamestate_restore(s, savegameId)) {
+		s->r_acc = TRUE_REG; // signals failure
 	}
 
-	if (!s->r_acc.isNull()) {
-		// no success?
-		if (pausedMusic)
+	if (pausedMusic) {
+		if (!s->r_acc.isNull()) // no success?
 			g_sci->_soundCmd->pauseAll(false); // unpause music
+		else
+			g_sci->_soundCmd->resetGlobalPauseCounter(); // reset music global pause counter without affecting the individual sounds
 	}
 
 	return s->r_acc;
@@ -1303,7 +1319,7 @@ reg_t kGetSaveFiles(EngineState *s, int argc, reg_t *argv) {
 
 	for (uint i = 0; i < totalSaves; i++) {
 		*slot++ = make_reg(0, saves[i].id + SAVEGAMEID_OFFICIALRANGE_START); // Store the virtual savegame ID (see above)
-		strcpy(saveNamePtr, saves[i].name);
+		Common::strlcpy(saveNamePtr, saves[i].name, kMaxSaveNameLength);
 		saveNamePtr += kMaxSaveNameLength;
 	}
 
@@ -1318,12 +1334,29 @@ reg_t kGetSaveFiles(EngineState *s, int argc, reg_t *argv) {
 #ifdef ENABLE_SCI32
 
 reg_t kSaveGame32(EngineState *s, int argc, reg_t *argv) {
+	// fix bug #9752 - make sure that control panel (in case of QFG4),
+	// keyboard (in case of Shivers), or any other obstacle (in other unknown SCI32 games...)
+	// will be hidden before saving
+	kFrameOut(s, 0, NULL);
+
 	const Common::String gameName = s->_segMan->getString(argv[0]);
 	int16 saveNo = argv[1].toSint16();
-	const Common::String saveDescription = argv[2].isNull() ? "" : s->_segMan->getString(argv[2]);
+	Common::String saveDescription = argv[2].isNull() ? "" : s->_segMan->getString(argv[2]);
 	const Common::String gameVersion = (argc <= 3 || argv[3].isNull()) ? "" : s->_segMan->getString(argv[3]);
 
 	debugC(kDebugLevelFile, "Game name %s save %d desc %s ver %s", gameName.c_str(), saveNo, saveDescription.c_str(), gameVersion.c_str());
+
+	// Display the save prompt for Mac games with native dialogs. Passing
+	//  zero for the save number would trigger these, but we can't act solely
+	//  on that since we shift save numbers around to accommodate autosave
+	//  slots, causing some games to pass zero that normally wouldn't.
+	if (g_sci->hasMacSaveRestoreDialogs() && saveNo == 0) {
+		saveNo = g_sci->_guestAdditions->runSaveRestore(true, argv[2]);
+		if (saveNo == -1) {
+			return NULL_REG;
+		}
+		saveDescription = s->_segMan->getString(argv[2]);
+	}
 
 	// Auto-save system used by Torin and LSL7
 	if (gameName == "Autosave" || gameName == "Autosv") {
@@ -1334,7 +1367,7 @@ reg_t kSaveGame32(EngineState *s, int argc, reg_t *argv) {
 			saveNo = kNewGameId;
 		}
 	} else {
-		saveNo += kSaveIdShift;
+		saveNo = shiftSciToScummVMSaveId(saveNo);
 	}
 
 	if (g_sci->getGameId() == GID_PHANTASMAGORIA2 && s->callInStack(g_sci->getGameObject(), SELECTOR(bookMark))) {
@@ -1355,37 +1388,27 @@ reg_t kSaveGame32(EngineState *s, int argc, reg_t *argv) {
 		s->_segMan->freeArray(autoSaveNameId);
 	}
 
-	Common::SaveFileManager *saveFileMan = g_sci->getSaveFileManager();
-	const Common::String filename = g_sci->getSavegameName(saveNo);
-	Common::OutSaveFile *saveStream = saveFileMan->openForSaving(filename);
-
-	if (saveStream == nullptr) {
-		warning("Error opening savegame \"%s\" for writing", filename.c_str());
-		return NULL_REG;
+	if (gamestate_save(s, saveNo, saveDescription, gameVersion)) {
+		return TRUE_REG;
 	}
-
-	if (!gamestate_save(s, saveStream, saveDescription, gameVersion)) {
-		warning("Saving the game failed");
-		saveStream->finalize();
-		delete saveStream;
-		return NULL_REG;
-	}
-
-	saveStream->finalize();
-	if (saveStream->err()) {
-		warning("Writing the savegame failed");
-		delete saveStream;
-		return NULL_REG;
-	}
-
-	delete saveStream;
-	return TRUE_REG;
+	return NULL_REG;
 }
 
 reg_t kRestoreGame32(EngineState *s, int argc, reg_t *argv) {
 	const Common::String gameName = s->_segMan->getString(argv[0]);
 	int16 saveNo = argv[1].toSint16();
-	const Common::String gameVersion = argv[2].isNull() ? "" : s->_segMan->getString(argv[2]);
+	//const Common::String gameVersion = argv[2].isNull() ? "" : s->_segMan->getString(argv[2]);
+
+	// Display the restore prompt for Mac games with native dialogs. Passing
+	//  zero for the save number would trigger these, but we can't act solely
+	//  on that since we shift save numbers around to accommodate autosave
+	//  slots, causing some games to pass zero that normally wouldn't.
+	if (g_sci->hasMacSaveRestoreDialogs() && saveNo == 0) {
+		saveNo = g_sci->_guestAdditions->runSaveRestore(false, NULL_REG, s->_delayedRestoreGameId);
+		if (saveNo == -1) {
+			return NULL_REG;
+		}
+	}
 
 	if (gameName == "Autosave" || gameName == "Autosv") {
 		if (saveNo == 0) {
@@ -1395,39 +1418,32 @@ reg_t kRestoreGame32(EngineState *s, int argc, reg_t *argv) {
 			saveNo = kNewGameId;
 		}
 	} else {
-		saveNo += kSaveIdShift;
+		saveNo = shiftSciToScummVMSaveId(saveNo);
 	}
 
-	Common::SaveFileManager *saveFileMan = g_sci->getSaveFileManager();
-	const Common::String filename = g_sci->getSavegameName(saveNo);
-	Common::SeekableReadStream *saveStream = saveFileMan->openForLoading(filename);
-
-	if (saveStream == nullptr) {
-		warning("Savegame #%d not found", saveNo);
-		return NULL_REG;
+	if (gamestate_restore(s, saveNo)) {
+		return TRUE_REG;
 	}
-
-	gamestate_restore(s, saveStream);
-	delete saveStream;
-
-	gamestate_afterRestoreFixUp(s, saveNo);
-	return TRUE_REG;
+	return NULL_REG;
 }
 
 reg_t kCheckSaveGame32(EngineState *s, int argc, reg_t *argv) {
 	const Common::String gameName = s->_segMan->getString(argv[0]);
 	int16 saveNo = argv[1].toSint16();
-	const Common::String gameVersion = argv[2].isNull() ? "" : s->_segMan->getString(argv[2]);
+	Common::String gameVersion = argv[2].isNull() ? "" : s->_segMan->getString(argv[2]);
 
-	Common::Array<SavegameDesc> saves;
-	listSavegames(saves);
+	// If the game version is empty, fall back to loading it from the VERSION file
+	if (gameVersion == "") {
+		Common::ScopedPtr<Common::SeekableReadStream> versionFile(SearchMan.createReadStreamForMember("VERSION"));
+		gameVersion = versionFile ? versionFile->readLine() : "";
+	}
 
 	if (gameName == "Autosave" || gameName == "Autosv") {
 		if (saveNo == 1) {
 			saveNo = kNewGameId;
 		}
 	} else {
-		saveNo += kSaveIdShift;
+		saveNo = shiftSciToScummVMSaveId(saveNo);
 	}
 
 	SavegameDesc save;
@@ -1445,7 +1461,7 @@ reg_t kCheckSaveGame32(EngineState *s, int argc, reg_t *argv) {
 		return NULL_REG;
 	}
 
-	if (save.gameVersion != gameVersion) {
+	if (save.gameVersion != gameVersion && gameVersion != "" && save.gameVersion != "") {
 		warning("Save game was created for game version %s, but the current game version is %s", save.gameVersion.c_str(), gameVersion.c_str());
 		return NULL_REG;
 	}
@@ -1488,7 +1504,8 @@ reg_t kGetSaveFiles32(EngineState *s, int argc, reg_t *argv) {
 		// At least Phant2 requires use of strncpy, since it creates save game
 		// names of exactly kMaxSaveNameLength
 		strncpy(target, save.name, kMaxSaveNameLength);
-		saveIds.setFromInt16(i, save.id - kSaveIdShift);
+		int16 sciSaveId = shiftScummVMToSciSaveId(save.id);
+		saveIds.setFromInt16(i, sciSaveId);
 	}
 
 	descriptions.charAt(kMaxSaveNameLength * saves.size()) = '\0';

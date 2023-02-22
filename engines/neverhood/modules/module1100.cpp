@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -126,6 +125,8 @@ void Module1100::createScene(int sceneNum, int which) {
 		_vm->_soundMan->setTwoSoundsPlayFlag(true);
 		createSmackerScene(0x00012211, true, true, false);
 		break;
+	default:
+		break;
 	}
 	SetUpdateHandler(&Module1100::updateScene);
 	_childObject->handleUpdate();
@@ -211,6 +212,8 @@ void Module1100::updateScene() {
 			_vm->_soundMan->playTwoSounds(0x0002C818, 0x48498E46, 0x50399F64, 0);
 			createScene(1, 1);
 			break;
+		default:
+			break;
 		}
 	} else {
 		switch (_sceneNum) {
@@ -237,6 +240,8 @@ void Module1100::updateScene() {
 				_vm->_soundMan->setSoundVolume(0x48498E46, 65);
 				_vm->_soundMan->setSoundVolume(0x50399F64, 65);
 			}
+			break;
+		default:
 			break;
 		}
 	}
@@ -374,6 +379,8 @@ uint32 Scene1105::handleMessage(int messageNum, const MessageParam &param, Entit
 				}
 			}
 		}
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -526,6 +533,8 @@ uint32 Scene1109::handleMessage(int messageNum, const MessageParam &param, Entit
 			setRectList(0x004B6398);
 			_klaymen->setKlaymenIdleTable1();
 		}
+		break;
+	default:
 		break;
 	}
 	return 0;

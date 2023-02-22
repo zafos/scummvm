@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,8 +23,11 @@
 #define FORBIDDEN_SYMBOL_EXCEPTION_time_h
 #define FORBIDDEN_SYMBOL_EXCEPTION_unistd_h
 
+#include <3ds.h>
 #include "osystem.h"
 
+#include "backends/platform/3ds/config.h"
+#include "backends/mutex/3ds/3ds-mutex.h"
 #include "backends/saves/default/default-saves.h"
 #include "backends/timer/default/default-timer.h"
 #include "backends/events/default/default-events.h"
@@ -33,14 +35,13 @@
 #include "common/scummsys.h"
 #include "common/config-manager.h"
 #include "common/str.h"
-#include "config.h"
 
-#include "backends/fs/posix/posix-fs-factory.h"
-#include "backends/fs/posix/posix-fs.h"
+#include "backends/fs/posix-drives/posix-drives-fs-factory.h"
+#include "backends/fs/posix-drives/posix-drives-fs.h"
 #include <unistd.h>
 #include <time.h>
 
-namespace _3DS {
+namespace N3DS {
 
 OSystem_3DS::OSystem_3DS():
 	_focusDirty(true),
@@ -61,8 +62,10 @@ OSystem_3DS::OSystem_3DS():
 	_cursorPaletteEnabled(false),
 	_cursorVisible(false),
 	_cursorScalable(false),
-	_cursorX(0),
-	_cursorY(0),
+	_cursorScreenX(0),
+	_cursorScreenY(0),
+	_cursorOverlayX(0),
+	_cursorOverlayY(0),
 	_cursorHotspotX(0),
 	_cursorHotspotY(0),
 	_gameTopX(0),
@@ -71,12 +74,41 @@ OSystem_3DS::OSystem_3DS():
 	_gameBottomY(0),
 	_gameWidth(320),
 	_gameHeight(240),
+	_magX(0),
+	_magY(0),
+	_magWidth(400),
+	_magHeight(240),
+	_gameTextureDirty(false),
+	_filteringEnabled(true),
 	_overlayVisible(false),
+	_overlayInGUI(false),
+	_screenChangeId(0),
+	_magnifyMode(MODE_MAGOFF),
 	exiting(false),
-	sleeping(false)
+	sleeping(false),
+	_logger(0)
 {
 	chdir("sdmc:/");
-	_fsFactory = new POSIXFilesystemFactory();
+
+	DrivesPOSIXFilesystemFactory *fsFactory = new DrivesPOSIXFilesystemFactory();
+	fsFactory->addDrive("sdmc:");
+	fsFactory->addDrive("romfs:");
+
+	//
+	// Disable newlib's buffered IO, and use ScummVM's own buffering stream wrappers.
+	//
+	// The newlib version in use in devkitPro has performance issues
+	//  when seeking with a relative offset. See:
+	//  https://sourceware.org/git/gitweb.cgi?p=newlib-cygwin.git;a=commit;h=59362c80e3a02c011fd0ef3d7f07a20098d2a9d5
+	//
+	// devKitPro has a patch to newlib that can cause data corruption when
+	//  seeking back in files and then reading. See:
+	//  https://github.com/devkitPro/newlib/issues/16
+	//
+	fsFactory->configureBuffering(DrivePOSIXFilesystemNode::kBufferingModeScummVM, 2048);
+
+	_fsFactory = fsFactory;
+
 	Posix::assureDirectoryExists("/3ds/scummvm/saves/");
 }
 
@@ -84,7 +116,10 @@ OSystem_3DS::~OSystem_3DS() {
 	exiting = true;
 	destroyEvents();
 	destroyAudio();
-	destroyGraphics();
+	destroy3DSGraphics();
+
+	delete _logger;
+	_logger = 0;
 
 	delete _timerManager;
 	_timerManager = 0;
@@ -95,36 +130,53 @@ void OSystem_3DS::quit() {
 }
 
 void OSystem_3DS::initBackend() {
+	if (!_logger)
+		_logger = new Backends::Log::Log(this);
+
+	if (_logger) {
+		Common::WriteStream *logFile = createLogFile();
+		if (logFile)
+			_logger->open(logFile);
+	}
+
 	loadConfig();
 	ConfMan.registerDefault("fullscreen", true);
 	ConfMan.registerDefault("aspect_ratio", true);
-	if (!ConfMan.hasKey("vkeybd_pack_name"))
+	ConfMan.registerDefault("filtering", true);
+	if (!ConfMan.hasKey("vkeybd_pack_name")) {
 		ConfMan.set("vkeybd_pack_name", "vkeybd_small");
-	if (!ConfMan.hasKey("vkeybdpath"))
-		ConfMan.set("vkeybdpath", "/3ds/scummvm/kb");
-	if (!ConfMan.hasKey("themepath"))
-		ConfMan.set("themepath", "/3ds/scummvm");
-	if (!ConfMan.hasKey("gui_theme"))
+	}
+	if (!ConfMan.hasKey("gui_theme")) {
 		ConfMan.set("gui_theme", "builtin");
+	}
 
 	_timerManager = new DefaultTimerManager();
-	_savefileManager = new DefaultSaveFileManager("/3ds/scummvm/saves/");
+	_savefileManager = new DefaultSaveFileManager("sdmc:/3ds/scummvm/saves/");
 
-	initGraphics();
+	init3DSGraphics();
 	initAudio();
-	initEvents();
 	EventsBaseBackend::initBackend();
+	initEvents();
 }
 
 void OSystem_3DS::updateConfig() {
 	if (_gameScreen.getPixels()) {
 		updateSize();
-		warpMouse(_cursorX, _cursorY);
+		(!_overlayVisible) ? warpMouse(_cursorScreenX, _cursorScreenY) :
+		                     warpMouse(_cursorOverlayX, _cursorOverlayY);
 	}
 }
 
 Common::String OSystem_3DS::getDefaultConfigFileName() {
-	return "/3ds/scummvm/scummvm.ini";
+	return "sdmc:/3ds/scummvm/scummvm.ini";
+}
+
+Common::String OSystem_3DS::getDefaultLogFileName() {
+	return "sdmc:/3ds/scummvm/scummvm.log";
+}
+
+void OSystem_3DS::addSysArchivesToSearchSet(Common::SearchSet &s, int priority) {
+	s.add("RomFS", new Common::FSDirectory(DATA_PATH"/"), priority);
 }
 
 uint32 OSystem_3DS::getMillis(bool skipRecord) {
@@ -135,7 +187,7 @@ void OSystem_3DS::delayMillis(uint msecs) {
 	svcSleepThread(msecs * 1000000);
 }
 
-void OSystem_3DS::getTimeAndDate(TimeDate& td) const {
+void OSystem_3DS::getTimeAndDate(TimeDate& td, bool skipRecord) const {
 	time_t curTime = time(0);
 	struct tm t = *localtime(&curTime);
 	td.tm_sec = t.tm_sec;
@@ -147,19 +199,8 @@ void OSystem_3DS::getTimeAndDate(TimeDate& td) const {
 	td.tm_wday = t.tm_wday;
 }
 
-OSystem::MutexRef OSystem_3DS::createMutex() {
-	RecursiveLock *mutex = new RecursiveLock();
-	RecursiveLock_Init(mutex);
-	return (OSystem::MutexRef) mutex;
-}
-void OSystem_3DS::lockMutex(MutexRef mutex) {
-	RecursiveLock_Lock((RecursiveLock*)mutex);
-}
-void OSystem_3DS::unlockMutex(MutexRef mutex) {
-	RecursiveLock_Unlock((RecursiveLock*)mutex);
-}
-void OSystem_3DS::deleteMutex(MutexRef mutex) {
-	delete (RecursiveLock*)mutex;
+Common::MutexInternal *OSystem_3DS::createMutex() {
+	return create3DSMutexInternal();
 }
 
 Common::String OSystem_3DS::getSystemLanguage() const {
@@ -187,7 +228,31 @@ void OSystem_3DS::fatalError() {
 }
 
 void OSystem_3DS::logMessage(LogMessageType::Type type, const char *message) {
-	printf("3DS log: %s\n", message);
+	printf("%s", message);
+
+	// Then log into file (via the logger)
+	if (_logger)
+		_logger->print(message);
 }
 
-} // namespace _3DS
+Common::WriteStream *OSystem_3DS::createLogFile() {
+	// Start out by resetting _logFilePath, so that in case
+	// of a failure, we know that no log file is open.
+	_logFilePath.clear();
+
+	Common::String logFile;
+	if (ConfMan.hasKey("logfile"))
+		logFile = ConfMan.get("logfile");
+	else
+		logFile = getDefaultLogFileName();
+	if (logFile.empty())
+		return nullptr;
+
+	Common::FSNode file(logFile);
+	Common::WriteStream *stream = file.createWriteStream();
+	if (stream)
+		_logFilePath = logFile;
+	return stream;
+}
+
+} // namespace N3DS

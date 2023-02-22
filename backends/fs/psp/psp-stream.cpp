@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 #ifdef __PSP__
@@ -82,7 +81,7 @@ PspIoStream::~PspIoStream() {
 /* Function to open the file pointed to by the path.
  *
  */
-void *PspIoStream::open() {
+SceUID PspIoStream::open() {
 	DEBUG_ENTER_FUNC();
 
 	if (PowerMan.beginCriticalSection()) {
@@ -91,15 +90,15 @@ void *PspIoStream::open() {
 	}
 
 	_handle = sceIoOpen(_path.c_str(), _writeMode ? PSP_O_WRONLY | PSP_O_CREAT | PSP_O_TRUNC : PSP_O_RDONLY, 0777);
-	if (!_handle) {
+	if (_handle <= 0) {
 		_error = true;
-		_handle = NULL;
+		_handle = 0;
 	}
 
 	// Get the file size. This way is much faster than going to the end of the file and back
 	SceIoStat stat;
 	sceIoGetstat(_path.c_str(), &stat);
-	_fileSize = *((uint32 *)(void *)&stat.st_size);	// 4GB file (32 bits) is big enough for us
+	_fileSize = stat.st_size;	// 4GB file (32 bits) is big enough for us
 
 	PSP_DEBUG_PRINT("%s filesize[%d]\n", _path.c_str(), _fileSize);
 
@@ -107,7 +106,7 @@ void *PspIoStream::open() {
 
 	PowerMan.endCriticalSection();
 
-	return (void *)_handle;
+	return _handle;
 }
 
 bool PspIoStream::err() const {
@@ -130,11 +129,11 @@ bool PspIoStream::eos() const {
 	return _eos;
 }
 
-int32 PspIoStream::pos() const {
+int64 PspIoStream::pos() const {
 	return _pos;
 }
 
-int32 PspIoStream::size() const {
+int64 PspIoStream::size() const {
 	return _fileSize;
 }
 
@@ -151,7 +150,7 @@ bool PspIoStream::physicalSeekFromCur(int32 offset) {
 	return true;
 }
 
-bool PspIoStream::seek(int32 offs, int whence) {
+bool PspIoStream::seek(int64 offs, int whence) {
 	DEBUG_ENTER_FUNC();
 	PSP_DEBUG_PRINT_FUNC("offset[0x%x], whence[%d], _pos[0x%x], _physPos[0x%x]\n", offs, whence, _pos, _physicalPos);
 	_eos = false;
@@ -201,12 +200,13 @@ uint32 PspIoStream::read(void *ptr, uint32 len) {
 		PSP_DEBUG_PRINT_FUNC("suspended\n");
 
 	// check if we need to seek
-	if (_pos != _physicalPos)
+	if (_pos != _physicalPos) {
 		PSP_DEBUG_PRINT("seeking from %x to %x\n", _physicalPos, _pos);
 		if (!physicalSeekFromCur(_pos - _physicalPos)) {
 			_error = true;
 			return 0;
 		}
+	}
 
 	int ret = sceIoRead(_handle, ptr, len);
 

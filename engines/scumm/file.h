@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -38,12 +37,12 @@ public:
 	BaseScummFile() : _encbyte(0) {}
 	void setEnc(byte value) { _encbyte = value; }
 
-	virtual bool open(const Common::String &filename) = 0;
+	bool open(const Common::Path &filename) override = 0;
 	virtual bool openSubFile(const Common::String &filename) = 0;
 
-	virtual int32 pos() const = 0;
-	virtual int32 size() const = 0;
-	virtual bool seek(int32 offs, int whence = SEEK_SET) = 0;
+	int64 pos() const override = 0;
+	int64 size() const override = 0;
+	bool seek(int64 offs, int whence = SEEK_SET) override = 0;
 
 // Unused
 #if 0
@@ -64,16 +63,16 @@ protected:
 public:
 	ScummFile();
 
-	virtual bool open(const Common::String &filename);
-	bool openSubFile(const Common::String &filename);
+	bool open(const Common::Path &filename) override;
+	bool openSubFile(const Common::String &filename) override;
 
-	void clearErr() { _myEos = false; BaseScummFile::clearErr(); }
+	void clearErr() override { _myEos = false; BaseScummFile::clearErr(); }
 
-	bool eos() const;
-	int32 pos() const;
-	int32 size() const;
-	bool seek(int32 offs, int whence = SEEK_SET);
-	uint32 read(void *dataPtr, uint32 dataSize);
+	bool eos() const override;
+	int64 pos() const override;
+	int64 size() const override;
+	bool seek(int64 offs, int whence = SEEK_SET) override;
+	uint32 read(void *dataPtr, uint32 dataSize) override;
 };
 
 class ScummDiskImage : public BaseScummFile {
@@ -109,15 +108,15 @@ private:
 public:
 	ScummDiskImage(const char *disk1, const char *disk2, GameSettings game);
 
-	bool open(const Common::String &filename);
-	bool openSubFile(const Common::String &filename);
+	bool open(const Common::Path &filename) override;
+	bool openSubFile(const Common::String &filename) override;
 
-	void close();
-	bool eos() const { return _stream->eos(); }
-	int32 pos() const { return _stream->pos(); }
-	int32 size() const { return _stream->size(); }
-	bool seek(int32 offs, int whence = SEEK_SET) { return _stream->seek(offs, whence); }
-	uint32 read(void *dataPtr, uint32 dataSize);
+	void close() override;
+	bool eos() const override { return _stream->eos(); }
+	int64 pos() const override { return _stream->pos(); }
+	int64 size() const override { return _stream->size(); }
+	bool seek(int64 offs, int whence = SEEK_SET) override { return _stream->seek(offs, whence); }
+	uint32 read(void *dataPtr, uint32 dataSize) override;
 };
 
 struct SteamIndexFile {
@@ -130,8 +129,6 @@ struct SteamIndexFile {
 	int32 len;
 };
 
-const SteamIndexFile *lookUpSteamIndexFile(Common::String pattern, Common::Platform platform);
-
 class ScummSteamFile : public ScummFile {
 private:
 	const SteamIndexFile &_indexFile;
@@ -140,7 +137,7 @@ private:
 public:
 	ScummSteamFile(const SteamIndexFile &indexFile) : ScummFile(), _indexFile(indexFile) {}
 
-	bool open(const Common::String &filename);
+	bool open(const Common::Path &filename) override;
 };
 
 } // End of namespace Scumm

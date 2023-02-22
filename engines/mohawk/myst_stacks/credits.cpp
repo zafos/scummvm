@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,13 +15,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "mohawk/myst.h"
 #include "mohawk/myst_areas.h"
+#include "mohawk/myst_card.h"
 #include "mohawk/myst_graphics.h"
 #include "mohawk/cursors.h"
 #include "mohawk/sound.h"
@@ -36,7 +36,7 @@ namespace MystStacks {
 // NOTE: Credits Start Card is 10000
 
 Credits::Credits(MohawkEngine_Myst *vm) :
-		MystScriptParser(vm),
+		MystScriptParser(vm, kCreditsStack),
 		_creditsRunning(false),
 		_curImage(0) {
 	setupOpcodes();
@@ -61,7 +61,7 @@ void Credits::runPersistentScripts() {
 	if (!_creditsRunning)
 		return;
 
-	if (_vm->_system->getMillis() - _startTime >= 7 * 1000) {
+	if (_vm->getTotalPlayTime() - _startTime >= 7 * 1000) {
 		_curImage++;
 
 		// After the 6th image has shown, it's time to quit
@@ -71,10 +71,10 @@ void Credits::runPersistentScripts() {
 		}
 
 		// Draw next image
-		_vm->drawCardBackground();
+		_vm->getCard()->drawBackground();
 		_vm->_gfx->copyBackBufferToScreen(Common::Rect(544, 333));
 
-		_startTime = _vm->_system->getMillis();
+		_startTime = _vm->getTotalPlayTime();
 	}
 }
 
@@ -97,7 +97,7 @@ void Credits::o_runCredits(uint16 var, const ArgumentsArray &args) {
 	// Activate the credits
 	_creditsRunning = true;
 	_curImage = 0;
-	_startTime = _vm->_system->getMillis();
+	_startTime = _vm->getTotalPlayTime();
 }
 
 } // End of namespace MystStacks

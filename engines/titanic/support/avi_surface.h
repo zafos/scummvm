@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -52,23 +51,23 @@ private:
 	File *_innerStream;
 public:
 	y222();
-	virtual ~y222();
+	~y222() override;
 
-	virtual uint32 read(void *dataPtr, uint32 dataSize);
-	virtual bool eos() const { return _innerStream->eos(); }
-	virtual int32 pos() const { return _innerStream->pos(); }
-	virtual int32 size() const { return _innerStream->size(); }
-	virtual bool seek(int32 offset, int whence = SEEK_SET) {
+	uint32 read(void *dataPtr, uint32 dataSize) override;
+	bool eos() const override { return _innerStream->eos(); }
+	int64 pos() const override { return _innerStream->pos(); }
+	int64 size() const override { return _innerStream->size(); }
+	bool seek(int64 offset, int whence = SEEK_SET) override {
 		return _innerStream->seek(offset, whence);
 	}
-	virtual bool skip(uint32 offset) {
+	bool skip(uint32 offset) override {
 		return _innerStream->skip(offset);
 	}
-	virtual char *readLine(char *s, size_t bufSize) {
-		return _innerStream->readLine(s, bufSize);
+	char *readLine(char *s, size_t bufSize, bool handleCR = true) override {
+		return _innerStream->readLine(s, bufSize, handleCR);
 	}
-	virtual Common::String readLine() {
-		return _innerStream->readLine();
+	Common::String readLine(bool handleCR = true) override {
+		return _innerStream->readLine(handleCR);
 	}
 };
 
@@ -191,7 +190,7 @@ public:
 	}
 
 	/**
-	 * Handle any movie events relevent for the frame
+	 * Handle any movie events relevant for the frame
 	 */
 	virtual bool handleEvents(CMovieEventList &events);
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -36,6 +35,7 @@
 #include "common/config-manager.h"
 #include "common/textconsole.h"
 
+#include "engines/advancedDetector.h"
 #include "engines/util.h"
 
 #include "gui/message.h"
@@ -44,28 +44,25 @@ namespace Sword1 {
 
 SystemVars SwordEngine::_systemVars;
 
-SwordEngine::SwordEngine(OSystem *syst)
+SwordEngine::SwordEngine(OSystem *syst, const ADGameDescription *gameDesc)
 	: Engine(syst) {
 
-	if (!scumm_stricmp(ConfMan.get("gameid").c_str(), "sword1demo") ||
-	        !scumm_stricmp(ConfMan.get("gameid").c_str(), "sword1psxdemo") ||
-	        !scumm_stricmp(ConfMan.get("gameid").c_str(), "sword1macdemo"))
-		_features = GF_DEMO;
-	else
-		_features = 0;
+	_features = gameDesc->flags;
+	_systemVars.platform = gameDesc->platform;
 
 	// Add default file directories
 	const Common::FSNode gameDataDir(ConfMan.get("path"));
-	SearchMan.addSubDirectoryMatching(gameDataDir, "clusters");
 	SearchMan.addSubDirectoryMatching(gameDataDir, "music");
 	SearchMan.addSubDirectoryMatching(gameDataDir, "speech");
-	SearchMan.addSubDirectoryMatching(gameDataDir, "video");
-	SearchMan.addSubDirectoryMatching(gameDataDir, "smackshi");
 	SearchMan.addSubDirectoryMatching(gameDataDir, "streams"); // PSX videos
-	SearchMan.addSubDirectoryMatching(gameDataDir, "english"); // PSX Demo
-	SearchMan.addSubDirectoryMatching(gameDataDir, "italian"); // PSX Demo
 
-	_console = new SwordConsole(this);
+	//SearchMan.addSubDirectoryMatching(gameDataDir, "clusters"); // Comes from AD
+	//SearchMan.addSubDirectoryMatching(gameDataDir, "video"); // Comes from AD
+	//SearchMan.addSubDirectoryMatching(gameDataDir, "smackshi"); // Comes from AD
+	//SearchMan.addSubDirectoryMatching(gameDataDir, "english"); // PSX Demo  // Comes from AD
+	//SearchMan.addSubDirectoryMatching(gameDataDir, "italian"); // PSX Demo  // Comes from AD
+
+	setDebugger(new SwordConsole(this));
 
 	_mouseState = 0;
 	_resMan = 0;
@@ -89,21 +86,11 @@ SwordEngine::~SwordEngine() {
 	delete _mouse;
 	delete _objectMan;
 	delete _resMan;
-	delete _console;
 }
 
 Common::Error SwordEngine::init() {
 
 	initGraphics(640, 480);
-
-	if (0 == scumm_stricmp(ConfMan.get("gameid").c_str(), "sword1mac") ||
-	        0 == scumm_stricmp(ConfMan.get("gameid").c_str(), "sword1macdemo"))
-		_systemVars.platform = Common::kPlatformMacintosh;
-	else if (0 == scumm_stricmp(ConfMan.get("gameid").c_str(), "sword1psx") ||
-	         0 == scumm_stricmp(ConfMan.get("gameid").c_str(), "sword1psxdemo"))
-		_systemVars.platform = Common::kPlatformPSX;
-	else
-		_systemVars.platform = Common::kPlatformWindows;
 
 	checkCdFiles();
 
@@ -127,6 +114,7 @@ Common::Error SwordEngine::init() {
 	_systemVars.forceRestart = false;
 	_systemVars.wantFade = true;
 	_systemVars.realLanguage = Common::parseLanguage(ConfMan.get("language"));
+	_systemVars.isLangRtl = false;
 
 	switch (_systemVars.realLanguage) {
 	case Common::DE_DEU:
@@ -144,8 +132,13 @@ Common::Error SwordEngine::init() {
 	case Common::PT_BRA:
 		_systemVars.language = BS1_PORT;
 		break;
-	case Common::CZ_CZE:
+	case Common::CS_CZE:
 		_systemVars.language = BS1_CZECH;
+		break;
+	case Common::HE_ISR:
+		// Hebrew is using "faked" English
+		_systemVars.language = BS1_ENGLISH;
+		_systemVars.isLangRtl = true;
 		break;
 	default:
 		_systemVars.language = BS1_ENGLISH;
@@ -290,7 +283,7 @@ const CdFile SwordEngine::_pcCdFileList[] = {
 	{ "scripts.clu", FLAG_CD1 | FLAG_DEMO | FLAG_IMMED },
 	{ "swordres.rif", FLAG_CD1 | FLAG_DEMO | FLAG_IMMED },
 	{ "text.clu", FLAG_CD1 | FLAG_DEMO },
-	{ "cows.mad", FLAG_DEMO },
+	{ "1m14a.wav", FLAG_DEMO },
 	{ "speech1.clu", FLAG_SPEECH1 },
 	{ "speech2.clu", FLAG_SPEECH2 }
 #ifdef USE_FLAC
@@ -376,16 +369,17 @@ void SwordEngine::showFileErrorMsg(uint8 type, bool *fileExists) {
 		warning("%d files missing", missCnt);
 		int msgId = (type == TYPE_IMMED) ? 0 : 2;
 		if (missCnt == 1) {
-			sprintf(msg, errorMsgs[msgId],
+			Common::sprintf_s(msg, errorMsgs[msgId],
 			        _macCdFileList[missNum].name, (_macCdFileList[missNum].flags & FLAG_CD2) ? 2 : 1);
 			warning("%s", msg);
 		} else {
-			char *pos = msg + sprintf(msg, errorMsgs[msgId + 1], missCnt);
+			char *pos = msg + Common::sprintf_s(msg, errorMsgs[msgId + 1], missCnt);
 			warning("%s", msg);
 			for (int i = 0; i < ARRAYSIZE(_macCdFileList); i++)
 				if (!fileExists[i]) {
 					warning("\"%s\" (CD %d)", _macCdFileList[i].name, (_macCdFileList[i].flags & FLAG_CD2) ? 2 : 1);
-					pos += sprintf(pos, "\"%s\" (CD %d)\n", _macCdFileList[i].name, (_macCdFileList[i].flags & FLAG_CD2) ? 2 : 1);
+					pos += Common::sprintf_s(pos, sizeof(msg) - (pos - msg),
+						"\"%s\" (CD %d)\n", _macCdFileList[i].name, (_macCdFileList[i].flags & FLAG_CD2) ? 2 : 1);
 				}
 		}
 	} else if (SwordEngine::isPsx()) {
@@ -398,15 +392,16 @@ void SwordEngine::showFileErrorMsg(uint8 type, bool *fileExists) {
 		warning("%d files missing", missCnt);
 		int msgId = (type == TYPE_IMMED) ? 0 : 2;
 		if (missCnt == 1) {
-			sprintf(msg, errorMsgs[msgId], _psxCdFileList[missNum].name, 1);
+			Common::sprintf_s(msg, errorMsgs[msgId], _psxCdFileList[missNum].name, 1);
 			warning("%s", msg);
 		} else {
-			char *pos = msg + sprintf(msg, errorMsgs[msgId + 1], missCnt);
+			char *pos = msg + Common::sprintf_s(msg, errorMsgs[msgId + 1], missCnt);
 			warning("%s", msg);
 			for (int i = 0; i < ARRAYSIZE(_psxCdFileList); i++)
 				if (!fileExists[i]) {
 					warning("\"%s\"", _macCdFileList[i].name);
-					pos += sprintf(pos, "\"%s\"\n", _macCdFileList[i].name);
+					pos += Common::sprintf_s(pos, sizeof(msg) - (pos - msg),
+						"\"%s\"\n", _macCdFileList[i].name);
 				}
 		}
 	} else {
@@ -419,16 +414,17 @@ void SwordEngine::showFileErrorMsg(uint8 type, bool *fileExists) {
 		warning("%d files missing", missCnt);
 		int msgId = (type == TYPE_IMMED) ? 0 : 2;
 		if (missCnt == 1) {
-			sprintf(msg, errorMsgs[msgId],
+			Common::sprintf_s(msg, errorMsgs[msgId],
 			        _pcCdFileList[missNum].name, (_pcCdFileList[missNum].flags & FLAG_CD2) ? 2 : 1);
 			warning("%s", msg);
 		} else {
-			char *pos = msg + sprintf(msg, errorMsgs[msgId + 1], missCnt);
+			char *pos = msg + Common::sprintf_s(msg, errorMsgs[msgId + 1], missCnt);
 			warning("%s", msg);
 			for (int i = 0; i < ARRAYSIZE(_pcCdFileList); i++)
 				if (!fileExists[i]) {
 					warning("\"%s\" (CD %d)", _pcCdFileList[i].name, (_pcCdFileList[i].flags & FLAG_CD2) ? 2 : 1);
-					pos += sprintf(pos, "\"%s\" (CD %d)\n", _pcCdFileList[i].name, (_pcCdFileList[i].flags & FLAG_CD2) ? 2 : 1);
+					pos += Common::sprintf_s(pos, sizeof(msg) - (pos - msg),
+						"\"%s\" (CD %d)\n", _pcCdFileList[i].name, (_pcCdFileList[i].flags & FLAG_CD2) ? 2 : 1);
 				}
 		}
 	}
@@ -491,8 +487,8 @@ void SwordEngine::checkCdFiles() { // check if we're running from cd, hdd or wha
 		}
 	}
 
-	if (((_features & GF_DEMO) == 0) != isFullVersion) // shouldn't happen...
-		warning("Your Broken Sword 1 version looks like a %s version but you are starting it as a %s version", isFullVersion ? "full" : "demo", (_features & GF_DEMO) ? "demo" : "full");
+	if (((_features & ADGF_DEMO) == 0) != isFullVersion) // shouldn't happen...
+		warning("Your Broken Sword 1 version looks like a %s version but you are starting it as a %s version", isFullVersion ? "full" : "demo", (_features & ADGF_DEMO) ? "demo" : "full");
 
 	if (foundTypes[TYPE_SPEECH1]) // we found some kind of speech1 file (.clu, .cl3, .clv)
 		missingTypes[TYPE_SPEECH1] = false; // so we don't care if there's a different kind missing
@@ -571,7 +567,10 @@ void SwordEngine::checkCdFiles() { // check if we're running from cd, hdd or wha
 		_systemVars.isDemo = true;
 	*/
 	// make the demo flag depend on the Gamesettings for now, and not on what the datafiles look like
-	_systemVars.isDemo = (_features & GF_DEMO) != 0;
+	_systemVars.isDemo = (_features & ADGF_DEMO) != 0;
+
+	// Spanish demo has proper speech.clu and uses normal sound and var mapping
+	_systemVars.isSpanishDemo = (_systemVars.isDemo && Common::parseLanguage(ConfMan.get("language")) == Common::ES_ESP) != 0;
 }
 
 Common::Error SwordEngine::go() {
@@ -690,12 +689,6 @@ uint8 SwordEngine::mainLoop() {
 				retCode = _control->runPanel();
 				if (retCode == CONTROL_NOTHING_DONE)
 					_screen->fullRefresh();
-			}
-
-			// Check for Debugger Activation
-			if (_keyPressed.hasFlags(Common::KBD_CTRL) && _keyPressed.keycode == Common::KEYCODE_d) {
-				this->getDebugger()->attach();
-				this->getDebugger()->onFrame();
 			}
 
 			_mouseState = 0;

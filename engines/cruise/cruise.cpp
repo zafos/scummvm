@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,11 +42,8 @@ CruiseEngine *_vm;
 CruiseEngine::CruiseEngine(OSystem * syst, const CRUISEGameDescription *gameDesc)
 	: Engine(syst), _gameDescription(gameDesc), _rnd("cruise") {
 
-	DebugMan.addDebugChannel(kCruiseDebugScript, "scripts", "Scripts debug level");
-	DebugMan.addDebugChannel(kCruiseDebugSound, "sound", "Sound debug level");
-
 	_vm = this;
-	_debugger = new Debugger();
+	setDebugger(new Debugger());
 	_sound = new PCSound(_mixer, this);
 
 	PCFadeFlag = false;
@@ -66,7 +62,6 @@ CruiseEngine::CruiseEngine(OSystem * syst, const CRUISEGameDescription *gameDesc
 extern void listMemory();
 
 CruiseEngine::~CruiseEngine() {
-	delete _debugger;
 	delete _sound;
 
 	freeSystem();
@@ -77,7 +72,7 @@ CruiseEngine::~CruiseEngine() {
 
 bool CruiseEngine::hasFeature(EngineFeature f) const {
 	return
-		(f == kSupportsRTL) ||
+		(f == kSupportsReturnToLauncher) ||
 		(f == kSupportsLoadingDuringRuntime) ||
 		(f == kSupportsSavingDuringRuntime);
 }
@@ -120,7 +115,7 @@ void CruiseEngine::deinitialize() {
 	for (int i = 0; i < 8; ++i) {
 		if (backgroundScreens[i]) {
 			MemFree(backgroundScreens[i]);
-			backgroundScreens[i] = NULL;
+			backgroundScreens[i] = nullptr;
 		}
 	}
 }
@@ -152,7 +147,7 @@ bool CruiseEngine::loadLanguageStrings() {
 
 	} else {
 		// Try and use one of the pre-defined language lists
-		const char **p = NULL;
+		const char **p = nullptr;
 		switch (getLanguage()) {
 		case Common::EN_ANY:
 			p = englishLanguageStrings;
@@ -165,6 +160,9 @@ bool CruiseEngine::loadLanguageStrings() {
 			break;
 		case Common::IT_ITA:
 			p = italianLanguageStrings;
+			break;
+		case Common::ES_ESP:
+			p = spanishLanguageStrings;
 			break;
 		default:
 			return false;
@@ -179,9 +177,8 @@ bool CruiseEngine::loadLanguageStrings() {
 }
 
 void CruiseEngine::pauseEngine(bool pause) {
-	Engine::pauseEngine(pause);
-
 	if (pause) {
+		_gamePauseToken = Engine::pauseEngine();
 		// Draw the 'Paused' message
 		drawSolidBox(64, 100, 256, 117, 0);
 		drawString(10, 100, langString(ID_PAUSED), gfxModuleData.pPage00, itemColor, 300);
@@ -190,6 +187,7 @@ void CruiseEngine::pauseEngine(bool pause) {
 		_savedCursor = currentCursor;
 		changeCursor(CURSOR_NOMOUSE);
 	} else {
+		_gamePauseToken.clear();
 		processAnimation();
 		flipScreen();
 		changeCursor(_savedCursor);
@@ -206,7 +204,7 @@ bool CruiseEngine::canLoadGameStateCurrently() {
 	return playerMenuEnabled != 0;
 }
 
-Common::Error CruiseEngine::saveGameState(int slot, const Common::String &desc) {
+Common::Error CruiseEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	return saveSavegameData(slot, desc);
 }
 
@@ -216,7 +214,7 @@ bool CruiseEngine::canSaveGameStateCurrently() {
 
 const char *CruiseEngine::getSavegameFile(int saveGameIdx) {
 	static char buffer[20];
-	sprintf(buffer, "cruise.s%02d", saveGameIdx);
+	Common::sprintf_s(buffer, "cruise.s%02d", saveGameIdx);
 	return buffer;
 }
 

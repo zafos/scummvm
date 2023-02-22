@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,166 +15,96 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "base/plugins.h"
 
 #include "engines/advancedDetector.h"
-#include "common/system.h"
-
 #include "macventure/macventure.h"
 
 namespace MacVenture {
 
-#define ADGF_DEFAULT (ADGF_DROPLANGUAGE|ADGF_DROPPLATFORM|ADGF_MACRESFORK)
+#define ADGF_DEFAULT (ADGF_DROPLANGUAGE|ADGF_DROPPLATFORM|ADGF_MACRESFORK|ADGF_UNSTABLE)
 
-#define BASEGAME(n, v, f, md5, s) {n, v, AD_ENTRY1s(f, md5, s), Common::EN_ANY, Common::kPlatformMacintosh, ADGF_DEFAULT, GUIO0()}
+#define MACGAME(n, v, f, md5, s) {n, v, AD_ENTRY1s(f, md5, s), Common::EN_ANY, Common::kPlatformMacintosh, ADGF_DEFAULT, GUIO1(GUIO_NOMIDI)}
+#define MACDEMO(n, v, f, md5, s) {n, v, AD_ENTRY1s(f, md5, s), Common::EN_ANY, Common::kPlatformMacintosh, ADGF_DEFAULT|ADGF_DEMO, GUIO1(GUIO_NOMIDI)}
+#define IIGSGAME(n, v, f, md5, s) {n, v, AD_ENTRY1s(f, md5, s), Common::EN_ANY, Common::kPlatformApple2GS, ADGF_DEFAULT, GUIO1(GUIO_NOMIDI)}
 
 static const ADGameDescription gameDescriptions[] = {
-	BASEGAME("shadowgate", "Zojoi Rerelease", "Shadowgate.bin", "ebbfbcbf93938bd2900cb0c0213b19ad", 68974), // Zojoi Rerelease
-	BASEGAME("deja_vu", "Zojoi Rerelease", "Deja Vu.bin", "5e9f5a8e3c8eb29ed02b34ae5937354f", 69034), // Zojoi Rerelease
-	BASEGAME("deja_vu2", "Zojoi Rerelease", "Lost in Las Vegas.bin", "8f8e1d8d41f577ee0fbc03847969af0d", 66520), // Zojoi Rerelease
+	// Original Mac releases (uses protection)
+	MACGAME("shadowgate", "", "Shadowgate", "b9e8e5d68a81cdbd2cbb5cfe8ea7a47d", 58886), // protection cracked
+	MACGAME("deja_vu", "", "xn--Dj Vu-sqa5d", "9e0436d1f24a1c8a3c9fd846f055201e", 58468), // original filename is "Déjà Vu", protection cracked
+	MACGAME("uninvited", "", "Uninvited", "2cf518cddeda96bfc0cc9ba0bd91b42e", 58631), // v2.1D1, with protection
+	MACGAME("uninvited", "", "Uninvited", "20291feb9bce70a32979031631c42da1", 58639), // protection cracked
+
+	// 1993 Mac rereleases (identical to the Zojoi rereleases), no protection
+	MACGAME("shadowgate", "1993 rerelease", "Shadowgate", "0f4eb65cf369c6c75e4b991b986c34a2", 68718),
+	MACGAME("deja_vu", "1993 rerelease", "xn--Dj Vu-sqa5d", "0f4eb65cf369c6c75e4b991b986c34a2", 68778), // original filename is "Déjà Vu"
+	MACGAME("deja_vu2", "1993 rerelease", "Lost in Las Vegas", "0f4eb65cf369c6c75e4b991b986c34a2", 66264),
+	MACGAME("uninvited", "1993 rerelease", "Uninvited", "0f4eb65cf369c6c75e4b991b986c34a2", 68974),
+
+	// IIGS releases
+	IIGSGAME("shadowgate", "", "SHADOWGATE", "45924ea00ea4ef088e00db0ee774b8df", 101376),
+	IIGSGAME("deja_vu", "", "DEJAVU", "45924ea00ea4ef088e00db0ee774b8df", 101376),
+	IIGSGAME("deja_vu", "Zojoi rerelease", "DEJAVU", "81f1ee050d2afae2fa90a3306010dc56", 101376), // 6 bytes different, BB BE F0 -> BB BE 80
+	IIGSGAME("deja_vu2", "", "DEJAVUII", "f6ef6ead871d4d1cc0f6cf840f48b63f", 69047),
+	IIGSGAME("uninvited", "", "UNINVITED", "45924ea00ea4ef088e00db0ee774b8df", 101376),
+
+	// Misc
+	MACDEMO("uninvited", "Demo", "Uninvited Demo", "e53adca77d773dca926f61faac68df86", 53119),
 	AD_TABLE_END_MARKER
 };
 
-const char *MacVentureEngine::getGameFileName() const {
-	return _gameDescription->filesDescriptions[0].fileName;
-}
 } // End of namespace MacVenture
+
+static const DebugChannelDef debugFlagList[] = {
+	{MacVenture::kMVDebugMain, "main", "Engine state"},
+	{MacVenture::kMVDebugGUI, "gui", "Gui"},
+	{MacVenture::kMVDebugText, "text", "Text decoders and printers"},
+	{MacVenture::kMVDebugImage, "image", "Image decoders and renderers"},
+	{MacVenture::kMVDebugScript, "script", "Script engine"},
+	{MacVenture::kMVDebugSound, "sound", "Sound decoders"},
+	{MacVenture::kMVDebugContainer, "container", "Containers"},
+	DEBUG_CHANNEL_END
+};
 
 static const PlainGameDescriptor macventureGames[] = {
 	{ "shadowgate", "Shadowgate" },
 	{ "deja_vu", "Deja Vu"},
 	{ "deja_vu2", "Deja Vu II"},
-	{ 0, 0 }
+	{ "uninvited", "Uninvited."},
+	{ nullptr, nullptr }
 };
 
 namespace MacVenture {
 
 SaveStateDescriptor loadMetaData(Common::SeekableReadStream *s, int slot, bool skipThumbnail = true);
 
-class MacVentureMetaEngine : public AdvancedMetaEngine {
+class MacVentureMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	MacVentureMetaEngine() : AdvancedMetaEngine(MacVenture::gameDescriptions, sizeof(ADGameDescription), macventureGames) {
-		_guiOptions = GUIO0();
-		_md5Bytes = 5000000; // TODO: Upper limit, adjust it once all games are added
+	MacVentureMetaEngineDetection() : AdvancedMetaEngineDetection(MacVenture::gameDescriptions, sizeof(ADGameDescription), macventureGames) {
+		_guiOptions = GUIO1(GUIO_NOMIDI);
 	}
 
-	const char *getName() const {
+	const char *getName() const override {
+		return "macventure";
+	}
+
+	const char *getEngineName() const override {
 		return "MacVenture";
 	}
-	const char *getOriginalCopyright() const {
+
+	const char *getOriginalCopyright() const override {
 		return "(C) ICOM Simulations";
 	}
 
-protected:
-	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
-	bool hasFeature(MetaEngineFeature f) const;
-	SaveStateList listSaves(const char *target) const;
-	int getMaximumSaveSlot() const;
-	void removeSaveState(const char *target, int slot) const;
-	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const;
+	const DebugChannelDef *getDebugChannels() const override {
+		return debugFlagList;
+	}
 };
-
-bool MacVentureMetaEngine::hasFeature(MetaEngineFeature f) const {
-	return
-		(f == kSupportsListSaves) ||
-		(f == kSupportsLoadingDuringStartup) ||
-		(f == kSupportsDeleteSave) ||
-		(f == kSavesSupportMetaInfo) ||
-		(f == kSavesSupportThumbnail) ||
-		(f == kSavesSupportCreationDate) ||
-		(f == kSavesSupportPlayTime);
-}
-
-bool MacVentureEngine::hasFeature(EngineFeature f) const {
-	return
-		(f == kSupportsRTL) ||
-		(f == kSupportsLoadingDuringRuntime) ||
-		(f == kSupportsSavingDuringRuntime);
-}
-
-SaveStateList MacVentureMetaEngine::listSaves(const char *target) const {
-	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
-	Common::StringArray filenames;
-	Common::String pattern = target;
-	pattern += ".###";
-
-	filenames = saveFileMan->listSavefiles(pattern);
-
-	SaveStateList saveList;
-	for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
-		int slotNum = atoi(file->c_str() + file->size() - 3);
-		SaveStateDescriptor desc;
-		// Do not allow save slot 0 (used for auto-saving) to be deleted or
-		// overwritten.
-		desc.setDeletableFlag(slotNum != 0);
-		desc.setWriteProtectedFlag(slotNum == 0);
-
-		if (slotNum >= 0 && slotNum <= getMaximumSaveSlot()) {
-			Common::InSaveFile *in = saveFileMan->openForLoading(*file);
-			if (in) {
-				desc = loadMetaData(in, slotNum);
-				if (desc.getSaveSlot() != slotNum) {
-					// invalid
-					delete in;
-					continue;
-				}
-				saveList.push_back(desc);
-				delete in;
-			}
-		}
-	}
-
-	// Sort saves based on slot number.
-	Common::sort(saveList.begin(), saveList.end(), SaveStateDescriptorSlotComparator());
-	return saveList;
-}
-
-int MacVentureMetaEngine::getMaximumSaveSlot() const { return 999; }
-
-bool MacVentureMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *game) const {
-	if (game) {
-		*engine = new MacVenture::MacVentureEngine(syst, game);
-	}
-	return game != 0;
-}
-
-void MacVentureMetaEngine::removeSaveState(const char *target, int slot) const {
-	g_system->getSavefileManager()->removeSavefile(Common::String::format("%s.%03d", target, slot));
-}
-
-
-SaveStateDescriptor MacVentureMetaEngine::querySaveMetaInfos(const char *target, int slot) const {
-	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
-	SaveStateDescriptor desc;
-	Common::String saveFileName;
-	Common::String pattern = target;
-	pattern += ".###";
-	Common::StringArray filenames = saveFileMan->listSavefiles(pattern);
-	for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
-		int slotNum = atoi(file->c_str() + file->size() - 3);
-		if (slotNum == slot) {
-			saveFileName = *file;
-		}
-	}
-
-	Common::InSaveFile *in = saveFileMan->openForLoading(saveFileName);
-	if (in) {
-		desc = loadMetaData(in, slot, false);
-		delete in;
-		return desc;
-	}
-	return SaveStateDescriptor(-1, "");
-}
 
 } // End of namespace MacVenture
 
-#if PLUGIN_ENABLED_DYNAMIC(MACVENTURE)
- REGISTER_PLUGIN_DYNAMIC(MACVENTURE, PLUGIN_TYPE_ENGINE, MacVenture::MacVentureMetaEngine);
-#else
- REGISTER_PLUGIN_STATIC(MACVENTURE, PLUGIN_TYPE_ENGINE, MacVenture::MacVentureMetaEngine);
-#endif
+REGISTER_PLUGIN_STATIC(MACVENTURE_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, MacVenture::MacVentureMetaEngineDetection);

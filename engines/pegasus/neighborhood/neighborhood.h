@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995-1997 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -99,10 +98,10 @@ class Neighborhood;
 class StriderCallBack : public TimeBaseCallBack {
 public:
 	StriderCallBack(Neighborhood *);
-	virtual ~StriderCallBack() {}
+	~StriderCallBack() override {}
 
 protected:
-	virtual void callBack();
+	void callBack() override;
 
 	Neighborhood *_neighborhood;
 };
@@ -115,7 +114,7 @@ friend class StriderCallBack;
 
 public:
 	Neighborhood(InputHandler *nextHandler, PegasusEngine *vm, const Common::String &resName, NeighborhoodID id);
-	virtual ~Neighborhood();
+	~Neighborhood() override;
 
 	virtual void init();
 	virtual void start();
@@ -123,8 +122,8 @@ public:
 	virtual void checkContinuePoint(const RoomID, const DirectionConstant) = 0;
 	void makeContinuePoint();
 
-	virtual void activateHotspots();
-	virtual void clickInHotspot(const Input &, const Hotspot *);
+	void activateHotspots() override;
+	void clickInHotspot(const Input &, const Hotspot *) override;
 
 	virtual CanMoveForwardReason canMoveForward(ExitTable::Entry &entry);
 	virtual CanTurnReason canTurn(TurnDirection turn, DirectionConstant &nextDir);
@@ -250,7 +249,7 @@ public:
 
 	virtual void pickedUpItem(Item *) {}
 
-	virtual void handleInput(const Input &, const Hotspot *);
+	void handleInput(const Input &, const Hotspot *) override;
 protected:
 	PegasusEngine *_vm;
 	Common::String _resName;
@@ -259,7 +258,7 @@ protected:
 	virtual Common::String getNavMovieName() = 0;
 
 	// Notification function.
-	virtual void receiveNotification(Notification *, const NotificationFlags);
+	void receiveNotification(Notification *, const NotificationFlags) override;
 
 	// Map info functions.
 	virtual void getExitEntry(const RoomID room, const DirectionConstant direction, ExitTable::Entry &entry);
@@ -292,7 +291,7 @@ protected:
 
 	virtual void createNeighborhoodSpots();
 
-	void resetLastExtra() { _lastExtra = -1; }
+	void resetLastExtra() { _lastExtra = 0xffffffff; }
 
 	virtual void throwAwayInterface();
 
@@ -304,7 +303,7 @@ protected:
 	virtual bool prepareExtraSync(const ExtraID);
 	virtual bool waitMovieFinish(Movie *, const InputBits);
 
-	virtual InputBits getInputFilter();
+	InputBits getInputFilter() override;
 
 	// Misc.
 	virtual int16 getStaticCompassAngle(const RoomID, const DirectionConstant dir);
@@ -327,7 +326,7 @@ protected:
 	void reinstateMonocleInterface();
 
 	virtual void newInteraction(const InteractionID);
-	virtual void useIdleTime();
+	void useIdleTime() override;
 	virtual void bumpIntoWall();
 	virtual void zoomUpOrBump();
 
@@ -354,7 +353,7 @@ protected:
 	AlternateID _currentAlternate;
 	HotSpotActivationID _currentActivation;
 
-	int32 _lastExtra;
+	ExtraID _lastExtra;
 	DeathReason _extraDeathReason;
 
 	// Graphics

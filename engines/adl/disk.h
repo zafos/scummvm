@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -53,6 +52,7 @@ public:
 
 	virtual const DataBlockPtr getDataBlock(const Common::String &filename, uint offset = 0) const = 0;
 	virtual Common::SeekableReadStream *createReadStream(const Common::String &filename, uint offset = 0) const = 0;
+	virtual bool exists(const Common::String &filename) const = 0;
 
 protected:
 	class DataBlock : public Adl::DataBlock {
@@ -62,7 +62,7 @@ protected:
 				_filename(filename),
 				_offset(offset) { }
 
-		Common::SeekableReadStream *createReadStream() const {
+		Common::SeekableReadStream *createReadStream() const override {
 			return _files->createReadStream(_filename, _offset);
 		}
 
@@ -80,7 +80,8 @@ public:
 			_tracks(0),
 			_sectorsPerTrack(0),
 			_bytesPerSector(0),
-			_sectorLimit(0) { }
+			_sectorLimit(0),
+			_firstSector(0) { }
 
 	~DiskImage() {
 		delete _stream;
@@ -105,7 +106,7 @@ protected:
 				_sectorLimit(sectorLimit),
 				_disk(disk) { }
 
-		Common::SeekableReadStream *createReadStream() const {
+		Common::SeekableReadStream *createReadStream() const override {
 			return _disk->createReadStream(_track, _sector, _offset, _size, _sectorLimit);
 		}
 
@@ -116,26 +117,28 @@ protected:
 	};
 
 	Common::SeekableReadStream *_stream;
-	uint _tracks, _sectorsPerTrack, _bytesPerSector;
+	uint _tracks, _sectorsPerTrack, _bytesPerSector, _firstSector;
 	uint _sectorLimit;
 };
 
 // Data in plain files
 class Files_Plain : public Files {
 public:
-	const DataBlockPtr getDataBlock(const Common::String &filename, uint offset = 0) const;
-	Common::SeekableReadStream *createReadStream(const Common::String &filename, uint offset = 0) const;
+	const DataBlockPtr getDataBlock(const Common::String &filename, uint offset = 0) const override;
+	Common::SeekableReadStream *createReadStream(const Common::String &filename, uint offset = 0) const override;
+	bool exists(const Common::String &filename) const override { return Common::File::exists(filename); }
 };
 
 // Data in files contained in Apple DOS 3.3 disk image
 class Files_AppleDOS : public Files {
 public:
 	Files_AppleDOS();
-	~Files_AppleDOS();
+	~Files_AppleDOS() override;
 
-	bool open(const Common::String &filename, uint trackVTOC = 17);
-	const DataBlockPtr getDataBlock(const Common::String &filename, uint offset = 0) const;
-	Common::SeekableReadStream *createReadStream(const Common::String &filename, uint offset = 0) const;
+	bool open(const Common::String &filename);
+	const DataBlockPtr getDataBlock(const Common::String &filename, uint offset = 0) const override;
+	Common::SeekableReadStream *createReadStream(const Common::String &filename, uint offset = 0) const override;
+	bool exists(const Common::String &filename) const override { return _toc.contains(filename); }
 
 private:
 	enum FileType {
@@ -160,13 +163,38 @@ private:
 		Common::Array<TrackSector> sectors;
 	};
 
-	void readVTOC(uint trackVTOC);
+	void readVTOC();
 	void readSectorList(TrackSector start, Common::Array<TrackSector> &list);
 	Common::SeekableReadStream *createReadStreamText(const TOCEntry &entry) const;
 	Common::SeekableReadStream *createReadStreamBinary(const TOCEntry &entry) const;
 
 	DiskImage *_disk;
 	Common::HashMap<Common::String, TOCEntry> _toc;
+};
+
+// On the Apple II, sector headers contain a disk volume number. This number
+// is used by ADL multi-disk games. The PC port has the disk volume number
+// as the first data byte of every sector that contains game data. We need
+// to skip this number as we read in the data. Additionally, the data is now
+// prefixed with an uint16 containing the data size.
+class DataBlock_PC : public DataBlock {
+public:
+	DataBlock_PC(DiskImage *disk, byte track, byte sector, uint16 offset = 0) :
+			_disk(disk),
+			_track(track),
+			_sector(sector),
+			_offset(offset) { }
+
+	~DataBlock_PC() override { }
+
+	Common::SeekableReadStream *createReadStream() const override;
+
+private:
+	void read(Common::SeekableReadStream &stream, byte *const dataPtr, const uint32 size) const;
+
+	DiskImage *_disk;
+	byte _track, _sector;
+	uint16 _offset;
 };
 
 } // End of namespace Adl

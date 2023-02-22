@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
 
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
 
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,7 +26,7 @@
 #include "common/savefile.h"
 #include "common/serializer.h"
 #include "common/system.h"
-#include "common/zlib.h"
+#include "common/compression/zlib.h"
 #include "graphics/palette.h"
 
 #include "composer/composer.h"
@@ -155,7 +154,7 @@ void ComposerEngine::sync<OldScript *>(Common::Serializer &ser, OldScript *&data
 template<>
 void ComposerEngine::sync<QueuedScript>(Common::Serializer &ser, QueuedScript &data, Common::Serializer::Version minVersion, Common::Serializer::Version maxVersion) {
 	ser.syncAsUint32LE(data._baseTime);
-	ser.syncAsUint32LE(data._duration);	
+	ser.syncAsUint32LE(data._duration);
 	ser.syncAsUint32LE(data._count);
 	ser.syncAsUint16LE(data._scriptId);
 	if (ser.isLoading()) data._baseTime += _timeDelta;
@@ -266,20 +265,21 @@ void ComposerEngine::sync<Sprite>(Common::Serializer &ser, Sprite &data, Common:
 		}
 
 }
-Common::String ComposerEngine::makeSaveGameName(int slot) {
-	return (_targetName + Common::String::format(".%02d", slot));
+
+Common::String ComposerEngine::getSaveStateName(int slot) const {
+	return Common::String::format("%s.%02d", _targetName.c_str(), slot);
 }
 
 Common::Error ComposerEngine::loadGameState(int slot) {
-	Common::String filename = makeSaveGameName(slot);
+	Common::String filename = getSaveStateName(slot);
 	Common::InSaveFile *in;
 	if (!(in = _saveFileMan->openForLoading(filename)))
 		return Common::kPathNotFile;
 
-	Common::Serializer ser(in, NULL);
+	Common::Serializer ser(in, nullptr);
 	byte magic[4];
 	ser.syncBytes(magic, 4);
-	if (magic[0] != 'C' || magic[1] != 'M' || magic[2] != 'P' || magic[3] != 'S') 
+	if (magic[0] != 'C' || magic[1] != 'M' || magic[2] != 'P' || magic[3] != 'S')
 		return Common::kUnknownError;
 
 	ser.syncVersion(0);
@@ -296,9 +296,9 @@ Common::Error ComposerEngine::loadGameState(int slot) {
 
 	// Unload all Libraries
 	Common::Array<uint16> libIds;
-	for (Common::List<Library>::iterator i = _libraries.begin(); i != _libraries.end(); i++) 
+	for (Common::List<Library>::iterator i = _libraries.begin(); i != _libraries.end(); i++)
 		libIds.push_back((*i)._id);
-	for (uint32 i = 0; i < libIds.size(); i++) 
+	for (uint32 i = 0; i < libIds.size(); i++)
 		unloadLibrary(libIds[i]);
 
 	syncListReverse<Library>(ser, _libraries);
@@ -352,7 +352,7 @@ Common::Error ComposerEngine::loadGameState(int slot) {
 	_needsUpdate = true;
 
 	_mixer->stopAll();
-	_audioStream = NULL;
+	_audioStream = nullptr;
 
 	// Restore the buffered audio
 	ser.syncAsSint16LE(_currSoundPriority);
@@ -366,21 +366,16 @@ Common::Error ComposerEngine::loadGameState(int slot) {
 	if (!_mixer->isSoundHandleActive(_soundHandle))
 		_mixer->playStream(Audio::Mixer::kSFXSoundType, &_soundHandle, _audioStream);
 
-
-	// Reset autosave duration on load
-	_lastSaveTime = _system->getMillis();
-
 	return Common::kNoError;
 }
 
-Common::Error ComposerEngine::saveGameState(int slot, const Common::String &desc) {
-	Common::String filename = makeSaveGameName(slot);
+Common::Error ComposerEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
+	Common::String filename = getSaveStateName(slot);
 	Common::OutSaveFile *out;
-	_lastSaveTime = _system->getMillis();
 	if (!(out = _saveFileMan->openForSaving(filename)))
 		return Common::kWritingFailed;
 
-	Common::Serializer ser(NULL, out);
+	Common::Serializer ser(nullptr, out);
 	byte magic[4] = {'C', 'M', 'P', 'S'};
 	ser.syncBytes(magic, 4);
 	ser.syncVersion(0);

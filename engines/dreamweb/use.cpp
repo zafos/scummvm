@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,13 +15,15 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "dreamweb/sound.h"
 #include "dreamweb/dreamweb.h"
+
+#include "common/config-manager.h"
+#include "common/text-to-speech.h"
 
 namespace DreamWeb {
 
@@ -144,6 +146,9 @@ void DreamWebEngine::useRoutine() {
 	if (findNextColon(&obText) != 0) {
 		if (findNextColon(&obText) != 0) {
 			if (*obText != 0) {
+				if (_ttsMan != nullptr && ConfMan.getBool("tts_enabled_objects")) {
+					_ttsMan->say((const char *)obText, Common::TextToSpeechManager::INTERRUPT, _textEncoding);
+				}
 				useText(obText);
 				hangOnP(400);
 				putBackObStuff();
@@ -179,6 +184,9 @@ void DreamWebEngine::showFirstUse() {
 	findNextColon(&obText);
 	findNextColon(&obText);
 	useText(obText);
+
+	speakObject((const char *)obText);
+
 	hangOnP(400);
 }
 
@@ -188,6 +196,9 @@ void DreamWebEngine::showSecondUse() {
 	findNextColon(&obText);
 	findNextColon(&obText);
 	useText(obText);
+
+	speakObject((const char *)obText);
+
 	hangOnP(400);
 }
 
@@ -741,7 +752,7 @@ void DreamWebEngine::useGun() {
 		_getBack = 1;
 		_vars._progressPoints++;
 
-	} else if (_realLocation == 25) {
+	} else if (_realLocation == 25 && _mapX == 0 && _mapY == 50) {
 		// helicopter
 		showPuzText(34, 300);
 		_vars._lastWeapon = 1;
@@ -1509,10 +1520,10 @@ void DreamWebEngine::useCashCard() {
 	y = 98;
 	printDirect(&obText, 36, &y, 36, 36 & 1);
 	char amountStr[10];
-	sprintf(amountStr, "%04d", _vars._card1Money / 10);
+	Common::sprintf_s(amountStr, "%04d", _vars._card1Money / 10);
 	_charShift = 91 * 2 + 75;
 	printDirect((const uint8 *)amountStr, 160, 155, 240, 240 & 1);
-	sprintf(amountStr, "%02d", (_vars._card1Money % 10) * 10);
+	Common::sprintf_s(amountStr, "%02d", (_vars._card1Money % 10) * 10);
 	_charShift = 91 * 2 + 85;
 	printDirect((const uint8 *)amountStr, 187, 155, 240, 240 & 1);
 	_charShift = 0;

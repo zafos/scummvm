@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -51,12 +50,15 @@ public:
 	float y;
 	float z;
 
-	Vector3() : x(0.0), y(0.0), z(0.0) {}
+	Vector3() : x(0.0f), y(0.0f), z(0.0f) {}
 
 	Vector3(float ax, float ay, float az) : x(ax), y(ay), z(az) {}
 
-	float length() { return sqrtf(x * x + y * y + z * z); }
-	Vector3 normalize() {
+	inline float length() {
+		return sqrt(x * x + y * y + z * z);
+	}
+
+	inline Vector3 normalize() {
 		float len = length();
 		if (len == 0) {
 			return Vector3(0.0f, 0.0f, 0.0f);
@@ -64,11 +66,19 @@ public:
 		return Vector3(x / len, y / len, z / len);
 	}
 
-	static Vector3 cross(Vector3 a, Vector3 b) {
+	inline static Vector3 cross(Vector3 a, Vector3 b) {
 		return Vector3(
 			a.y * b.z - a.z * b.y,
 			a.z * b.x - a.x * b.z,
 			a.x * b.y - a.y * b.x);
+	}
+
+	inline static float dot(Vector3 a, Vector3 b) {
+		return a.x * b.x + a.y * b.y + a.z * b.z;
+	}
+
+	Vector2 xz() const {
+		return Vector2(x, z);
 	}
 };
 
@@ -146,14 +156,6 @@ inline float distance(const Vector2 &v1, const Vector2 &v2) {
 
 inline float distance(const Vector3 &v1, const Vector3 &v2) {
 	return distance(v1.x, v1.z, v2.x, v2.z);
-}
-
-inline float cos_1024(int angle1024) {
-	return cos(angle1024 * (M_PI / 512.0f));
-}
-
-inline float sin_1024(int angle1024) {
-	return sin(angle1024 * (M_PI / 512.0f));
 }
 
 inline bool lineIntersection(Vector2 a1, Vector2 a2, Vector2 b1, Vector2 b2, Vector2 *intersection) {

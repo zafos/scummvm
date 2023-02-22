@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -214,6 +213,8 @@ void Scene800::Action1::signal() {
 		BF_GLOBALS._player.enableControl();
 		remove();
 		break;
+	default:
+		break;
 	}
 
 }
@@ -344,6 +345,8 @@ void Scene800::signal() {
 		BF_GLOBALS.clearFlag(fWithLyle);
 		_lyle.remove();
 		BF_GLOBALS._player.enableControl();
+		break;
+	default:
 		break;
 	}
 }
@@ -1720,6 +1723,8 @@ void Scene830::postInit(SceneObjectList *OwnerList) {
 			_field18AC = 1;
 		}
 		break;
+	default:
+		break;
 	}
 
 	_item2.setDetails(7, 830, 9, 10, 11, 1);
@@ -1876,6 +1881,8 @@ void Scene830::signal() {
 	case 8312:
 		_object1.remove();
 		BF_GLOBALS._player.enableControl();
+		break;
+	default:
 		break;
 	}
 }
@@ -2504,6 +2511,8 @@ void Scene840::signal() {
 		BF_INVENTORY.setObjectScene(INV_WAVE_KEYS, 0);
 		BF_INVENTORY.setObjectScene(INV_RENTAL_KEYS, 0);
 		BF_GLOBALS._player.enableControl();
+		break;
+	default:
 		break;
 	}
 }

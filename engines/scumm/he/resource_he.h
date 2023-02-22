@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,7 +23,10 @@
 #define SCUMM_HE_RESOURCE_HE_H
 
 #include "common/macresman.h"
-#include "common/winexe_pe.h"
+
+namespace Common {
+class PEResources;
+}
 
 namespace Scumm {
 
@@ -68,23 +70,23 @@ private:
 class Win32ResExtractor : public ResExtractor {
 public:
 	Win32ResExtractor(ScummEngine_v70he *scumm);
-	~Win32ResExtractor() {}
+	~Win32ResExtractor() override;
 
 private:
-	Common::PEResources _exe;
+	Common::PEResources *_exe;
 
-	bool extractResource(int id, CachedCursor *cc);
+	bool extractResource(int id, CachedCursor *cc) override;
 };
 
 class MacResExtractor : public ResExtractor {
 public:
 	MacResExtractor(ScummEngine_v70he *scumm);
-	~MacResExtractor() {}
+	~MacResExtractor() override {}
 
 private:
 	Common::MacResManager *_resMgr;
 
-	bool extractResource(int id, CachedCursor *cc);
+	bool extractResource(int id, CachedCursor *cc) override;
 };
 
 } // End of namespace Scumm

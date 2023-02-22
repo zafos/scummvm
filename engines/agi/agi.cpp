@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -66,7 +65,6 @@ void AgiEngine::wait(uint32 msec, bool busy) {
 
 	do {
 		processScummVMEvents();
-		_console->onFrame();
 		_system->updateScreen();
 		_system->delayMillis(10);
 	} while (_system->getMillis() < endTime);
@@ -91,21 +89,22 @@ int AgiEngine::agiInit() {
 
 	// clear all resources and events
 	for (i = 0; i < MAX_DIRECTORY_ENTRIES; i++) {
-		memset(&_game.views[i], 0, sizeof(struct AgiView));
-		memset(&_game.pictures[i], 0, sizeof(struct AgiPicture));
-		memset(&_game.logics[i], 0, sizeof(struct AgiLogic));
-		memset(&_game.sounds[i], 0, sizeof(class AgiSound *)); // _game.sounds contains pointers now
-		memset(&_game.dirView[i], 0, sizeof(struct AgiDir));
-		memset(&_game.dirPic[i], 0, sizeof(struct AgiDir));
-		memset(&_game.dirLogic[i], 0, sizeof(struct AgiDir));
-		memset(&_game.dirSound[i], 0, sizeof(struct AgiDir));
+		_game.views[i].reset();
+		_game.pictures[i].reset();
+		_game.logics[i].reset();
+		_game.sounds[i] = nullptr; // _game.sounds contains pointers now
+		_game.dirView[i].reset();
+		_game.dirPic[i].reset();
+		_game.dirLogic[i].reset();
+		_game.dirSound[i].reset();
 	}
 
 	// clear view table
-	for (i = 0; i < SCREENOBJECTS_MAX; i++)
-		memset(&_game.screenObjTable[i], 0, sizeof(struct ScreenObjEntry));
+	for (i = 0; i < SCREENOBJECTS_MAX; i++) {
+		_game.screenObjTable[i].reset();
+	}
 
-	memset(&_game.addToPicView, 0, sizeof(struct ScreenObjEntry));
+	_game.addToPicView.reset();
 
 	_words->clearEgoWords();
 
@@ -118,7 +117,7 @@ int AgiEngine::agiInit() {
 	// some scripts expect that the game strings remain unaffected after a
 	// restart. An example is script 98 in SQ2, which is not invoked on restart
 	// to ask Ego's name again. The name is supposed to be maintained in string 1.
-	// Fixes bug #3292784.
+	// Fixes bug #5673.
 	if (!_restartGame) {
 		for (i = 0; i < MAX_STRINGS; i++)
 			_game.strings[i][0] = 0;
@@ -136,6 +135,9 @@ int AgiEngine::agiInit() {
 		debug("Emulating Sierra AGI v%x.002.%03x",
 		      (int)(getVersion() >> 12) & 0xF,
 		      (int)(getVersion()) & 0xFFF);
+		break;
+	default:
+		warning("Unknown AGI Emulation Version %x", (int)(getVersion() >> 12));
 		break;
 	}
 
@@ -164,14 +166,6 @@ int AgiEngine::agiInit() {
 	if (ec == errOK)
 		ec = _loader->loadResource(RESOURCETYPE_LOGIC, 0);
 
-#ifdef __DS__
-	// Normally, the engine loads the predictive text dictionary when the predictive dialog
-	// is shown.  On the DS version, the word completion feature needs the dictionary too.
-
-	// FIXME - loadDict() no long exists in AGI as this has been moved to within the
-	// GUI Predictive Dialog, but DS Word Completion is probably broken due to this...
-#endif
-
 	_keyHoldMode = false;
 	_keyHoldModeLastKey = Common::KEYCODE_INVALID;
 
@@ -180,8 +174,7 @@ int AgiEngine::agiInit() {
 	// Reset in-game timer
 	inGameTimerReset();
 
-	// Sync volume settings from ScummVM system settings
-	setVolumeViaSystemSetting();
+	applyVolumeToMixer();
 
 	return ec;
 }
@@ -214,7 +207,7 @@ int AgiEngine::agiDeinit() {
 	agiUnloadResources();    // unload resources in memory
 	_loader->unloadResource(RESOURCETYPE_LOGIC, 0);
 	ec = _loader->deinit();
-	unloadObjects();
+	_objects.clear();
 	_words->unloadDictionary();
 
 	clearImageStack();
@@ -262,7 +255,7 @@ AgiBase::AgiBase(OSystem *syst, const AGIGameDescription *gameDesc) : Engine(sys
 	_noSaveLoadAllowed = false;
 
 	_rnd = new Common::RandomSource("agi");
-	_sound = 0;
+	_sound = nullptr;
 
 	initFeatures();
 	initVersion();
@@ -334,7 +327,7 @@ void AgiBase::initRenderMode() {
 		break;
 	}
 
-	if (getFeatures() & (GF_AGI256 | GF_AGI256_2)) {
+	if (getFeatures() & GF_AGI256) {
 		// If current game is AGI256, switch (force) to VGA render mode
 		_renderMode = Common::kRenderVGA;
 	}
@@ -348,21 +341,7 @@ AgiEngine::AgiEngine(OSystem *syst, const AGIGameDescription *gameDesc) : AgiBas
 	// Setup mixer
 	syncSoundSettings();
 
-	DebugMan.addDebugChannel(kDebugLevelMain, "Main", "Generic debug level");
-	DebugMan.addDebugChannel(kDebugLevelResources, "Resources", "Resources debugging");
-	DebugMan.addDebugChannel(kDebugLevelSprites, "Sprites", "Sprites debugging");
-	DebugMan.addDebugChannel(kDebugLevelInventory, "Inventory", "Inventory debugging");
-	DebugMan.addDebugChannel(kDebugLevelInput, "Input", "Input events debugging");
-	DebugMan.addDebugChannel(kDebugLevelMenu, "Menu", "Menu debugging");
-	DebugMan.addDebugChannel(kDebugLevelScripts, "Scripts", "Scripts debugging");
-	DebugMan.addDebugChannel(kDebugLevelSound, "Sound", "Sound debugging");
-	DebugMan.addDebugChannel(kDebugLevelText, "Text", "Text output debugging");
-	DebugMan.addDebugChannel(kDebugLevelSavegame, "Savegame", "Saving & restoring game debugging");
-
-
-	memset(&_game, 0, sizeof(struct AgiGame));
 	memset(&_debug, 0, sizeof(struct AgiDebug));
-	memset(&_mouse, 0, sizeof(struct Mouse));
 
 	_game.mouseEnabled = true;
 	_game.mouseHidden = false;
@@ -382,11 +361,9 @@ AgiEngine::AgiEngine(OSystem *syst, const AGIGameDescription *gameDesc) : AgiBas
 
 	_allowSynthetic = false;
 
-	_intobj = NULL;
+	_intobj = nullptr;
 
 	memset(&_stringdata, 0, sizeof(struct StringData));
-
-	_objects = NULL;
 
 	_restartGame = false;
 
@@ -394,14 +371,12 @@ AgiEngine::AgiEngine(OSystem *syst, const AGIGameDescription *gameDesc) : AgiBas
 
 	resetControllers();
 
-	_game._curLogic = NULL;
+	_game._curLogic = nullptr;
 	_veryFirstInitialCycle = true;
 	_instructionCounter = 0;
 	resetGetVarSecondsHeuristic();
 
-	_setVolumeBrokenFangame = false; // for further study see AgiEngine::setVolumeViaScripts()
-
-	_lastSaveTime = 0;
+	_setVolumeBrokenFangame = false; // for further study see AgiEngine::applyVolumeToMixer()
 
 	_playTimeInSecondsAdjust = 0;
 	_lastUsedPlayTimeInCycles = 0;
@@ -410,7 +385,6 @@ AgiEngine::AgiEngine(OSystem *syst, const AGIGameDescription *gameDesc) : AgiBas
 
 	memset(_keyQueue, 0, sizeof(_keyQueue));
 
-	_console = nullptr;
 	_font = nullptr;
 	_gfx = nullptr;
 	_sound = nullptr;
@@ -421,6 +395,7 @@ AgiEngine::AgiEngine(OSystem *syst, const AGIGameDescription *gameDesc) : AgiBas
 	_menu = nullptr;
 	_systemUI = nullptr;
 	_inventory = nullptr;
+	_logFile = nullptr;
 
 	_keyHoldMode = false;
 	_keyHoldModeLastKey = Common::KEYCODE_INVALID;
@@ -458,7 +433,6 @@ void AgiEngine::initialize() {
 			_soundemu = SOUND_EMU_AMIGA;
 			break;
 		default:
-			debug(0, "DEF");
 			_soundemu = SOUND_EMU_MIDI;
 			break;
 		}
@@ -466,7 +440,7 @@ void AgiEngine::initialize() {
 
 	initRenderMode();
 
-	_console = new Console(this);
+	setDebugger(new Console(this));
 	_words = new Words(this);
 	_font = new GfxFont(this);
 	_gfx = new GfxMgr(this, _font);
@@ -487,8 +461,6 @@ void AgiEngine::initialize() {
 	_text->charAttrib_Set(15, 0);
 
 	_game.name[0] = '\0';
-
-	_lastSaveTime = 0;
 
 	debugC(2, kDebugLevelMain, "Detect game");
 
@@ -523,6 +495,11 @@ AgiEngine::~AgiEngine() {
 	if (_gfx) {
 		_gfx->deinitVideo();
 	}
+	if (_logFile) {
+		_logFile->finalize();
+		_logFile->close();
+	}
+	delete _logFile;
 	delete _inventory;
 	delete _systemUI;
 	delete _menu;
@@ -532,7 +509,6 @@ AgiEngine::~AgiEngine() {
 	delete _gfx;
 	delete _font;
 	delete _words;
-	delete _console;
 }
 
 Common::Error AgiBase::init() {
@@ -557,7 +533,7 @@ Common::Error AgiEngine::go() {
 void AgiEngine::syncSoundSettings() {
 	Engine::syncSoundSettings();
 
-	setVolumeViaSystemSetting();
+	applyVolumeToMixer();
 }
 
 // WORKAROUND:
@@ -707,6 +683,25 @@ void AgiEngine::artificialDelayTrigger_DrawPicture(int16 newPictureNr) {
 		}
 	}
 	_artificialDelayCurrentPicture = newPictureNr;
+}
+
+void AgiGame::setAppleIIgsSpeedLevel(int i) {
+	appleIIgsSpeedLevel = i;
+	_vm->setVar(VM_VAR_WINDOW_AUTO_CLOSE_TIMER, 6);
+	switch (i) {
+	case 0:
+		_vm->_text->messageBox("Fastest speed.");
+		break;
+	case 1:
+		_vm->_text->messageBox("Fast speed.");
+		break;
+	case 2:
+		_vm->_text->messageBox("Normal speed.");
+		break;
+	case 3:
+		_vm->_text->messageBox("Slow speed.");
+		break;
+	}
 }
 
 } // End of namespace Agi

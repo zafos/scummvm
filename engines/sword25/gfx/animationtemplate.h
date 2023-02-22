@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -57,16 +56,16 @@ private:
 	AnimationTemplate(InputPersistenceBlock &reader, uint handle);
 
 public:
-	~AnimationTemplate();
+	~AnimationTemplate() override;
 
-	virtual const Frame    &getFrame(uint index) const {
+	const Frame    &getFrame(uint index) const override {
 		assert(index < _frames.size());
 		return _frames[index];
 	}
-	virtual uint    getFrameCount() const {
+	uint    getFrameCount() const override {
 		return _frames.size();
 	}
-	virtual void            unlock() {
+	void            unlock() override {
 		delete this;
 	}
 
@@ -75,18 +74,18 @@ public:
 	}
 
 	/**
-	    @brief Fügt einen neuen Frame zur Animation hinzu.
+	    @brief FÃ¼gt einen neuen Frame zur Animation hinzu.
 
-	    Der Frame wird an das Ende der Animation angehängt.
+	    Der Frame wird an das Ende der Animation angehÃ¤ngt.
 
 	    @param Index der Index des Frames in der Quellanimation
 	*/
 	void addFrame(int index);
 
 	/**
-	    @brief Ändert einen bereits in der Animation vorhandenen Frame.
-	    @param DestIndex der Index des Frames der überschrieben werden soll
-	    @param SrcIndex der Index des einzufügenden Frames in der Quellanimation
+	    @brief Ã„ndert einen bereits in der Animation vorhandenen Frame.
+	    @param DestIndex der Index des Frames der Ã¼berschrieben werden soll
+	    @param SrcIndex der Index des einzufÃ¼genden Frames in der Quellanimation
 	*/
 	void setFrame(int destIndex, int srcIndex);
 
@@ -104,8 +103,8 @@ public:
 	*/
 	void setFPS(int FPS);
 
-	virtual bool persist(OutputPersistenceBlock &writer);
-	virtual bool unpersist(InputPersistenceBlock &reader);
+	bool persist(OutputPersistenceBlock &writer) override;
+	bool unpersist(InputPersistenceBlock &reader) override;
 
 private:
 	Common::Array<Frame>  _frames;

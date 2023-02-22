@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,7 +24,7 @@
 
 #include "common/rational.h"
 #include "common/rect.h"
-#include "sci/resource.h"
+#include "sci/resource/resource.h"
 #include "sci/engine/vm_types.h"
 #include "sci/util.h"
 
@@ -101,7 +100,8 @@ struct CelInfo32 {
 		resourceId(0),
 		loopNo(0),
 		celNo(0),
-		bitmap(NULL_REG) {}
+		bitmap(NULL_REG),
+		color(0) {}
 
 	// This is the equivalence criteria used by CelObj::searchCache in at least
 	// SSCI SQ6. Notably, it does not check the color field.
@@ -263,7 +263,7 @@ protected:
 	bool _drawMirrored;
 
 public:
-	static Common::ScopedPtr<CelScaler> _scaler;
+	static CelScaler *_scaler;
 
 	/**
 	 * The basic identifying information for this cel. This information
@@ -334,6 +334,12 @@ public:
 	 * of the owner screen item when rendering.
 	 */
 	bool _mirrorX;
+
+	/**
+	 * If true, the source for this cel is a Mac pic or view or color whose pixels for
+	 * entries 0 and 255 must be swapped when drawing since we use the PC palette.
+	 */
+	bool _isMacSource;
 
 	/**
 	 * Initialises static CelObj members.
@@ -457,7 +463,7 @@ protected:
 	 * A cache of cel objects used to avoid reinitialisation overhead for cels
 	 * with the same CelInfo32.
 	 */
-	static Common::ScopedPtr<CelCache> _cache;
+	static CelCache *_cache;
 
 	/**
 	 * Searches the cel cache for a CelObj matching the provided CelInfo32. If
@@ -496,7 +502,7 @@ private:
 
 public:
 	CelObjView(const GuiResourceId viewId, const int16 loopNo, const int16 celNo);
-	virtual ~CelObjView() override {};
+	~CelObjView() override {};
 
 	using CelObj::draw;
 
@@ -509,8 +515,8 @@ public:
 	 */
 	void draw(Buffer &target, const Common::Rect &targetRect, const Common::Point &scaledPosition, bool mirrorX, const Ratio &scaleX, const Ratio &scaleY);
 
-	virtual CelObjView *duplicate() const override;
-	virtual const SciSpan<const byte> getResPointer() const override;
+	CelObjView *duplicate() const override;
+	const SciSpan<const byte> getResPointer() const override;
 
 	Common::Point getLinkPosition(const int16 linkId) const;
 };
@@ -548,13 +554,13 @@ public:
 	int16 _priority;
 
 	CelObjPic(const GuiResourceId pictureId, const int16 celNo);
-	virtual ~CelObjPic() override {};
+	~CelObjPic() override {};
 
 	using CelObj::draw;
-	virtual void draw(Buffer &target, const Common::Rect &targetRect, const Common::Point &scaledPosition, const bool mirrorX) override;
+	void draw(Buffer &target, const Common::Rect &targetRect, const Common::Point &scaledPosition, const bool mirrorX) override;
 
-	virtual CelObjPic *duplicate() const override;
-	virtual const SciSpan<const byte> getResPointer() const override;
+	CelObjPic *duplicate() const override;
+	const SciSpan<const byte> getResPointer() const override;
 };
 
 #pragma mark -
@@ -568,10 +574,10 @@ public:
 class CelObjMem : public CelObj {
 public:
 	CelObjMem(const reg_t bitmap);
-	virtual ~CelObjMem() override {};
+	~CelObjMem() override {};
 
-	virtual CelObjMem *duplicate() const override;
-	virtual const SciSpan<const byte> getResPointer() const override;
+	CelObjMem *duplicate() const override;
+	const SciSpan<const byte> getResPointer() const override;
 };
 
 #pragma mark -
@@ -584,18 +590,18 @@ public:
 class CelObjColor : public CelObj {
 public:
 	CelObjColor(const uint8 color, const int16 width, const int16 height);
-	virtual ~CelObjColor() override {};
+	~CelObjColor() override {};
 
 	using CelObj::draw;
 	/**
 	 * Block fills the target buffer with the cel color.
 	 */
 	void draw(Buffer &target, const Common::Rect &targetRect) const;
-	virtual void draw(Buffer &target, const ScreenItem &screenItem, const Common::Rect &targetRect, const bool mirrorX) override;
-	virtual void draw(Buffer &target, const Common::Rect &targetRect, const Common::Point &scaledPosition, const bool mirrorX) override;
+	void draw(Buffer &target, const ScreenItem &screenItem, const Common::Rect &targetRect, const bool mirrorX) override;
+	void draw(Buffer &target, const Common::Rect &targetRect, const Common::Point &scaledPosition, const bool mirrorX) override;
 
-	virtual CelObjColor *duplicate() const override;
-	virtual const SciSpan<const byte> getResPointer() const override;
+	CelObjColor *duplicate() const override;
+	const SciSpan<const byte> getResPointer() const override;
 };
 } // End of namespace Sci
 

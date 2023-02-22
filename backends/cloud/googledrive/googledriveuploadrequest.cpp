@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,7 +26,7 @@
 #include "backends/networking/curl/connectionmanager.h"
 #include "backends/networking/curl/curljsonrequest.h"
 #include "backends/networking/curl/networkreadstream.h"
-#include "common/json.h"
+#include "common/formats/json.h"
 #include "googledrivetokenrefresher.h"
 
 namespace Cloud {
@@ -55,7 +54,7 @@ void GoogleDriveUploadRequest::start() {
 		_workingRequest->finish();
 	if (_contentsStream == nullptr || !_contentsStream->seek(0)) {
 		warning("GoogleDriveUploadRequest: cannot restart because stream couldn't seek(0)");
-		finishError(Networking::ErrorResponse(this, false, true, "", -1));
+		finishError(Networking::ErrorResponse(this, false, true, "GoogleDriveUploadRequest::start: couldn't restart because failed to seek(0)", -1));
 		return;
 	}
 	_resolvedId = ""; //used to update file contents
@@ -146,33 +145,31 @@ void GoogleDriveUploadRequest::startUploadCallback(Networking::JsonResponse resp
 	if (_ignoreCallback)
 		return;
 
-	Networking::ErrorResponse error(this, false, true, "", -1);
+	Networking::ErrorResponse error(this, false, true, "GoogleDriveUploadRequest::startUploadCallback", -1);
 	Networking::CurlJsonRequest *rq = (Networking::CurlJsonRequest *)response.request;
 	if (rq) {
 		const Networking::NetworkReadStream *stream = rq->getNetworkReadStream();
 		if (stream) {
 			long code = stream->httpResponseCode();
-			Common::String headers = stream->responseHeaders();
 			if (code == 200) {
-				const char *cstr = headers.c_str();
-				const char *position = strstr(cstr, "Location: ");
-
-				if (position) {
-					Common::String result = "";
-					char c;
-					for (const char *i = position + 10; c = *i, c != 0; ++i) {
-						if (c == '\n' || c == '\r')
-							break;
-						result += c;
-					}
-					_uploadUrl = result;
+				Common::HashMap<Common::String, Common::String> headers = stream->responseHeadersMap();
+				if (headers.contains("location")) {
+					_uploadUrl = headers["location"];
 					uploadNextPart();
 					return;
+				} else {
+					error.response += ": response must provide Location header, but it's not there";
 				}
+			} else {
+				error.response += ": response is not 200 OK";
 			}
 
 			error.httpResponseCode = code;
+		} else {
+			error.response += ": missing response stream [improbable]";
 		}
+	} else {
+		error.response += ": missing request object [improbable]";
 	}
 
 	Common::JSONValue *json = response.value;
@@ -201,8 +198,8 @@ void GoogleDriveUploadRequest::uploadNextPart() {
 	uint32 oldPos = _contentsStream->pos();
 	if (oldPos != _serverReceivedBytes) {
 		if (!_contentsStream->seek(_serverReceivedBytes)) {
-			warning("GoogleDriveUploadRequest: cannot upload because stream couldn't seek(%lu)", _serverReceivedBytes);
-			finishError(Networking::ErrorResponse(this, false, true, "", -1));
+			warning("GoogleDriveUploadRequest: cannot upload because stream couldn't seek(%llu)", (unsigned long long)_serverReceivedBytes);
+			finishError(Networking::ErrorResponse(this, false, true, "GoogleDriveUploadRequest::uploadNextPart: seek() didn't work", -1));
 			return;
 		}
 		oldPos = _serverReceivedBytes;
@@ -217,7 +214,7 @@ void GoogleDriveUploadRequest::uploadNextPart() {
 		if (_contentsStream->pos() == 0)
 			request->addHeader(Common::String::format("Content-Length: 0"));
 		else
-			request->addHeader(Common::String::format("Content-Range: bytes %u-%u/%u", oldPos, _contentsStream->pos() - 1, _contentsStream->size()));
+			request->addHeader(Common::String::format("Content-Range: bytes %u-%lu/%lu", oldPos, long(_contentsStream->pos() - 1), long(_contentsStream->size())));
 	}
 
 	_workingRequest = ConnMan.addRequest(request);
@@ -230,25 +227,19 @@ bool GoogleDriveUploadRequest::handleHttp308(const Networking::NetworkReadStream
 	if (stream->httpResponseCode() != 308)
 		return false; //seriously
 
-	Common::String headers = stream->responseHeaders();
-	const char *cstr = headers.c_str();
-	for (int rangeTry = 0; rangeTry < 2; ++rangeTry) {
-		const char *needle = (rangeTry == 0 ? "Range: 0-" : "Range: bytes=0-");
-		uint32 needleLength = (rangeTry == 0 ? 9 : 15);
+	Common::HashMap<Common::String, Common::String> headers = stream->responseHeadersMap();
+	if (headers.contains("range")) {
+		Common::String range = headers["range"];
+		for (int rangeTry = 0; rangeTry < 2; ++rangeTry) {
+			const char *needle = (rangeTry == 0 ? "0-" : "bytes=0-"); //if it lost the first part, I refuse to talk with it
+			uint32 needleLength = (rangeTry == 0 ? 2 : 8);
 
-		const char *position = strstr(cstr, needle); //if it lost the first part, I refuse to talk with it
-
-		if (position) {
-			Common::String result = "";
-			char c;
-			for (const char *i = position + needleLength; c = *i, c != 0; ++i) {
-				if (c == '\n' || c == '\r')
-					break;
-				result += c;
+			if (range.hasPrefix(needle)) {
+				range.erase(0, needleLength);
+				_serverReceivedBytes = range.asUint64() + 1;
+				uploadNextPart();
+				return true;
 			}
-			_serverReceivedBytes = result.asUint64() + 1;
-			uploadNextPart();
-			return true;
 		}
 	}
 

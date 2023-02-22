@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -92,36 +91,40 @@ bool Chip::write(uint32 reg, uint8 val) {
 		timer[1].counter = val;
 		return true;
 	case 0x04:
-		double time = g_system->getMillis() / 1000.0;
+		{
+			double time = g_system->getMillis() / 1000.0;
 
-		if (val & 0x80) {
-			timer[0].reset(time);
-			timer[1].reset(time);
-		} else {
-			timer[0].update(time);
-			timer[1].update(time);
+			if (val & 0x80) {
+				timer[0].reset(time);
+				timer[1].reset(time);
+			} else {
+				timer[0].update(time);
+				timer[1].update(time);
 
-			if (val & 0x1)
-				timer[0].start(time, 80);
-			else
-				timer[0].stop();
+				if (val & 0x1)
+					timer[0].start(time, 80);
+				else
+					timer[0].stop();
 
-			timer[0].masked = (val & 0x40) > 0;
+				timer[0].masked = (val & 0x40) > 0;
 
-			if (timer[0].masked)
-				timer[0].overflow = false;
+				if (timer[0].masked)
+					timer[0].overflow = false;
 
-			if (val & 0x2)
-				timer[1].start(time, 320);
-			else
-				timer[1].stop();
+				if (val & 0x2)
+					timer[1].start(time, 320);
+				else
+					timer[1].stop();
 
-			timer[1].masked = (val & 0x20) > 0;
+				timer[1].masked = (val & 0x20) > 0;
 
-			if (timer[1].masked)
-				timer[1].overflow = false;
+				if (timer[1].masked)
+					timer[1].overflow = false;
+			}
 		}
 		return true;
+	default:
+		break;
 	}
 	return false;
 }
@@ -145,7 +148,7 @@ uint8 Chip::read() {
 	return ret;
 }
 
-OPL::OPL(Config::OplType type) : _type(type), _rate(0), _emulator(0) {
+OPL::OPL(Config::OplType type) : _type(type), _rate(0), _emulator(nullptr) {
 }
 
 OPL::~OPL() {
@@ -155,14 +158,14 @@ OPL::~OPL() {
 
 void OPL::free() {
 	delete _emulator;
-	_emulator = 0;
+	_emulator = nullptr;
 }
 
 bool OPL::init() {
 	free();
 
 	memset(&_reg, 0, sizeof(_reg));
-	memset(_chip, 0, sizeof(_chip));
+	ARRAYCLEAR(_chip);
 
 	_emulator = new DBOPL::Chip();
 	if (!_emulator)
@@ -203,6 +206,8 @@ void OPL::write(int port, int val) {
 				dualWrite(1, _reg.dual[1], val);
 			}
 			break;
+		default:
+			break;
 		}
 	} else {
 		// Ask the handler to write the address
@@ -223,6 +228,8 @@ void OPL::write(int port, int val) {
 				_reg.dual[0] = val & 0xff;
 				_reg.dual[1] = val & 0xff;
 			}
+			break;
+		default:
 			break;
 		}
 	}
@@ -245,6 +252,8 @@ byte OPL::read(int port) {
 			return 0xff;
 		// Make sure the low bits are 6 on opl2
 		return _chip[(port >> 1) & 1].read() | 0x6;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -281,6 +290,8 @@ void OPL::writeReg(int r, int v) {
 		} else {
 			write(0x388, tempReg);
 		}
+		break;
+	default:
 		break;
 	};
 }

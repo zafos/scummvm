@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -566,6 +565,7 @@ bool PspUnitTests::testFileSystem() {
 	wrStream = file.createWriteStream();
 	if (!wrStream) {
 		PSP_ERROR("%s couldn't be created.\n", path);
+		delete[] buffer;
 		return false;
 	}
 
@@ -579,6 +579,8 @@ bool PspUnitTests::testFileSystem() {
 	while(totalLength - curLength > 0) {
 		if ((int)wrStream->write(index, curLength) != curLength) {
 			PSP_ERROR("couldn't write %d bytes\n", curLength);
+			delete[] buffer;
+			delete wrStream;
 			return false;
 		}
 		totalLength -= curLength;
@@ -590,6 +592,8 @@ bool PspUnitTests::testFileSystem() {
 	// write the rest
 	if ((int)wrStream->write(index, totalLength) != totalLength) {
 		PSP_ERROR("couldn't write %d bytes\n", curLength);
+		delete[] buffer;
+		delete wrStream;
 		return false;
 	}
 
@@ -600,18 +604,20 @@ bool PspUnitTests::testFileSystem() {
 	rdStream = file.createReadStream();
 	if (!rdStream) {
 		PSP_ERROR("%s couldn't be created.\n", path);
+		delete[] buffer;
 		return false;
 	}
 
 	// seek to beginning
 	if (!rdStream->seek(0, SEEK_SET)) {
 		PSP_ERROR("couldn't seek to the beginning after writing the file\n");
+		delete[] buffer;
+		delete rdStream;
 		return false;
 	}
 
 	// read the contents
-	char *readBuffer = new char[BufSize + 4];
-	memset(readBuffer, 0, (BufSize + 4));
+	char *readBuffer = new char[BufSize + 4]();
 	index = readBuffer;
 	while (rdStream->read(index, 100) == 100) {
 		index += 100;
@@ -619,6 +625,9 @@ bool PspUnitTests::testFileSystem() {
 
 	if (!rdStream->eos()) {
 		PSP_ERROR("didn't find EOS at end of stream\n");
+		delete[] buffer;
+		delete rdStream;
+		delete[] readBuffer;
 		return false;
 	}
 
@@ -626,6 +635,9 @@ bool PspUnitTests::testFileSystem() {
 	for (i=0; i<(int)BufSize; i++)
 		if (buffer[i] != readBuffer[i]) {
 			PSP_ERROR("reading/writing mistake at %x. Got %x instead of %x\n", i, readBuffer[i], buffer[i]);
+			delete[] buffer;
+			delete rdStream;
+			delete[] readBuffer;
 			return false;
 		}
 
@@ -636,7 +648,9 @@ bool PspUnitTests::testFileSystem() {
 		}
 	}
 
+	delete[] buffer;
 	delete rdStream;
+	delete[] readBuffer;
 
 	PSP_INFO_PRINT("writing...\n");
 
@@ -652,29 +666,34 @@ bool PspUnitTests::testFileSystem() {
 	int ret;
 	if ((ret = wrStream->write(phrase, phraseLen)) != (int)phraseLen) {
 		PSP_ERROR("couldn't write phrase. Got %d instead of %d\n", ret, phraseLen);
+		delete wrStream;
 		return false;
 	}
 
 	PSP_INFO_PRINT("reading...\n");
 
 	delete wrStream;
+
 	rdStream = file.createReadStream();
 	if (!rdStream) {
 		PSP_ERROR("%s couldn't be created.\n", path);
 		return false;
 	}
 
-	char *readPhrase = new char[phraseLen + 2];
-	memset(readPhrase, 0, phraseLen + 2);
+	char *readPhrase = new char[phraseLen + 2]();
 
 	if ((ret = rdStream->read(readPhrase, phraseLen) != phraseLen)) {
 		PSP_ERROR("read error on phrase. Got %d instead of %d\n", ret, phraseLen);
+		delete rdStream;
+		delete[] readPhrase;
 		return false;
 	}
 
 	for (i=0; i<(int)phraseLen; i++) {
 		if (readPhrase[i] != phrase[i]) {
 			PSP_ERROR("bad read/write in phrase. At %d, %x != %x\n", i, readPhrase[i], phrase[i]);
+			delete rdStream;
+			delete[] readPhrase;
 			return false;
 		}
 	}
@@ -682,6 +701,8 @@ bool PspUnitTests::testFileSystem() {
 	// check for exceeding
 	if (readPhrase[i] != 0) {
 		PSP_ERROR("found excessive copy in phrase. %c at %d\n", readPhrase[i], i);
+		delete rdStream;
+		delete[] readPhrase;
 		return false;
 	}
 
@@ -690,14 +711,21 @@ bool PspUnitTests::testFileSystem() {
 	// seek to end
 	if (!rdStream->seek(0, SEEK_END)) {
 		PSP_ERROR("couldn't seek to end for append\n");
+		delete rdStream;
+		delete[] readPhrase;
 		return false;
 	};
 
 	// try to read
 	if (rdStream->read(readPhrase, 2) || !rdStream->eos()) {
 		PSP_ERROR("was able to read at end of file\n");
+		delete rdStream;
+		delete[] readPhrase;
 		return false;
 	}
+
+	delete rdStream;
+	delete[] readPhrase;
 
 	PSP_INFO_PRINT("ok\n");
 	return true;

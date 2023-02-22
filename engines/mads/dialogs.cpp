@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,6 +25,8 @@
 #include "mads/screen.h"
 #include "mads/msurface.h"
 #include "mads/nebular/dialogs_nebular.h"
+#include "common/config-manager.h"
+#include "common/text-to-speech.h"
 
 namespace MADS {
 
@@ -147,7 +148,7 @@ TextDialog::TextDialog(MADSEngine *vm, const Common::String &fontName,
 	: Dialog(vm) {
 	_font = _vm->_font->getFont(fontName);
 	_position = pos;
-	_icon = nullptr;
+	_portrait = nullptr;
 	_edgeSeries = nullptr;
 	_piecesPerCenter = 0;
 	_fontSpacing = 0;
@@ -158,10 +159,10 @@ TextDialog::TextDialog(MADSEngine *vm, const Common::String &fontName,
 }
 
 TextDialog::TextDialog(MADSEngine *vm, const Common::String &fontName,
-		const Common::Point &pos, MSurface *icon, int maxTextChars): Dialog(vm) {
+		const Common::Point &pos, MSurface *portrait, int maxTextChars): Dialog(vm) {
 	_font = _vm->_font->getFont(fontName);
 	_position = pos;
-	_icon = icon;
+	_portrait = portrait;
 	_edgeSeries = new SpriteAsset(_vm, "box.ss", PALFLAG_RESERVED);
 	_vm->_font->setColors(TEXTDIALOG_BLACK, TEXTDIALOG_BLACK, TEXTDIALOG_BLACK, TEXTDIALOG_BLACK);
 	_piecesPerCenter = _edgeSeries->getFrame(EDGE_UPPER_CENTER)->w / _edgeSeries->getFrame(EDGE_BOTTOM)->w;
@@ -174,6 +175,8 @@ TextDialog::TextDialog(MADSEngine *vm, const Common::String &fontName,
 void TextDialog::init(int maxTextChars) {
 	_innerWidth = (_font->maxWidth() + 1) * maxTextChars;
 	_width = _innerWidth + 10;
+	if (_portrait != nullptr)
+		_width += _portrait->w + 10;
 	_lineSize = maxTextChars * 2;
 	_lineWidth = 0;
 	_currentX = 0;
@@ -192,6 +195,12 @@ int TextDialog::estimatePieces(int maxLen) {
 }
 
 TextDialog::~TextDialog() {
+	if (ConfMan.getBool("tts_narrator")) {
+		Common::TextToSpeechManager* ttsMan = g_system->getTextToSpeechManager();
+		if (ttsMan != nullptr)
+			ttsMan->stop();
+	}
+
 	delete _edgeSeries;
 }
 
@@ -320,8 +329,23 @@ void TextDialog::draw() {
 	// Draw the underlying dialog
 	Dialog::draw();
 
+	// Draw the edges
+	if (_edgeSeries != nullptr) {
+		//_vm->_screen->transBlitFrom(*_edgeSeries->getFrame(EDGE_UPPER_LEFT), _position, 0xFF);
+		//_vm->_screen->transBlitFrom(*_edgeSeries->getFrame(EDGE_UPPER_RIGHT), _position);
+		//_vm->_screen->transBlitFrom(*_edgeSeries->getFrame(EDGE_LOWER_LEFT), Common::Point(_position.x, _position.y + _height));
+		//_vm->_screen->transBlitFrom(*_edgeSeries->getFrame(EDGE_LOWER_RIGHT), _position);
+	}
+
+	// Draw the portrait
+	if (_portrait != nullptr) {
+		Common::Point portraitPos = Common::Point(_position.x + 5, _position.y + 5);
+		_vm->_screen->transBlitFrom(*_portrait, portraitPos, 0xFF);
+	}
+
 	// Draw the text lines
 	int lineYp = _position.y + 5;
+	Common::String text;
 	for (int lineNum = 0; lineNum <= _numLines; ++lineNum) {
 		if (_lineXp[lineNum] == -1) {
 			// Draw a line across the entire dialog
@@ -335,18 +359,30 @@ void TextDialog::draw() {
 			if (_lineXp[lineNum] & 0x40)
 				++yp;
 
+			if (_portrait != nullptr)
+				xp += _portrait->w + 5;
 			_font->writeString(_vm->_screen, _lines[lineNum],
 				Common::Point(xp, yp), 1);
 
 			if (_lineXp[lineNum] & 0x80) {
-				// Draw an underline under the text
+				// Draw an underline under the text - used for the header text
 				int lineWidth = _font->getWidth(_lines[lineNum], 1);
 				_vm->_screen->hLine(xp, yp + _font->getHeight(), xp + lineWidth,
 					TEXTDIALOG_BLACK);
+			} else {
+				text += _lines[lineNum];
 			}
 		}
 
 		lineYp += _font->getHeight() + 1;
+	}
+
+	if (ConfMan.getBool("tts_narrator")) {
+		Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+		if (ttsMan != nullptr) {
+			ttsMan->stop();
+			ttsMan->say(text.c_str());
+		}
 	}
 }
 
@@ -417,6 +453,8 @@ MessageDialog::MessageDialog(MADSEngine *vm, int maxChars, ...)
 Dialogs *Dialogs::init(MADSEngine *vm) {
 	if (vm->getGameID() == GType_RexNebular)
 		return new Nebular::DialogsNebular(vm);
+	//else if (vm->getGameID() == GType_Phantom)
+	//	return new Phantom::DialogsPhantom(vm);
 
 	// Throw a warning for now, since the associated Dialogs class isn't implemented yet
 	warning("Dialogs: Unknown game");

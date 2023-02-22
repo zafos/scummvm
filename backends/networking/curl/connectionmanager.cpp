@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,19 +15,19 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#include <curl/curl.h>
 #include "backends/networking/curl/connectionmanager.h"
 #include "backends/networking/curl/networkreadstream.h"
 #include "common/debug.h"
+#include "common/fs.h"
 #include "common/system.h"
 #include "common/timer.h"
-#include <curl/curl.h>
 
 namespace Common {
 
@@ -37,7 +37,7 @@ DECLARE_SINGLETON(Networking::ConnectionManager);
 
 namespace Networking {
 
-ConnectionManager::ConnectionManager(): _multi(0), _timerStarted(false), _frame(0) {
+ConnectionManager::ConnectionManager(): _multi(nullptr), _timerStarted(false), _frame(0) {
 	curl_global_init(CURL_GLOBAL_ALL);
 	_multi = curl_multi_init();
 }
@@ -98,6 +98,29 @@ uint32 ConnectionManager::getCloudRequestsPeriodInMicroseconds() {
 	return TIMER_INTERVAL * CLOUD_PERIOD;
 }
 
+const char *ConnectionManager::getCaCertPath() {
+#if defined(DATA_PATH)
+	static enum {
+		kNotInitialized,
+		kFileNotFound,
+		kFileExists
+	} state = kNotInitialized;
+
+	if (state == kNotInitialized) {
+		Common::FSNode node(DATA_PATH"/cacert.pem");
+		state = node.exists() ? kFileExists : kFileNotFound;
+	}
+
+	if (state == kFileExists) {
+		return DATA_PATH"/cacert.pem";
+	} else {
+		return nullptr;
+	}
+#else
+	return nullptr;
+#endif
+}
+
 //private goes here:
 
 void connectionsThread(void *ignored) {
@@ -106,7 +129,7 @@ void connectionsThread(void *ignored) {
 
 void ConnectionManager::startTimer(int interval) {
 	Common::TimerManager *manager = g_system->getTimerManager();
-	if (manager->installTimerProc(connectionsThread, interval, 0, "Networking::ConnectionManager's Timer")) {
+	if (manager->installTimerProc(connectionsThread, interval, nullptr, "Networking::ConnectionManager's Timer")) {
 		_timerStarted = true;
 	} else {
 		warning("Failed to install Networking::ConnectionManager's timer");
@@ -151,7 +174,8 @@ void ConnectionManager::interateRequests() {
 	_addedRequestsMutex.unlock();
 
 	//call handle() of all running requests (so they can do their work)
-	debug(9, "handling %d request(s)", _requests.size());
+	if (_frame % DEBUG_PRINT_PERIOD == 0)
+		debug(9, "handling %d request(s)", _requests.size());
 	for (Common::Array<RequestWithCallback>::iterator i = _requests.begin(); i != _requests.end();) {
 		Request *request = i->request;
 		if (request) {
@@ -183,20 +207,19 @@ void ConnectionManager::processTransfers() {
 	int messagesInQueue;
 	CURLMsg *curlMsg;
 	while ((curlMsg = curl_multi_info_read(_multi, &messagesInQueue))) {
-		CURL *easyHandle = curlMsg->easy_handle;
-
-		NetworkReadStream *stream;
-		curl_easy_getinfo(easyHandle, CURLINFO_PRIVATE, &stream);
-		if (stream)
-			stream->finished();
-
 		if (curlMsg->msg == CURLMSG_DONE) {
-			debug(9, "ConnectionManager: SUCCESS (%d - %s)", curlMsg->data.result, curl_easy_strerror(curlMsg->data.result));
-		} else {
-			warning("ConnectionManager: FAILURE (CURLMsg (%d))", curlMsg->msg);
-		}
+			CURL *easyHandle = curlMsg->easy_handle;
 
-		curl_multi_remove_handle(_multi, easyHandle);
+			NetworkReadStream *stream = nullptr;
+			curl_easy_getinfo(easyHandle, CURLINFO_PRIVATE, &stream);
+
+			if (stream)
+				stream->finished(curlMsg->data.result);
+
+			curl_multi_remove_handle(_multi, easyHandle);
+		} else {
+			warning("Unknown libcurl message type %d", curlMsg->msg);
+		}
 	}
 }
 

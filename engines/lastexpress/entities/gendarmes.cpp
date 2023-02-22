@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -37,14 +36,14 @@ namespace LastExpress {
 Gendarmes::Gendarmes(LastExpressEngine *engine) : Entity(engine, kEntityGendarmes) {
 	ADD_CALLBACK_FUNCTION(Gendarmes, reset);
 	ADD_CALLBACK_FUNCTION(Gendarmes, chapter1);
-	ADD_CALLBACK_FUNCTION(Gendarmes, doDraw);
-	ADD_CALLBACK_FUNCTION(Gendarmes, doDialog);
-	ADD_CALLBACK_FUNCTION(Gendarmes, doDialogFullVolume);
-	ADD_CALLBACK_FUNCTION(Gendarmes, doWait);
-	ADD_CALLBACK_FUNCTION(Gendarmes, savegame);
-	ADD_CALLBACK_FUNCTION(Gendarmes, doWalk);
-	ADD_CALLBACK_FUNCTION(Gendarmes, doCompartment);
-	ADD_CALLBACK_FUNCTION(Gendarmes, trappedCath);
+	ADD_CALLBACK_FUNCTION_S(Gendarmes, doDraw);
+	ADD_CALLBACK_FUNCTION_S(Gendarmes, doDialog);
+	ADD_CALLBACK_FUNCTION_S(Gendarmes, doDialogFullVolume);
+	ADD_CALLBACK_FUNCTION_I(Gendarmes, doWait);
+	ADD_CALLBACK_FUNCTION_II(Gendarmes, savegame);
+	ADD_CALLBACK_FUNCTION_II(Gendarmes, doWalk);
+	ADD_CALLBACK_FUNCTION_TYPE3(Gendarmes, doCompartment, EntityParametersIISS, EntityParametersSSS, EntityParametersISII);
+	ADD_CALLBACK_FUNCTION_III(Gendarmes, trappedCath);
 	ADD_CALLBACK_FUNCTION(Gendarmes, chapter1Handler);
 	ADD_CALLBACK_FUNCTION(Gendarmes, searchTrain);
 	ADD_CALLBACK_FUNCTION(Gendarmes, function13);
@@ -87,12 +86,12 @@ IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION_S(5, Gendarmes, doDialogFullVolume)
-	handleAction(savepoint, true, kFlagDefault);
+	handleAction(savepoint, true, kVolumeFull);
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION_I(6, Gendarmes, doWait, uint32)
-	handleAction(savepoint, true, kFlagInvalid, true);
+	handleAction(savepoint, true, kSoundVolumeEntityDefault, true);
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
@@ -102,7 +101,7 @@ IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION_II(8, Gendarmes, doWalk, CarIndex, EntityPosition)
-	handleAction(savepoint, true, kFlagInvalid, false, true);
+	handleAction(savepoint, true, kSoundVolumeEntityDefault, false, true);
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
@@ -156,24 +155,24 @@ IMPLEMENT_FUNCTION_IISS(9, Gendarmes, doCompartment, CarIndex, EntityPosition)
 			parameters2->param7 = kPosition_7850;
 		}
 
-		if (params->param1 == kCarBaggageRear)
+		if (params->param1 == kCarRedSleeping)
 			parameters2->param5 += 31; // Switch to next compartment car
 
 		if (parameters2->param6) {
-			strcpy((char *)&parameters1->seq1, "632A");
-			strcpy((char *)&parameters1->seq2, "632B");
-			strcpy((char *)&parameters1->seq3, "632C");
+			Common::strcpy_s(parameters1->seq1, "632A");
+			Common::strcpy_s(parameters1->seq2, "632B");
+			Common::strcpy_s(parameters1->seq3, "632C");
 		} else {
-			strcpy((char *)&parameters1->seq1, "632D");
-			strcpy((char *)&parameters1->seq2, "632E");
-			strcpy((char *)&parameters1->seq3, "632F");
+			Common::strcpy_s(parameters1->seq1, "632D");
+			Common::strcpy_s(parameters1->seq2, "632E");
+			Common::strcpy_s(parameters1->seq3, "632F");
 		}
 
 		// The sequence 3 string needs to be a maximum of 9 characters, leaving 5 characters after the initial setup
 		assert(Common::String(params->seq1).size() <= 5);
 
-		strcat((char *)&parameters1->seq1, (char *)&params->seq1);
-		strcat((char *)&parameters1->seq2, (char *)&params->seq1);
+		Common::strcat_s(parameters1->seq1, params->seq1);
+		Common::strcat_s(parameters1->seq2, params->seq1);
 		Common::strlcat((char *)&parameters1->seq3, (char *)&params->seq1, 9); // Beware, seq3 is smaller than seq1
 
 		if ((getEntities()->isInsideCompartment(kEntityPlayer, (CarIndex)params->param1, (EntityPosition)params->param2)
@@ -183,8 +182,8 @@ IMPLEMENT_FUNCTION_IISS(9, Gendarmes, doCompartment, CarIndex, EntityPosition)
 			setCallback(1);
 			setup_trappedCath((CarIndex)params->param1, (EntityPosition)params->param2, (ObjectIndex)parameters2->param5);
 		} else {
-			getEntities()->drawSequenceLeft(kEntityGendarmes, (char *)&parameters1->seq1);
-			getEntities()->enterCompartment(kEntityGendarmes, (ObjectIndex)CURRENT_PARAM(2, 5));
+			getEntities()->drawSequenceLeft(kEntityGendarmes, parameters1->seq1);
+			getEntities()->enterCompartment(kEntityGendarmes, (ObjectIndex)CURRENT_PARAM(2, 5), true);
 
 			setCallback(parameters2->param6 ? 2 : 3);
 			setup_doDialog(parameters2->param6 ? "POL1044A" : "POL1044B");
@@ -202,14 +201,14 @@ IMPLEMENT_FUNCTION_IISS(9, Gendarmes, doCompartment, CarIndex, EntityPosition)
 
 		case 2:
 		case 3:
-			getEntities()->drawSequenceLeft(kEntityGendarmes, (char *)&parameters1->seq2);
+			getEntities()->drawSequenceLeft(kEntityGendarmes, parameters1->seq2);
 			if (getEntities()->isNobodyInCompartment((CarIndex)params->param1, (EntityPosition)params->param2) || !strcmp(params->seq2, "NODIALOG")) {
 				setCallback(4);
 				setup_doWait(150);
 			} else {
-				char *arrestSound = (char *)&parameters2->seq;
-				strcpy(arrestSound, "POL1045");
-				strcat(arrestSound, (char *)&params->seq2);
+				char *arrestSound = parameters2->seq;
+				Common::strcpy_s(arrestSound, sizeof(parameters2->seq), "POL1045");
+				Common::strcat_s(arrestSound, sizeof(parameters2->seq), params->seq2);
 
 				setCallback(5);
 				setup_doDialog(arrestSound);
@@ -219,22 +218,22 @@ IMPLEMENT_FUNCTION_IISS(9, Gendarmes, doCompartment, CarIndex, EntityPosition)
 		case 4:
 		case 5:
 			if (!getEntities()->isNobodyInCompartment((CarIndex)params->param1, (EntityPosition)params->param2) && strcmp(params->seq2, "NODIALOG")) {
-				char *arrestSound = (char *)&parameters2->seq;
-				strcpy(arrestSound, "POL1043");
-				strcat(arrestSound, (char *)&params->seq2);
+				char *arrestSound = parameters2->seq;
+				Common::strcpy_s(arrestSound, sizeof(parameters2->seq), "POL1043");
+				Common::strcat_s(arrestSound, sizeof(parameters2->seq), params->seq2);
 
-				getSound()->playSound(kEntityGendarmes, arrestSound, kFlagInvalid, 30);
+				getSound()->playSound(kEntityGendarmes, arrestSound, kSoundVolumeEntityDefault, 30);
 			}
 
 			getData()->location = kLocationInsideCompartment;
 
 			setCallback(6);
-			setup_doDraw((char *)&parameters1->seq3);
+			setup_doDraw(parameters1->seq3);
 			break;
 
 		case 6:
 			getData()->location = kLocationOutsideCompartment;
-			getEntities()->exitCompartment(kEntityGendarmes, (ObjectIndex)parameters2->param5);
+			getEntities()->exitCompartment(kEntityGendarmes, (ObjectIndex)parameters2->param5, true);
 			callbackAction();
 			break;
 		}
@@ -249,10 +248,10 @@ IMPLEMENT_FUNCTION_III(10, Gendarmes, trappedCath, CarIndex, EntityPosition, Obj
 		break;
 
 	case kActionNone:
-		if (!params->param5 || getState()->timeTicks > (uint32)params->param5) {
-			if (!params->param5)
-				params->param5 = getState()->timeTicks + 75;
+		if (!params->param5)
+			params->param5 = getState()->timeTicks + 75;
 
+		if (getState()->timeTicks > (uint32)params->param5) {
 			if (!getEntities()->isOutsideAlexeiWindow() && getObjects()->get((ObjectIndex)params->param3).status != kObjectLocation1) {
 				setCallback(2);
 				setup_savegame(kSavegameTypeEvent, kEventGendarmesArrestation);
@@ -266,7 +265,7 @@ IMPLEMENT_FUNCTION_III(10, Gendarmes, trappedCath, CarIndex, EntityPosition, Obj
 		if (params->param6 == 0 || getState()->timeTicks > (uint32)params->param6) {
 			params->param6 = kTimeInvalid;
 
-			getSound()->playSound(kEntityGendarmes, "POL1046A", kFlagDefault);
+			getSound()->playSound(kEntityGendarmes, "POL1046A", kVolumeFull);
 		}
 
 		if (!Entity::updateParameter(params->param7, getState()->timeTicks, 300))
@@ -279,7 +278,7 @@ IMPLEMENT_FUNCTION_III(10, Gendarmes, trappedCath, CarIndex, EntityPosition, Obj
 			if (getEntities()->isOutsideAlexeiWindow())
 				getScenes()->loadSceneFromPosition(kCarGreenSleeping, 49);
 
-			getSound()->playSound(kEntityGendarmes, "LIB017", kFlagDefault);
+			getSound()->playSound(kEntityGendarmes, "LIB017", kVolumeFull);
 
 			setCallback(getProgress().jacket == kJacketBlood ? 3 : 4);
 			setup_savegame(kSavegameTypeEvent, getProgress().jacket == kJacketBlood ? kEventMertensBloodJacket : kEventGendarmesArrestation);
@@ -315,13 +314,13 @@ IMPLEMENT_FUNCTION_III(10, Gendarmes, trappedCath, CarIndex, EntityPosition, Obj
 			break;
 
 		case 2:
-			getSound()->playSound(kEntityGendarmes, "LIB014", kFlagDefault);
+			getSound()->playSound(kEntityGendarmes, "LIB014", kVolumeFull);
 			getAction()->playAnimation(kEventGendarmesArrestation);
 			getLogic()->gameOver(kSavegameTypeIndex, 1, kSceneGameOverPolice1, true);
 			break;
 
 		case 3:
-			getAction()->playAnimation((params->param1 < kCarRedSleeping) ? kEventMertensBloodJacket : kEventCoudertBloodJacket);
+			getAction()->playAnimation((params->param1 == kCarGreenSleeping) ? kEventMertensBloodJacket : kEventCoudertBloodJacket);
 			getLogic()->gameOver(kSavegameTypeIndex, 1, kSceneGameOverBloodJacket, true);
 
 			getObjects()->update((ObjectIndex)params->param3, kEntityPlayer, kObjectLocationNone, kCursorHandKnock, kCursorHand);
@@ -338,10 +337,11 @@ IMPLEMENT_FUNCTION_III(10, Gendarmes, trappedCath, CarIndex, EntityPosition, Obj
 
 		case 5:
 			getObjects()->update((ObjectIndex)params->param3, kEntityGendarmes, getObjects()->get((ObjectIndex)params->param3).status, kCursorNormal, kCursorHand);
+			params->param4 = 1;
 			break;
 
 		case 6:
-			getSound()->playSound(kEntityGendarmes, "LIB014", kFlagDefault);
+			getSound()->playSound(kEntityGendarmes, "LIB014", kVolumeFull);
 			getAction()->playAnimation(kEventGendarmesArrestation);
 			getLogic()->gameOver(kSavegameTypeIndex, 1, kSceneGameOverPolice1, true);
 			break;
@@ -574,7 +574,7 @@ void Gendarmes::handleAction(const SavePoint &savepoint, bool shouldPlaySound, S
 			ENTITY_PARAM(0, 1) = 1;
 		}
 
-		if (getEntities()->isDistanceBetweenEntities(kEntityGendarmes, kEntityPlayer, 1000) && !getEntityData(kEntityPlayer)->location) {
+		if (getEntities()->isDistanceBetweenEntities(kEntityGendarmes, kEntityPlayer, shouldUpdateEntity ? 1750 : 1000) && !getEntityData(kEntityPlayer)->location) {
 
 			if (shouldUpdateEntity)
 				if (getEntities()->isPlayerPosition(kCarRedSleeping, 22) && !getEntities()->isDistanceBetweenEntities(kEntityGendarmes, kEntityPlayer, 250))
@@ -585,19 +585,27 @@ void Gendarmes::handleAction(const SavePoint &savepoint, bool shouldPlaySound, S
 		}
 		break;
 
+	case kActionEndSound:
+		if (shouldPlaySound && !checkCallback && !shouldUpdateEntity) {
+			callbackAction();
+		}
+		break;
+
 	case kActionExitCompartment:
-		callbackAction();
+		if (!shouldPlaySound && !checkCallback && !shouldUpdateEntity) {
+			callbackAction();
+		}
 		break;
 
 	case kActionDefault:
 		// Only handle when passing SIIS params
-		if (!checkCallback) {
+		if (!checkCallback && !shouldUpdateEntity) {
 			EXPOSE_PARAMS(EntityData::EntityParametersSIIS);
 
 			if (!shouldPlaySound)
-				getEntities()->drawSequenceRight(kEntityGendarmes, (char *)&params->seq1);
+				getEntities()->drawSequenceRight(kEntityGendarmes, params->seq1);
 			else
-				getSound()->playSound(kEntityGendarmes, (char *)&params->seq1, flag);
+				getSound()->playSound(kEntityGendarmes, params->seq1, flag);
 		}
 
 		if (shouldUpdateEntity) {

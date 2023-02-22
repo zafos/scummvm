@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,6 +25,7 @@
 #include <UIKit/UIKit.h>
 #include <Foundation/Foundation.h>
 #include <QuartzCore/QuartzCore.h>
+#include <Accelerate/Accelerate.h>
 
 #include <OpenGLES/EAGL.h>
 #include <OpenGLES/ES2/gl.h>
@@ -33,14 +33,16 @@
 
 #include "backends/platform/ios7/ios7_keyboard.h"
 #include "backends/platform/ios7/ios7_common.h"
+#include "backends/platform/ios7/ios7_game_controller.h"
 
 #include "common/list.h"
-#include "graphics/scaler.h"
 
 typedef struct {
 	GLfloat x, y;
 	GLfloat u,v;
 } GLVertex;
+
+uint getSizeNextPOT(uint size);
 
 @interface iPhoneView : UIView {
 	VideoContext _videoContext;
@@ -48,6 +50,9 @@ typedef struct {
 	Common::List<InternalEvent> _events;
 	NSLock *_eventLock;
 	SoftKeyboard *_keyboardView;
+	Common::List<GameController*> _controllers;
+
+	UIBackgroundTaskIdentifier _backgroundSaveStateTask;
 
 	EAGLContext *_context;
 	GLuint _viewRenderbuffer;
@@ -63,7 +68,8 @@ typedef struct {
 
 	GLuint _screenSizeSlot;
 	GLuint _textureSlot;
-	GLuint _shakeSlot;
+	GLuint _shakeXSlot;
+	GLuint _shakeYSlot;
 
 	GLuint _positionSlot;
 	GLuint _textureCoordSlot;
@@ -83,26 +89,18 @@ typedef struct {
 	GLint _mouseWidth, _mouseHeight;
 	GLfloat _mouseScaleX, _mouseScaleY;
 
-	int _scaledShakeOffsetY;
-
-	UITouch *_firstTouch;
-	UITouch *_secondTouch;
-
-#ifdef ENABLE_IOS7_SCALERS
-	uint8_t *_scalerMemorySrc;
-	uint8_t *_scalerMemoryDst;
-	size_t _scalerMemorySrcSize;
-	size_t _scalerMemoryDstSize;
-	int _scalerScale;
-	ScalerProc *_scaler;
-#endif
+	int _scaledShakeXOffset;
+	int _scaledShakeYOffset;
 }
+
+@property (nonatomic, assign) CGPoint pointerPosition;
+@property (nonatomic, assign) BOOL isInGame;
 
 - (id)initWithFrame:(struct CGRect)frame;
 
 - (VideoContext *)getVideoContext;
 
-- (void)createScreenTexture;
+- (void)setGameScreenCoords;
 - (void)initSurface;
 - (void)setViewTransformation;
 
@@ -118,14 +116,33 @@ typedef struct {
 - (void)updateMouseCursorScaling;
 - (void)updateMouseCursor;
 
+#if TARGET_OS_IOS
 - (void)deviceOrientationChanged:(UIDeviceOrientation)orientation;
+#endif
+
+- (void)showKeyboard;
+- (void)hideKeyboard;
+- (BOOL)isKeyboardShown;
+
+- (void)handleMainMenuKey;
 
 - (void)applicationSuspend;
-
 - (void)applicationResume;
 
+- (void)saveApplicationState;
+- (void)clearApplicationState;
+- (void)restoreApplicationState;
+
+- (void) beginBackgroundSaveStateTask;
+- (void) endBackgroundSaveStateTask;
+
+- (void)addEvent:(InternalEvent)event;
 - (bool)fetchEvent:(InternalEvent *)event;
 
+- (bool)getMouseCoords:(CGPoint)point eventX:(int *)x eventY:(int *)y;
+- (BOOL)isTouchControllerConnected;
+- (BOOL)isMouseControllerConnected;
+- (BOOL)isGamepadControllerConnected;
 @end
 
 #endif

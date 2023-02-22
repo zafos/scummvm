@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,46 +15,44 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#include "common/debug.h"
-#include "common/stream.h"
+#include "common/file.h"
 
 #include "engines/advancedDetector.h"
 
+#include "sludge/detection.h"
 #include "sludge/sludge.h"
 
-namespace Sludge {
 
-struct SludgeGameDescription {
-	ADGameDescription desc;
-	uint languageID;
+static const DebugChannelDef debugFlagList[] = {
+	{Sludge::kSludgeDebugFatal, "script", "Script debug level"},
+	{Sludge::kSludgeDebugDataLoad, "loading", "Data loading debug level"},
+	{Sludge::kSludgeDebugStackMachine, "stack", "Stack Machine debug level"},
+	{Sludge::kSludgeDebugBuiltin, "builtin", "Built-in debug level"},
+	{Sludge::kSludgeDebugGraphics, "graphics", "Graphics debug level"},
+	{Sludge::kSludgeDebugZBuffer, "zBuffer", "ZBuffer debug level"},
+	{Sludge::kSludgeDebugSound, "sound", "Sound debug level"},
+	DEBUG_CHANNEL_END
 };
-
-uint SludgeEngine::getLanguageID() const { return _gameDescription->languageID; }
-const char *SludgeEngine::getGameId() const { return _gameDescription->desc.gameId;}
-uint32 SludgeEngine::getFeatures() const { return _gameDescription->desc.flags; }
-Common::Language SludgeEngine::getLanguage() const { return _gameDescription->desc.language; }
-const char *SludgeEngine::getGameFile() const {
-	return _gameDescription->desc.filesDescriptions[0].fileName;
-}
-
-} // End of namespace Sludge
-
 static const PlainGameDescriptor sludgeGames[] = {
-	{ "sludge", "Sludge Game" },
-	{ "welcome", "Welcome Example" },
-	{ "verbcoin", "Verb Coin" },
-	{ "robinsrescue", "Robin's Rescue" },
-	{ "outoforder", "Out Of Order" },
-	{ "frasse", "Frasse and the Peas of Kejick" },
-	{ "interview", "The Interview" },
-	{ "life", "Life Flashed By"},
-	{ "tgttpoacs", "The Game That Takes Place on a Cruise Ship" },
-	{ "mandy", "Mandy Christmas Adventure" },
-	{ "cubert", "Cubert Badbone, P.I." },
+	{ "sludge",			"Sludge Game" },
+	{ "welcome",		"Welcome Example" },
+	{ "verbcoin",		"Verb Coin" },
+	{ "robinsrescue",	"Robin's Rescue" },
+	{ "outoforder",		"Out Of Order" },
+	{ "frasse",			"Frasse and the Peas of Kejick" },
+	{ "interview",		"The Interview" },
+	{ "life",			"Life Flashes By" },
+	{ "tgttpoacs",		"The Game That Takes Place on a Cruise Ship" },
+	{ "mandy",			"Mandy Christmas Adventure" },
+	{ "cubert",			"Cubert Badbone, P.I." },
+	{ "gjgagsas",		"The Game Jam Game About Games, Secrets and Stuff" },
+	{ "tsotc",			"The Secret of Tremendous Corporation" },
+	{ "nsc",			"Nathan's Second Chance" },
+	{ "atw",			"Above The Waves" },
+	{ "leptonsquest",	"Lepton's Quest" },
 	{ 0, 0 }
 };
 
@@ -69,48 +67,47 @@ static Sludge::SludgeGameDescription s_fallbackDesc =
 		Common::UNK_LANG,
 		Common::kPlatformWindows,
 		ADGF_NO_FLAGS,
-		GUIO0()
+		GUIO1(GUIO_NOMIDI)
 	},
 	0
 };
 
 static char s_fallbackFileNameBuffer[51];
 
-class SludgeMetaEngine : public AdvancedMetaEngine {
+class SludgeMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	SludgeMetaEngine() : AdvancedMetaEngine(Sludge::gameDescriptions, sizeof(Sludge::SludgeGameDescription), sludgeGames) {
-		_singleId = "sludge";
+	SludgeMetaEngineDetection() : AdvancedMetaEngineDetection(Sludge::gameDescriptions, sizeof(Sludge::SludgeGameDescription), sludgeGames) {
 		_maxScanDepth = 1;
 	}
 
-	virtual const char *getName() const {
-		return "Sludge Engine";
+	const char *getName() const override {
+		return "sludge";
 	}
- 
-	virtual const char *getOriginalCopyright() const {
-		return "Copyright (C) 2000-2014 Hungry Software and contributors";
+
+	const char *getEngineName() const override {
+		return "Sludge";
 	}
- 
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-		const Sludge::SludgeGameDescription *gd = (const Sludge::SludgeGameDescription *)desc;
-			if (gd) {
-				*engine = new Sludge::SludgeEngine(syst, gd);
-			}
-			return gd != 0;
+
+	const char *getOriginalCopyright() const override {
+		return "Sludge (C) 2000-2014 Hungry Software and contributors";
+	}
+
+	const DebugChannelDef *getDebugChannels() const override {
+		return debugFlagList;
 	}
 
 	// for fall back detection
-	virtual const ADGameDescription *fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const;
+	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist, ADDetectedGameExtraInfo **extra) const override;
 };
 
-const ADGameDescription *SludgeMetaEngine::fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const {
+ADDetectedGame SludgeMetaEngineDetection::fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist, ADDetectedGameExtraInfo **extra) const {
 	// reset fallback description
 	s_fallbackDesc.desc.gameId = "sludge";
 	s_fallbackDesc.desc.extra = "";
 	s_fallbackDesc.desc.language = Common::EN_ANY;
 	s_fallbackDesc.desc.flags = ADGF_UNSTABLE;
 	s_fallbackDesc.desc.platform = Common::kPlatformUnknown;
-	s_fallbackDesc.desc.guiOptions = GUIO0();
+	s_fallbackDesc.desc.guiOptions = GUIO1(GUIO_NOMIDI);
 	s_fallbackDesc.languageID = 0;
 
 	for (Common::FSList::const_iterator file = fslist.begin(); file != fslist.end(); ++file) {
@@ -147,13 +144,19 @@ const ADGameDescription *SludgeMetaEngine::fallbackDetect(const FileMap &allFile
 		s_fallbackFileNameBuffer[50] = '\0';
 		s_fallbackDesc.desc.filesDescriptions[0].fileName = s_fallbackFileNameBuffer;
 
-		return (const ADGameDescription *)&s_fallbackDesc;
+		ADDetectedGame game;
+		game.desc = &s_fallbackDesc.desc;
+
+		FileProperties tmp;
+		if (getFileProperties(allFiles, kMD5Head, fileName, tmp)) {
+			game.hasUnknownFiles = true;
+			game.matchedFiles[fileName] = tmp;
+		}
+
+		return game;
 	}
-	return 0;
+
+	return ADDetectedGame();
 }
 
-#if PLUGIN_ENABLED_DYNAMIC(SLUDGE)
-	REGISTER_PLUGIN_DYNAMIC(SLUDGE, PLUGIN_TYPE_ENGINE, SludgeMetaEngine);
-#else
-	REGISTER_PLUGIN_STATIC(SLUDGE, PLUGIN_TYPE_ENGINE, SludgeMetaEngine);
-#endif
+REGISTER_PLUGIN_STATIC(SLUDGE_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, SludgeMetaEngineDetection);

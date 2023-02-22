@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -226,7 +225,7 @@ void TattooUserInterface::doJournal() {
 	_windowOpen = false;
 	_key = -1;
 
-	// Restore the the old screen palette and greyscale lookup table
+	// Restore the old screen palette and greyscale lookup table
 	screen.clear();
 	screen.setPalette(screen._cMap);
 	Common::copy(&lookupTable[0], &lookupTable[PALETTE_COUNT], &_lookupTable[0]);
@@ -856,6 +855,9 @@ void TattooUserInterface::drawMaskArea(bool mode) {
 		case 68:
 			maskArea(*_mask, Common::Point(xp, 203));
 			maskArea(*_mask1, Common::Point(124 + xp, 239));
+			break;
+
+		default:
 			break;
 		}
 	}

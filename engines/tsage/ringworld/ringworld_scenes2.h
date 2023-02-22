@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,17 +40,17 @@ class Scene1000 : public Scene {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action3 : public Action {
 	private:
 		void zoom(bool up);
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 
 public:
@@ -60,14 +59,14 @@ public:
 	Action2 _action2;
 	Action3 _action3;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
 };
 
 class Scene1001 : public Scene {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	SpeakerQText _speakerQText;
@@ -79,7 +78,7 @@ public:
 	SceneObject _object5, _object6, _object7;
 	ASound _soundHandler1, _soundHandler2;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
 };
 
 class Scene1250 : public Scene {
@@ -87,19 +86,19 @@ public:
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action3 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action4 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	SpeakerQText _speakerQText;
@@ -109,7 +108,7 @@ public:
 	Action4 _action4;
 	SceneObject _object1, _object2;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
 };
 
 class Scene1400 : public Scene {
@@ -117,13 +116,13 @@ public:
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
-		virtual void dispatch();
+		void signal() override;
+		void dispatch() override;
 	};
 public:
 	Action1 _action1;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
 
 };
 
@@ -132,11 +131,11 @@ public:
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	ASound _soundHandler;
@@ -144,7 +143,7 @@ public:
 	Action2 _action2;
 	SceneObject _object1, _object2, _object3;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
 };
 
 } // End of namespace Ringworld

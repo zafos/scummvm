@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -44,7 +43,7 @@
 #include "sci/graphics/cache.h"
 #include "sci/graphics/compare.h"
 #include "sci/graphics/cursor32.h"
-#include "sci/graphics/font.h"
+#include "sci/graphics/scifont.h"
 #include "sci/graphics/frameout.h"
 #include "sci/graphics/helpers.h"
 #include "sci/graphics/paint32.h"
@@ -140,7 +139,9 @@ bool GfxFrameout::detectHiRes() const {
 	}
 
 	// PQ4 DOS floppy is low resolution only
-	if (g_sci->getGameId() == GID_PQ4 && !g_sci->isCD()) {
+	if (g_sci->getGameId() == GID_PQ4 &&
+		g_sci->getPlatform() == Common::kPlatformDOS &&
+		!g_sci->isCD()) {
 		return false;
 	}
 
@@ -234,7 +235,9 @@ void GfxFrameout::kernelUpdateScreenItem(const reg_t object) {
 		const reg_t planeObject = readSelector(_segMan, object, SELECTOR(plane));
 		Plane *plane = _planes.findByObject(planeObject);
 		if (plane == nullptr) {
-			error("kUpdateScreenItem: Plane %04x:%04x not found for screen item %04x:%04x", PRINT_REG(planeObject), PRINT_REG(object));
+			// Script bug in PQ:SWAT, when skipping the Tactics Training
+			warning("kUpdateScreenItem: Plane %04x:%04x not found for screen item %04x:%04x", PRINT_REG(planeObject), PRINT_REG(object));
+			return;
 		}
 
 		ScreenItem *screenItem = plane->_screenItemList.findByObject(object);
@@ -277,6 +280,29 @@ void GfxFrameout::kernelAddPlane(const reg_t object) {
 		plane = new Plane(object);
 		addPlane(plane);
 	}
+
+	// Detect the QFG4 import character dialog, disable the Change Directory
+	//  button, and display a message box explaining how to import saved
+	//  character files in ScummVM. SCI16 games are handled by kDrawControl.
+	if (g_sci->inQfGImportRoom()) {
+		// kAddPlane is called several times, this detects the second call
+		//  which is for the import character dialog. If changeButton:value
+		//  is non-zero then the dialog is initializing. If the button isn't
+		//  disabled then we haven't displayed the message box yet. There
+		//  are multiple changeButtons because the script clones the object.
+		SegManager *segMan = g_sci->getEngineState()->_segMan;
+		Common::Array<reg_t> changeDirButtons = _segMan->findObjectsByName("changeButton");
+		for (uint i = 0; i < changeDirButtons.size(); ++i) {
+			if (readSelectorValue(segMan, changeDirButtons[i], SELECTOR(value))) {
+				// disable Change Directory button by setting state to zero
+				if (readSelectorValue(segMan, changeDirButtons[i], SELECTOR(state))) {
+					writeSelectorValue(segMan, changeDirButtons[i], SELECTOR(state), 0);
+					g_sci->showQfgImportMessageBox();
+					break;
+				}
+			}
+		}
+	}
 }
 
 void GfxFrameout::kernelUpdatePlane(const reg_t object) {
@@ -317,6 +343,58 @@ void GfxFrameout::deletePlane(Plane &planeToFind) {
 		plane->_created = 0;
 		plane->_moved = 0;
 		plane->_deleted = getScreenCount();
+	}
+}
+
+void GfxFrameout::deletePlanesForMacRestore() {
+	// SCI32 PC games delete planes and screen items from
+	//  their Game:restore script before calling kRestore.
+	//  In Mac this work was moved into the interpreter
+	//  for some games, while others added it back to
+	//  Game:restore or used their own scripts that took
+	//  care of this in both PC and Mac versions.
+	if (!(g_sci->getGameId() == GID_GK1 ||
+		  g_sci->getGameId() == GID_PQ4 ||
+		  g_sci->getGameId() == GID_LSL6HIRES ||
+		  g_sci->getGameId() == GID_KQ7)) {
+		return;
+	}
+
+	for (PlaneList::size_type i = 0; i < _planes.size(); ) {
+		Plane *plane = _planes[i];
+
+		// don't delete the default plane
+		if (plane->isDefaultPlane()) {
+			i++;
+			continue;
+		}
+
+		// delete all inserted screen items from the plane
+		for (ScreenItemList::size_type j = 0; j < plane->_screenItemList.size(); ++j) {
+			ScreenItem *screenItem = plane->_screenItemList[j];
+			if (screenItem != nullptr &&
+				!screenItem->_object.isNumber() &&
+				_segMan->getObject(screenItem->_object)->isInserted()) {
+
+				// delete the screen item
+				if (screenItem->_created) {
+					plane->_screenItemList.erase_at(j);
+				} else {
+					screenItem->_updated = 0;
+					screenItem->_deleted = getScreenCount();
+				}
+			}
+		}
+		plane->_screenItemList.pack();
+
+		// delete the plane
+		if (plane->_created) {
+			_planes.erase(plane);
+		} else {
+			plane->_moved = 0;
+			plane->_deleted = getScreenCount();
+			i++;
+		}
 	}
 }
 
@@ -1166,30 +1244,30 @@ void GfxFrameout::throttle() {
 }
 
 void GfxFrameout::shakeScreen(int16 numShakes, const ShakeDirection direction) {
-	if (direction & kShakeHorizontal) {
-		// Used by QFG4 room 750
-		warning("TODO: Horizontal shake not implemented");
-		return;
-	}
-
 	while (numShakes--) {
 		if (g_engine->shouldQuit()) {
 			break;
 		}
 
-		if (direction & kShakeVertical) {
-			g_system->setShakePos(_isHiRes ? 8 : 4);
+		int shakeXOffset = 0;
+		if (direction & kShakeHorizontal) {
+			shakeXOffset = _isHiRes ? 8 : 4;
 		}
 
-		updateScreen();
-		g_sci->getEngineState()->wait(3);
-
+		int shakeYOffset = 0;
 		if (direction & kShakeVertical) {
-			g_system->setShakePos(0);
+			shakeYOffset = _isHiRes ? 8 : 4;
 		}
 
+		g_system->setShakePos(shakeXOffset, shakeYOffset);
+
 		updateScreen();
-		g_sci->getEngineState()->wait(3);
+		g_sci->getEngineState()->sleep(3);
+
+		g_system->setShakePos(0, 0);
+
+		updateScreen();
+		g_sci->getEngineState()->sleep(3);
 	}
 }
 
@@ -1353,6 +1431,16 @@ void GfxFrameout::remapMarkRedraw() {
 
 #pragma mark -
 #pragma mark Debugging
+
+Plane *GfxFrameout::getTopVisiblePlane() {
+	for (PlaneList::const_iterator it = _visiblePlanes.begin(); it != _visiblePlanes.end(); ++it) {
+		Plane *p = *it;
+		if (p->_type == kPlaneTypePicture)
+			return p;
+	}
+
+	return nullptr;
+}
 
 void GfxFrameout::printPlaneListInternal(Console *con, const PlaneList &planeList) const {
 	for (PlaneList::const_iterator it = planeList.begin(); it != planeList.end(); ++it) {

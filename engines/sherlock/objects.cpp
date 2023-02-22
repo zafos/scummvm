@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -130,6 +129,7 @@ bool BaseObject::hasAborts() const {
 			case TELEPORT_CODE:	idx += 4; break;
 			case CALL_TALK_CODE:idx += 8; break;
 			case HIDE_CODE:		idx += 2; break;
+			default: break;
 			}
 		}
 	} while (idx < _seqSize);
@@ -714,7 +714,7 @@ void Sprite::checkSprite() {
 
 		if (objBounds.contains(pt)) {
 			if (objBounds.contains(spritePt)) {
-				// Current point is already inside the the bounds, so impact occurred
+				// Current point is already inside the bounds, so impact occurred
 				// on a previous call. So simply do nothing until we're clear of the box
 				switch (obj._aType) {
 				case TALK_MOVE:
@@ -1120,7 +1120,7 @@ void Object::load3DO(Common::SeekableReadStream &s) {
 	_goto.y = _goto.y * FIXED_INT_MULTIPLIER / 100;
 
 	// Offset 42
-	warning("pos %d", s.pos());
+	warning("pos %d", (int)s.pos());
 
 	// Unverified
 	_lookFlag = s.readSint16BE();
@@ -1281,6 +1281,7 @@ void Object::setObjTalkSequence(int seq) {
 			case TELEPORT_CODE: idx += 4; break;
 			case CALL_TALK_CODE: idx += 8; break;
 			case HIDE_CODE: idx += 2; break;
+			default: break;
 			}
 		}
 

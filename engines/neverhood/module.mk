@@ -4,7 +4,7 @@ MODULE_OBJS = \
 	background.o \
 	blbarchive.o \
 	console.o \
-	detection.o \
+	dialogs.o \
 	diskplayerscene.o \
 	entity.o \
 	gamemodule.o \
@@ -12,8 +12,9 @@ MODULE_OBJS = \
 	graphics.o \
 	klaymen.o \
 	menumodule.o \
+	metaengine.o \
 	microtiles.o \
-	module.o \
+	module_scene.o \
 	modules/module1000.o \
 	modules/module1000_sprites.o \
 	modules/module1100.o \
@@ -56,6 +57,7 @@ MODULE_OBJS = \
 	mouse.o \
 	navigationscene.o \
 	neverhood.o \
+	nhcarchive.o \
 	palette.o \
 	resource.o \
 	resourceman.o \
@@ -66,7 +68,8 @@ MODULE_OBJS = \
 	smackerplayer.o \
 	sound.o \
 	sprite.o \
-	staticdata.o
+	staticdata.o \
+	subtitles.o
 
 # This module can be built as a plugin
 ifeq ($(ENABLE_NEVERHOOD), DYNAMIC_PLUGIN)
@@ -75,3 +78,6 @@ endif
 
 # Include common rules
 include $(srcdir)/rules.mk
+
+# Detection objects
+DETECT_OBJS += $(MODULE)/detection.o

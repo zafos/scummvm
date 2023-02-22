@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -32,7 +31,7 @@ namespace Neverhood {
 class Module1000 : public Module {
 public:
 	Module1000(NeverhoodEngine *vm, Module *parentModule, int which);
-	virtual ~Module1000();
+	~Module1000() override;
 protected:
 	int _sceneNum;
 	uint32 _musicFileHash;
@@ -43,7 +42,7 @@ protected:
 class Scene1001 : public Scene {
 public:
 	Scene1001(NeverhoodEngine *vm, Module *parentModule, int which);
-	virtual ~Scene1001();
+	~Scene1001() override;
 protected:
 	Sprite *_asHammer;
 	Sprite *_asDoor;
@@ -56,7 +55,7 @@ protected:
 class Scene1002 : public Scene {
 public:
 	Scene1002(NeverhoodEngine *vm, Module *parentModule, int which);
-	virtual ~Scene1002();
+	~Scene1002() override;
 protected:
 	Sprite *_asRing1;
 	Sprite *_asRing2;
@@ -102,7 +101,7 @@ protected:
 	uint32 getTextIndex();
 	uint32 getTextIndex1();
 	uint32 getKloggsTextIndex();
-	uint32 getTextIndex3();
+	uint32 getTextIndex3(uint32 usefulHint);
 };
 
 } // End of namespace Neverhood

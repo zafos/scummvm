@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,6 +40,7 @@
 #include "engines/wintermute/ad/ad_scene_state.h"
 #include "engines/wintermute/ad/ad_sentence.h"
 #include "engines/wintermute/ad/ad_waypoint_group.h"
+#include "engines/wintermute/base/base_engine.h"
 #include "engines/wintermute/base/base_dynamic_buffer.h"
 #include "engines/wintermute/base/base_file_manager.h"
 #include "engines/wintermute/base/font/base_font.h"
@@ -59,7 +59,14 @@
 #include "engines/wintermute/ui/ui_window.h"
 #include "engines/wintermute/utils/utils.h"
 #include "engines/wintermute/wintermute.h"
-#include <limits.h>
+
+#ifdef ENABLE_WME3D
+#include "engines/wintermute/ad/ad_actor_3dx.h"
+#include "engines/wintermute/ad/ad_scene_geometry.h"
+#include "engines/wintermute/base/gfx/opengl/base_render_opengl3d.h"
+#include "engines/wintermute/base/gfx/3dcamera.h"
+#include "engines/wintermute/base/gfx/3dlight.h"
+#endif
 
 namespace Wintermute {
 
@@ -88,7 +95,9 @@ void AdScene::setDefaults() {
 	_pfTargetPath = nullptr;
 	_pfRequester = nullptr;
 	_mainLayer = nullptr;
-
+#ifdef ENABLE_WME3D
+	_sceneGeometry = nullptr;
+#endif
 	_pfPointsNum = 0;
 	_persistentState = false;
 	_persistentStateSprites = true;
@@ -104,6 +113,10 @@ void AdScene::setDefaults() {
 	_pfMaxTime = 15;
 
 	_paralaxScrolling = true;
+
+#ifdef ENABLE_WME3D
+	_showGeometry = false;
+#endif
 
 	// editor settings
 	_editorMarginH = _editorMarginV = 100;
@@ -127,10 +140,36 @@ void AdScene::setDefaults() {
 	_editorShowEntities = true;
 	_editorShowScale    = true;
 
+#ifdef ENABLE_WME3D
+	_editorResolutionWidth = 0;
+	_editorResolutionHeight = 0;
+#endif
+
 	_shieldWindow = nullptr;
 
 	_fader = new BaseFader(_gameRef);
 	_gameRef->registerObject(_fader);
+
+#ifdef ENABLE_WME3D
+	_fov = -1.0f;
+#endif
+	_viewport = nullptr;
+
+#ifdef ENABLE_WME3D
+	_nearPlane = -1.0f;
+	_farPlane = -1.0f;
+
+	_2DPathfinding = false;
+	_maxShadowType = SHADOW_FLAT;
+
+	_scroll3DCompatibility = false;
+	_ambientLightColor = 0x00000000;
+
+	_fogEnabled = false;
+	_fogColor = 0x00FFFFFF;
+	_fogStart = 0.0f;
+	_fogEnd = 0.0f;
+#endif
 
 	_viewport = nullptr;
 }
@@ -180,7 +219,10 @@ void AdScene::cleanup() {
 		_gameRef->unregisterObject(_objects[i]);
 	}
 	_objects.clear();
-
+#ifdef ENABLE_WME3D
+	delete _sceneGeometry;
+	_sceneGeometry = nullptr;
+#endif
 	delete _viewport;
 	_viewport = nullptr;
 
@@ -234,7 +276,7 @@ bool AdScene::getPath(const BasePoint &source, const BasePoint &target, AdPath *
 
 		// last point
 		//_pfPath.add(new AdPathPoint(target.x, target.y, INT_MAX));
-		pfPointsAdd(target.x, target.y, INT_MAX);
+		pfPointsAdd(target.x, target.y, INT_MAX_VALUE);
 
 		// active waypoints
 		for (uint32 i = 0; i < _waypointGroups.size(); i++) {
@@ -274,7 +316,7 @@ void AdScene::pfAddWaypointGroup(AdWaypointGroup *wpt, BaseObject *requester) {
 		}
 
 		//_pfPath.add(new AdPathPoint(Wpt->_points[i]->x, Wpt->_points[i]->y, INT_MAX));
-		pfPointsAdd(wpt->_points[i]->x, wpt->_points[i]->y, INT_MAX);
+		pfPointsAdd(wpt->_points[i]->x, wpt->_points[i]->y, INT_MAX_VALUE);
 	}
 }
 
@@ -472,7 +514,7 @@ int AdScene::getPointsDist(const BasePoint &p1, const BasePoint &p2, BaseObject 
 void AdScene::pathFinderStep() {
 	int i;
 	// get lowest unmarked
-	int lowestDist = INT_MAX;
+	int lowestDist = INT_MAX_VALUE;
 	AdPathPoint *lowestPt = nullptr;
 
 	for (i = 0; i < _pfPointsNum; i++)
@@ -532,6 +574,11 @@ bool AdScene::initLoop() {
 	}
 #endif
 
+#ifdef ENABLE_WME3D
+	if (_sceneGeometry) {
+		return _sceneGeometry->initLoop();
+	}
+#endif
 	return STATUS_OK;
 }
 
@@ -568,6 +615,7 @@ TOKEN_DEF(LAYER)
 TOKEN_DEF(WAYPOINTS)
 TOKEN_DEF(EVENTS)
 TOKEN_DEF(CURSOR)
+TOKEN_DEF(GEOMETRY) // WME3D
 TOKEN_DEF(CAMERA)
 TOKEN_DEF(ENTITY)
 TOKEN_DEF(SCALE_LEVEL)
@@ -598,6 +646,17 @@ TOKEN_DEF(VIEWPORT)
 TOKEN_DEF(PERSISTENT_STATE_SPRITES)
 TOKEN_DEF(PERSISTENT_STATE)
 TOKEN_DEF(EDITOR_PROPERTY)
+TOKEN_DEF(EDITOR_SHOW_GEOMETRY) // WME3D
+TOKEN_DEF(EDITOR_RESOLUTION_WIDTH) // WME3D
+TOKEN_DEF(EDITOR_RESOLUTION_HEIGHT) // WME3D
+TOKEN_DEF(FOV_OVERRIDE) // WME3D
+TOKEN_DEF(WAYPOINT_HEIGHT) // WME3D
+TOKEN_DEF(NEAR_CLIPPING_PLANE) // WME3D
+TOKEN_DEF(FAR_CLIPPING_PLANE) // WME3D
+TOKEN_DEF(2D_PATHFINDING) // WME3D
+TOKEN_DEF(MAX_SHADOW_TYPE) // WME3D
+TOKEN_DEF(SCROLL_3D_COMPATIBILITY) // WME3D
+TOKEN_DEF(AMBIENT_LIGHT_COLOR) // WME3D
 TOKEN_DEF_END
 //////////////////////////////////////////////////////////////////////////
 bool AdScene::loadBuffer(char *buffer, bool complete) {
@@ -609,6 +668,7 @@ bool AdScene::loadBuffer(char *buffer, bool complete) {
 	TOKEN_TABLE(WAYPOINTS)
 	TOKEN_TABLE(EVENTS)
 	TOKEN_TABLE(CURSOR)
+	TOKEN_TABLE(GEOMETRY) // WME3D
 	TOKEN_TABLE(CAMERA)
 	TOKEN_TABLE(ENTITY)
 	TOKEN_TABLE(SCALE_LEVEL)
@@ -639,6 +699,17 @@ bool AdScene::loadBuffer(char *buffer, bool complete) {
 	TOKEN_TABLE(PERSISTENT_STATE_SPRITES)
 	TOKEN_TABLE(PERSISTENT_STATE)
 	TOKEN_TABLE(EDITOR_PROPERTY)
+	TOKEN_TABLE(EDITOR_SHOW_GEOMETRY) // WME3D
+	TOKEN_TABLE(EDITOR_RESOLUTION_WIDTH) // WME3D
+	TOKEN_TABLE(EDITOR_RESOLUTION_HEIGHT) // WME3D
+	TOKEN_TABLE(FOV_OVERRIDE) // WME3D
+	TOKEN_TABLE(WAYPOINT_HEIGHT) // WME3D
+	TOKEN_TABLE(NEAR_CLIPPING_PLANE) // WME3D
+	TOKEN_TABLE(FAR_CLIPPING_PLANE) // WME3D
+	TOKEN_TABLE(2D_PATHFINDING) // WME3D
+	TOKEN_TABLE(MAX_SHADOW_TYPE) // WME3D
+	TOKEN_TABLE(SCROLL_3D_COMPATIBILITY) // WME3D
+	TOKEN_TABLE(AMBIENT_LIGHT_COLOR) // WME3D
 	TOKEN_TABLE_END
 
 	cleanup();
@@ -657,7 +728,9 @@ bool AdScene::loadBuffer(char *buffer, bool complete) {
 
 	int ar, ag, ab, aa;
 	char camera[MAX_PATH_LENGTH] = "";
-	/* float waypointHeight = -1.0f; */
+#ifdef ENABLE_WME3D
+	float waypointHeight = -1.0f;
+#endif
 
 	while ((cmd = parser.getCommand(&buffer, commands, &params)) > 0) {
 		switch (cmd) {
@@ -754,6 +827,21 @@ bool AdScene::loadBuffer(char *buffer, bool complete) {
 			}
 			break;
 
+#ifdef ENABLE_WME3D
+		case TOKEN_GEOMETRY:
+			delete _sceneGeometry;
+			_sceneGeometry = nullptr;
+			if (!_gameRef->_useD3D) {
+				break;
+			}
+			_sceneGeometry = new AdSceneGeometry(_gameRef);
+			if (_sceneGeometry == nullptr || !_sceneGeometry->loadFile(params)) {
+				delete _sceneGeometry;
+				cmd = PARSERR_GENERIC;
+			}
+			break;
+#endif
+
 		case TOKEN_CAMERA:
 			Common::strlcpy(camera, params, MAX_PATH_LENGTH);
 			break;
@@ -846,6 +934,14 @@ bool AdScene::loadBuffer(char *buffer, bool complete) {
 			parser.scanStr(params, "%b", &_editorShowScale);
 			break;
 
+#ifdef ENABLE_WME3D
+		case TOKEN_EDITOR_SHOW_GEOMETRY:
+			parser.scanStr(params, "%b", &_showGeometry);
+			if (!_gameRef->_editorMode)
+				_showGeometry = false;
+			break;
+#endif
+
 		case TOKEN_SCRIPT:
 			addScript(params);
 			break;
@@ -878,6 +974,54 @@ bool AdScene::loadBuffer(char *buffer, bool complete) {
 			parseEditorProperty(params, false);
 			break;
 
+#ifdef ENABLE_WME3D
+		case TOKEN_EDITOR_RESOLUTION_WIDTH:
+			parser.scanStr(params, "%d", &_editorResolutionWidth);
+			break;
+
+		case TOKEN_EDITOR_RESOLUTION_HEIGHT:
+			parser.scanStr(params, "%d", &_editorResolutionHeight);
+			break;
+
+		case TOKEN_FOV_OVERRIDE:
+			parser.scanStr(params, "%f", &_fov);
+			break;
+
+		case TOKEN_WAYPOINT_HEIGHT:
+			parser.scanStr(params, "%f", &waypointHeight);
+			break;
+
+		case TOKEN_NEAR_CLIPPING_PLANE:
+			parser.scanStr(params, "%f", &_nearPlane);
+			break;
+
+		case TOKEN_FAR_CLIPPING_PLANE:
+			parser.scanStr(params, "%f", &_farPlane);
+			break;
+
+		case TOKEN_2D_PATHFINDING:
+			parser.scanStr(params, "%b", &_2DPathfinding);
+			break;
+
+		case TOKEN_MAX_SHADOW_TYPE: {
+			int maxShadowType = SHADOW_NONE;
+			parser.scanStr(params, "%d", &maxShadowType);
+			setMaxShadowType(static_cast<TShadowType>(maxShadowType));
+			}
+			break;
+
+		case TOKEN_SCROLL_3D_COMPATIBILITY:
+			parser.scanStr(params, "%b", &_scroll3DCompatibility);
+			break;
+
+		case TOKEN_AMBIENT_LIGHT_COLOR:
+			parser.scanStr(params, "%d,%d,%d", &ar, &ag, &ab);
+			_ambientLightColor = BYTETORGBA(ar, ag, ab, 255);
+			break;
+#endif
+
+		default:
+			break;
 		}
 	}
 	if (cmd == PARSERR_TOKENNOTFOUND) {
@@ -889,12 +1033,39 @@ bool AdScene::loadBuffer(char *buffer, bool complete) {
 		_gameRef->LOG(0, "Warning: scene '%s' has no main layer.", getFilename());
 	}
 
+#ifdef ENABLE_WME3D
+	if (_sceneGeometry && camera[0] != '\0') {
+		_sceneGeometry->setActiveCamera(camera, _fov, _nearPlane, _farPlane);
+	}
+#endif
 
 	sortScaleLevels();
 	sortRotLevels();
 
 	_initialized = true;
 
+#ifdef ENABLE_WME3D
+	if (_sceneGeometry) {
+		if (waypointHeight >= 0.0f) {
+			_sceneGeometry->_waypointHeight = waypointHeight;
+			_sceneGeometry->dropWaypoints();
+		}
+
+		Camera3D *activeCamera = _sceneGeometry->getActiveCamera();
+		if (activeCamera != nullptr) {
+			_gameRef->_renderer->setup3D(activeCamera);
+			_gameRef->_renderer->setScreenViewport();
+			_sceneGeometry->render(false);
+		}
+	}
+
+	if (_mainLayer) {
+		if (_editorResolutionWidth <= 0)
+			_editorResolutionWidth = _mainLayer->_width;
+		if (_editorResolutionHeight <= 0)
+			_editorResolutionHeight = _mainLayer->_height;
+	}
+#endif
 
 	return STATUS_OK;
 }
@@ -999,8 +1170,10 @@ bool AdScene::traverseNodes(bool doUpdate) {
 	_gameRef->_renderer->setup2D();
 
 	// for each layer
-	/* int mainOffsetX = 0; */
-	/* int mainOffsetY = 0; */
+#ifdef ENABLE_WME3D
+	int mainOffsetX = 0;
+	int mainOffsetY = 0;
+#endif
 
 	for (uint32 j = 0; j < _layers.size(); j++) {
 		if (!_layers[j]->_active) {
@@ -1038,6 +1211,15 @@ bool AdScene::traverseNodes(bool doUpdate) {
 			_gameRef->_offsetPercentY = (float)(_offsetTop - viewportY) / ((float)_layers[j]->_height - viewportHeight) * 100.0f;
 		}
 
+#ifdef ENABLE_WME3D
+		if (!doUpdate && _sceneGeometry && _layers[j]->_main) {
+			_gameRef->getOffset(&mainOffsetX, &mainOffsetY);
+
+			if (_gameRef->getMaxShadowType() >= SHADOW_STENCIL) {
+				_sceneGeometry->renderShadowGeometry();
+			}
+		}
+#endif
 
 		// for each node
 		for (uint32 k = 0; k < _layers[j]->_nodes.size(); k++) {
@@ -1045,6 +1227,7 @@ bool AdScene::traverseNodes(bool doUpdate) {
 			switch (node->_type) {
 			case OBJECT_ENTITY:
 				if (node->_entity->_active && (_gameRef->_editorMode || !node->_entity->_editorOnly)) {
+#ifndef ENABLE_WME3D
 					_gameRef->_renderer->setup2D();
 
 					if (doUpdate) {
@@ -1052,6 +1235,21 @@ bool AdScene::traverseNodes(bool doUpdate) {
 					} else {
 						node->_entity->display();
 					}
+#else
+					if (node->_entity->_is3D) {
+						_gameRef->_renderer->setup3D();
+					} else {
+						_gameRef->_renderer->setup2D();
+					}
+
+					if (!node->_entity->_is3D || _sceneGeometry) {
+						if (doUpdate) {
+							node->_entity->update();
+						} else {
+							node->_entity->display();
+						}
+					}
+#endif
 				}
 				break;
 
@@ -1084,6 +1282,12 @@ bool AdScene::traverseNodes(bool doUpdate) {
 		}
 	} // each layer
 
+#ifdef ENABLE_WME3D
+	if (!doUpdate && _sceneGeometry) {
+		_gameRef->setOffset(mainOffsetX, mainOffsetY);
+		_sceneGeometry->render(_showGeometry);
+	}
+#endif
 
 	// restore state
 	_gameRef->setOffset(origX, origY);
@@ -1114,16 +1318,25 @@ bool AdScene::display() {
 //////////////////////////////////////////////////////////////////////////
 bool AdScene::updateFreeObjects() {
 	AdGame *adGame = (AdGame *)_gameRef;
-	// 3D-code removed
-	// bool is3DSet;
+#ifdef ENABLE_WME3D
+	bool is3DSet = false;
+#endif
 
 	// *** update all active objects
-	// is3DSet = false;
 	for (uint32 i = 0; i < adGame->_objects.size(); i++) {
 		if (!adGame->_objects[i]->_active) {
 			continue;
 		}
-		// 3D-code removed
+
+#ifdef ENABLE_WME3D
+		if (adGame->_objects[i]->_is3D && _sceneGeometry) {
+			Camera3D *activeCamera = _sceneGeometry->getActiveCamera();
+			if (activeCamera != nullptr) {
+				_gameRef->_renderer->setup3D(activeCamera, !is3DSet);
+				is3DSet = true;
+			}
+		}
+#endif
 		adGame->_objects[i]->update();
 		adGame->_objects[i]->_drawn = false;
 	}
@@ -1133,6 +1346,15 @@ bool AdScene::updateFreeObjects() {
 		if (!_objects[i]->_active) {
 			continue;
 		}
+#ifdef ENABLE_WME3D
+		if (_objects[i]->_is3D && _sceneGeometry) {
+			Camera3D *activeCamera = _sceneGeometry->getActiveCamera();
+			if (activeCamera != nullptr) {
+				_gameRef->_renderer->setup3D(activeCamera, !is3DSet);
+				is3DSet = true;
+			}
+		}
+#endif
 
 		_objects[i]->update();
 		_objects[i]->_drawn = false;
@@ -1181,11 +1403,28 @@ bool AdScene::displayRegionContent(AdRegion *region, bool display3DOnly) {
 			continue;
 		}
 
+#ifndef ENABLE_WME3D
 		_gameRef->_renderer->setup2D();
+#else
+		if (objects[i]->_is3D && _sceneGeometry) {
+			Camera3D *activeCamera = _sceneGeometry->getActiveCamera();
+			if (activeCamera != nullptr) {
+				_gameRef->_renderer->setup3D(activeCamera);
+			}
+		} else {
+			_gameRef->_renderer->setup2D();
+		}
+#endif
 
+#ifndef ENABLE_WME3D
 		if (_gameRef->_editorMode || !obj->_editorOnly) {
 			obj->display();
 		}
+#else
+		if ((_gameRef->_editorMode || !obj->_editorOnly) && (!objects[i]->_is3D || _sceneGeometry)) {
+			obj->display();
+		}
+#endif
 		obj->_drawn = true;
 	}
 
@@ -1222,7 +1461,7 @@ bool AdScene::displayRegionContentOld(AdRegion *region) {
 	// display all objects in region sorted by _posY
 	do {
 		obj = nullptr;
-		int minY = INT_MAX;
+		int minY = INT_MAX_VALUE;
 
 		// global objects
 		for (uint32 i = 0; i < adGame->_objects.size(); i++) {
@@ -1242,8 +1481,16 @@ bool AdScene::displayRegionContentOld(AdRegion *region) {
 
 
 		if (obj != nullptr) {
+#ifndef ENABLE_WME3D
 			_gameRef->_renderer->setup2D();
-
+#else
+			Camera3D *activeCamera = _sceneGeometry->getActiveCamera();
+			if (activeCamera != nullptr) {
+				_gameRef->_renderer->setup3D(activeCamera);
+			} else {
+				_gameRef->_renderer->setup2D();
+			}
+#endif
 			if (_gameRef->_editorMode || !obj->_editorOnly) {
 				obj->display();
 			}
@@ -1352,6 +1599,24 @@ bool AdScene::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack,
 		}
 		return STATUS_OK;
 	}
+
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// LoadActor3D
+	//////////////////////////////////////////////////////////////////////////
+	if (strcmp(name, "LoadActor3D") == 0) {
+		stack->correctParams(1);
+		AdActor3DX *act = new AdActor3DX(_gameRef);
+		if (act && DID_SUCCEED(act->loadFile(stack->pop()->getString()))) {
+			addObject(act);
+			stack->pushNative(act, true);
+		} else {
+			delete act;
+			stack->pushNULL();
+		}
+		return STATUS_OK;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// LoadEntity
@@ -1491,7 +1756,19 @@ bool AdScene::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack,
 		BaseObject *node = getNodeByName(nodeName);
 		if (node) {
 			stack->pushNative((BaseScriptable *)node, true);
-		} else {
+		}
+
+#ifdef ENABLE_HEROCRAFT
+		//////////////////////////////////////////////////////////////////////////
+		// [HeroCraft] papasEntity
+		// Used in some self-check at "Papa's Daughters 2"
+		//////////////////////////////////////////////////////////////////////////
+		else if (BaseEngine::instance().getTargetExecutable() == WME_HEROCRAFT && strcmp(nodeName,"papasEntity") == 0) {
+			stack->pushInt(777);
+		}
+#endif
+
+		else {
 			stack->pushNULL();
 		}
 
@@ -1684,6 +1961,218 @@ bool AdScene::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack,
 		return STATUS_OK;
 	}
 
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// EnableNode3D
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "EnableNode3D") == 0) {
+		stack->correctParams(1);
+		const char *nodeName = stack->pop()->getString();
+
+		if (!_sceneGeometry) {
+			script->runtimeError("Scene.EnableNode3D: Scene doesn't contain any geometry");
+			stack->pushBool(false);
+		} else {
+			bool ret = _sceneGeometry->enableNode(nodeName, true);
+			stack->pushBool(ret);
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// DisableNode3D
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "DisableNode3D") == 0) {
+		stack->correctParams(1);
+		const char *nodeName = stack->pop()->getString();
+
+		if (!_sceneGeometry) {
+			script->runtimeError("Scene.EnableNode3D: Scene doesn't contain any geometry");
+			stack->pushBool(false);
+		} else {
+			bool ret = _sceneGeometry->enableNode(nodeName, false);
+			stack->pushBool(ret);
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// IsNode3DEnabled
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "IsNode3DEnabled") == 0) {
+		stack->correctParams(1);
+		const char *nodeName = stack->pop()->getString();
+
+		if (_sceneGeometry) {
+			bool ret = _sceneGeometry->isNodeEnabled(nodeName);
+			stack->pushBool(ret);
+		} else {
+			stack->pushBool(false);
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// EnableLight
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "EnableLight") == 0) {
+		stack->correctParams(1);
+
+		const char *lightName = stack->pop()->getString();
+
+		if (!_sceneGeometry) {
+			script->runtimeError("Scene.EnableLight: Scene doesn't contain any geometry");
+			stack->pushBool(false);
+		} else {
+			bool res = _sceneGeometry->enableLight(lightName);
+			stack->pushBool(res);
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// DisableLight
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "DisableLight") == 0) {
+		stack->correctParams(1);
+
+		const char *lightName = stack->pop()->getString();
+
+		if (!_sceneGeometry) {
+			script->runtimeError("Scene.DisableLight: Scene doesn't contain any geometry");
+			stack->pushBool(false);
+		} else {
+			bool res = _sceneGeometry->enableLight(lightName, false);
+			stack->pushBool(res);
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// IsLightEnabled
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "IsLightEnabled") == 0) {
+		stack->correctParams(1);
+
+		const char *lightName = stack->pop()->getString();
+
+		if (_sceneGeometry) {
+			bool res = _sceneGeometry->isLightEnabled(lightName);
+			stack->pushBool(res);
+		} else {
+			stack->pushBool(false);
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// GetLightName
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetLightName") == 0) {
+		stack->correctParams(1);
+
+		int index = stack->pop()->getInt();
+
+		if (_sceneGeometry && index >= 0 && static_cast<uint>(index) < _sceneGeometry->_lights.size()) {
+			stack->pushString(_sceneGeometry->_lights[index]->getName());
+		} else {
+			stack->pushNULL();
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// SetLightColor
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "SetLightColor") == 0) {
+		stack->correctParams(2);
+
+		const char *lightName = stack->pop()->getString();
+		uint32 color = static_cast<uint32>(stack->pop()->getInt());
+
+		if (!_sceneGeometry) {
+			script->runtimeError("Scene.SetLightColor: Scene doesn't contain any geometry");
+			stack->pushBool(false);
+		} else {
+			bool ret = _sceneGeometry->setLightColor(lightName, color);
+			stack->pushBool(ret);
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// GetLightColor
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetLightColor") == 0) {
+		stack->correctParams(1);
+		const char *lightName = stack->pop()->getString();
+
+		if (!_sceneGeometry) {
+			script->runtimeError("Scene.GetLightColor: Scene doesn't contain any geometry");
+			stack->pushInt(0);
+		} else {
+			stack->pushInt(_sceneGeometry->getLightColor(lightName));
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// GetLightPosition
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetLightPosition") == 0) {
+		stack->correctParams(1);
+		const char *lightName = stack->pop()->getString();
+
+		if (!_sceneGeometry) {
+			script->runtimeError("Scene.GetLightPosition: Scene doesn't contain any geometry");
+			stack->pushInt(0);
+		} else {
+			Math::Vector3d pos = _sceneGeometry->getLightPos(lightName);
+			ScValue *val = stack->getPushValue();
+
+			if (val) {
+				val->setProperty("X", pos.x());
+				val->setProperty("Y", pos.y());
+				// invert z coordinate to change to OpenGL coordinate system
+				val->setProperty("Z", -pos.z());
+			}
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// SetActiveCamera
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "SetActiveCamera") == 0) {
+		stack->correctParams(1);
+
+		const char *cameraName = stack->pop()->getString();
+
+		if (!_sceneGeometry) {
+			script->runtimeError("Scene.SetActiveCamera: Scene doesn't contain any geometry");
+			stack->pushBool(false);
+		} else {
+			bool res = _sceneGeometry->setActiveCamera(cameraName, _fov, _nearPlane, _farPlane);
+			if (!res) {
+				script->runtimeError("Scene.SetActiveCamera failed");
+			}
+			stack->pushBool(res);
+		}
+
+		return STATUS_OK;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// SetViewport
 	//////////////////////////////////////////////////////////////////////////
@@ -1808,7 +2297,36 @@ bool AdScene::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack,
 		}
 		stack->pushBool(true);
 		return STATUS_OK;
-	} else {
+	}
+
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// EnableFog
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "EnableFog") == 0) {
+		stack->correctParams(3);
+		_fogEnabled = true;
+		_fogColor = stack->pop()->getInt();
+		_fogStart = stack->pop()->getFloat();
+		_fogEnd = stack->pop()->getFloat();
+
+		stack->pushNULL();
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// DisableFog
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "DisableFog") == 0) {
+		stack->correctParams(0);
+		_fogEnabled = false;
+
+		stack->pushNULL();
+		return STATUS_OK;
+	}
+#endif
+
+	else {
 		return BaseObject::scCallMethod(script, stack, thisStack, name);
 	}
 }
@@ -1893,6 +2411,16 @@ ScValue *AdScene::scGetProperty(const Common::String &name) {
 		return _scValue;
 	}
 
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// ShowGeometry
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "ShowGeometry") {
+		_scValue->setBool(_showGeometry);
+		return _scValue;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// PersistentState
 	//////////////////////////////////////////////////////////////////////////
@@ -1958,6 +2486,34 @@ ScValue *AdScene::scGetProperty(const Common::String &name) {
 		return _scValue;
 	}
 
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// GeometryFile
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "GeometryFile") {
+		if (_sceneGeometry && _sceneGeometry->getFilename()) {
+			_scValue->setString(_sceneGeometry->getFilename());
+		} else {
+			_scValue->setNULL();
+		}
+
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// WaypointsHeight
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "WaypointsHeight") {
+		if (_sceneGeometry) {
+			_scValue->setFloat(_sceneGeometry->_waypointHeight);
+		} else {
+			_scValue->setFloat(0.0f);
+		}
+
+		return _scValue;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// Width (RO)
 	//////////////////////////////////////////////////////////////////////////
@@ -1980,7 +2536,40 @@ ScValue *AdScene::scGetProperty(const Common::String &name) {
 			_scValue->setInt(0);
 		}
 		return _scValue;
-	} else {
+	}
+
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// MaxShadowType
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "MaxShadowType") {
+		_scValue->setInt(_maxShadowType);
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// AmbientLightColor
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "AmbientLightColor") {
+		_scValue->setInt(_ambientLightColor);
+		return _scValue;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// NumLights
+	//////////////////////////////////////////////////////////////////////////
+	else if (name == "NumLights") {
+		if (_sceneGeometry) {
+			_scValue->setInt(_sceneGeometry->_lights.size());
+		} else {
+			_scValue->setInt(0);
+		}
+
+		return _scValue;
+	}
+#endif
+
+	else {
 		return BaseObject::scGetProperty(name);
 	}
 }
@@ -2003,6 +2592,16 @@ bool AdScene::scSetProperty(const char *name, ScValue *value) {
 		_autoScroll = value->getBool();
 		return STATUS_OK;
 	}
+
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// ShowGeometry
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "ShowGeometry") == 0) {
+		_showGeometry = value->getBool();
+		return _scValue;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// PersistentState
@@ -2090,7 +2689,39 @@ bool AdScene::scSetProperty(const char *name, ScValue *value) {
 		_targetOffsetTop = _offsetTop;
 
 		return STATUS_OK;
-	} else {
+	}
+
+#ifdef ENABLE_WME3D
+	//////////////////////////////////////////////////////////////////////////
+	// WaypointsHeight
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "WaypointsHeight") == 0) {
+		if (_sceneGeometry) {
+			_sceneGeometry->_waypointHeight = value->getFloat();
+			_sceneGeometry->dropWaypoints();
+		}
+
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// MaxShadowType
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "MaxShadowType") == 0) {
+		setMaxShadowType(static_cast<TShadowType>(value->getInt()));
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// AmbientLightColor
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "AmbientLightColor") == 0) {
+		_ambientLightColor = value->getInt();
+		return STATUS_OK;
+	}
+#endif
+
+	else {
 		return BaseObject::scSetProperty(name, value);
 	}
 }
@@ -2136,6 +2767,46 @@ bool AdScene::saveAsText(BaseDynamicBuffer *buffer, int indent) {
 		buffer->putTextIndent(indent + 2, "PERSISTENT_STATE_SPRITES=%s\n", _persistentStateSprites ? "TRUE" : "FALSE");
 	}
 
+#ifdef ENABLE_WME3D
+	if (_sceneGeometry) {
+		if (_sceneGeometry->getFilename())
+			buffer->putTextIndent(indent + 2, "GEOMETRY=\"%s\"\n", _sceneGeometry->getFilename());
+
+		Camera3D *activeCamera = _sceneGeometry->getActiveCamera();
+		if (activeCamera != nullptr) {
+			buffer->putTextIndent(indent + 2, "CAMERA=\"%s\"\n", activeCamera->getName());
+		}
+
+		if (_fov >= 0.0f)
+			buffer->putTextIndent(indent + 2, "FOV_OVERRIDE=%f\n", _fov);
+
+		if (_nearPlane >= 0.0f)
+			buffer->putTextIndent(indent + 2, "NEAR_CLIPPING_PLANE=%f\n", _nearPlane);
+
+		if (_farPlane >= 0.0f)
+			buffer->putTextIndent(indent + 2, "FAR_CLIPPING_PLANE=%f\n", _farPlane);
+
+		if (_showGeometry)
+			buffer->putTextIndent(indent + 2, "EDITOR_SHOW_GEOMETRY=%s\n", "TRUE");
+
+		if (_2DPathfinding)
+			buffer->putTextIndent(indent + 2, "2D_PATHFINDING=%s\n", "TRUE");
+
+		buffer->putTextIndent(indent + 2, "MAX_SHADOW_TYPE=%d\n", _maxShadowType);
+		if (_scroll3DCompatibility)
+			buffer->putTextIndent(indent + 2, "SCROLL_3D_COMPATIBILITY=%s\n", "TRUE");
+
+		if (_ambientLightColor != 0x00000000)
+			buffer->putTextIndent(indent + 2, "AMBIENT_LIGHT_COLOR { %d,%d,%d }\n", RGBCOLGetR(_ambientLightColor), RGBCOLGetG(_ambientLightColor), RGBCOLGetB(_ambientLightColor));
+
+		buffer->putTextIndent(indent + 2, "WAYPOINT_HEIGHT=%f\n", _sceneGeometry->_waypointHeight);
+
+		buffer->putTextIndent(indent + 2, "EDITOR_RESOLUTION_WIDTH=%d\n", _editorResolutionWidth);
+		buffer->putTextIndent(indent + 2, "EDITOR_RESOLUTION_HEIGHT=%d\n", _editorResolutionHeight);
+
+		buffer->putTextIndent(indent + 2, "\n");
+	}
+#endif
 
 	// scripts
 	for (uint32 i = 0; i < _scripts.size(); i++) {
@@ -2329,6 +3000,13 @@ bool AdScene::persist(BasePersistenceManager *persistMgr) {
 	persistMgr->transferBool(TMEMBER(_editorShowRegions));
 	persistMgr->transferBool(TMEMBER(_editorShowScale));
 	persistMgr->transferPtr(TMEMBER_PTR(_fader));
+#ifdef ENABLE_WME3D
+	if (BaseEngine::instance().getFlags() & GF_3D) {
+		persistMgr->transferPtr(TMEMBER(_sceneGeometry));
+	} else {
+		_sceneGeometry = nullptr;
+	}
+#endif
 	persistMgr->transferSint32(TMEMBER(_height));
 	persistMgr->transferBool(TMEMBER(_initialized));
 	persistMgr->transferUint32(TMEMBER(_lastTimeH));
@@ -2355,17 +3033,58 @@ bool AdScene::persist(BasePersistenceManager *persistMgr) {
 	persistMgr->transferUint32(TMEMBER(_scrollTimeH));
 	persistMgr->transferUint32(TMEMBER(_scrollTimeV));
 	persistMgr->transferPtr(TMEMBER_PTR(_shieldWindow));
+#ifdef ENABLE_WME3D
+	if (BaseEngine::instance().getFlags() & GF_3D) {
+		persistMgr->transferBool(TMEMBER(_showGeometry));
+	} else {
+		_showGeometry = false;
+	}
+#endif
 	persistMgr->transferSint32(TMEMBER(_targetOffsetLeft));
 	persistMgr->transferSint32(TMEMBER(_targetOffsetTop));
 	_waypointGroups.persist(persistMgr);
 	persistMgr->transferPtr(TMEMBER_PTR(_viewport));
 	persistMgr->transferSint32(TMEMBER(_width));
 
+#ifdef ENABLE_WME3D
+	if (BaseEngine::instance().getFlags() & GF_3D) {
+		persistMgr->transferSint32(TMEMBER(_editorResolutionWidth));
+		persistMgr->transferSint32(TMEMBER(_editorResolutionHeight));
+		persistMgr->transferFloat(TMEMBER(_fov));
+		persistMgr->transferFloat(TMEMBER(_nearPlane));
+		persistMgr->transferFloat(TMEMBER(_farPlane));
+		persistMgr->transferBool(TMEMBER(_2DPathfinding));
+		persistMgr->transferSint32(TMEMBER_INT(_maxShadowType));
+		persistMgr->transferBool(TMEMBER(_scroll3DCompatibility));
+		persistMgr->transferUint32(TMEMBER(_ambientLightColor));
+		persistMgr->transferBool(TMEMBER(_fogEnabled));
+		persistMgr->transferUint32(TMEMBER(_fogColor));
+		persistMgr->transferFloat(TMEMBER(_fogStart));
+		persistMgr->transferFloat(TMEMBER(_fogEnd));
+	} else {
+		_editorResolutionWidth = _editorResolutionHeight = 0;
+		_fov = _nearPlane = _farPlane = -1.0f;
+		_2DPathfinding = false;
+		_maxShadowType = SHADOW_SIMPLE;
+		_scroll3DCompatibility = false;
+		_ambientLightColor = 0x00000000;
+		_fogEnabled = false;
+	}
+#endif
+
 	return STATUS_OK;
 }
 
 //////////////////////////////////////////////////////////////////////////
 bool AdScene::afterLoad() {
+#ifdef ENABLE_WME3D
+	if (_sceneGeometry) {
+		int activeCamera = _sceneGeometry->_activeCamera;
+		if (activeCamera >= 0 && static_cast<uint>(activeCamera) < _sceneGeometry->_cameras.size()) {
+			_sceneGeometry->setActiveCamera(activeCamera, _fov, _nearPlane, _farPlane);
+		}
+	}
+#endif
 	return STATUS_OK;
 }
 
@@ -2468,7 +3187,7 @@ bool AdScene::correctTargetPoint(int32 startX, int32 startY, int32 *argX, int32 
 		return STATUS_OK;
 	}
 
-	int offsetX = INT_MAX, offsetY = INT_MAX;
+	int offsetX = INT_MAX_VALUE, offsetY = INT_MAX_VALUE;
 
 	if (foundLeft && foundRight) {
 		if (abs(lengthLeft) < abs(lengthRight)) {
@@ -2998,9 +3717,23 @@ bool AdScene::getRegionObjects(AdRegion *region, BaseArray<AdObject *> &objects,
 	return STATUS_OK;
 }
 
+#ifdef ENABLE_WME3D
+//////////////////////////////////////////////////////////////////////////
+void Wintermute::AdScene::setMaxShadowType(Wintermute::TShadowType shadowType) {
+	if (shadowType > SHADOW_STENCIL) {
+		shadowType = SHADOW_STENCIL;
+	}
+
+	if (shadowType < 0) {
+		shadowType = SHADOW_NONE;
+	}
+
+	_maxShadowType = shadowType;
+}
+#endif
 
 Common::String AdScene::debuggerToString() const {
 	return Common::String::format("%p: Scene \"%s\", paralax: %d, autoscroll: %d", (const void *)this, getName(), _paralaxScrolling, _autoScroll);
 }
-} // End of namespace Wintermute
 
+} // End of namespace Wintermute

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -127,26 +126,26 @@ private:
 class FileManager_v1d : public FileManager {
 public:
 	FileManager_v1d(HugoEngine *vm);
-	~FileManager_v1d();
+	~FileManager_v1d() override;
 
-	virtual void closeDatabaseFiles();
-	virtual void instructions() const;
-	virtual void openDatabaseFiles();
-	virtual void readBackground(const int screenIndex);
-	virtual void readOverlay(const int screenNum, ImagePtr image, OvlType overlayType);
-	virtual const char *fetchString(const int index);
+	void closeDatabaseFiles() override;
+	void instructions() const override;
+	void openDatabaseFiles() override;
+	void readBackground(const int screenIndex) override;
+	void readOverlay(const int screenNum, ImagePtr image, OvlType overlayType) override;
+	const char *fetchString(const int index) override;
 };
 
 class FileManager_v2d : public FileManager_v1d {
 public:
 	FileManager_v2d(HugoEngine *vm);
-	~FileManager_v2d();
+	~FileManager_v2d() override;
 
-	virtual void closeDatabaseFiles();
-	virtual void openDatabaseFiles();
-	virtual void readBackground(const int screenIndex);
-	virtual void readOverlay(const int screenNum, ImagePtr image, OvlType overlayType);
-	const   char *fetchString(const int index);
+	void closeDatabaseFiles() override;
+	void openDatabaseFiles() override;
+	void readBackground(const int screenIndex) override;
+	void readOverlay(const int screenNum, ImagePtr image, OvlType overlayType) override;
+	const   char *fetchString(const int index) override;
 private:
 	char *_fetchStringBuf;
 };
@@ -154,12 +153,12 @@ private:
 class FileManager_v3d : public FileManager_v2d {
 public:
 	FileManager_v3d(HugoEngine *vm);
-	~FileManager_v3d();
+	~FileManager_v3d() override;
 
-	void closeDatabaseFiles();
-	void openDatabaseFiles();
-	void readBackground(const int screenIndex);
-	void readOverlay(const int screenNum, ImagePtr image, OvlType overlayType);
+	void closeDatabaseFiles() override;
+	void openDatabaseFiles() override;
+	void readBackground(const int screenIndex) override;
+	void readOverlay(const int screenNum, ImagePtr image, OvlType overlayType) override;
 private:
 	Common::File _sceneryArchive2;                  // Handle for scenery file
 };
@@ -167,17 +166,17 @@ private:
 class FileManager_v2w : public FileManager_v2d {
 public:
 	FileManager_v2w(HugoEngine *vm);
-	~FileManager_v2w();
+	~FileManager_v2w() override;
 
-	void instructions() const;
+	void instructions() const override;
 };
 
 class FileManager_v1w : public FileManager_v2w {
 public:
 	FileManager_v1w(HugoEngine *vm);
-	~FileManager_v1w();
+	~FileManager_v1w() override;
 
-	void readOverlay(const int screenNum, ImagePtr image, OvlType overlayType);
+	void readOverlay(const int screenNum, ImagePtr image, OvlType overlayType) override;
 };
 
 } // End of namespace Hugo

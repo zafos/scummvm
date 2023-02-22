@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -92,8 +91,8 @@ inline int transpose_clamp(int a, int b, int c) {
 //////////////////////////////////////////////////
 
 struct TimerCallbackInfo {
-	IMuseInternal *imuse;
-	MidiDriver *driver;
+	IMuseInternal *imuse = nullptr;
+	MidiDriver *driver = nullptr;
 };
 
 struct HookDatas {
@@ -106,7 +105,15 @@ struct HookDatas {
 
 	int query_param(int param, byte chan);
 	int set(byte cls, byte value, byte chan);
-	HookDatas() { memset(this, 0, sizeof(HookDatas)); }
+	HookDatas() { reset(); }
+	void reset() {
+		_transpose = 0;
+		memset(_jump, 0, sizeof(_jump));
+		memset(_part_onoff, 0, sizeof(_part_onoff));
+		memset(_part_volume, 0, sizeof(_part_volume));
+		memset(_part_program, 0, sizeof(_part_program));
+		memset(_part_transpose, 0, sizeof(_part_transpose));
+	}
 };
 
 struct ParameterFader {
@@ -170,8 +177,16 @@ protected:
 	static uint16 _active_notes[128];
 
 protected:
+	enum ParserType {
+		kParserTypeNone = 0,
+		kParserTypeRO,
+		kParserTypeXMI,
+		kParserTypeSMF
+	};
+
 	MidiDriver *_midi;
 	MidiParser *_parser;
+	ParserType _parserType;
 
 	Part *_parts;
 	bool _active;
@@ -203,17 +218,15 @@ protected:
 	HookDatas _hook;
 	ParameterFader _parameterFaders[4];
 
-	bool _isMT32;
 	bool _isMIDI;
+	bool _isMT32;
 	bool _supportsPercussion;
 
 protected:
 	// Player part
 	void hook_clear();
 	void uninit_parts();
-	byte *parse_midi(byte *s);
 	void part_set_transpose(uint8 chan, byte relative, int8 b);
-	void parse_sysex(byte *p, uint len);
 	void maybe_jump(byte cmd, uint track, uint beat, uint tick);
 	void maybe_set_transpose(byte *data);
 	void maybe_part_onoff(byte *data);
@@ -232,7 +245,6 @@ protected:
 	// Sequencer part
 	int start_seq_sound(int sound, bool reset_vars = true);
 	void loadStartParameters(int sound);
-	int query_param(int param);
 
 public:
 	IMuseInternal *_se;
@@ -240,7 +252,7 @@ public:
 
 public:
 	Player();
-	virtual ~Player();
+	~Player() override;
 
 	int addParameterFader(int param, int target, int time);
 	void clear();
@@ -267,7 +279,7 @@ public:
 	void onTimer();
 	void removePart(Part *part);
 	int scan(uint totrack, uint tobeat, uint totick);
-	void saveLoadWithSerializer(Common::Serializer &ser);
+	void saveLoadWithSerializer(Common::Serializer &ser) override;
 	int setHook(byte cls, byte value, byte chan) { return _hook.set(cls, value, chan); }
 	void setDetune(int detune);
 	void setOffsetNote(int offset);
@@ -282,9 +294,10 @@ public:
 
 public:
 	// MidiDriver interface
-	void send(uint32 b);
-	void sysEx(const byte *msg, uint16 length);
-	void metaEvent(byte type, byte *data, uint16 length);
+	void send(uint32 b) override;
+	void sysEx(const byte *msg, uint16 length) override;
+	uint16 sysExNoDelay(const byte *msg, uint16 length) override;
+	void metaEvent(byte type, byte *data, uint16 length) override;
 };
 
 
@@ -303,10 +316,12 @@ struct Part : public Common::Serializable {
 	Player *_player;
 	int16 _pitchbend;
 	byte _pitchbend_factor;
+	byte _volControlSensitivity;
 	int8 _transpose, _transpose_eff;
 	byte _vol, _vol_eff;
 	int8 _detune, _detune_eff;
 	int8 _pan, _pan_eff;
+	byte _polyphony;
 	bool _on;
 	byte _modwheel;
 	bool _pedal;
@@ -338,20 +353,20 @@ struct Part : public Common::Serializable {
 	void allNotesOff();
 
 	void set_param(byte param, int value) { }
-	void init();
+	void init(bool useNativeMT32);
 	void setup(Player *player);
 	void uninit();
 	void off();
 	void set_instrument(uint b);
 	void set_instrument(byte *data);
-	void set_instrument_pcspk(byte *data);
 	void load_global_instrument(byte b);
 
-	void set_transpose(int8 transpose);
+	void set_transpose(int8 transpose, int8 clipRangeLow, int8 clipRangeHi);
 	void set_detune(int8 detune);
 	void set_pri(int8 pri);
 	void set_pan(int8 pan);
 
+	void set_polyphony(byte val);
 	void set_onoff(bool on);
 	void fix_after_load();
 
@@ -360,12 +375,17 @@ struct Part : public Common::Serializable {
 
 	Part();
 
-	void saveLoadWithSerializer(Common::Serializer &ser);
+	void saveLoadWithSerializer(Common::Serializer &ser) override;
 
 private:
 	void sendPitchBend();
+	void sendVolume(int8 fadeModifier);
+	void sendVolumeFade();
+	void sendTranspose();
+	void sendDetune();
 	void sendPanPosition(uint8 value);
 	void sendEffectLevel(uint8 value);
+	void sendPolyphony();
 };
 
 
@@ -389,14 +409,16 @@ class IMuseInternal : public IMuse {
 #endif
 
 protected:
-	bool _native_mt32;
-	bool _enable_gs;
+	const bool _native_mt32;
+	const bool _enable_gs;
+	const bool _newSystem;
+	const MidiDriverFlags _soundType;
 	MidiDriver *_midi_adlib;
 	MidiDriver *_midi_native;
 	TimerCallbackInfo _timer_info_adlib;
 	TimerCallbackInfo _timer_info_native;
 
-	uint32 _game_id;
+	const uint32 _game_id;
 
 	// Plug-in SysEx handling. Right now this only supports one
 	// custom SysEx handler for the hardcoded IMUSE_SYSEX_ID
@@ -404,8 +426,8 @@ protected:
 	// SysEx handlers for client-specified manufacturer codes.
 	sysexfunc _sysex;
 
-	OSystem *_system;
-	Common::Mutex _mutex;
+	Common::Mutex &_mutex;
+	Common::Mutex _dummyMutex;
 
 protected:
 	bool _paused;
@@ -435,19 +457,27 @@ protected:
 	Player _players[8];
 	Part _parts[32];
 
-	bool _pcSpeaker;
 	Instrument _global_instruments[32];
 	CommandQueue _cmd_queue[64];
 	DeferredCommand _deferredCommands[4];
 
+	// These are basically static vars in the original drivers
+	struct RhyState {
+		RhyState() : RhyState(127, 1, 0) {}
+		RhyState(byte volume, byte polyphony, byte priority) : vol(volume), poly(polyphony), prio(priority) {}
+		byte vol;
+		byte poly;
+		byte prio;
+	} _rhyState;
+
 protected:
-	IMuseInternal();
-	virtual ~IMuseInternal();
+	IMuseInternal(ScummEngine *vm, MidiDriverFlags sndType, uint32 initFlags);
+	~IMuseInternal() override;
 
 	int initialize(OSystem *syst, MidiDriver *nativeMidiDriver, MidiDriver *adlibMidiDriver);
 
 	static void midiTimerCallback(void *data);
-	void on_timer(MidiDriver *midi);
+	void on_timer(MidiDriver *midi) override;
 
 	enum ChunkType {
 		kMThd = 1,
@@ -464,8 +494,6 @@ protected:
 	void handle_marker(uint id, byte data);
 	int get_channel_volume(uint a);
 	void initMidiDriver(TimerCallbackInfo *info);
-	void initGM(MidiDriver *midi);
-	void initMT32(MidiDriver *midi);
 	void init_players();
 	void init_parts();
 	void init_queue();
@@ -485,7 +513,7 @@ protected:
 
 	int enqueue_command(int a, int b, int c, int d, int e, int f, int g);
 	int enqueue_trigger(int sound, int marker);
-	int clear_queue();
+	int clear_queue() override;
 	int query_queue(int param);
 	Player *findActivePlayer(int id);
 
@@ -493,7 +521,6 @@ protected:
 	int set_volchan_entry(uint a, uint b);
 	int set_channel_volume(uint chan, uint vol);
 	void update_volumes();
-	void reset_tick();
 
 	int set_volchan(int sound, int volchan);
 
@@ -517,27 +544,27 @@ protected:
 
 public:
 	// IMuse interface
-	void pause(bool paused);
-	void saveLoadIMuse(Common::Serializer &ser, ScummEngine *scumm, bool fixAfterLoad = true);
-	bool get_sound_active(int sound) const;
-	int32 doCommand(int numargs, int args[]);
-	uint32 property(int prop, uint32 value);
-	virtual void addSysexHandler(byte mfgID, sysexfunc handler);
+	void pause(bool paused) override;
+	void saveLoadIMuse(Common::Serializer &ser, ScummEngine *scumm, bool fixAfterLoad = true) override;
+	bool get_sound_active(int sound) const override;
+	int32 doCommand(int numargs, int args[]) override;
+	uint32 property(int prop, uint32 value) override;
+	void addSysexHandler(byte mfgID, sysexfunc handler) override;
 
 public:
-	void startSoundWithNoteOffset(int sound, int offset);
+	void startSoundWithNoteOffset(int sound, int offset) override;
 
 	// MusicEngine interface
-	void setMusicVolume(int vol);
-	void startSound(int sound);
-	void stopSound(int sound);
-	void stopAllSounds();
-	int getSoundStatus(int sound) const;
-	int getMusicTimer();
+	void setMusicVolume(int vol) override;
+	void startSound(int sound) override;
+	void stopSound(int sound) override;
+	void stopAllSounds() override;
+	int getSoundStatus(int sound) const override;
+	int getMusicTimer() override;
 
 public:
 	// Factory function
-	static IMuseInternal *create(OSystem *syst, MidiDriver *nativeMidiDriver, MidiDriver *adlibMidiDriver);
+	static IMuseInternal *create(ScummEngine *vm, MidiDriver *nativeMidiDriver, MidiDriver *adlibMidiDriver, MidiDriverFlags sndType, uint32 initFlags);
 };
 
 } // End of namespace Scumm

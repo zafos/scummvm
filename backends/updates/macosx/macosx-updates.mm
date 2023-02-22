@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -38,14 +37,14 @@
 SUUpdater *sparkleUpdater;
 
 /**
- * Sparkle is a software update framework for Mac OS X which uses appcasts for
+ * Sparkle is a software update framework for macOS which uses appcasts for
  * release information. Appcasts are RSS-like XML feeds which contain information
  * about the most current version at the time. If a new version is available, the
- * user is presented the release-notes/changes/fixes and is asked if he wants to
+ * user is presented the release-notes/changes/fixes and is asked if they want to
  * update, and if yes the Sparkle framework downloads a signed update package
  * from the server and automatically installs and restarts the software.
  * More detailed information is available at the following address:
- * http://sparkle.andymatuschak.org/
+ * https://sparkle-project.org/
  *
  */
 MacOSXUpdateManager::MacOSXUpdateManager() {
@@ -70,21 +69,13 @@ MacOSXUpdateManager::MacOSXUpdateManager() {
 	// Set appcast URL
 	[sparkleUpdater setFeedURL:[NSURL URLWithString:feedbackURL]];
 
-	// Get current encoding
-	CFStringRef encStr = CFStringCreateWithCString(NULL, TransMan.getCurrentCharset().c_str(), kCFStringEncodingASCII);
-	CFStringEncoding stringEncoding = CFStringConvertIANACharSetNameToEncoding(encStr);
-	CFRelease(encStr);
-
 	// Add "Check for Updates..." menu item
-	CFStringRef title = CFStringCreateWithCString(NULL, _("Check for Updates..."), stringEncoding);
+	CFStringRef title = CFStringCreateWithCString(NULL, _("Check for Updates...").encode().c_str(), kCFStringEncodingUTF8);
 	NSMenuItem *updateMenuItem = [applicationMenu insertItemWithTitle:(NSString *)title action:@selector(checkForUpdates:) keyEquivalent:@"" atIndex:1];
 	CFRelease(title);
 
 	// Set the target of the new menu item
 	[updateMenuItem setTarget:sparkleUpdater];
-
-	// Finally give up our references to the objects
-	[menuItem release];
 
 	if (!ConfMan.hasKey("updates_check")
 			|| ConfMan.getInt("updates_check") == Common::UpdateManager::kUpdateIntervalNotSupported) {

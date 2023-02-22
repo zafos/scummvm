@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -93,7 +92,7 @@ enum ZoneFlags {
 };
 
 
-enum CommandFlags {
+enum CommandFlags : uint {
 	kFlagsAll			= 0xFFFFFFFFU,
 
 	kFlagsVisited		= 1,
@@ -112,13 +111,12 @@ struct Command {
 	bool			_valid;
 
 	Command();
-	~Command();
 
 	// Common fields
 	uint32			_flags;
 	ZonePtr			_zone;
 	Common::String	_zoneName;
-	char*			_string;
+	Common::String	_string;
 	uint16			_callable;
 	uint16			_object;
 	Common::Point	 _move;
@@ -131,8 +129,8 @@ struct Command {
 	int				_zeta0;
 	int				_zeta1;
 	int				_zeta2;
-	int				_characterId;
-	char*			_string2;
+	Common::String	_characterName;
+	Common::String	_string2;
 	int				_musicCommand;
 	int				_musicParm;
 };
@@ -428,14 +426,12 @@ struct Instruction {
 	// BRA specific
 	byte		_colors[3];
 	ScriptVar	_opC;
-	char		*_text;
-	char		*_text2;
+	Common::String _text;
+	Common::String _text2;
 	int			_y;
 	uint32		_endif;
 
 	Instruction();
-	~Instruction();
-
 };
 
 enum {
@@ -474,10 +470,10 @@ protected:
 public:
 
 	GfxObj		*gfxobj;
-	char		*_scriptName;
+	Common::String _scriptName;
 
 	Animation();
-	virtual ~Animation();
+	~Animation() override;
 	uint16 getFrameNum() const;
 	byte* getFrameData() const;
 
@@ -494,11 +490,11 @@ public:
 	void forceXYZF(int16 x, int16 y, int16 z, int16 f);
 
 	// getters/setters used by scripts
-	int16 getX()			{ return _left; }
-	void  setX(int16 value) { _left = value; }
+	int16 getX() override			{ return _left; }
+	void  setX(int16 value) override { _left = value; }
 
-	int16 getY()			{ return _top; }
-	void  setY(int16 value) { _top = value; }
+	int16 getY() override			{ return _top; }
+	void  setY(int16 value) override { _top = value; }
 
 	int16 getZ()			{ return _z; }
 	void  setZ(int16 value) { _z = value; }
@@ -542,7 +538,7 @@ class FixedTable : public Table {
 
 public:
 	FixedTable(uint32 size, uint32 fixed);
-	void clear();
+	void clear() override;
 };
 
 Table* createTableFromStream(uint32 size, Common::SeekableReadStream *stream);

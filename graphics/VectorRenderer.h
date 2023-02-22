@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,8 +26,7 @@
 #include "common/scummsys.h"
 #include "common/str.h"
 
-#include "graphics/surface.h"
-#include "graphics/transparent_surface.h"
+#include "graphics/managed_surface.h"
 
 #include "gui/ThemeEngine.h"
 
@@ -38,14 +36,27 @@ namespace Graphics {
 class VectorRenderer;
 struct DrawStep;
 
+/**
+ * @defgroup graphics_vector_renderer Vector renderer
+ * @ingroup graphics
+ *
+ * @brief VectorRenderer for drawing on a given surface.
+ *
+ * @{
+ */
 
-typedef void (VectorRenderer::*DrawingFunctionCallback)(const Common::Rect &, const Graphics::DrawStep &, const Common::Rect &);
+typedef void (VectorRenderer::*DrawingFunctionCallback)(const Common::Rect &, const Graphics::DrawStep &);
 
 
 struct DrawStep {
+	DrawingFunctionCallback drawingCall; /**< Pointer to drawing function */
+	Graphics::ManagedSurface *blitSrc;
+
 	struct Color {
 		uint8 r, g, b;
 		bool set;
+
+		Color () : r(0), g(0), b(0), set(false) {}
 	};
 	Color fgColor; /**< Foreground color */
 	Color bgColor; /**< background color */
@@ -58,6 +69,7 @@ struct DrawStep {
 						  negative values mean counting from the opposite direction */
 
 	Common::Rect padding;
+	Common::Rect clip; /**< Clipping rect restriction */
 
 	enum VectorAlignment {
 		kVectorAlignManual,
@@ -82,9 +94,21 @@ struct DrawStep {
 
 	GUI::ThemeEngine::AutoScaleMode autoscale; /**< scale alphaimage if present */
 
-	DrawingFunctionCallback drawingCall; /**< Pointer to drawing function */
-	Graphics::Surface *blitSrc;
-	Graphics::TransparentSurface *blitAlphaSrc;
+	DrawStep() {
+		drawingCall = nullptr;
+		blitSrc = nullptr;
+		// fgColor, bgColor, gradColor1, gradColor2, bevelColor initialized by Color default constructor
+		autoWidth = autoHeight = false;
+		x = y = w = h = 0;
+		// padding initialized by Common::Rect default constructor
+		xAlign = yAlign = kVectorAlignManual;
+		shadow = stroke = factor = radius = bevel = 0;
+		fillMode = 0;
+		shadowFillMode = 0;
+		extraData = 0;
+		scale = 0;
+		autoscale = GUI::ThemeEngine::kAutoScaleNone;
+	}
 };
 
 VectorRenderer *createRenderer(int mode);
@@ -110,7 +134,7 @@ VectorRenderer *createRenderer(int mode);
 class VectorRenderer {
 public:
 	VectorRenderer() : _activeSurface(NULL), _fillMode(kFillDisabled), _shadowOffset(0), _shadowFillMode(kShadowExponential),
-		_disableShadows(false), _strokeWidth(1), _gradientFactor(1) {
+		_disableShadows(false), _strokeWidth(1), _gradientFactor(1), _bevel(0), _dynamicData(0) {
 
 	}
 
@@ -146,7 +170,6 @@ public:
 	 * @param y2 Vertical (Y) coordinate for the line end
 	 */
 	virtual void drawLine(int x1, int y1, int x2, int y2) = 0;
-	virtual void drawLineClip(int x1, int y1, int x2, int y2, Common::Rect clipping) = 0;
 
 	/**
 	 * Draws a circle centered at (x,y) with radius r.
@@ -156,7 +179,6 @@ public:
 	 * @param r Radius of the circle.
 	 */
 	virtual void drawCircle(int x, int y, int r) = 0;
-	virtual void drawCircleClip(int x, int y, int r, Common::Rect clipping) = 0;
 
 	/**
 	 * Draws a square starting at (x,y) with the given width and height.
@@ -167,7 +189,6 @@ public:
 	 * @param h Height of the square
 	 */
 	virtual void drawSquare(int x, int y, int w, int h) = 0;
-	virtual void drawSquareClip(int x, int y, int w, int h, Common::Rect clipping) = 0;
 
 	/**
 	 * Draws a rounded square starting at (x,y) with the given width and height.
@@ -180,7 +201,6 @@ public:
 	 * @param r Radius of the corners.
 	 */
 	virtual void drawRoundedSquare(int x, int y, int r, int w, int h) = 0;
-	virtual void drawRoundedSquareClip(int x, int y, int r, int w, int h, Common::Rect clipping) = 0;
 
 	/**
 	 * Draws a triangle starting at (x,y) with the given base and height.
@@ -194,7 +214,6 @@ public:
 	 * @param orient Orientation of the triangle.
 	 */
 	virtual void drawTriangle(int x, int y, int base, int height, TriangleOrientation orient) = 0;
-	virtual void drawTriangleClip(int x, int y, int base, int height, TriangleOrientation orient, Common::Rect clipping) = 0;
 
 	/**
 	 * Draws a beveled square like the ones in the Classic GUI themes.
@@ -207,8 +226,7 @@ public:
 	 * @param h Height of the square
 	 * @param bevel Amount of bevel. Must be positive.
 	 */
-	virtual void drawBeveledSquare(int x, int y, int w, int h, int bevel) = 0;
-	virtual void drawBeveledSquareClip(int x, int y, int w, int h, int bevel, Common::Rect clipping) = 0;
+	virtual void drawBeveledSquare(int x, int y, int w, int h) = 0;
 
 	/**
 	 * Draws a tab-like shape, specially thought for the Tab widget.
@@ -220,10 +238,9 @@ public:
 	 * @param w Width of the tab
 	 * @param h Height of the tab
 	 * @param r Radius of the corners of the tab (0 for squared tabs).
+	 * @param s Shadow size
 	 */
-	virtual void drawTab(int x, int y, int r, int w, int h) = 0;
-	virtual void drawTabClip(int x, int y, int r, int w, int h, Common::Rect clipping) = 0;
-
+	virtual void drawTab(int x, int y, int r, int w, int h, int s) = 0;
 
 	/**
 	 * Simple helper function to draw a cross.
@@ -231,11 +248,6 @@ public:
 	virtual void drawCross(int x, int y, int w, int h) {
 		drawLine(x, y, x + w, y + w);
 		drawLine(x + w, y, x, y + h);
-	}
-
-	virtual void drawCrossClip(int x, int y, int w, int h, Common::Rect clipping) {
-		drawLineClip(x, y, x + w, y + w, clipping);
-		drawLineClip(x + w, y, x, y + h, clipping);
 	}
 
 	/**
@@ -285,14 +297,14 @@ public:
 	 *
 	 * @param surface Pointer to a Surface object.
 	 */
-	virtual void setSurface(TransparentSurface *surface) {
+	virtual void setSurface(ManagedSurface *surface) {
 		_activeSurface = surface;
 	}
 
 	/**
 	 * Returns the currently active drawing surface
 	 */
-	virtual TransparentSurface *getActiveSurface() {
+	virtual ManagedSurface *getActiveSurface() {
 		return _activeSurface;
 	}
 
@@ -301,7 +313,6 @@ public:
 	 * Defaults to using the active Foreground color for filling.
 	 */
 	virtual void fillSurface() = 0;
-	virtual void fillSurfaceClip(Common::Rect clipping) = 0;
 
 	/**
 	 * Clears the active surface.
@@ -365,6 +376,16 @@ public:
 	}
 
 	/**
+	 * Sets the clipping rectangle to be used by draw calls.
+	 *
+	 * Draw calls are restricted to pixels that are inside of the clipping
+	 * rectangle. Pixels outside the clipping rectangle are not modified.
+	 * To disable the clipping rectangle, call this method with a rectangle
+	 * the same size as the target surface.
+	 */
+	virtual void setClippingRect(const Common::Rect &clippingArea) = 0;
+
+	/**
 	 * Translates the position data inside a DrawStep into actual
 	 * screen drawing positions.
 	 */
@@ -377,76 +398,75 @@ public:
 	int stepGetRadius(const DrawStep &step, const Common::Rect &area);
 
 	/**
+	 * Restrict a draw call clipping rect with a step specific clipping rect
+	 */
+	Common::Rect applyStepClippingRect(const Common::Rect &area, const Common::Rect &clip, const DrawStep &step);
+
+	/**
 	 * DrawStep callback functions for each drawing feature
 	 */
-	void drawCallback_CIRCLE(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
+	void drawCallback_CIRCLE(const Common::Rect &area, const DrawStep &step) {
 		uint16 x, y, w, h, radius;
 
 		radius = stepGetRadius(step, area);
 		stepGetPositions(step, area, x, y, w, h);
 
-		drawCircleClip(x + radius, y + radius, radius, clip);
+		drawCircle(x + radius, y + radius, radius);
 	}
 
-	void drawCallback_SQUARE(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
+	void drawCallback_SQUARE(const Common::Rect &area, const DrawStep &step) {
 		uint16 x, y, w, h;
 		stepGetPositions(step, area, x, y, w, h);
-		drawSquareClip(x, y, w, h, clip);
+		drawSquare(x, y, w, h);
 	}
 
-	void drawCallback_LINE(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
+	void drawCallback_LINE(const Common::Rect &area, const DrawStep &step) {
 		uint16 x, y, w, h;
 		stepGetPositions(step, area, x, y, w, h);
-		drawLineClip(x, y, x + w, y + w, clip);
+		drawLine(x, y, x + w, y + h);
 	}
 
-	void drawCallback_ROUNDSQ(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
+	void drawCallback_ROUNDSQ(const Common::Rect &area, const DrawStep &step) {
 		uint16 x, y, w, h;
 		stepGetPositions(step, area, x, y, w, h);
-		drawRoundedSquareClip(x, y, stepGetRadius(step, area), w, h, clip);
+		drawRoundedSquare(x, y, stepGetRadius(step, area), w, h);
 	}
 
-	void drawCallback_FILLSURFACE(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
-		fillSurfaceClip(clip);
+	void drawCallback_FILLSURFACE(const Common::Rect &area, const DrawStep &step) {
+		fillSurface();
 	}
 
-	void drawCallback_TRIANGLE(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
+	void drawCallback_TRIANGLE(const Common::Rect &area, const DrawStep &step) {
 		uint16 x, y, w, h;
 		stepGetPositions(step, area, x, y, w, h);
-		drawTriangleClip(x, y, w, h, (TriangleOrientation)step.extraData, clip);
+		drawTriangle(x, y, w, h, (TriangleOrientation)step.extraData);
 	}
 
-	void drawCallback_BEVELSQ(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
+	void drawCallback_BEVELSQ(const Common::Rect &area, const DrawStep &step) {
 		uint16 x, y, w, h;
 		stepGetPositions(step, area, x, y, w, h);
-		drawBeveledSquareClip(x, y, w, h, _bevel, clip);
+		drawBeveledSquare(x, y, w, h);
 	}
 
-	void drawCallback_TAB(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
+	void drawCallback_TAB(const Common::Rect &area, const DrawStep &step) {
 		uint16 x, y, w, h;
 		stepGetPositions(step, area, x, y, w, h);
-		drawTabClip(x, y, stepGetRadius(step, area), w, h, clip);
+		drawTab(x, y, stepGetRadius(step, area), w, h, step.shadow);
 	}
 
-	void drawCallback_BITMAP(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
+	void drawCallback_BITMAP(const Common::Rect &area, const DrawStep &step) {
 		uint16 x, y, w, h;
 		stepGetPositions(step, area, x, y, w, h);
-		blitKeyBitmapClip(step.blitSrc, Common::Rect(x, y, x + w, y + h), clip);
+		blitKeyBitmap(step.blitSrc, Common::Point(x, y), true);
 	}
 
-	void drawCallback_ALPHABITMAP(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
+	void drawCallback_CROSS(const Common::Rect &area, const DrawStep &step) {
 		uint16 x, y, w, h;
 		stepGetPositions(step, area, x, y, w, h);
-		blitAlphaBitmap(step.blitAlphaSrc, Common::Rect(x, y, x + w, y + h), step.autoscale, step.xAlign, step.yAlign); // TODO
+		drawCross(x, y, w, h);
 	}
 
-	void drawCallback_CROSS(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {
-		uint16 x, y, w, h;
-		stepGetPositions(step, area, x, y, w, h);
-		drawCrossClip(x, y, w, h, clip);
-	}
-
-	void drawCallback_VOID(const Common::Rect &area, const DrawStep &step, const Common::Rect &clip) {}
+	void drawCallback_VOID(const Common::Rect &area, const DrawStep &step) {}
 
 	/**
 	 * Draws the specified draw step on the screen.
@@ -455,8 +475,7 @@ public:
 	 * @param area Zone to paint on
 	 * @param step Pointer to a DrawStep struct.
 	 */
-	virtual void drawStep(const Common::Rect &area, const DrawStep &step, uint32 extra = 0);
-	virtual void drawStepClip(const Common::Rect &area, const Common::Rect &clip, const DrawStep &step, uint32 extra = 0);
+	virtual void drawStep(const Common::Rect &area, const Common::Rect &clip, const DrawStep &step, uint32 extra = 0);
 
 	/**
 	 * Copies the part of the current frame to the system overlay.
@@ -487,32 +506,15 @@ public:
 	 * @param source Surface to blit into the drawing surface.
 	 * @param r Position in the active drawing surface to do the blitting.
 	 */
-	virtual void blitSurface(const Graphics::Surface *source, const Common::Rect &r) = 0;
+	virtual void blitSurface(const Graphics::ManagedSurface *source, const Common::Rect &r) = 0;
 
-	/**
-	 * Blits a given graphics surface into a small area of the current drawing surface.
-	 *
-	 * Note that the given surface is expected to be smaller than the
-	 * active drawing surface, hence the WHOLE source surface will be
-	 * blitted into the active surface, at the position specified by "r".
-	 */
-	virtual void blitSubSurface(const Graphics::Surface *source, const Common::Rect &r) = 0;
-	virtual void blitSubSurfaceClip(const Graphics::Surface *source, const Common::Rect &r, const Common::Rect &clipping) = 0;
-
-	virtual void blitKeyBitmap(const Graphics::Surface *source, const Common::Rect &r) = 0;
-	virtual void blitKeyBitmapClip(const Graphics::Surface *source, const Common::Rect &r, const Common::Rect &clipping) = 0;
-
-	virtual void blitAlphaBitmap(Graphics::TransparentSurface *source, const Common::Rect &r,
-			GUI::ThemeEngine::AutoScaleMode autoscale = GUI::ThemeEngine::kAutoScaleNone,
-			Graphics::DrawStep::VectorAlignment xAlign = Graphics::DrawStep::kVectorAlignManual,
-			Graphics::DrawStep::VectorAlignment yAlign = Graphics::DrawStep::kVectorAlignManual,
-			int alpha = 255) = 0;
+	virtual void blitKeyBitmap(const Graphics::ManagedSurface *source, const Common::Point &p, bool themeTrans) = 0;
 
 	/**
 	 * Draws a string into the screen. Wrapper for the Graphics::Font string drawing
 	 * method.
 	 */
-	virtual void drawString(const Graphics::Font *font, const Common::String &text,
+	virtual void drawString(const Graphics::Font *font, const Common::U32String &text,
 	                        const Common::Rect &area, Graphics::TextAlign alignH,
 	                        GUI::ThemeEngine::TextAlignVertical alignV, int deltax, bool useEllipsis, const Common::Rect &textDrawableArea) = 0;
 
@@ -530,7 +532,7 @@ public:
 	virtual void applyScreenShading(GUI::ThemeEngine::ShadingStyle) = 0;
 
 protected:
-	TransparentSurface *_activeSurface; /**< Pointer to the surface currently being drawn */
+	ManagedSurface *_activeSurface; /**< Pointer to the surface currently being drawn */
 
 	FillMode _fillMode; /**< Defines in which way (if any) are filled the drawn shapes */
 	ShadowFillMode _shadowFillMode;
@@ -543,7 +545,7 @@ protected:
 
 	int _gradientFactor; /**< Multiplication factor of the active gradient */
 };
-
+/** @} */
 } // End of namespace Graphics
 
 #endif

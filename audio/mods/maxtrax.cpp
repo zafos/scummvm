@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -236,6 +235,8 @@ void MaxTrax::interrupt() {
 							}
 						}
 						break;
+					default:
+						break;
 					}
 					break;
 
@@ -326,6 +327,9 @@ endOfEventLoop:
 				// Send Audio Packet
 			}
 			voice.stopEventTime = -1;
+			break;
+
+		default:
 			break;
 		}
 
@@ -500,6 +504,8 @@ allNotesOff:
 			if (_voiceCtx[i].channel == &channel)
 				killVoice((byte)i);
 		}
+		break;
+	default:
 		break;
 	}
 }
@@ -744,7 +750,7 @@ int8 MaxTrax::noteOn(ChannelContext &channel, const byte note, uint16 volume, ui
 		// adjust precalculated value
 		voice.preCalcNote = plainNote - (useOctave << 16);
 
-		// next calculate the actual period which depends on wether porta is enabled
+		// next calculate the actual period which depends on whether porta is enabled
 		if (&channel < &_channelCtx[kNumChannels] && (channel.flags & ChannelContext::kFlagPortamento) != 0) {
 			if ((channel.flags & ChannelContext::kFlagMono) != 0 && channel.lastNote < 0x80 && channel.lastNote != note) {
 				voice.portaTicks = 0;

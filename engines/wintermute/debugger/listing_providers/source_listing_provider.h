@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,11 +33,11 @@ class Listing;
 
 class SourceListingProvider : ListingProvider {
 public:
-	virtual ~SourceListingProvider() {};
+	~SourceListingProvider() override {};
 	/**
 	 * Get a listing. When implementing this, the result should be safe to delete for the caller.
 	 */
-	virtual Listing *getListing(const Common::String &filename, ErrorCode &err) = 0;
+	Listing *getListing(const Common::String &filename, ErrorCode &err) override = 0;
 	virtual ErrorCode setPath(const Common::String &path) = 0;
 	virtual Common::String getPath() const = 0;
 

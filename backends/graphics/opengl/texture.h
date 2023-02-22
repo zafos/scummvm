@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,24 +15,31 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef BACKENDS_GRAPHICS_OPENGL_TEXTURE_H
 #define BACKENDS_GRAPHICS_OPENGL_TEXTURE_H
 
-#include "backends/graphics/opengl/opengl-sys.h"
+#include "graphics/opengl/system_headers.h"
+#include "graphics/opengl/context.h"
 
 #include "graphics/pixelformat.h"
 #include "graphics/surface.h"
 
 #include "common/rect.h"
 
+class Scaler;
+
 namespace OpenGL {
 
-class Shader;
+enum WrapMode {
+	kWrapModeBorder,
+	kWrapModeEdge,
+	kWrapModeRepeat,
+	kWrapModeMirroredRepeat
+};
 
 /**
  * A simple GL texture object abstraction.
@@ -64,6 +71,13 @@ public:
 	bool isLinearFilteringEnabled() const { return (_glFilter == GL_LINEAR); }
 
 	/**
+	 * Enable or disable linear texture filtering.
+	 *
+	 * @param enable true to enable and false to disable.
+	 */
+	void setWrapMode(WrapMode wrapMode);
+
+	/**
 	 * Destroy the OpenGL texture name.
 	 */
 	void destroy();
@@ -86,8 +100,9 @@ public:
 	 *
 	 * @param width  The desired logical width.
 	 * @param height The desired logical height.
+	 * @return Whether the call was successful
 	 */
-	void setSize(uint width, uint height);
+	bool setSize(uint width, uint height);
 
 	/**
 	 * Copy image data to the texture.
@@ -179,6 +194,13 @@ public:
 	virtual void allocate(uint width, uint height) = 0;
 
 	/**
+	 * Assign a mask to the surface, where a byte value of 0 is black with 0 alpha and 1 is the normal color.
+	 *
+	 * @param mask   The mask data.
+	 */
+	virtual void setMask(const byte *mask) {}
+
+	/**
 	 * Copy image data to the surface.
 	 *
 	 * The format of the input data needs to match the format returned by
@@ -229,6 +251,8 @@ public:
 	virtual void setColorKey(uint colorKey) {}
 	virtual void setPalette(uint start, uint colors, const byte *palData) {}
 
+	virtual void setScaler(uint scalerIndex, int scaleFactor) {}
+
 	/**
 	 * Update underlying OpenGL texture to reflect current state.
 	 */
@@ -262,31 +286,33 @@ public:
 	 * @param format      The format used for the texture input.
 	 */
 	Texture(GLenum glIntFormat, GLenum glFormat, GLenum glType, const Graphics::PixelFormat &format);
-	virtual ~Texture();
+	~Texture() override;
 
-	virtual void destroy();
+	void destroy() override;
 
-	virtual void recreate();
+	void recreate() override;
 
-	virtual void enableLinearFiltering(bool enable);
+	void enableLinearFiltering(bool enable) override;
 
-	virtual void allocate(uint width, uint height);
+	void allocate(uint width, uint height) override;
 
-	virtual uint getWidth() const { return _userPixelData.w; }
-	virtual uint getHeight() const { return _userPixelData.h; }
+	uint getWidth() const override { return _userPixelData.w; }
+	uint getHeight() const override { return _userPixelData.h; }
 
 	/**
 	 * @return The logical format of the texture data.
 	 */
-	virtual Graphics::PixelFormat getFormat() const { return _format; }
+	Graphics::PixelFormat getFormat() const override { return _format; }
 
-	virtual Graphics::Surface *getSurface() { return &_userPixelData; }
-	virtual const Graphics::Surface *getSurface() const { return &_userPixelData; }
+	Graphics::Surface *getSurface() override { return &_userPixelData; }
+	const Graphics::Surface *getSurface() const override { return &_userPixelData; }
 
-	virtual void updateGLTexture();
-	virtual const GLTexture &getGLTexture() const { return _glTexture; }
+	void updateGLTexture() override;
+	const GLTexture &getGLTexture() const override { return _glTexture; }
 protected:
 	const Graphics::PixelFormat _format;
+
+	void updateGLTexture(Common::Rect &dirtyArea);
 
 private:
 	GLTexture _glTexture;
@@ -295,47 +321,76 @@ private:
 	Graphics::Surface _userPixelData;
 };
 
-class TextureCLUT8 : public Texture {
+class FakeTexture : public Texture {
 public:
-	TextureCLUT8(GLenum glIntFormat, GLenum glFormat, GLenum glType, const Graphics::PixelFormat &format);
-	virtual ~TextureCLUT8();
+	FakeTexture(GLenum glIntFormat, GLenum glFormat, GLenum glType, const Graphics::PixelFormat &format, const Graphics::PixelFormat &fakeFormat);
+	~FakeTexture() override;
 
-	virtual void allocate(uint width, uint height);
+	void allocate(uint width, uint height) override;
+	void setMask(const byte *mask) override;
 
-	virtual Graphics::PixelFormat getFormat() const;
+	Graphics::PixelFormat getFormat() const override { return _fakeFormat; }
 
-	virtual bool hasPalette() const { return true; }
+	bool hasPalette() const override { return (_palette != nullptr); }
 
-	virtual void setColorKey(uint colorKey);
-	virtual void setPalette(uint start, uint colors, const byte *palData);
+	void setColorKey(uint colorKey) override;
+	void setPalette(uint start, uint colors, const byte *palData) override;
 
-	virtual Graphics::Surface *getSurface() { return &_clut8Data; }
-	virtual const Graphics::Surface *getSurface() const { return &_clut8Data; }
+	Graphics::Surface *getSurface() override { return &_rgbData; }
+	const Graphics::Surface *getSurface() const override { return &_rgbData; }
 
-	virtual void updateGLTexture();
-private:
-	Graphics::Surface _clut8Data;
-	byte *_palette;
+	void updateGLTexture() override;
+protected:
+	Graphics::Surface _rgbData;
+	Graphics::PixelFormat _fakeFormat;
+	uint32 *_palette;
+	uint8 *_mask;
 };
 
-#if !USE_FORCED_GL
-class TextureRGB555 : public Texture {
+class TextureRGB555 : public FakeTexture {
 public:
 	TextureRGB555();
-	virtual ~TextureRGB555();
+	~TextureRGB555() override {}
 
-	virtual void allocate(uint width, uint height);
-
-	virtual Graphics::PixelFormat getFormat() const;
-
-	virtual Graphics::Surface *getSurface() { return &_rgb555Data; }
-	virtual const Graphics::Surface *getSurface() const { return &_rgb555Data; }
-
-	virtual void updateTexture();
-private:
-	Graphics::Surface _rgb555Data;
+	void updateGLTexture() override;
 };
-#endif // !USE_FORCED_GL
+
+class TextureRGBA8888Swap : public FakeTexture {
+public:
+	TextureRGBA8888Swap();
+	~TextureRGBA8888Swap() override {}
+
+	void updateGLTexture() override;
+};
+
+#ifdef USE_SCALERS
+class ScaledTexture : public FakeTexture {
+public:
+	ScaledTexture(GLenum glIntFormat, GLenum glFormat, GLenum glType, const Graphics::PixelFormat &format, const Graphics::PixelFormat &fakeFormat);
+	~ScaledTexture() override;
+
+	void allocate(uint width, uint height) override;
+
+	uint getWidth() const override { return _rgbData.w; }
+	uint getHeight() const override { return _rgbData.h; }
+	Graphics::PixelFormat getFormat() const override { return _fakeFormat; }
+
+	bool hasPalette() const override { return (_palette != nullptr); }
+
+	Graphics::Surface *getSurface() override { return &_rgbData; }
+	const Graphics::Surface *getSurface() const override { return &_rgbData; }
+
+	void updateGLTexture() override;
+
+	void setScaler(uint scalerIndex, int scaleFactor) override;
+protected:
+	Graphics::Surface *_convData;
+	Scaler *_scaler;
+	uint _scalerIndex;
+	uint _extraPixels;
+	uint _scaleFactor;
+};
+#endif
 
 #if !USE_FORCED_GLES
 class TextureTarget;
@@ -344,38 +399,38 @@ class CLUT8LookUpPipeline;
 class TextureCLUT8GPU : public Surface {
 public:
 	TextureCLUT8GPU();
-	virtual ~TextureCLUT8GPU();
+	~TextureCLUT8GPU() override;
 
-	virtual void destroy();
+	void destroy() override;
 
-	virtual void recreate();
+	void recreate() override;
 
-	virtual void enableLinearFiltering(bool enable);
+	void enableLinearFiltering(bool enable) override;
 
-	virtual void allocate(uint width, uint height);
+	void allocate(uint width, uint height) override;
 
-	virtual bool isDirty() const { return _paletteDirty || Surface::isDirty(); }
+	bool isDirty() const override { return _paletteDirty || Surface::isDirty(); }
 
-	virtual uint getWidth() const { return _userPixelData.w; }
-	virtual uint getHeight() const { return _userPixelData.h; }
+	uint getWidth() const override { return _userPixelData.w; }
+	uint getHeight() const override { return _userPixelData.h; }
 
-	virtual Graphics::PixelFormat getFormat() const;
+	Graphics::PixelFormat getFormat() const override;
 
-	virtual bool hasPalette() const { return true; }
+	bool hasPalette() const override { return true; }
 
-	virtual void setColorKey(uint colorKey);
-	virtual void setPalette(uint start, uint colors, const byte *palData);
+	void setColorKey(uint colorKey) override;
+	void setPalette(uint start, uint colors, const byte *palData) override;
 
-	virtual Graphics::Surface *getSurface() { return &_userPixelData; }
-	virtual const Graphics::Surface *getSurface() const { return &_userPixelData; }
+	Graphics::Surface *getSurface() override { return &_userPixelData; }
+	const Graphics::Surface *getSurface() const override { return &_userPixelData; }
 
-	virtual void updateGLTexture();
-	virtual const GLTexture &getGLTexture() const;
+	void updateGLTexture() override;
+	const GLTexture &getGLTexture() const override;
 
 	static bool isSupportedByContext() {
-		return g_context.shadersSupported
-		    && g_context.multitextureSupported
-		    && g_context.framebufferObjectSupported;
+		return OpenGLContext.shadersSupported
+		    && OpenGLContext.multitextureSupported
+		    && OpenGLContext.framebufferObjectSupported;
 	}
 private:
 	void lookUpColors();

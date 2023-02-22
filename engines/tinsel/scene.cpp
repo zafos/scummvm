@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Starts up new scenes.
  */
@@ -40,7 +39,7 @@
 #include "tinsel/pid.h"	// process IDs
 #include "tinsel/play.h"
 #include "tinsel/polygons.h"
-#include "tinsel/rince.h"
+#include "tinsel/movers.h"
 #include "tinsel/sched.h"
 #include "tinsel/scn.h"
 #include "tinsel/scroll.h"
@@ -48,14 +47,12 @@
 #include "tinsel/sysvar.h"
 #include "tinsel/token.h"
 
+#include "common/memstream.h"
 #include "common/textconsole.h"
 
 namespace Tinsel {
 
 //----------------- EXTERNAL FUNCTIONS ---------------------
-
-// in BG.C
-extern void DropBackground();
 
 // in EFFECT.C
 extern void EffectPolyProcess(CORO_PARAM, const void *);
@@ -87,7 +84,11 @@ struct SCENE_STRUC {
 	int32 numProcess;	// number of processes in this scene
 	SCNHANDLE hProcess;	// handle to table of processes
 	SCNHANDLE hMusicScript;	// handle to music script data - Tinsel 2 only
-	SCNHANDLE hMusicSegment;// handle to music segments - Tinsel 2 only
+	SCNHANDLE hMusicSegment;	// handle to music segments - Tinsel 2 only
+	int32 numCameras;
+	SCNHANDLE hCamera;
+	int32 numLights;
+	SCNHANDLE hLight;
 } PACKED_STRUCT;
 
 /** entrance structure - one per entrance */
@@ -99,37 +100,61 @@ struct ENTRANCE_STRUC {
 	uint32 flags;
 } PACKED_STRUCT;
 
+/** camera strucutre, Noir only */
+struct CAMERA_STRUC {
+	int32 sceneId;
+	int32 rotX;
+	int32 rotY;
+	int32 rotZ;
+	int32 posX;
+	int32 posY;
+	int32 posZ;
+	int32 aperture;
+} PACKED_STRUCT;
+
+struct LIGHT_STRUC {
+	int32 sceneId;
+	int32 posX;
+	int32 posY;
+	int32 posZ;
+} PACKED_STRUCT;
+
 #include "common/pack-end.h"	// END STRUCT PACKING
 
 
 //----------------- LOCAL GLOBAL DATA --------------------
 
-// FIXME: Avoid non-const global vars
+// These vars are reset upon engine destruction
 
 #ifdef DEBUG
 static bool g_ShowPosition = false;	// Set when showpos() has been called
 #endif
 
 int g_sceneCtr = 0;
-static int g_initialMyEscape;
+static int g_initialMyEscape = 0;
 
 static SCNHANDLE g_SceneHandle = 0;	// Current scene handle - stored in case of Save_Scene()
 
 SCENE_STRUC g_tempStruc;
+
+static bool g_isViewSet = false;
 
 struct TP_INIT {
 	SCNHANDLE hTinselCode;		// Code
 	TINSEL_EVENT event;			// Triggering event
 };
 
-const SCENE_STRUC *GetSceneStruc(const byte *pStruc) {
-	if (TinselVersion == TINSEL_V2)
-		return (const SCENE_STRUC *)pStruc;
+void ResetVarsScene() {
+	g_sceneCtr = 0;
+	g_initialMyEscape = 0;
 
-	// Copy appropriate fields into tempStruc, and return a pointer to it
-	const byte *p = pStruc;
+	g_SceneHandle = 0;
+	g_isViewSet = false;
+
 	memset(&g_tempStruc, 0, sizeof(SCENE_STRUC));
+}
 
+SCENE_STRUC* parseSceneV1(const byte *p) {
 	g_tempStruc.numEntrance    = READ_UINT32(p); p += sizeof(uint32);
 	g_tempStruc.numPoly        = READ_UINT32(p); p += sizeof(uint32);
 	g_tempStruc.numTaggedActor = READ_UINT32(p); p += sizeof(uint32);
@@ -142,6 +167,59 @@ const SCENE_STRUC *GetSceneStruc(const byte *pStruc) {
 	return &g_tempStruc;
 }
 
+SCENE_STRUC* parseSceneV2(const byte *p) {
+	g_tempStruc.defRefer       = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hSceneScript   = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hSceneDesc     = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.numEntrance    = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hEntrance      = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.numPoly        = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hPoly          = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.numTaggedActor = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hTaggedActor   = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.numProcess     = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hProcess       = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hMusicScript   = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hMusicSegment  = READ_UINT32(p); p += sizeof(uint32);
+
+	return &g_tempStruc;
+}
+
+SCENE_STRUC* parseSceneV3(const byte *p) {
+	g_tempStruc.defRefer       = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hSceneScript   = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hSceneDesc     = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.numEntrance    = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hEntrance      = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.numCameras     = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hCamera        = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.numLights      = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hLight         = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.numPoly        = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hPoly          = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.numTaggedActor = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hTaggedActor   = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.numProcess     = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hProcess       = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hMusicScript   = READ_UINT32(p); p += sizeof(uint32);
+	g_tempStruc.hMusicSegment  = READ_UINT32(p); p += sizeof(uint32);
+	// scollfields scaling/speed - 4 ints
+	warning("TODO: Complete scene loading logic for Noir");
+
+	return &g_tempStruc;
+}
+
+const SCENE_STRUC *GetSceneStruc(const byte *pStruc) {
+	memset(&g_tempStruc, 0, sizeof(SCENE_STRUC));
+
+	if (TinselVersion == 3) {
+		return parseSceneV3(pStruc);
+	} else if (TinselVersion == 2) {
+		return parseSceneV2(pStruc);
+	} else {
+		return parseSceneV1(pStruc);
+	}
+}
 
 /**
  * Started up for scene script and entrance script.
@@ -157,10 +235,9 @@ static void SceneTinselProcess(CORO_PARAM, const void *param) {
 	CORO_BEGIN_CODE(_ctx);
 
 	// The following myEscape value setting is used for enabling title screen skipping in DW1
-	if (TinselV1 && (g_sceneCtr == 1)) g_initialMyEscape = GetEscEvents();
-	// DW1 PSX has its own scene skipping script code for scenes 2 and 3 (bug #3541542).
-	// Same goes for DW1 Mac.
-	_ctx->myEscape = (TinselV1 && (g_sceneCtr < ((TinselV1PSX || TinselV1Mac) ? 2 : 4))) ? g_initialMyEscape : 0;
+	if ((TinselVersion == 1) && (g_sceneCtr == 1)) g_initialMyEscape = GetEscEvents();
+	// DW1 PSX, Saturn and Mac has its own scene skipping script code for scenes 2 and 3 (bug #6094).
+	_ctx->myEscape = ((TinselVersion == 1) && (g_sceneCtr < ((TinselV1PSX || TinselV1Saturn || TinselV1Mac) ? 2 : 4))) ? g_initialMyEscape : 0;
 
 	// get the stuff copied to process when it was created
 	_ctx->pInit = (const TP_INIT *)param;
@@ -169,7 +246,7 @@ static void SceneTinselProcess(CORO_PARAM, const void *param) {
 
 	_ctx->pic = InitInterpretContext(GS_SCENE,
 		FROM_32(_ctx->pInit->hTinselCode),
-		TinselV2 ? _ctx->pInit->event : NOEVENT,
+		(TinselVersion >= 2) ? _ctx->pInit->event : NOEVENT,
 		NOPOLY,			// No polygon
 		0,				// No actor
 		NULL,			// No object
@@ -217,10 +294,10 @@ static void LoadScene(SCNHANDLE scene, int entry) {
 
 	// Scene handle
 	g_SceneHandle = scene;		// Save scene handle in case of Save_Scene()
-	LockMem(g_SceneHandle);		// Make sure scene is loaded
-	LockScene(g_SceneHandle);		// Prevent current scene from being discarded
+	_vm->_handle->LockMem(g_SceneHandle); // Make sure scene is loaded
+	_vm->_handle->LockScene(g_SceneHandle); // Prevent current scene from being discarded
 
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		// CdPlay() stuff
 		byte *cptr = FindChunk(scene, CHUNK_CDPLAY_FILENUM);
 		assert(cptr);
@@ -228,14 +305,14 @@ static void LoadScene(SCNHANDLE scene, int entry) {
 		assert(i < 512);
 		cptr = FindChunk(scene, CHUNK_CDPLAY_FILENAME);
 		assert(cptr);
-		SetCdPlaySceneDetails(i, (const char *)cptr);
+		_vm->_handle->SetCdPlaySceneDetails((const char *)cptr);
 	}
 
 	// Find scene structure
 	ss = GetSceneStruc(FindChunk(scene, CHUNK_SCENE));
 	assert(ss != NULL);
 
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		// Music stuff
 		char *cptr = (char *)FindChunk(scene, CHUNK_MUSIC_FILENAME);
 		assert(cptr);
@@ -249,9 +326,9 @@ static void LoadScene(SCNHANDLE scene, int entry) {
 		InitPolygons(FROM_32(ss->hPoly), FROM_32(ss->numPoly), true);
 
 		// Initialize the actors for this scene
-		StartTaggedActors(FROM_32(ss->hTaggedActor), FROM_32(ss->numTaggedActor), false);
+		_vm->_actor->StartTaggedActors(FROM_32(ss->hTaggedActor), FROM_32(ss->numTaggedActor), false);
 
-		if (TinselV2)
+		if (TinselVersion >= 2)
 			// Returning from cutscene
 			SendSceneTinselProcess(RESTORE);
 
@@ -262,10 +339,10 @@ static void LoadScene(SCNHANDLE scene, int entry) {
 		InitPolygons(FROM_32(ss->hPoly), FROM_32(ss->numPoly), false);
 
 		// Initialize the actors for this scene
-		StartTaggedActors(FROM_32(ss->hTaggedActor), FROM_32(ss->numTaggedActor), true);
+		_vm->_actor->StartTaggedActors(FROM_32(ss->hTaggedActor), FROM_32(ss->numTaggedActor), true);
 
 		// Run the appropriate entrance code (if any)
-		es = (const ENTRANCE_STRUC *)LockMem(FROM_32(ss->hEntrance));
+		es = (const ENTRANCE_STRUC *)_vm->_handle->LockMem(FROM_32(ss->hEntrance));
 		for (i = 0; i < FROM_32(ss->numEntrance); i++) {
 			if (FROM_32(es->eNumber) == (uint)entry) {
 				if (es->hScript) {
@@ -278,7 +355,7 @@ static void LoadScene(SCNHANDLE scene, int entry) {
 			}
 
 			// Move to next entrance
-			if (TinselV2)
+			if (TinselVersion >= 2)
 				++es;
 			else
 				es = (const ENTRANCE_STRUC *)((const byte *)es + 8);
@@ -309,29 +386,29 @@ static void LoadScene(SCNHANDLE scene, int entry) {
  */
 void EndScene() {
 	if (g_SceneHandle != 0) {
-		UnlockScene(g_SceneHandle);
+		_vm->_handle->UnlockScene(g_SceneHandle);
 		g_SceneHandle = 0;
 	}
 
-	KillInventory();	// Close down any open inventory
+	_vm->_dialogs->killInventory(); // Close down any open inventory
 
 	DropPolygons();		// No polygons
-	DropScroll();	// No no-scrolls
-	DropBackground();	// No background
+	_vm->_scroll->DropScroll(); // No no-scrolls
+	_vm->_bg->DropBackground();	// No background
 	DropMovers();		// No moving actors
-	DropCursor();		// No cursor
-	DropActors();		// No actor reels running
+	_vm->_cursor->DropCursor(); // No cursor
+	_vm->_actor->DropActors();      // No actor reels running
 	FreeAllTokens();	// No-one has tokens
 	FreeMostInterpretContexts();	// Only master script still interpreting
 
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		SetSysVar(ISV_DIVERT_ACTOR, 0);
 		SetSysVar(ISV_GHOST_ACTOR, 0);
 		SetSysVar(SV_MinimumXoffset, 0);
 		SetSysVar(SV_MaximumXoffset, 0);
 		SetSysVar(SV_MinimumYoffset, 0);
 		SetSysVar(SV_MaximumYoffset, 0);
-		ResetFontHandles();
+		_vm->_font->ResetFontHandles();
 		NoSoundReels();
 	}
 
@@ -349,52 +426,6 @@ void EndScene() {
 }
 
 /**
- *
- */
-void PrimeBackground() {
-	// structure for playfields
-	// FIXME: Avoid non-const global vars
-	// TODO: We should simply merge this function with InitBackground
-	//   in order to avoid the static var and the problems associate
-	//   with it.
-	static PLAYFIELD playfield[] = {
-		{	// FIELD WORLD
-			NULL,		// display list
-			0,			// init field x
-			0,			// init field y
-			0,			// x vel
-			0,			// y vel
-			Common::Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT),	// clip rect
-			false		// moved flag
-		},
-		{	// FIELD STATUS
-			NULL,		// display list
-			0,			// init field x
-			0,			// init field y
-			0,			// x vel
-			0,			// y vel
-			Common::Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT),	// clip rect
-			false		// moved flag
-		}
-	};
-
-	// structure for background
-	static const BACKGND backgnd = {
-		BLACK,			// sky color
-		Common::Point(0, 0),	// initial world pos
-		Common::Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT),	// scroll limits
-		0,				// no background update process
-		NULL,			// no x scroll table
-		NULL,			// no y scroll table
-		2,				// 2 playfields
-		playfield,		// playfield pointer
-		false			// no auto-erase
-	};
-
-	InitBackground(&backgnd);
-}
-
-/**
  * Start up the standard stuff for the next scene.
  */
 
@@ -402,8 +433,8 @@ void PrimeScene() {
 	SetNoBlocking(false);
 	SetSysVar(SYS_SceneFxDimFactor, SysVar(SYS_DefaultFxDimFactor));
 
-	RestartCursor();	// Restart the cursor
-	if (!TinselV2)
+	_vm->_cursor->RestartCursor(); // Restart the cursor
+	if (TinselVersion <= 1)
 		EnableTags();		// Next scene with tags enabled
 
 	CoroScheduler.createProcess(PID_SCROLL, ScrollProcess, NULL, 0);
@@ -418,7 +449,7 @@ void PrimeScene() {
 	CoroScheduler.createProcess(PID_TAG, PointProcess, NULL, 0);
 
 	// init the current background
-	PrimeBackground();
+	_vm->_bg->InitBackground();
 }
 
 /**
@@ -428,15 +459,17 @@ void PrimeScene() {
 void StartNewScene(SCNHANDLE scene, int entry) {
 	EndScene();	// Wrap up the last scene.
 
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		TouchMoverReels();
 
-		LockMem(scene);	// Do CD change before PrimeScene
+		_vm->_handle->LockMem(scene); // Do CD change before PrimeScene
 	}
 
 	PrimeScene();	// Start up the standard stuff for the next scene.
 
 	LoadScene(scene, entry);
+
+	g_isViewSet = false;
 }
 
 #ifdef DEBUG
@@ -472,7 +505,7 @@ void DoHailScene(SCNHANDLE scene) {
 		init.event = NOEVENT;
 		init.hTinselCode = ss->hSceneScript;
 
-		CoroScheduler.createProcess(PID_TCODE, SceneTinselProcess, &init, sizeof(init));
+		CoroScheduler.createProcess(PID_SCENE, SceneTinselProcess, &init, sizeof(init));
 	}
 }
 
@@ -481,6 +514,59 @@ void DoHailScene(SCNHANDLE scene) {
  */
 void WrapScene() {
 	SendSceneTinselProcess(CLOSEDOWN);
+}
+
+
+
+/**
+ * Set parameters for 3D rendering for Noir.
+ */
+void SetView(int sceneId, int scale) {
+	if (sceneId == SysVar(SV_SPRITER_SCENE_ID)) {
+		if (scale == SysVar(SV_SPRITER_SCALE)) {
+			debug("Ignoring SetView()");
+			return;
+		}
+	}
+	debug("SetView(%d, %d)", sceneId, scale);
+
+	SetSysVar(SV_SPRITER_SCALE, scale);
+	SetSysVar(SV_USER3 ,0x28);
+
+	if (g_isViewSet) {
+		//EndActors();
+	} else {
+		g_isViewSet = true;
+	}
+
+	int i = 0;
+	CAMERA_STRUC *pCamera = (CAMERA_STRUC *)_vm->_handle->LockMem(g_tempStruc.hCamera);
+	for (i = 0; i < g_tempStruc.numCameras; ++i, ++pCamera) {
+		if (sceneId == (int)FROM_32(pCamera->sceneId)) {
+			// set camera
+			SetSysVar(SV_SPRITER_SCENE_ID, sceneId);
+			break;
+		}
+	}
+
+	if (i == g_tempStruc.numCameras) {
+		// no suitable camera found
+		return;
+	}
+
+	LIGHT_STRUC *pLight = (LIGHT_STRUC *)_vm->_handle->LockMem(g_tempStruc.hLight);
+	for (i = 0; i < g_tempStruc.numLights; ++i, ++pLight) {
+		if (sceneId == (int)FROM_32(pLight->sceneId)) {
+			// set light
+			break;
+		}
+	}
+
+	if (i == g_tempStruc.numLights) {
+		// use default light
+	}
+
+	//update ground plane
 }
 
 } // End of namespace Tinsel

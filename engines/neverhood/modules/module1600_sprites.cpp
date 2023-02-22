@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -48,7 +47,7 @@ AsCommonCar::AsCommonCar(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16
 	_rectFlag = false;
 	_newDeltaXType = -1;
 	_soundCounter = 0;
-	_pathPoints = NULL;
+	_pathPoints = nullptr;
 	_currMoveDirection = 0;
 	_newMoveDirection = 0;
 
@@ -57,7 +56,7 @@ AsCommonCar::AsCommonCar(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16
 
 	SetUpdateHandler(&AsCommonCar::update);
 	SetMessageHandler(&AsCommonCar::handleMessage);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 }
 
 AsCommonCar::~AsCommonCar() {
@@ -98,7 +97,7 @@ uint32 AsCommonCar::handleMessage(int messageNum, const MessageParam &param, Ent
 	uint32 messageResult = Sprite::handleMessage(messageNum, param, sender);
 	switch (messageNum) {
 	case NM_SCENE_LEAVE:
-		SetSpriteUpdate(NULL);
+		SetSpriteUpdate(nullptr);
 		break;
 	case NM_POSITION_CHANGE:
 		// Set the current position without moving
@@ -167,7 +166,7 @@ uint32 AsCommonCar::handleMessage(int messageNum, const MessageParam &param, Ent
 					if (_currPointIndex == 0)
 						moveToPrevPoint();
 					else
-						SetSpriteUpdate(NULL);
+						SetSpriteUpdate(nullptr);
 				} else {
 					if (minMatchIndex > _currPointIndex)
 						moveToNextPoint();
@@ -207,6 +206,8 @@ uint32 AsCommonCar::handleMessage(int messageNum, const MessageParam &param, Ent
 		stCarAtHome();
 		_newDeltaXType = param.asInteger();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -221,6 +222,8 @@ uint32 AsCommonCar::hmAnimation(int messageNum, const MessageParam &param, Entit
 	case NM_ANIMATION_STOP:
 		gotoNextState();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -234,13 +237,15 @@ uint32 AsCommonCar::hmLeaveCar(int messageNum, const MessageParam &param, Entity
 		sendMessage(_parentScene, NM_CAR_LEAVE, 0);
 		SetMessageHandler(&AsCommonCar::handleMessage);
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
 
 void AsCommonCar::stCarAtHome() {
 	bool doDeltaX = _doDeltaX;
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 	_hasAgainDestPoint = false;
 	_hasAgainDestPointIndex = false;
 	_isBraking = false;
@@ -421,7 +426,7 @@ void AsCommonCar::stTurnCarMoveToNextPoint() {
 
 void AsCommonCar::stTurnCarMoveToPrevPoint() {
 	// Turn to left/right #3
-	FinalizeState(NULL);
+	FinalizeState(nullptr);
 	_isBusy = true;
 	startAnimation(0xF46A0324, 0, -1);
 	SetUpdateHandler(&AsCommonCar::update);
@@ -474,7 +479,7 @@ void AsCommonCar::moveToPrevPoint() {
 }
 
 void AsCommonCar::stBrakeMoveToPrevPoint() {
-	FinalizeState(NULL);
+	FinalizeState(nullptr);
 	_isBusy = true;
 	_isBraking = true;
 	startAnimation(0x192ADD30, 0, -1);
@@ -929,6 +934,8 @@ uint32 KmScene1608::xHandleMessage(int messageNum, const MessageParam &param) {
 		break;
 	case 0x4840:
 		startSpecialWalkLeft(param.asInteger());
+		break;
+	default:
 		break;
 	}
 	return messageResult;

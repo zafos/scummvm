@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -63,6 +62,8 @@ void Module1200::createScene(int sceneNum, int which) {
 		createSmackerScene(0x31890001, true, true, false);
 		setGlobalVar(V_SEEN_CREATURE_EXPLODE_VID, 1);
 		break;
+	default:
+		break;
 	}
 	SetUpdateHandler(&Module1200::updateScene);
 	_childObject->handleUpdate();
@@ -89,6 +90,8 @@ void Module1200::updateScene() {
 			_vm->_soundMan->startMusic(0x62222CAE, 0, 0);
 			createScene(0, 3);
 			break;
+		default:
+			break;
 		}
 	}
 }
@@ -98,8 +101,8 @@ static const uint32 kScene1201InitArray[] = {
 };
 
 Scene1201::Scene1201(NeverhoodEngine *vm, Module *parentModule, int which)
-	: Scene(vm, parentModule), _creatureExploded(false), _asMatch(NULL), _asTntMan(NULL),
-	_asCreature(NULL), _asTntManRope(NULL), _asLeftDoor(NULL), _asRightDoor(NULL), _asTape(NULL) {
+	: Scene(vm, parentModule), _creatureExploded(false), _asMatch(nullptr), _asTntMan(nullptr),
+	_asCreature(nullptr), _asTntManRope(nullptr), _asLeftDoor(nullptr), _asRightDoor(nullptr), _asTape(nullptr) {
 
 	int16 topY1, topY2, topY3, topY4;
 	int16 x1, x2;
@@ -184,7 +187,7 @@ Scene1201::Scene1201(NeverhoodEngine *vm, Module *parentModule, int which)
 	if (getGlobalVar(V_CREATURE_ANGRY) && !getGlobalVar(V_CREATURE_EXPLODED)) {
 		setBackground(0x4019A2C4);
 		setPalette(0x4019A2C4);
-		_asRightDoor = NULL;
+		_asRightDoor = nullptr;
 	} else {
 		setBackground(0x40206EC5);
 		setPalette(0x40206EC5);
@@ -267,7 +270,7 @@ Scene1201::Scene1201(NeverhoodEngine *vm, Module *parentModule, int which)
 	if (getGlobalVar(V_CREATURE_ANGRY) && getGlobalVar(V_MATCH_STATUS) == 0)
 		setGlobalVar(V_MATCH_STATUS, 1);
 
-	_asMatch = NULL;
+	_asMatch = nullptr;
 
 	if (getGlobalVar(V_MATCH_STATUS) < 3) {
 		_asMatch = insertSprite<AsScene1201Match>(this);
@@ -348,6 +351,8 @@ uint32 Scene1201::handleMessage(int messageNum, const MessageParam &param, Entit
 		break;
 	case 0x8000:
 		sendMessage(_asKlaymenHead, NM_KLAYMEN_STOP_CLIMBING, 0);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -437,6 +442,8 @@ uint32 Scene1202::handleMessage(int messageNum, const MessageParam &param, Entit
 	case NM_POSITION_CHANGE:
 		_counter--;
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -447,6 +454,8 @@ uint32 Scene1202::hmSolved(int messageNum, const MessageParam &param, Entity *se
 	case NM_MOUSE_CLICK:
 		if (param.asPoint().x <= 20 || param.asPoint().x >= 620)
 			leaveScene(0);
+		break;
+	default:
 		break;
 	}
 	return 0;

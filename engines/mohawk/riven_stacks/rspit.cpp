@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -48,7 +47,12 @@ void RSpit::xrcredittime(const ArgumentArray &args) {
 	// For the record, when agehn == 4, Gehn will thank you for
 	// showing him the rebel age and then leave you to die.
 	// Otherwise, the rebels burn the book. Epic fail either way.
-	runEndGame(1, 1500);
+
+	if (_vm->_vars["agehn"] == 4) {
+		runEndGame(1, 1500, 712);
+	} else {
+		runEndGame(1, 1500, 0);
+	}
 }
 
 void RSpit::xrshowinventory(const ArgumentArray &args) {

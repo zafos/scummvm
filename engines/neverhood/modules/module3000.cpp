@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -168,6 +167,8 @@ void Module3000::createScene(int sceneNum, int which) {
 	case 1008:
 		createSmackerScene(getGlobalVar(V_CANNON_SMACKER_NAME), true, true, false);
 		break;
+	default:
+		break;
 	}
 	SetUpdateHandler(&Module3000::updateScene);
 	_childObject->handleUpdate();
@@ -277,6 +278,8 @@ void Module3000::updateScene() {
 		case 1008:
 			createScene(8, -1);
 			break;
+		default:
+			break;
 		}
 	} else {
 		switch (_vm->gameState().sceneNum) {
@@ -353,6 +356,8 @@ void Module3000::updateScene() {
 			if (navigationScene()->isWalkingForward() && navigationScene()->getNavigationIndex() == 0) {
 				_vm->_soundMan->setTwoSoundsPlayFlag(false);
 			}
+			break;
+		default:
 			break;
 		}
 	}
@@ -523,6 +528,8 @@ void Scene3009::update() {
 				playActionVideo();
 			}
 			break;
+		default:
+			break;
 		}
 	}
 
@@ -629,6 +636,8 @@ uint32 Scene3009::handleMessage(int messageNum, const MessageParam &param, Entit
 				setGlobalVar(V_CANNON_TURNED, 0);
 			}
 		}
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -764,6 +773,8 @@ uint32 Scene3010::handleMessage(int messageNum, const MessageParam &param, Entit
 	case 0x2003:
 		_boltUnlocked[param.asInteger()] = false;
 		break;
+	default:
+		break;
 	}
 	return 0;
 }
@@ -833,6 +844,8 @@ void Scene3011::update() {
 			if (_currentSymbolIndex >= 12)
 				_currentSymbolIndex = 0;
 			break;
+		default:
+			break;
 		}
 	}
 }
@@ -849,6 +862,8 @@ uint32 Scene3011::handleMessage(int messageNum, const MessageParam &param, Entit
 		_buttonClicked = true;
 		if (_countdown == 0)
 			_countdown = 1;
+		break;
+	default:
 		break;
 	}
 	return 0;

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -35,10 +34,10 @@
 
 namespace Lure {
 
-static Game *int_game = NULL;
+static Game *int_game = nullptr;
 
 bool Game::isCreated() {
-	return int_game != NULL;
+	return int_game != nullptr;
 }
 
 Game &Game::getReference() {
@@ -47,7 +46,7 @@ Game &Game::getReference() {
 
 Game::Game() {
 	int_game = this;
-	_debugger = new Debugger();
+	g_engine->setDebugger(new Debugger());
 	_fastTextFlag = false;
 	_preloadFlag = false;
 	_debugFlag = gDebugLevel >= ERROR_BASIC;
@@ -56,7 +55,6 @@ Game::Game() {
 }
 
 Game::~Game() {
-	delete _debugger;
 }
 
 void Game::tick() {
@@ -190,13 +188,6 @@ void Game::execute() {
 				if (events.type() == Common::EVENT_KEYDOWN) {
 					uint16 roomNum = room.roomNumber();
 
-					if ((events.event().kbd.hasFlags(Common::KBD_CTRL)) &&
-						(events.event().kbd.keycode == Common::KEYCODE_d)) {
-						// Activate the debugger
-						_debugger->attach();
-						break;
-					}
-
 					// Handle special keys
 					bool handled = true;
 					switch (events.event().kbd.keycode) {
@@ -216,7 +207,7 @@ void Game::execute() {
 					case Common::KEYCODE_KP_PLUS:
 						if (_debugFlag) {
 							while (++roomNum <= 51)
-								if (res.getRoom(roomNum) != NULL) break;
+								if (res.getRoom(roomNum) != nullptr) break;
 							if (roomNum == 52) roomNum = 1;
 							room.setRoomNumber(roomNum);
 						}
@@ -225,7 +216,7 @@ void Game::execute() {
 					case Common::KEYCODE_KP_MINUS:
 						if (_debugFlag) {
 							if (roomNum == 1) roomNum = 55;
-							while (res.getRoom(--roomNum) == NULL)
+							while (res.getRoom(--roomNum) == nullptr)
 								;
 							room.setRoomNumber(roomNum);
 						}
@@ -263,7 +254,7 @@ void Game::execute() {
 			destRoom = fields.getField(NEW_ROOM_NUMBER);
 			if (destRoom != 0) {
 				// Need to change the current room
-				strcpy(room.statusLine(), "");
+				room.statusLine()[0] = '\0';
 				bool remoteFlag = fields.getField(OLD_ROOM_NUMBER) != 0;
 				room.setRoomNumber(destRoom, remoteFlag);
 				fields.setField(NEW_ROOM_NUMBER, 0);
@@ -276,20 +267,25 @@ void Game::execute() {
 
 			system.updateScreen();
 			system.delayMillis(10);
-
-			_debugger->onFrame();
 		}
 
 		room.leaveRoom();
 
 		// If Skorl catches player, show the catching animation
 		if ((_state & GS_CAUGHT) != 0) {
+			if (!engine.isEGA())
+				screen.paletteFadeOut();
+
 			Palette palette(SKORL_CATCH_PALETTE_ID);
-			AnimationSequence *anim = new AnimationSequence(SKORL_CATCH_ANIM_ID, palette, false);
 			mouse.cursorOff();
-			Sound.addSound(0x33);
+
+			static const AnimSoundSequence catchSound[] = { { 12, 0xFF, 0xFF, 1, false }, { 1, 41, 41, 1, false }, {0, 0, 0, 0, false} };
+			AnimationSequence *anim = new AnimationSequence(SKORL_CATCH_ANIM_ID, palette, true, 5, catchSound);
 			anim->show();
 			delete anim;
+
+			if (!engine.isEGA())
+				screen.paletteFadeOut();
 		}
 
 		// If the Restart/Restore dialog is needed, show it
@@ -333,6 +329,10 @@ void Game::handleMenuResponse(uint8 selection) {
 
 	case MENUITEM_SOUND:
 		doSound();
+		break;
+
+	default:
+		break;
 	}
 }
 
@@ -390,44 +390,73 @@ void Game::displayChuteAnimation() {
 	ValueTableData &fields = res.fieldList();
 	Palette palette(CHUTE_PALETTE_ID);
 
+	mouse.setCursorNum(CURSOR_DISK);
+	if (!LureEngine::getReference().isEGA())
+		Screen::getReference().paletteFadeOut();
+
 	debugC(ERROR_INTERMEDIATE, kLureDebugAnimations, "Starting chute animation");
 	mouse.cursorOff();
 
 	Sound.killSounds();
-	Sound.musicInterface_Play(0x40, 0);
 
-	AnimationSequence *anim = new AnimationSequence(CHUTE_ANIM_ID, palette, false);
-	anim->show();
+	AnimationSequence *anim = new AnimationSequence(CHUTE_ANIM_ID, palette, true);
+	Sound.musicInterface_Play(0x40, true);
+	AnimAbortType result = anim->show();
 	delete anim;
 
-	anim = new AnimationSequence(CHUTE2_ANIM_ID, palette, false);
-	anim->show();
-	delete anim;
+	if (result != ABORT_END_INTRO) {
+		anim = new AnimationSequence(CHUTE2_ANIM_ID, palette, true, 5, nullptr, 4);
+		result = anim->show();
+		delete anim;
+	}
 
-	anim = new AnimationSequence(CHUTE3_ANIM_ID, palette, false);
-	anim->show();
-	delete anim;
+	if (result != ABORT_END_INTRO) {
+		anim = new AnimationSequence(CHUTE3_ANIM_ID, palette, false);
+		anim->show();
+		delete anim;
+	}
 
 	Sound.killSounds();
 	mouse.cursorOn();
 	fields.setField(AREA_FLAG, 1);
+
+	// WORKAROUND When outside in the town, the game plays an ambient sound
+	// of twittering birds. When first entering town after falling through
+	// the chute, this sound does not play; it starts playing after you
+	// enter and exit a building. Calling removeSounds here triggers the
+	// function which manages the ambient sounds in town, so the bird
+	// sounds start playing. Because all other sounds have already been
+	// removed, this has no side effects.
+	Sound.removeSounds();
 }
 
 void Game::displayBarrelAnimation() {
 	Mouse &mouse = Mouse::getReference();
 	Resources &res = Resources::getReference();
+	LureEngine &engine = LureEngine::getReference();
+	Screen &screen = Screen::getReference();
+
+	mouse.setCursorNum(CURSOR_DISK);
+	if (!engine.isEGA())
+		screen.paletteFadeOut();
 
 	debugC(ERROR_INTERMEDIATE, kLureDebugAnimations, "Starting barrel animation");
 	Palette palette(BARREL_PALETTE_ID);
-	AnimationSequence *anim = new AnimationSequence(BARREL_ANIM_ID, palette, false);
 	mouse.cursorOff();
 
 	Sound.killSounds();
-	Sound.musicInterface_Play(0x3B, 0);
+	Sound.musicInterface_Play(0x3B, true);
 
+	AnimationSequence *anim = new AnimationSequence(BARREL_ANIM_ID, palette, true);
 	anim->show();
 
 	delete anim;
+
+	if (!engine.shouldQuit() && !engine.isEGA())
+		screen.paletteFadeOut();
+
+	Sound.killSounds();
+	mouse.cursorOn();
 
 	// Disable town NPCs that are no longer needed
 	res.deactivateHotspot(SKORL_ID);
@@ -438,9 +467,6 @@ void Game::displayBarrelAnimation() {
 	res.deactivateHotspot(GOEWIN_ID);
 	res.deactivateHotspot(MONK2_ID);
 	res.deactivateHotspot(WAYNE_ID);
-
-	Sound.killSounds();
-	mouse.cursorOn();
 }
 
 void Game::handleClick() {
@@ -512,19 +538,19 @@ void Game::handleRightClickMenu() {
 		actions &= 0xFF7FFFFF;
 
 	action = NONE;
-	hotspot = NULL;
+	hotspot = nullptr;
 
 	bool breakFlag = false;
 	while (!breakFlag) {
 		statusLine = room.statusLine();
-		strcpy(statusLine, "");
+		statusLine[0] = '\0';
 		room.update();
 		screen.update();
 
 		action = PopupMenu::Show(actions);
 
 		if (action != NONE) {
-			sprintf(statusLine, "%s ", stringList.getString(action));
+			Common::sprintf_s(statusLine, MAX_DESC_SIZE, "%s ", stringList.getString(action));
 			statusLine += strlen(statusLine);
 		}
 
@@ -600,14 +626,14 @@ void Game::handleRightClickMenu() {
 	if (action != NONE) {
 		player->stopWalking();
 
-		if (hotspot == NULL) {
+		if (hotspot == nullptr) {
 			doAction(action, 0, itemId);
 		} else {
 			if (action != TELL) {
 				// Add the hotspot name to the status line and then go do the action
 				if ((itemId != 0xffff) && (action != GIVE) && (action != USE)) {
 					HotspotData *itemHotspot = res.getHotspot(itemId);
-					if (itemHotspot != NULL)
+					if (itemHotspot != nullptr)
 						strings.getString(itemHotspot->nameId, statusLine);
 				}
 				else
@@ -618,7 +644,7 @@ void Game::handleRightClickMenu() {
 		}
 	} else {
 		// Clear the status line
-		strcpy(room.statusLine(), "");
+		room.statusLine()[0] = '\0';
 	}
 }
 
@@ -634,11 +660,11 @@ void Game::handleLeftClick() {
 	player->stopWalking();
 	player->setDestHotspot(0);
 	player->setActionCtr(0);
-	strcpy(room.statusLine(), "");
+	room.statusLine()[0] = '\0';
 
 	if ((room.destRoomNumber() == 0) && (room.hotspotId() != 0)) {
 		// Handle look at hotspot
-		sprintf(room.statusLine(), "%s ", stringList.getString(LOOK_AT));
+		Common::sprintf_s(room.statusLine(), MAX_DESC_SIZE, "%s ", stringList.getString(LOOK_AT));
 		HotspotData *hotspot = res.getHotspot(room.hotspotId());
 		assert(hotspot);
 		strings.getString(hotspot->nameId, room.statusLine() + strlen(room.statusLine()));
@@ -663,7 +689,8 @@ bool Game::GetTellActions() {
 	Room &room = Room::getReference();
 	StringData &strings = StringData::getReference();
 	StringList &stringList = res.stringList();
-	char *statusLine = room.statusLine();
+	char *origStatusLine = room.statusLine();
+	char *statusLine = origStatusLine;
 	uint16 *commands = &_tellCommands[1];
 	char *statusLinePos[MAX_TELL_COMMANDS][4];
 	int paramIndex = 0;
@@ -696,7 +723,7 @@ bool Game::GetTellActions() {
 			screen.update();
 
 			switch (paramIndex) {
-			case 0:
+			case 0: {
 				// Prompt for selection of action to perform
 				action = PopupMenu::Show(0x6A07FD);
 				if (action == NONE) {
@@ -713,7 +740,8 @@ bool Game::GetTellActions() {
 				}
 
 				// Add the action to the status line
-				sprintf(statusLine + strlen(statusLine), "%s ", stringList.getString(action));
+				size_t pos = strlen(statusLine);
+				Common::sprintf_s(statusLine + pos, MAX_DESC_SIZE - (statusLine - origStatusLine) - pos, "%s ", stringList.getString(action));
 
 				// Handle any processing for the action
 				commands[_numTellCommands * 3] = (uint16) action;
@@ -721,7 +749,7 @@ bool Game::GetTellActions() {
 				commands[_numTellCommands * 3 + 2] = 0;
 				++paramIndex;
 				break;
-
+			}
 			case 1:
 				// First parameter
 				action = (Action) commands[_numTellCommands * 3];
@@ -752,7 +780,7 @@ bool Game::GetTellActions() {
 
 					// Store selected entry
 					commands[_numTellCommands * 3 + 1] = selectionId;
-					strcat(statusLine, selectionName);
+					Common::strcat_s(statusLine, MAX_DESC_SIZE - (statusLine - origStatusLine), selectionName);
 				}
 
 				++paramIndex;
@@ -784,7 +812,7 @@ bool Game::GetTellActions() {
 					hotspot = res.getHotspot(selectionId);
 					assert(hotspot);
 					strings.getString(hotspot->nameId, selectionName);
-					strcat(statusLine, selectionName);
+					Common::strcat_s(statusLine, MAX_DESC_SIZE - (statusLine - origStatusLine), selectionName);
 
 					commands[_numTellCommands * 3 + 2] = selectionId;
 					++paramIndex;
@@ -802,13 +830,14 @@ bool Game::GetTellActions() {
 					selectionId = PopupMenu::Show(2, continueStrsList);
 
 					switch (selectionId) {
-					case 0:
+					case 0: {
 						// Get ready for next command
-						sprintf(statusLine + strlen(statusLine), " %s ", continueStrsList[0]);
+						size_t pos = strlen(statusLine);
+						Common::sprintf_s(statusLine + pos, MAX_DESC_SIZE - (statusLine - origStatusLine) - pos, " %s ", continueStrsList[0]);
 						++_numTellCommands;
 						paramIndex = 0;
 						break;
-
+					}
 					case 1:
 						// Increment for just selected command, and add a large amount
 						// to signal that the command sequence is complete
@@ -834,6 +863,10 @@ bool Game::GetTellActions() {
 						*statusLine = '\0';
 					}
 				}
+				break;
+
+			default:
+				break;
 			}
 		}
 	}
@@ -842,7 +875,7 @@ bool Game::GetTellActions() {
 	if (result) {
 		_numTellCommands &= 0xff;
 		assert((_numTellCommands > 0) && (_numTellCommands <= MAX_TELL_COMMANDS));
-		strcpy(statusLinePos[0][0], "..");
+		Common::strcpy_s(statusLinePos[0][0], MAX_DESC_SIZE - (statusLinePos[0][0] - origStatusLine), "..");
 		room.update();
 		screen.update();
 	}

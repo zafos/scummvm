@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Original license header:
  *
@@ -26,10 +25,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -37,8 +36,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -178,13 +176,14 @@ public:
 	LinuxAudioCDManager();
 	~LinuxAudioCDManager();
 
-	bool open();
-	void close();
-	bool play(int track, int numLoops, int startFrame, int duration, bool onlyEmulate = false);
+	bool open() override;
+	void close() override;
+	bool play(int track, int numLoops, int startFrame, int duration, bool onlyEmulate,
+			Audio::Mixer::SoundType soundType) override;
 
 protected:
-	bool openCD(int drive);
-	bool openCD(const Common::String &drive);
+	bool openCD(int drive) override;
+	bool openCD(const Common::String &drive) override;
 
 private:
 	struct Device {
@@ -285,9 +284,10 @@ bool LinuxAudioCDManager::openCD(const Common::String &drive) {
 	return true;
 }
 
-bool LinuxAudioCDManager::play(int track, int numLoops, int startFrame, int duration, bool onlyEmulate) {
+bool LinuxAudioCDManager::play(int track, int numLoops, int startFrame, int duration, bool onlyEmulate,
+		Audio::Mixer::SoundType soundType) {
 	// Prefer emulation
-	if (DefaultAudioCDManager::play(track, numLoops, startFrame, duration, onlyEmulate))
+	if (DefaultAudioCDManager::play(track, numLoops, startFrame, duration, onlyEmulate, soundType))
 		return true;
 
 	// If we're set to only emulate, or have no CD drive, return here
@@ -320,7 +320,7 @@ bool LinuxAudioCDManager::play(int track, int numLoops, int startFrame, int dura
 	_emulating = true;
 
 	_mixer->playStream(
-	    Audio::Mixer::kMusicSoundType,
+	    soundType,
 	    &_handle,
 	    Audio::makeLoopingAudioStream(audioStream, start, end, (numLoops < 1) ? numLoops + 1 : numLoops),
 	    -1,

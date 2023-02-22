@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -30,26 +29,32 @@ namespace Cloud {
 namespace Box {
 
 class BoxStorage: public Id::IdStorage {
-	static char *KEY, *SECRET;
-
-	static void loadKeyAndSecret();
-
-	Common::String _token, _refreshToken;
-
 	/** This private constructor is called from loadFromConfig(). */
-	BoxStorage(Common::String token, Common::String refreshToken);
-
-	void tokenRefreshed(BoolCallback callback, Networking::JsonResponse response);
-	void codeFlowComplete(BoolResponse response);
-	void codeFlowFailed(Networking::ErrorResponse error);
+	BoxStorage(Common::String token, Common::String refreshToken, bool enabled);
 
 	/** Constructs StorageInfo based on JSON response from cloud. */
 	void infoInnerCallback(StorageInfoCallback outerCallback, Networking::JsonResponse json);
 
 	void createDirectoryInnerCallback(BoolCallback outerCallback, Networking::JsonResponse response);
+
+protected:
+	/**
+	 * @return "box"
+	 */
+	virtual Common::String cloudProvider();
+
+	/**
+	 * @return kStorageBoxId
+	 */
+	virtual uint32 storageIndex();
+
+	virtual bool needsRefreshToken();
+
+	virtual bool canReuseRefreshToken();
+
 public:
 	/** This constructor uses OAuth code flow to get tokens. */
-	BoxStorage(Common::String code);
+	BoxStorage(Common::String code, Networking::ErrorCallback cb);
 	virtual ~BoxStorage();
 
 	/**
@@ -94,18 +99,16 @@ public:
 
 	/**
 	 * Load token and user id from configs and return BoxStorage for those.
-	 * @return pointer to the newly created BoxStorage or 0 if some problem occured.
+	 * @return pointer to the newly created BoxStorage or 0 if some problem occurred.
 	 */
 	static BoxStorage *loadFromConfig(Common::String keyPrefix);
 
-	virtual Common::String getRootDirectoryId();
-
 	/**
-	 * Gets new access_token. If <code> passed is "", refresh_token is used.
-	 * Use "" in order to refresh token and pass a callback, so you could
-	 * continue your work when new token is available.
+	 * Remove all BoxStorage-related data from config.
 	 */
-	void getAccessToken(BoolCallback callback, Networking::ErrorCallback errorCallback = nullptr, Common::String code = "");
+	static void removeFromConfig(Common::String keyPrefix);
+
+	virtual Common::String getRootDirectoryId();
 
 	Common::String accessToken() const { return _token; }
 };

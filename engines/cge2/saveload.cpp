@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 /*
  * This code is based on original Sfinx source code
- * Copyright (c) 1994-1997 Janus B. Wisniewski and L.K. Avalon
+ * Copyright (c) 1994-1997 Janusz B. Wisniewski and L.K. Avalon
  */
 
 #include "common/memstream.h"
@@ -47,7 +46,7 @@ bool CGE2Engine::canSaveGameStateCurrently() {
 		_commandHandler->idle() && (_soundStat._wait == nullptr);
 }
 
-Common::Error CGE2Engine::saveGameState(int slot, const Common::String &desc) {
+Common::Error CGE2Engine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	storeHeroPos();
 	saveGame(slot, desc);
 	sceneUp(_now);
@@ -56,7 +55,7 @@ Common::Error CGE2Engine::saveGameState(int slot, const Common::String &desc) {
 
 void CGE2Engine::saveGame(int slotNumber, const Common::String &desc) {
 	// Set up the serializer
-	Common::String slotName = generateSaveName(slotNumber);
+	Common::String slotName = getSaveStateName(slotNumber);
 	Common::OutSaveFile *saveFile = g_system->getSavefileManager()->openForSaving(slotName);
 
 	// Write out the ScummVM savegame header
@@ -93,7 +92,7 @@ bool CGE2Engine::loadGame(int slotNumber) {
 	Common::MemoryReadStream *readStream;
 
 	// Open up the savegame file
-	Common::String slotName = generateSaveName(slotNumber);
+	Common::String slotName = getSaveStateName(slotNumber);
 	Common::InSaveFile *saveFile = g_system->getSavefileManager()->openForLoading(slotName);
 
 	// Read the data into a data buffer
@@ -276,14 +275,6 @@ void CGE2Engine::syncHeader(Common::Serializer &s) {
 		if (checksum != kSavegameCheckSum)
 			error("%s", _text->getText(kBadSVG));
 	}
-}
-
-/**
-* Support method that generates a savegame name
-* @param slot		Slot number
-*/
-Common::String CGE2Engine::generateSaveName(int slot) {
-	return Common::String::format("%s.%03d", _targetName.c_str(), slot);
 }
 
 } // End of namespace CGE2

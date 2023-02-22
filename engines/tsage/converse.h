@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -60,12 +59,12 @@ public:
 public:
 	SequenceManager();
 
-	virtual Common::String getClassName() { return "SequenceManager"; }
-	virtual void synchronize(Serializer &s);
-	virtual void remove();
-	virtual void signal();
-	virtual void process(Event &event);
-	virtual void attached(EventHandler *newOwner, EventHandler *endHandler, va_list va);
+	Common::String getClassName() override { return "SequenceManager"; }
+	void synchronize(Serializer &s) override;
+	void remove() override;
+	void signal() override;
+	void process(Event &event) override;
+	void attached(EventHandler *newOwner, EventHandler *endHandler, va_list va) override;
 };
 
 
@@ -88,9 +87,9 @@ public:
 public:
 	Speaker();
 
-	virtual Common::String getClassName() { return "Speaker"; }
-	virtual void synchronize(Serializer &s);
-	virtual void remove();
+	Common::String getClassName() override { return "Speaker"; }
+	void synchronize(Serializer &s) override;
+	void remove() override;
 	virtual void startSpeaking(Action *action);
 	virtual void setText(const Common::String &msg);
 	virtual void removeText();
@@ -103,7 +102,7 @@ class SpeakerGameText : public Speaker {
 public:
 	SpeakerGameText();
 
-	virtual Common::String getClassName() { return "SpeakerGameText"; }
+	Common::String getClassName() override { return "SpeakerGameText"; }
 };
 
 class ScreenSpeaker : public Speaker {
@@ -112,15 +111,15 @@ public:
 public:
 	ScreenSpeaker();
 
-	virtual Common::String getClassName() { return "ScreenSpeaker"; }
-	virtual void setText(const Common::String &msg);
+	Common::String getClassName() override { return "ScreenSpeaker"; }
+	void setText(const Common::String &msg) override;
 };
 
 class SpeakerAction : public Action {
 public:
-	virtual void signal();
+	void signal() override;
 
-	virtual Common::String getClassName() { return "SpeakerAction"; }
+	Common::String getClassName() override { return "SpeakerAction"; }
 };
 
 class AnimatedSpeaker : public Speaker {
@@ -129,8 +128,8 @@ public:
 	SceneObject _object2;
 	SpeakerAction _speakerAction;
 public:
-	virtual Common::String getClassName() { return "AnimatedSpeaker"; }
-	virtual void removeText();
+	Common::String getClassName() override { return "AnimatedSpeaker"; }
+	void removeText() override;
 };
 
 class ChoiceEntry {
@@ -168,7 +167,7 @@ public:
 	void setFontNumber(int fontNum) { _fontNumber = fontNum; }
 	int execute(const Common::StringArray &choiceList);
 
-	virtual void draw();
+	void draw() override;
 };
 
 class Obj0A : public Serialisable {
@@ -176,7 +175,7 @@ public:
 	int _id;
 	uint _scriptOffset;
 
-	virtual void synchronize(Serializer &s) {
+	void synchronize(Serializer &s) override {
 		s.syncAsSint32LE(_id);
 		s.syncAsUint32LE(_scriptOffset);
 	}
@@ -199,7 +198,7 @@ public:
 	int _field16[11];
 public:
 	void load(const byte *dataP);
-	virtual void synchronize(Serializer &s);
+	void synchronize(Serializer &s) override;
 };
 
 typedef void (*StripProc)();
@@ -233,13 +232,13 @@ public:
 	byte *_lookupList;
 public:
 	StripManager();
-	virtual ~StripManager();
+	~StripManager() override;
 
-	virtual void synchronize(Serializer &s);
-	virtual void remove();
-	virtual void dispatch();
-	virtual void signal();
-	virtual void process(Event &event);
+	void synchronize(Serializer &s) override;
+	void remove() override;
+	void dispatch() override;
+	void signal() override;
+	void process(Event &event) override;
 
 	void start(int stripNum, EventHandler *owner, StripCallback *callback = NULL);
 	void start3(int stripNum, EventHandler *owner, byte *lookupList);

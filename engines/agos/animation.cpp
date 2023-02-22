@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -344,9 +343,9 @@ void MoviePlayerDXA::handleNextFrame() {
 }
 
 bool MoviePlayerDXA::processFrame() {
-	Graphics::Surface *screen = _vm->_system->lockScreen();
+	Graphics::Surface *screen = _vm->getBackendSurface();
 	copyFrameToBuffer((byte *)screen->getPixels(), (_vm->_screenWidth - getWidth()) / 2, (_vm->_screenHeight - getHeight()) / 2, screen->pitch);
-	_vm->_system->unlockScreen();
+	_vm->updateBackendSurface();
 
 	uint32 soundTime = _mixer->getSoundElapsedTime(_bgSound);
 	uint32 nextFrameStartTime = ((Video::VideoDecoder::VideoTrack *)getTrack(0))->getNextFrameStartTime();
@@ -417,6 +416,12 @@ MoviePlayerSMK::MoviePlayerSMK(AGOSEngine_Feeble *vm, const char *name)
 
 	memset(baseName, 0, sizeof(baseName));
 	memcpy(baseName, name, strlen(name));
+
+	int16 h = g_system->getOverlayHeight();
+
+	_subtitles.setBBox(Common::Rect(20, h - 120, g_system->getOverlayWidth() - 20, h - 20));
+	_subtitles.setColor(0xff, 0xff, 0xff);
+	_subtitles.setFont("FreeSans.ttf");
 }
 
 bool MoviePlayerSMK::load() {
@@ -431,6 +436,9 @@ bool MoviePlayerSMK::load() {
 	debug(0, "Playing video %s", videoName.c_str());
 
 	CursorMan.showMouse(false);
+
+	Common::String subtitlesName = Common::String::format("%s.srt", baseName);
+	_subtitles.loadSRTFile(subtitlesName.c_str());
 
 	return true;
 }
@@ -458,11 +466,19 @@ void MoviePlayerSMK::copyFrameToBuffer(byte *dst, uint x, uint y, uint pitch) {
 }
 
 void MoviePlayerSMK::playVideo() {
-	while (!endOfVideo() && !_skipMovie && !_vm->shouldQuit())
+	if (_subtitles.isLoaded()) {
+		g_system->clearOverlay();
+		g_system->showOverlay(false);
+	}
+	while (!endOfVideo() && !_skipMovie && !_vm->shouldQuit()) {
 		handleNextFrame();
+	}
 }
 
 void MoviePlayerSMK::stopVideo() {
+	if (_subtitles.isLoaded()) {
+		g_system->hideOverlay();
+	}
 	close();
 }
 
@@ -495,9 +511,9 @@ void MoviePlayerSMK::nextFrame() {
 }
 
 bool MoviePlayerSMK::processFrame() {
-	Graphics::Surface *screen = _vm->_system->lockScreen();
+	Graphics::Surface *screen = _vm->getBackendSurface();
 	copyFrameToBuffer((byte *)screen->getPixels(), (_vm->_screenWidth - getWidth()) / 2, (_vm->_screenHeight - getHeight()) / 2, screen->pitch);
-	_vm->_system->unlockScreen();
+	_vm->updateBackendSurface();
 
 	uint32 waitTime = getTimeToNextFrame();
 
@@ -505,6 +521,8 @@ bool MoviePlayerSMK::processFrame() {
 		warning("dropped frame %i", getCurFrame());
 		return false;
 	}
+
+	_subtitles.drawSubtitle(getTime(), false);
 
 	_vm->_system->updateScreen();
 
@@ -519,7 +537,7 @@ bool MoviePlayerSMK::processFrame() {
 
 MoviePlayer *makeMoviePlayer(AGOSEngine_Feeble *vm, const char *name) {
 	char baseName[40];
-	char filename[20];
+	char filename[45];
 
 	int baseLen = strlen(name) - 4;
 	memset(baseName, 0, sizeof(baseName));
@@ -528,34 +546,34 @@ MoviePlayer *makeMoviePlayer(AGOSEngine_Feeble *vm, const char *name) {
 	if (vm->getLanguage() == Common::DE_DEU && baseLen >= 8) {
 		// Check short filename to work around
 		// bug in a German Windows 2CD version.
-		char shortName[20];
+		char shortName[10];
 		memset(shortName, 0, sizeof(shortName));
 		memcpy(shortName, baseName, 6);
 
-		sprintf(filename, "%s~1.dxa", shortName);
+		Common::sprintf_s(filename, "%s~1.dxa", shortName);
 		if (Common::File::exists(filename)) {
 			memset(baseName, 0, sizeof(baseName));
 			memcpy(baseName, filename, 8);
 		}
 
-		sprintf(filename, "%s~1.smk", shortName);
+		Common::sprintf_s(filename, "%s~1.smk", shortName);
 		if (Common::File::exists(filename)) {
 			memset(baseName, 0, sizeof(baseName));
 			memcpy(baseName, filename, 8);
 		}
 	}
 
-	sprintf(filename, "%s.dxa", baseName);
+	Common::sprintf_s(filename, "%s.dxa", baseName);
 	if (Common::File::exists(filename)) {
 		return new MoviePlayerDXA(vm, baseName);
 	}
 
-	sprintf(filename, "%s.smk", baseName);
+	Common::sprintf_s(filename, "%s.smk", baseName);
 	if (Common::File::exists(filename)) {
 		return new MoviePlayerSMK(vm, baseName);
 	}
 
-	Common::String buf = Common::String::format(_("Cutscene file '%s' not found!"), baseName);
+	Common::U32String buf = Common::U32String::format(_("Cutscene file '%s' not found!"), baseName);
 	GUI::MessageDialog dialog(buf, _("OK"));
 	dialog.runModal();
 

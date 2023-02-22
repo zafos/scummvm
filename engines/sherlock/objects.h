@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -248,7 +247,7 @@ public:
 	static void setVm(SherlockEngine *vm);
 
 	/**
-	 * Returns true if the the object has an Allow Talk Code in the sequence that it's
+	 * Returns true if the object has an Allow Talk Code in the sequence that it's
 	 * currently running, specified by the _talkSeq field of the object. If it's 0,
 	 * then it's a regular sequence. If it's not 0 but below 128, then it's a Talk Sequence.
 	 * If it's above 128, then it's one of the Listen sequences.
@@ -298,7 +297,7 @@ public:
 	int _oldWalkSequence;
 public:
 	Sprite(): BaseObject() { clear(); }
-	virtual ~Sprite() {}
+	~Sprite() override {}
 
 	static void setVm(SherlockEngine *vm) { _vm = vm; }
 
@@ -324,7 +323,7 @@ public:
 	 * @param seq	Which sequence to use (if there's more than 1)
 	 * @remarks		1: First talk seq, 2: second talk seq, etc.
 	 */
-	virtual void setObjTalkSequence(int seq) {}
+	void setObjTalkSequence(int seq) override {}
 
 	/**
 	* Return frame width
@@ -376,7 +375,7 @@ public:
 	ActionType _aMove;
 
 	Object();
-	virtual ~Object() {}
+	~Object() override {}
 
 	/**
 	 * Load the data for the object
@@ -438,7 +437,7 @@ public:
 	 * @param seq	Which sequence to use (if there's more than 1)
 	 * @remarks		1: First talk seq, 2: second talk seq, etc.
 	 */
-	virtual void setObjTalkSequence(int seq);
+	void setObjTalkSequence(int seq) override;
 };
 
 struct CAnim {

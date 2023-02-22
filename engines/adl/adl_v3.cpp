@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -56,15 +55,7 @@ void AdlEngine_v3::loadItemDescriptions(Common::SeekableReadStream &stream, byte
 		error("Error loading item descriptions");
 }
 
-typedef Common::Functor1Mem<ScriptEnv &, int, AdlEngine_v3> OpcodeV3;
-
-void AdlEngine_v3::setupOpcodeTables() {
-	AdlEngine_v2::setupOpcodeTables();
-	delete _condOpcodes[0x04];
-	_condOpcodes[0x04] = new OpcodeV3(this, &AdlEngine_v3::o3_isNounNotInRoom);
-}
-
-int AdlEngine_v3::o3_isNounNotInRoom(ScriptEnv &e) {
+int AdlEngine_v3::o_isNounNotInRoom(ScriptEnv &e) {
 	OP_DEBUG_1("\t&& NO_SUCH_ITEMS_IN_ROOM(%s)", itemRoomStr(e.arg(1)).c_str());
 
 	Common::List<Item>::const_iterator item;

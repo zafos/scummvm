@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "sci/sci.h"
 #include "sci/engine/kernel.h"
 #include "sci/event.h"
-#include "sci/resource.h"
+#include "sci/resource/resource.h"
 #include "sci/engine/features.h"
 #include "sci/engine/kernel_tables.h"
 #include "sci/engine/state.h"
@@ -33,8 +32,12 @@
 
 namespace Sci {
 
-Kernel::Kernel(ResourceManager *resMan, SegManager *segMan)
-	: _resMan(resMan), _segMan(segMan), _invalid("<invalid>") {
+Kernel::Kernel(ResourceManager *resMan, SegManager *segMan)	:
+	_resMan(resMan),
+	_segMan(segMan),
+	_invalid("<invalid>") {
+	loadSelectorNames();
+	mapSelectors();
 }
 
 Kernel::~Kernel() {
@@ -49,11 +52,6 @@ Kernel::~Kernel() {
 		}
 		delete[] it->signature;
 	}
-}
-
-void Kernel::init() {
-	loadSelectorNames();
-	mapSelectors();      // Map a few special selectors for later use
 }
 
 uint Kernel::getSelectorNamesSize() const {
@@ -113,16 +111,11 @@ int Kernel::findSelector(const char *selectorName) const {
 	return -1;
 }
 
-// used by Script patcher to figure out, if it's okay to initialize signature/patch-table
-bool Kernel::selectorNamesAvailable() {
-	return !_selectorNames.empty();
-}
-
 void Kernel::loadSelectorNames() {
 	Resource *r = _resMan->findResource(ResourceId(kResourceTypeVocab, VOCAB_RESOURCE_SELECTORS), 0);
 	bool oldScriptHeader = (getSciVersion() == SCI_VERSION_0_EARLY);
 
-#ifdef ENABLE_SCI32_MAC
+#ifdef ENABLE_SCI32
 	// Starting with KQ7, Mac versions have a BE name table. GK1 Mac and earlier (and all
 	// other platforms) always use LE.
 	const bool isBE = (g_sci->getPlatform() == Common::kPlatformMacintosh && getSciVersion() >= SCI_VERSION_2_1_EARLY
@@ -180,8 +173,8 @@ void Kernel::loadSelectorNames() {
 static uint16 *parseKernelSignature(const char *kernelName, const char *writtenSig) {
 	const char *curPos;
 	char curChar;
-	uint16 *result = NULL;
-	uint16 *writePos = NULL;
+	uint16 *result = nullptr;
+	uint16 *writePos = nullptr;
 	int size = 0;
 	bool validType = false;
 	bool optionalType = false;
@@ -191,7 +184,7 @@ static uint16 *parseKernelSignature(const char *kernelName, const char *writtenS
 
 	// No signature given? no signature out
 	if (!writtenSig)
-		return NULL;
+		return nullptr;
 
 	// First, we check how many bytes the result will be
 	//  we also check, if the written signature makes any sense
@@ -306,6 +299,9 @@ static uint16 *parseKernelSignature(const char *kernelName, const char *writtenS
 					writePos++;
 					signature = 0;
 				}
+				break;
+			default:
+				break;
 			}
 		}
 		switch (curChar) {
@@ -442,7 +438,7 @@ static const SignatureDebugType signatureDebugTypeList[] = {
 	{ SIG_TYPE_NODE,          "node" },
 	{ SIG_TYPE_ERROR,         "error" },
 	{ SIG_IS_INVALID,         "invalid" },
-	{ 0,                      NULL }
+	{ 0,                      nullptr }
 };
 
 static void kernelSignatureDebugType(Common::String &signatureDetailsStr, const uint16 type) {
@@ -558,7 +554,7 @@ bool Kernel::signatureMatch(const uint16 *sig, int argc, const reg_t *argv) {
 	return false;
 }
 
-void Kernel::mapFunctions() {
+void Kernel::mapFunctions(GameFeatures *features) {
 	int mapped = 0;
 	int ignored = 0;
 	uint functionCount = _kernelNames.size();
@@ -596,11 +592,11 @@ void Kernel::mapFunctions() {
 		Common::String kernelName = _kernelNames[id];
 
 		// Reset the table entry
-		_kernelFuncs[id].function = NULL;
-		_kernelFuncs[id].signature = NULL;
-		_kernelFuncs[id].name = NULL;
-		_kernelFuncs[id].workarounds = NULL;
-		_kernelFuncs[id].subFunctions = NULL;
+		_kernelFuncs[id].function = nullptr;
+		_kernelFuncs[id].signature = nullptr;
+		_kernelFuncs[id].name = nullptr;
+		_kernelFuncs[id].workarounds = nullptr;
+		_kernelFuncs[id].subFunctions = nullptr;
 		_kernelFuncs[id].subFunctionCount = 0;
 		if (kernelName.empty()) {
 			// No name was given -> must be an unknown opcode
@@ -614,13 +610,13 @@ void Kernel::mapFunctions() {
 			continue;
 		}
 
-#ifdef ENABLE_SCI32_MAC
-		// HACK: Phantasmagoria Mac uses a modified kDoSound (which *nothing*
-		// else seems to use)!
-		if (g_sci->getPlatform() == Common::kPlatformMacintosh && g_sci->getGameId() == GID_PHANTASMAGORIA && kernelName == "DoSound") {
-			_kernelFuncs[id].function = kDoSoundPhantasmagoriaMac;
-			_kernelFuncs[id].signature = parseKernelSignature("DoSoundPhantasmagoriaMac", "i.*");
-			_kernelFuncs[id].name = "DoSoundPhantasmagoriaMac";
+#ifdef ENABLE_SCI32
+		// Several SCI 2.1 Middle Mac games use a modified kDoSound
+		//  with different subop numbers.
+		if (features->useDoSoundMac32() && kernelName == "DoSound") {
+			_kernelFuncs[id].function = kDoSoundMac32;
+			_kernelFuncs[id].signature = parseKernelSignature("DoSoundMac32", "i(.*)");
+			_kernelFuncs[id].name = "DoSoundMac32";
 			continue;
 		}
 #endif
@@ -648,7 +644,7 @@ void Kernel::mapFunctions() {
 			_kernelFuncs[id].workarounds = kernelMap->workarounds;
 			if (kernelMap->subFunctions) {
 				// Get version for subfunction identification
-				SciVersion mySubVersion = (SciVersion)kernelMap->function(NULL, 0, NULL).getOffset();
+				SciVersion mySubVersion = (SciVersion)kernelMap->function(nullptr, 0, nullptr).getOffset();
 				// Now check whats the highest subfunction-id for this version
 				const SciKernelMapSubEntry *kernelSubMap = kernelMap->subFunctions;
 				uint16 subFunctionCount = 0;
@@ -663,9 +659,8 @@ void Kernel::mapFunctions() {
 					error("k%s[%x]: no subfunctions found for requested version %s", kernelName.c_str(), id, getSciVersionDesc(mySubVersion));
 				// Now allocate required memory and go through it again
 				_kernelFuncs[id].subFunctionCount = subFunctionCount;
-				KernelSubFunction *subFunctions = new KernelSubFunction[subFunctionCount];
+				KernelSubFunction *subFunctions = new KernelSubFunction[subFunctionCount]();
 				_kernelFuncs[id].subFunctions = subFunctions;
-				memset(subFunctions, 0, sizeof(KernelSubFunction) * subFunctionCount);
 				// And fill this info out
 				kernelSubMap = kernelMap->subFunctions;
 				uint kernelSubNr = 0;
@@ -775,12 +770,17 @@ void Kernel::loadKernelNames(GameFeatures *features) {
 			// In the Windows version of KQ6 CD, the empty kSetSynonyms
 			// function has been replaced with kPortrait. In KQ6 Mac,
 			// kPlayBack has been replaced by kShowMovie.
-			if ((g_sci->getPlatform() == Common::kPlatformWindows) || (g_sci->forceHiresGraphics()))
+			if ((g_sci->getPlatform() == Common::kPlatformWindows) || 
+				(g_sci->getPlatform() == Common::kPlatformDOS && g_sci->forceHiresGraphics()))
 				_kernelNames[0x26] = "Portrait";
 			else if (g_sci->getPlatform() == Common::kPlatformMacintosh)
 				_kernelNames[0x84] = "ShowMovie";
 		} else if (g_sci->getGameId() == GID_QFG4DEMO) {
 			_kernelNames[0x7b] = "RemapColors"; // QFG4 Demo has this SCI2 function instead of StrSplit
+		} else if (_resMan->testResource(ResourceId(kResourceTypeVocab, 184))) {
+			_kernelNames[0x7b] = "RemapColorsKawa";
+			_kernelNames[0x88] = "KawaDbugStr";
+			_kernelNames[0x89] = "KawaHacks";
 		}
 
 		_kernelNames[0x71] = "PalVary";
@@ -847,7 +847,6 @@ void Kernel::loadKernelNames(GameFeatures *features) {
 		break;
 	}
 
-#ifdef ENABLE_SCI32
 	// Reserve a high range of kernel call IDs (0xe0 to 0xef) that can be used
 	// by ScummVM to improve integration and fix bugs in games that require
 	// more help than can be provided by a simple script patch (e.g. spinloops
@@ -857,30 +856,49 @@ void Kernel::loadKernelNames(GameFeatures *features) {
 	// that might try to add their own kernel calls in the same manner. It also
 	// helps to separate ScummVM interpreter's kernel calls from SSCI's standard
 	// kernel calls.
+	uint maxKernelId = kScummVMSleepId;
+#ifdef ENABLE_SCI32
 	if (getSciVersion() >= SCI_VERSION_2) {
-		const uint kernelListSize = _kernelNames.size();
-		_kernelNames.resize(0xe2);
-		for (uint id = kernelListSize; id < 0xe0; ++id) {
-			_kernelNames[id] = "Dummy";
-		}
+		maxKernelId = kScummVMSaveLoadId;
+	}
+#endif
+	const uint kernelListSize = _kernelNames.size();
+	_kernelNames.resize(maxKernelId + 1);
+	for (uint id = kernelListSize; id < kScummVMSleepId; ++id) {
+		_kernelNames[id] = "Dummy";
+	}
 
-		// Used by Hoyle5 script patches to remove CPU spinning on kGetTime
-		// (this repurposes the existing SCI16 kWait call that was removed in SCI32)
-		_kernelNames[kScummVMWaitId] = "Wait";
+	// Used by script patches to remove CPU spinning on kGetTime and add delays
+	_kernelNames[kScummVMSleepId] = "ScummVMSleep";
 
-		// Used by GuestAdditions to support integrated save/load dialogue
+#ifdef ENABLE_SCI32
+	if (getSciVersion() >= SCI_VERSION_2) {
+		// Used by GuestAdditions to support integrated save/load dialog
 		_kernelNames[kScummVMSaveLoadId] = "ScummVMSaveLoad";
 	}
 #endif
 
-	mapFunctions();
+	mapFunctions(features);
 }
 
 Common::String Kernel::lookupText(reg_t address, int index) {
 	if (address.getSegment())
 		return _segMan->getString(address);
 
-	Resource *textres = _resMan->findResource(ResourceId(kResourceTypeText, address.getOffset()), false);
+	ResourceId resourceId = ResourceId(kResourceTypeText, address.getOffset());
+	if (g_sci->getGameId() == GID_HOYLE3 && g_sci->getPlatform() == Common::kPlatformAmiga) {
+		// WORKAROUND: In the Amiga version of Hoyle 3, texts are stored as
+		// either text, font or palette types. Seems like the resource type
+		// bits are used as part of the resource numbers. This is the same
+		// as the workaround used in GfxFontFromResource()
+		resourceId = ResourceId(kResourceTypeText, address.getOffset() & 0x7FF);
+		if (!_resMan->testResource(resourceId))
+			resourceId = ResourceId(kResourceTypeFont, address.getOffset() & 0x7FF);
+		if (!_resMan->testResource(resourceId))
+			resourceId = ResourceId(kResourceTypePalette, address.getOffset() & 0x7FF);
+	}
+
+	Resource *textres = _resMan->findResource(resourceId, false);
 
 	if (!textres) {
 		error("text.%03d not found", address.getOffset());
@@ -889,8 +907,24 @@ Common::String Kernel::lookupText(reg_t address, int index) {
 	int textlen = textres->size();
 	const char *seeker = (const char *)textres->getUnsafeDataAt(0);
 
+	if (g_sci->getGameId() == GID_LONGBOW && address.getOffset() == 1535 && textlen == 2662) {
+		// WORKAROUND: Longbow 1.0's text resource 1535 is missing 8 texts for
+		//  the pub. It appears that only the 5.25 floppy release was affected.
+		//  This was fixed by Sierra's 1.0 patch.
+		if (index >= 41) {
+			// texts 41+ exist but with incorrect offsets
+			index -= 8;
+		} else if (index >= 33) {
+			// texts 33 through 40 are missing. they comprise two sequences of
+			//  four messages. only one of the two can play, and only once in
+			//  the specific circumstance that the player enters the pub as a
+			//  merchant, changes beards, and re-enters.
+			return "** MISSING MESSAGE **";
+		}
+	}
+
 	int _index = index;
-	while (index--)
+	while (index-- && textlen)
 		while (textlen-- && *seeker++)
 			;
 

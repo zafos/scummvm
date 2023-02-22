@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -198,6 +197,8 @@ void Timer::updateTimer() {
 			case kProcGiveLuteToGeida:
 				giveLuteToGeida();
 				break;
+			default:
+				break;
 			}
 		}
 	}
@@ -363,19 +364,21 @@ void Timer::jacquesWakesUp() {
 	_vm->_jacquesState++;
 
 	switch (_vm->_jacquesState) { // Additional pictures.
-	case 1 :
+	case 1:
 		_vm->_background->draw(-1, -1, 0); // Eyes open.
 		_vm->_dialogs->displayScrollChain('Q', 45);
 		break;
-	case 2 : // Going through the door.
+	case 2: // Going through the door.
 		_vm->_background->draw(-1, -1, 1); // Not on the floor.
 		_vm->_background->draw(-1, -1, 2); // But going through the door.
 		_vm->_magics[5]._operation = kMagicNothing; // You can't wake him up now.
 		break;
-	case 3 :  // Gone through the door.
+	case 3: // Gone through the door.
 		_vm->_background->draw(-1, -1, 1); // Not on the floor, either.
 		_vm->_background->draw(-1, -1, 3); // He's gone... so the door's open.
 		_vm->setRoom(kPeopleJacques, kRoomNowhere); // Gone!
+		break;
+	default:
 		break;
 	}
 
@@ -393,6 +396,8 @@ void Timer::jacquesWakesUp() {
 		break;
 	case 4:
 		addTimer(24, kProcJacquesWakesUp, kReasonJacquesWakingUp);
+		break;
+	default:
 		break;
 	}
 }
@@ -444,6 +449,8 @@ void Timer::jump() {
 	case 18:
 	case 19:
 		avvy->_y++;
+		break;
+	default:
 		break;
 	}
 

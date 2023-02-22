@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -30,8 +29,10 @@
 #include "pakfs_save_manager.h"
 #include "framfs_save_manager.h"
 #include "backends/fs/n64/n64-fs-factory.h"
+#include "backends/mutex/null/null-mutex.h"
 #include "backends/saves/default/default-saves.h"
 #include "backends/timer/default/default-timer.h"
+#include "graphics/blit.h"
 
 typedef unsigned long long uint64;
 
@@ -89,8 +90,10 @@ OSystem_N64::OSystem_N64() {
 	_disableFpsLimit = false;
 
 	_overlayVisible = false;
+	_overlayInGUI = false;
 
-	_shakeOffset = 0;
+	_shakeXOffset = 0;
+	_shakeYOffset = 0;
 
 	// Allocate memory for offscreen buffers
 	_offscreen_hic = (uint16 *)memalign(8, _screenWidth * _screenHeight * 2);
@@ -219,28 +222,11 @@ const OSystem::GraphicsMode* OSystem_N64::getSupportedGraphicsModes() const {
 	return s_supportedGraphicsModes;
 }
 
-
 int OSystem_N64::getDefaultGraphicsMode() const {
 	return OVERS_NTSC_340X240;
 }
 
-bool OSystem_N64::setGraphicsMode(const char *mode) {
-	int i = 0;
-	while (s_supportedGraphicsModes[i].name) {
-		if (!scumm_stricmp(s_supportedGraphicsModes[i].name, mode)) {
-			_graphicMode = s_supportedGraphicsModes[i].id;
-
-			switchGraphicModeId(_graphicMode);
-
-			return true;
-		}
-		i++;
-	}
-
-	return true;
-}
-
-bool OSystem_N64::setGraphicsMode(int mode) {
+bool OSystem_N64::setGraphicsMode(int mode, uint /*flags*/) {
 	_graphicMode = mode;
 	switchGraphicModeId(_graphicMode);
 
@@ -528,8 +514,8 @@ void OSystem_N64::updateScreen() {
 	// Copy the game buffer to screen
 	if (!_overlayVisible) {
 		tmpDst = game_framebuffer;
-		tmpSrc = _offscreen_hic + (_shakeOffset * _screenWidth);
-		for (currentHeight = _shakeOffset; currentHeight < _gameHeight; currentHeight++) {
+		tmpSrc = _offscreen_hic + (_shakeYOffset * _screenWidth);
+		for (currentHeight = _shakeYOffset; currentHeight < _gameHeight; currentHeight++) {
 			uint64 *game_dest = (uint64 *)(tmpDst + skip_pixels + _offscrPixels);
 			uint64 *game_src = (uint64 *)tmpSrc;
 
@@ -541,7 +527,7 @@ void OSystem_N64::updateScreen() {
 			tmpSrc += _screenWidth;
 		}
 
-		uint16 _clearLines = _shakeOffset; // When shaking we must take care of remaining lines to clear
+		uint16 _clearLines = _shakeYOffset; // When shaking we must take care of remaining lines to clear
 		while (_clearLines--) {
 			memset(tmpDst + skip_pixels + _offscrPixels, 0, _screenWidth * 2);
 			tmpDst += _frameBufferWidth;
@@ -615,39 +601,47 @@ void OSystem_N64::unlockScreen() {
 	_dirtyOffscreen = true;
 }
 
-void OSystem_N64::setShakePos(int shakeOffset) {
+void OSystem_N64::setShakePos(int shakeXOffset, int shakeYOffset) {
 
 	// If a rumble pak is plugged in and screen shakes, rumble!
-	if (shakeOffset && _controllerHasRumble) rumblePakEnable(1, _controllerPort);
-	else if (!shakeOffset && _controllerHasRumble) rumblePakEnable(0, _controllerPort);
+	if (shakeYOffset && _controllerHasRumble) rumblePakEnable(1, _controllerPort);
+	else if (!shakeYOffset && _controllerHasRumble) rumblePakEnable(0, _controllerPort);
 
-	_shakeOffset = shakeOffset;
+	_shakeXOffset = shakeXOffset;
+	_shakeYOffset = shakeYOffset;
 	_dirtyOffscreen = true;
 
 	return;
 }
 
-void OSystem_N64::showOverlay() {
-	// Change min/max mouse coords
-	_mouseMaxX = _overlayWidth;
-	_mouseMaxY = _overlayHeight;
+void OSystem_N64::showOverlay(bool inGUI) {
+	_overlayInGUI = inGUI;
 
-	// Relocate the mouse cursor given the new limitations
-	warpMouse(_mouseX, _mouseY);
+	if (inGUI) {
+		// Change min/max mouse coords
+		_mouseMaxX = _overlayWidth;
+		_mouseMaxY = _overlayHeight;
+
+		// Relocate the mouse cursor given the new limitations
+		warpMouse(_mouseX, _mouseY);
+	}
 
 	_overlayVisible = true;
 	_dirtyOffscreen = true;
 }
 
 void OSystem_N64::hideOverlay() {
-	// Change min/max mouse coords
-	_mouseMaxX = _gameWidth;
-	_mouseMaxY = _gameHeight;
+	if (_overlayInGUI) {
+		// Change min/max mouse coords
+		_mouseMaxX = _gameWidth;
+		_mouseMaxY = _gameHeight;
 
-	// Relocate the mouse cursor given the new limitations
-	warpMouse(_mouseX, _mouseY);
+		// Relocate the mouse cursor given the new limitations
+		warpMouse(_mouseX, _mouseY);
+	}
 
 	_overlayVisible = false;
+	_overlayInGUI = false;
 
 	// Clear double buffered display
 	clearAllVideoBuffers();
@@ -670,8 +664,8 @@ void OSystem_N64::clearOverlay() {
 	uint8 skip_pixels = (_screenWidth - _gameWidth) / 2; // Center horizontally the image
 
 	uint16 *tmpDst = _overlayBuffer + (_overlayWidth * skip_lines * 2);
-	uint16 *tmpSrc = _offscreen_hic + (_shakeOffset * _screenWidth);
-	for (uint16 currentHeight = _shakeOffset; currentHeight < _gameHeight; currentHeight++) {
+	uint16 *tmpSrc = _offscreen_hic + (_shakeYOffset * _screenWidth);
+	for (uint16 currentHeight = _shakeYOffset; currentHeight < _gameHeight; currentHeight++) {
 		memcpy((tmpDst + skip_pixels), tmpSrc, _gameWidth * 2);
 		tmpDst += _overlayWidth;
 		tmpSrc += _screenWidth;
@@ -680,16 +674,15 @@ void OSystem_N64::clearOverlay() {
 	_dirtyOffscreen = true;
 }
 
-void OSystem_N64::grabOverlay(void *buf, int pitch) {
-	int h = _overlayHeight;
-	uint16 *src = _overlayBuffer;
-	byte *dst = (byte *)buf;
+void OSystem_N64::grabOverlay(Graphics::Surface &surface) {
+	assert(surface.w >= _overlayWidth);
+	assert(surface.h >= _overlayHeight);
+	assert(surface.format.bytesPerPixel == sizeof(uint16));
 
-	do {
-		memcpy(dst, src, _overlayWidth * sizeof(uint16));
-		src += _overlayWidth;
-		dst += pitch;
-	} while (--h);
+	byte *src = (byte *)_overlayBuffer;
+	byte *dst = (byte *)surface.getPixels();
+	Graphics::copyBlit(dst, src, surface.pitch, _overlayWidth * sizeof(uint16),
+		_overlayWidth, _overlayHeight, sizeof(uint16));
 }
 
 void OSystem_N64::copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) {
@@ -773,8 +766,11 @@ void OSystem_N64::warpMouse(int x, int y) {
 	_dirtyOffscreen = true;
 }
 
-void OSystem_N64::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
+void OSystem_N64::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask) {
 	if (!w || !h) return;
+
+	if (mask)
+		warning("OSystem_N64::setMouseCursor: Masks are not supported");
 
 	_mouseHotspotX = hotspotX;
 	_mouseHotspotY = hotspotY;
@@ -827,20 +823,8 @@ void OSystem_N64::delayMillis(uint msecs) {
 }
 
 // As we don't have multi-threading, no need for mutexes
-OSystem::MutexRef OSystem_N64::createMutex(void) {
-	return NULL;
-}
-
-void OSystem_N64::lockMutex(MutexRef mutex) {
-	return;
-}
-
-void OSystem_N64::unlockMutex(MutexRef mutex) {
-	return;
-}
-
-void OSystem_N64::deleteMutex(MutexRef mutex) {
-	return;
+Common::MutexInternal *OSystem_N64::createMutex(void) {
+	return new NullMutexInternal();
 }
 
 void OSystem_N64::quit() {
@@ -853,7 +837,7 @@ Audio::Mixer *OSystem_N64::getMixer() {
 	return _mixer;
 }
 
-void OSystem_N64::getTimeAndDate(TimeDate &t) const {
+void OSystem_N64::getTimeAndDate(TimeDate &t, bool skipRecord) const {
 	// No RTC inside the N64, read mips timer to simulate
 	// passing of time, not a perfect solution, but can't think
 	// of anything better.
@@ -895,7 +879,7 @@ void OSystem_N64::setTimerCallback(TimerProc callback, int interval) {
 }
 
 void OSystem_N64::setupMixer(void) {
-	_mixer = new Audio::MixerImpl(this, DEFAULT_SOUND_SAMPLE_RATE);
+	_mixer = new Audio::MixerImpl(DEFAULT_SOUND_SAMPLE_RATE);
 	_mixer->setReady(false);
 
 	enableAudioPlayback();

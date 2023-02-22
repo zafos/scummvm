@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,16 +15,22 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef TOWNS_EUP_H
 #define TOWNS_EUP_H
 
+#define EUP_USE_MEMPOOL
+
 #include "audio/softsynth/fmtowns_pc98/towns_audio.h"
 #include "common/array.h"
+#include "common/func.h"
+
+#ifdef EUP_USE_MEMPOOL
+#include "common/memorypool.h"
+#endif
 
 class EuphonyBaseDriver {
 public:
@@ -154,7 +160,6 @@ private:
 
 	uint8 appendEvent(uint8 evt, uint8 chan);
 
-	typedef bool(EuphonyPlayer::*EuphonyEvent)();
 	bool event_notImpl();
 	bool event_noteOn();
 	bool event_polyphonicAftertouch();
@@ -169,8 +174,8 @@ private:
 	uint8 applyTranspose(uint8 in);
 	uint8 applyVolumeAdjust(uint8 in);
 
-	void sendEvent(uint8 type, uint8 command);
-	void sendNoteEvent(int type, int evt, int note, int velo);
+	void sendByte(uint8 type, uint8 command);
+	void sendPendingEvent(int type, int evt, int note, int velo);
 	void sendControllerReset(int type, int part);
 	void sendAllNotesOff(int type, int part);
 	void sendTempo(int tempo);
@@ -181,17 +186,24 @@ private:
 	int8 *_partConfig_volume;
 	int8 *_partConfig_transpose;
 
-	struct SavedEvent {
-		SavedEvent(int ev, int tp, int nt, int vl, int ln, SavedEvent *chain) : evt(ev), type(tp), note(nt), velo(vl), len(ln), next(chain) {}
+	struct PendingEvent {
+		PendingEvent(int ev, int tp, int nt, int vl, int ln, PendingEvent *chain) : evt(ev), type(tp), note(nt), velo(vl), len(ln), next(chain) {}
 		uint8 evt;
 		uint8 type;
 		uint8 note;
 		uint8 velo;
 		uint16 len;
-		SavedEvent *next;
+		PendingEvent *next;
 	};
 
-	SavedEvent *_savedEventsChain;
+#ifdef EUP_USE_MEMPOOL
+	Common::ObjectPool<PendingEvent> _pendingEventsPool;
+#endif
+	PendingEvent *_pendingEventsChain;
+
+	typedef Common::Functor0Mem<bool, EuphonyPlayer> EuphonyEvent;
+	typedef Common::Array<const EuphonyEvent*> EuphonyEventsArray;
+	EuphonyEventsArray _euphonyEvents;
 
 	uint8 _defaultBarLength;
 	uint8 _barLength;

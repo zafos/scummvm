@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,7 +27,7 @@
 
 namespace Titanic {
 
-class CStarCamera;
+class CCamera;
 class CSurfaceArea;
 
 class CBaseStarRef {
@@ -39,7 +38,7 @@ public:
 	CBaseStarRef() : _stars(nullptr) {}
 	virtual ~CBaseStarRef() {}
 
-	void process(CSurfaceArea *surface, CStarCamera *camera);
+	void process(CSurfaceArea *surface, CCamera *camera);
 
 	virtual bool check(const Common::Point &pt, int index) { return false; }
 };
@@ -52,9 +51,9 @@ public:
 public:
 	CStarRef1(CBaseStars *stars, const Common::Point &pt) :
 		CBaseStarRef(stars), _position(pt), _index(-1) {}
-	virtual ~CStarRef1() {}
+	~CStarRef1() override {}
 
-	virtual bool check(const Common::Point &pt, int index);
+	bool check(const Common::Point &pt, int index) override;
 };
 
 class CStarRefArray : public CBaseStarRef {
@@ -65,9 +64,9 @@ public:
 public:
 	CStarRefArray(CBaseStars *stars, Common::Array<CStarPosition> *positions) :
 		CBaseStarRef(stars), _positions(positions), _index(0) {}
-	virtual ~CStarRefArray() {}
+	~CStarRefArray() override {}
 
-	virtual bool check(const Common::Point &pt, int index);
+	bool check(const Common::Point &pt, int index) override;
 };
 
 class CStarRef3 : public CBaseStarRef {
@@ -75,9 +74,9 @@ public:
 	int _index;
 public:
 	CStarRef3(CBaseStars *stars) :CBaseStarRef(stars), _index(0) {}
-	virtual ~CStarRef3() {}
+	~CStarRef3() override {}
 
-	virtual bool check(const Common::Point &pt, int index);
+	bool check(const Common::Point &pt, int index) override;
 };
 
 } // End of namespace Titanic

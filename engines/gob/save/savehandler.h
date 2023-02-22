@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -64,7 +63,7 @@ class SlotFileIndexed : public SlotFile {
 public:
 	SlotFileIndexed(GobEngine *vm, uint32 slotCount, const Common::String &base,
 			const Common::String &extStub);
-	~SlotFileIndexed();
+	~SlotFileIndexed() override;
 
 	/** Build the save file name. */
 	Common::String build(int slot) const;
@@ -91,10 +90,10 @@ protected:
 class SlotFileStatic : public SlotFile {
 public:
 	SlotFileStatic(GobEngine *vm, const Common::String &base, const Common::String &ext);
-	~SlotFileStatic();
+	~SlotFileStatic() override;
 
-	int getSlot(int32 offset) const;
-	int getSlotRemainder(int32 offset) const;
+	int getSlot(int32 offset) const override;
+	int getSlotRemainder(int32 offset) const override;
 
 	/** Build the save file name. */
 	Common::String build() const;
@@ -120,6 +119,9 @@ public:
 	/** Saves (parts of) the file. */
 	virtual bool save(int16 dataVar, int32 size, int32 offset) = 0;
 
+	virtual bool loadToRaw(byte *ptr, int32 size, int32 offset);
+	virtual bool saveFromRaw(const byte *ptr, int32 size, int32 offset);
+
 	/** Deletes the file. */
 	virtual bool deleteFile();
 
@@ -133,11 +135,14 @@ protected:
 class TempSpriteHandler : public SaveHandler {
 public:
 	TempSpriteHandler(GobEngine *vm);
-	~TempSpriteHandler();
+	~TempSpriteHandler() override;
 
-	int32 getSize();
-	bool load(int16 dataVar, int32 size, int32 offset);
-	bool save(int16 dataVar, int32 size, int32 offset);
+	int32 getSize() override;
+	bool load(int16 dataVar, int32 size, int32 offset) override;
+	bool save(int16 dataVar, int32 size, int32 offset) override;
+
+	bool loadToRaw(byte *ptr, int32 size, int32 offset) override;
+	bool saveFromRaw(const byte *ptr, int32 size, int32 offset) override;
 
 	bool create(uint32 width, uint32 height, bool trueColor);
 	bool createFromSprite(int16 dataVar, int32 size, int32 offset);
@@ -161,17 +166,17 @@ protected:
 class NotesHandler : public SaveHandler {
 public:
 	NotesHandler(uint32 notesSize, GobEngine *vm, const Common::String &target);
-	~NotesHandler();
+	~NotesHandler() override;
 
-	int32 getSize();
-	bool load(int16 dataVar, int32 size, int32 offset);
-	bool save(int16 dataVar, int32 size, int32 offset);
+	int32 getSize() override;
+	bool load(int16 dataVar, int32 size, int32 offset) override;
+	bool save(int16 dataVar, int32 size, int32 offset) override;
 
 private:
 	class File : public SlotFileStatic {
 	public:
 		File(GobEngine *vm, const Common::String &base);
-		~File();
+		~File() override;
 	};
 
 	uint32 _notesSize;
@@ -183,13 +188,15 @@ private:
 class FakeFileHandler : public SaveHandler {
 public:
 	FakeFileHandler(GobEngine *vm);
-	~FakeFileHandler();
+	~FakeFileHandler() override;
 
-	int32 getSize();
-	bool load(int16 dataVar, int32 size, int32 offset);
-	bool save(int16 dataVar, int32 size, int32 offset);
+	int32 getSize() override;
+	bool load(int16 dataVar, int32 size, int32 offset) override;
+	bool save(int16 dataVar, int32 size, int32 offset) override;
+	bool loadToRaw(byte *ptr, int32 size, int32 offset) override;
+	bool saveFromRaw(const byte *ptr, int32 size, int32 offset) override;
 
-	bool deleteFile();
+	bool deleteFile() override;
 
 private:
 	Common::Array<byte> _data;

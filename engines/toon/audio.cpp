@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -84,20 +83,25 @@ void AudioManager::removeInstance(AudioStreamInstance *inst) {
 	}
 }
 
-void AudioManager::playMusic(const Common::String &dir, const Common::String &music) {
+int AudioManager::playMusic(const Common::String &dir, const Common::String &music) {
 	debugC(1, kDebugAudio, "playMusic(%s, %s)", dir.c_str(), music.c_str());
 
 	// two musics can be played at same time
-	Common::String path = Common::String::format("ACT%d/%s/%s.MUS", _vm->state()->_currentChapter, dir.c_str(), music.c_str());
+	Common::String path;
+	if (dir == "") {
+		path = Common::String::format("%s.MUS", music.c_str());
+	} else {
+		path = Common::String::format("ACT%d/%s/%s.MUS", _vm->state()->_currentChapter, dir.c_str(), music.c_str());
+	}
 
 	if (_currentMusicName == music)
-		return;
+		return -1;
 
 	_currentMusicName = music;
 
 	Common::SeekableReadStream *srs = _vm->resources()->openFile(path);
 	if (!srs)
-		return;
+		return -1;
 
 	// see what channel to take
 	// if the current channel didn't really start. reuse this one
@@ -119,10 +123,12 @@ void AudioManager::playMusic(const Common::String &dir, const Common::String &mu
 		_channels[_currentMusicChannel]->stop(false);
 	}
 
-	// no need to delete instance here it will automatically deleted by the mixer is done with it
+	// no need to delete instance here; it will automatically be deleted by the mixer when it is done with it
 	_channels[_currentMusicChannel] = new AudioStreamInstance(this, _mixer, srs, true, true);
 	_channels[_currentMusicChannel]->setVolume(_musicMuted ? 0 : 255);
 	_channels[_currentMusicChannel]->play(true, Audio::Mixer::kMusicSoundType);
+
+	return _currentMusicChannel;
 }
 
 bool AudioManager::voiceStillPlaying() {
@@ -207,7 +213,7 @@ bool AudioManager::loadAudioPack(int32 id, const Common::String &indexFile, cons
 	return _audioPacks[id]->loadAudioPackage(indexFile, packFile);
 }
 
-void AudioManager::setMusicVolume(int32 volume) {
+void AudioManager::setMusicVolume(uint8 volume) {
 	debugC(1, kDebugAudio, "setMusicVolume(%d)", volume);
 	if (_channels[0])
 		_channels[0]->setVolume(volume);
@@ -216,13 +222,20 @@ void AudioManager::setMusicVolume(int32 volume) {
 		_channels[1]->setVolume(volume);
 }
 
-void AudioManager::stopMusic() {
+void AudioManager::stopMusicChannel(int channelId, bool fade) {
+	if (_channels[channelId])
+		_channels[channelId]->stop(fade);
+
+	if (_currentMusicChannel == channelId)
+		// clean _currentMusicName too
+		_currentMusicName = "";
+}
+
+void AudioManager::stopMusic(bool fade) {
 	debugC(1, kDebugAudio, "stopMusic()");
 
-	if (_channels[0])
-		_channels[0]->stop(true);
-	if (_channels[1])
-		_channels[1]->stop(true);
+	stopMusicChannel(0, fade);
+	stopMusicChannel(1, fade);
 }
 
 AudioStreamInstance::AudioStreamInstance(AudioManager *man, Audio::Mixer *mixer, Common::SeekableReadStream *stream , bool looping, bool deleteFileStreamAtEnd) {
@@ -570,7 +583,7 @@ void AudioManager::killAmbientSFX(int32 id)
 			ambient->_enabled = false;
 			ambient->_id = -1;
 
-			if (_channels[ambient->_channel]) {
+			if (ambient->_channel >= 0 && _channels[ambient->_channel]) {
 				_channels[ambient->_channel]->stop(false);
 			}
 		}

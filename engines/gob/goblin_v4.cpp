@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -264,6 +263,9 @@ void Goblin_v4::movePathFind(Mult::Mult_Object *obj, Gob_Object *gobDesc, int16 
 			case 41:
 				animData->nextState = 31;
 				break;
+
+			default:
+				break;
 			}
 			break;
 		}
@@ -373,6 +375,8 @@ void Goblin_v4::movePathFind(Mult::Mult_Object *obj, Gob_Object *gobDesc, int16 
 			case 7:
 				animData->nextState = 31;
 				break;
+			default:
+				break;
 			}
 			break;
 		}
@@ -391,7 +395,7 @@ void Goblin_v4::moveAdvance(Mult::Mult_Object *obj, Gob_Object *gobDesc,
 	if (!obj->goblinStates)
 		return;
 
-	movePathFind(obj, 0, 0);
+	movePathFind(obj, nullptr, 0);
 	playSounds(obj);
 
 	animData = obj->pAnimData;
@@ -415,6 +419,9 @@ void Goblin_v4::moveAdvance(Mult::Mult_Object *obj, Gob_Object *gobDesc,
 	case 6:
 		if (animData->frame >= framesCount)
 			animData->isPaused = 1;
+		break;
+
+	default:
 		break;
 	}
 
@@ -469,6 +476,9 @@ void Goblin_v4::moveAdvance(Mult::Mult_Object *obj, Gob_Object *gobDesc,
 	case 31:
 		if (animData->pathExistence == 4)
 			animData->pathExistence = 5;
+		break;
+
+	default:
 		break;
 	}
 
@@ -595,6 +605,9 @@ int16 Goblin_v4::turnState(int16 state, uint16 dir) {
 	case 29:
 		dx = 2;
 		break;
+
+	default:
+		break;
 	}
 
 	switch (dir) {
@@ -628,6 +641,9 @@ int16 Goblin_v4::turnState(int16 state, uint16 dir) {
 
 	case kDirSE:
 		cx = 5;
+		break;
+
+	default:
 		break;
 	}
 

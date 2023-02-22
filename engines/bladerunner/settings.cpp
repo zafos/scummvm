@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -39,8 +38,8 @@ namespace BladeRunner {
 Settings::Settings(BladeRunnerEngine *vm) {
 	_vm = vm;
 
-	_difficulty = 1;
-	_playerAgenda = 1;
+	_difficulty = kGameDifficultyMedium;
+	_playerAgenda = kPlayerAgendaNormal;
 
 	_chapter = 1;
 	_scene = -1;
@@ -65,12 +64,23 @@ Settings::Settings(BladeRunnerEngine *vm) {
 	_fullHDFrames = true;
 	_mst3k = false;
 
+#if BLADERUNNER_ORIGINAL_BUGS
+	// Probably a bug. Assigning these here again, overrides the initialization above.
+	//       Also note: the reset() method assigns "_ammoAmounts[0] = 1" like above!
 	_ammoType = 0;
 	_ammoAmounts[0] = 0;
 	_ammoAmounts[1] = 0;
 	_ammoAmounts[2] = 0;
+#endif // BLADERUNNER_ORIGINAL_BUGS
 
 	_learyMode = false;
+}
+
+void Settings::reset() {
+	_ammoType = 0;
+	_ammoAmounts[0] = 1;
+	_ammoAmounts[1] = 0;
+	_ammoAmounts[2] = 0;
 }
 
 bool Settings::openNewScene() {
@@ -82,8 +92,8 @@ bool Settings::openNewScene() {
 
 	if (_startingGame) {
 		_vm->_ambientSounds->removeAllNonLoopingSounds(true);
-		_vm->_ambientSounds->removeAllLoopingSounds(1);
-		_vm->_music->stop(2);
+		_vm->_ambientSounds->removeAllLoopingSounds(1u);
+		_vm->_music->stop(2u);
 	}
 
 	int currentSet = _vm->_scene->getSetId();
@@ -108,8 +118,9 @@ bool Settings::openNewScene() {
 			return false;
 		}
 		_chapter = newChapter;
-		if (_startingGame)
+		if (_startingGame) {
 			_startingGame = false;
+		}
 	}
 
 	if (!_vm->_scene->open(newSet, newScene, _loadingGame)) {
@@ -140,6 +151,10 @@ bool Settings::openNewScene() {
 	return true;
 }
 
+int Settings::getAmmoTypesCount() {
+	return kAmmoTypesCount;
+}
+
 int Settings::getAmmoType() const {
 	return _ammoType;
 }
@@ -162,7 +177,7 @@ void Settings::addAmmo(int ammoType, int ammo) {
 }
 
 void Settings::decreaseAmmo() {
-	if (_difficulty == 0 || _ammoType == 0) {
+	if (_difficulty == kGameDifficultyEasy || _ammoType == 0) {
 		return;
 	}
 
@@ -182,6 +197,10 @@ void Settings::decreaseAmmo() {
 
 int Settings::getDifficulty() const {
 	return _difficulty;
+}
+
+void Settings::setDifficulty(int difficulty) {
+	_difficulty = difficulty;
 }
 
 int Settings::getPlayerAgenda() const {
@@ -208,7 +227,7 @@ void Settings::save(SaveFileWriteStream &f) {
 	f.writeInt(_unk0);
 	f.writeInt(_difficulty);
 	f.writeInt(_ammoType);
-	for (int i = 0; i != 3; ++i) {
+	for (int i = 0; i != kAmmoTypesCount; ++i) {
 		f.writeInt(_ammoAmounts[i]);
 	}
 }
@@ -221,7 +240,7 @@ void Settings::load(SaveFileReadStream &f) {
 	_unk0 = f.readInt();
 	_difficulty = f.readInt();
 	_ammoType = f.readInt();
-	for (int i = 0; i != 3; ++i) {
+	for (int i = 0; i != kAmmoTypesCount; ++i) {
 		_ammoAmounts[i] = f.readInt();
 	}
 }

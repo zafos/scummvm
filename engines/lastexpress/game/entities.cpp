@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -187,7 +186,7 @@ Entities::~Entities() {
 	_entities.clear();
 
 	// Zero passed pointers
-	_engine = NULL;
+	_engine = nullptr;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -241,7 +240,7 @@ int Entities::getCompartments1(int index) const {
 // Savegame
 //////////////////////////////////////////////////////////////////////////
 void Entities::saveLoadWithSerializer(Common::Serializer &s) {
-	_header->saveLoadWithSerializer(s);
+	_header->saveLoadWithSerializer(s, nullptr);
 	for (uint i = 1; i < _entities.size(); i++)
 		_entities[i]->saveLoadWithSerializer(s);
 }
@@ -296,7 +295,7 @@ void Entities::setupChapter(ChapterIndex chapter) {
 		memset(&_compartments1, 0, sizeof(_compartments1));
 		memset(&_positions, 0, sizeof(_positions));
 
-		getSoundQueue()->resetQueue(kSoundType13);
+		getSoundQueue()->stopAllExcept(kSoundTagMenu);
 	}
 
 	// we skip the header when doing entity setup
@@ -367,7 +366,7 @@ void Entities::resetState(EntityIndex entityIndex) {
 	getData(entityIndex)->inventoryItem = kItemNone;
 
 	if (getSoundQueue()->isBuffered(entityIndex))
-		getSoundQueue()->removeFromQueue(entityIndex);
+		getSoundQueue()->stop(entityIndex);
 
 	clearSequences(entityIndex);
 
@@ -432,8 +431,8 @@ void Entities::updateFields() const {
 }
 
 void Entities::updateFrame(EntityIndex entityIndex) const {
-	Sequence *sequence = NULL;
-	int16 *currentFrame = NULL;
+	Sequence *sequence = nullptr;
+	int16 *currentFrame = nullptr;
 	bool found = false;
 
 	if (getData(entityIndex)->direction == kDirectionSwitch) {
@@ -518,7 +517,7 @@ void Entities::updateSequences() const {
 				data->sequence = data->sequence2;
 				data->sequenceName = data->sequenceName2;
 
-				data->sequence2 = NULL;
+				data->sequence2 = nullptr;
 				data->sequenceName2 = "";
 			}
 
@@ -610,9 +609,9 @@ void Entities::resetSequences(EntityIndex entityIndex) const {
 	getData(entityIndex)->field_4A9 = false;
 	getData(entityIndex)->field_4AA = false;
 
-	strcpy((char *)&getData(entityIndex)->sequenceNameCopy, "");
-	strcpy((char *)&getData(entityIndex)->sequenceName, "");
-	strcpy((char *)&getData(entityIndex)->sequenceName2, "");
+	getData(entityIndex)->sequenceNameCopy.clear();
+	getData(entityIndex)->sequenceName.clear();
+	getData(entityIndex)->sequenceName2.clear();
 
 	getScenes()->resetQueue();
 }
@@ -1263,7 +1262,7 @@ void Entities::copySequenceData(EntityIndex entityIndex) const {
 		data->direction = data->directionSwitch;
 
 	// Clear sequence 3
-	data->sequence2 = NULL;
+	data->sequence2 = nullptr;
 	data->sequenceName2 = "";
 	data->field_4AA = false;
 	data->directionSwitch = kDirectionNone;
@@ -1430,7 +1429,7 @@ void Entities::drawSequences(EntityIndex entityIndex, EntityDirection direction,
 		} else {
 			data->sequence = data->sequence2;
 			data->sequenceName = data->sequenceName2;
-			data->sequence2 = NULL;
+			data->sequence2 = nullptr;
 		}
 
 		data->sequenceName2 = "";
@@ -1931,7 +1930,7 @@ void Entities::loadSceneFromEntityPosition(CarIndex car, EntityPosition entityPo
 	// Determine position
 	Position position = (alternate ? 1 : 40);
 	do {
-		if (entityPosition > entityPositions[position]) {
+		if (alternate ? entityPosition < entityPositions[position] : entityPosition > entityPositions[position]) {
 			if (alternate)
 				break;
 
@@ -1945,7 +1944,7 @@ void Entities::loadSceneFromEntityPosition(CarIndex car, EntityPosition entityPo
 	} while (alternate ? position <= 18 : position >= 22);
 
 	// For position outside bounds, use minimal value
-	if ((alternate && position > 18) || (alternate && position < 22)) {
+	if ((alternate && position > 18) || (!alternate && position < 22)) {
 		getScenes()->loadSceneFromPosition(car, alternate ? 18 : 22);
 		return;
 	}
@@ -2117,7 +2116,7 @@ label_process_entity:
 
 				if (checkDistanceFromPosition(entity, kPosition_1500, 750) && entity != kEntityFrancois) {
 
-					if (data->entity != kEntityPlayer) {
+					if (data->entity == kEntityPlayer) {
 						if (data->direction != kDirectionUp || (position <= kPosition_2000 && data->car == car)) {
 							if (data->direction == kDirectionDown && (position < kPosition_1500 || data->car != car)) {
 								if (data->entityPosition > kPosition_1500 && (data->car == kCarGreenSleeping || data->car == kCarRedSleeping)) {
@@ -2282,8 +2281,8 @@ label_process_entity:
 							}
 						}
 					}
-					return false;
 				}
+				return false;
 			}
 		} else if (!flag1) {
 			drawSequences(entity, direction, true);
@@ -2344,7 +2343,7 @@ bool Entities::changeCar(EntityData::EntityCallData *data, EntityIndex entity, C
 	if (data->car == newCar) {
 		if (isInGreenCarEntrance(kEntityPlayer)) {
 			getSound()->playSoundEvent(kEntityPlayer, 14);
-			getSound()->excuseMe(entity, kEntityPlayer, kFlagDefault);
+			getSound()->excuseMe(entity, kEntityPlayer, kVolumeFull);
 			getScenes()->loadSceneFromPosition(kCarGreenSleeping, 1);
 			getSound()->playSound(kEntityPlayer, "CAT1127A");
 			getSound()->playSoundEvent(kEntityPlayer, 15);
@@ -2363,7 +2362,7 @@ bool Entities::changeCar(EntityData::EntityCallData *data, EntityIndex entity, C
 	if (data->car == newCar) {
 		if (isInKronosCarEntrance(kEntityPlayer)) {
 			getSound()->playSoundEvent(kEntityPlayer, 14);
-			getSound()->excuseMe(entity, kEntityPlayer, kFlagDefault);
+			getSound()->excuseMe(entity, kEntityPlayer, kVolumeFull);
 			getScenes()->loadSceneFromPosition(kCarGreenSleeping, 62);
 			getSound()->playSound(kEntityPlayer, "CAT1127A");
 			getSound()->playSoundEvent(kEntityPlayer, 15);

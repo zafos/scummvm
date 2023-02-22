@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 /*
@@ -183,7 +182,7 @@ static int evaluateAndFreeExpression(byte *expr) {
  * will point to the area of memory containing the parsed expression
  * @returns		Pointer to the buffer immediately after the expression, or NULL if error.
  */
-const byte *parseExpression(const byte *lpBuf, MpalHandle *h) {
+const byte *parseExpression(const byte *lpBuf, const Common::UnalignedPtr<MpalHandle> &h) {
 	byte *start;
 
 	uint32 num = *lpBuf;
@@ -192,11 +191,11 @@ const byte *parseExpression(const byte *lpBuf, MpalHandle *h) {
 	if (num == 0)
 		return NULL;
 
-	*h = globalAllocate(GMEM_MOVEABLE | GMEM_ZEROINIT, num * sizeof(Expression) + 1);
-	if (*h == NULL)
+	h.store(globalAllocate(GMEM_MOVEABLE | GMEM_ZEROINIT, num * sizeof(Expression) + 1));
+	if (h.load() == NULL)
 		return NULL;
 
-	start = (byte *)globalLock(*h);
+	start = (byte *)globalLock(h.load());
 	*start = (byte)num;
 
 	LpExpression cur = (LpExpression)(start + 1);
@@ -313,6 +312,9 @@ bool compareExpressions(MpalHandle h1, MpalHandle h2) {
 				globalUnlock(h2);
 				return false;
 			}
+			break;
+
+		default:
 			break;
 		}
 

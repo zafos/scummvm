@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,10 +46,10 @@ private:
 	int _selectedAction;
 public:
 	RightClickDialog();
-	~RightClickDialog();
+	~RightClickDialog() override;
 
-	virtual void draw();
-	virtual bool process(Event &event);
+	void draw() override;
+	bool process(Event &event) override;
 	void execute();
 };
 
@@ -64,10 +63,10 @@ private:
 	bool _closeFlag;
 public:
 	AmmoBeltDialog();
-	~AmmoBeltDialog();
+	~AmmoBeltDialog() override;
 
-	virtual void draw();
-	virtual bool process(Event &event);
+	void draw() override;
+	bool process(Event &event) override;
 	void execute();
 };
 
@@ -76,7 +75,7 @@ private:
 	GfxButton _buttons[8];
 public:
 	RadioConvDialog();
-	virtual ~RadioConvDialog();
+	~RadioConvDialog() override;
 	int execute();
 
 	static int show();
@@ -90,7 +89,7 @@ private:
 	GfxMessage _gfxMessage;
 public:
 	OptionsDialog();
-	virtual ~OptionsDialog() {}
+	~OptionsDialog() override {}
 
 	static void show();
 };

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -38,15 +37,15 @@ namespace LastExpress {
 
 Ivo::Ivo(LastExpressEngine *engine) : Entity(engine, kEntityIvo) {
 	ADD_CALLBACK_FUNCTION(Ivo, reset);
-	ADD_CALLBACK_FUNCTION(Ivo, draw);
-	ADD_CALLBACK_FUNCTION(Ivo, enterExitCompartment);
-	ADD_CALLBACK_FUNCTION(Ivo, updateFromTime);
-	ADD_CALLBACK_FUNCTION(Ivo, updateFromTicks);
-	ADD_CALLBACK_FUNCTION(Ivo, updateEntity);
+	ADD_CALLBACK_FUNCTION_S(Ivo, draw);
+	ADD_CALLBACK_FUNCTION_SI(Ivo, enterExitCompartment);
+	ADD_CALLBACK_FUNCTION_I(Ivo, updateFromTime);
+	ADD_CALLBACK_FUNCTION_I(Ivo, updateFromTicks);
+	ADD_CALLBACK_FUNCTION_II(Ivo, updateEntity);
 	ADD_CALLBACK_FUNCTION(Ivo, callbackActionOnDirection);
-	ADD_CALLBACK_FUNCTION(Ivo, playSound);
+	ADD_CALLBACK_FUNCTION_S(Ivo, playSound);
 	ADD_CALLBACK_FUNCTION(Ivo, callbackActionRestaurantOrSalon);
-	ADD_CALLBACK_FUNCTION(Ivo, savegame);
+	ADD_CALLBACK_FUNCTION_II(Ivo, savegame);
 	ADD_CALLBACK_FUNCTION(Ivo, goCompartment);
 	ADD_CALLBACK_FUNCTION(Ivo, sitAtTableWithSalko);
 	ADD_CALLBACK_FUNCTION(Ivo, leaveTableWithSalko);
@@ -270,6 +269,7 @@ IMPLEMENT_FUNCTION(15, Ivo, chapter1Handler)
 	case kActionNone:
 		getData()->entityPosition = getEntityData(kEntityMilos)->entityPosition;
 		getData()->location = getEntityData(kEntityMilos)->location;
+		getData()->car = getEntityData(kEntityMilos)->car;
 		break;
 
 	case kActionCallback:
@@ -318,7 +318,7 @@ IMPLEMENT_FUNCTION(16, Ivo, inCompartment)
 
 		case 1:
 			getEntities()->drawSequenceLeft(kEntityIvo, "613Ch");
-			getEntities()->enterCompartment(kEntityIvo, kObjectCompartmentH);
+			getEntities()->enterCompartment(kEntityIvo, kObjectCompartmentH, true);
 			getSavePoints()->push(kEntityIvo, kEntityCoudert, kAction88652208);
 			break;
 
@@ -384,7 +384,7 @@ IMPLEMENT_FUNCTION(18, Ivo, chapter2)
 		getData()->inventoryItem = kItemNone;
 
 		getObjects()->update(kObjectCompartmentH, kEntityPlayer, kObjectLocation3, kCursorHandKnock, kCursorHand);
-		getObjects()->update(kObject47, kEntityPlayer, kObjectLocationNone, kCursorKeepValue, kCursorKeepValue);
+		getObjects()->update(kObject47, kEntityPlayer, kObjectLocation1, kCursorKeepValue, kCursorKeepValue);
 
 		break;
 	}
@@ -744,7 +744,7 @@ IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION(31, Ivo, chapter5Handler)
-	if (savepoint.action == kActionProceedChapter5)
+	if (savepoint.action == kAction192637492)
 		setup_fightCath();
 IMPLEMENT_FUNCTION_END
 
@@ -780,7 +780,7 @@ IMPLEMENT_FUNCTION(32, Ivo, fightCath)
 		case 2:
 			params->param1 = getFight()->setup(kFightIvo);
 			if (params->param1) {
-				getLogic()->gameOver(kSavegameTypeIndex, 0, kSceneNone, true);
+				getLogic()->gameOver(kSavegameTypeIndex, 0, kSceneNone, params->param1 == Fight::kFightEndLost);
 			} else {
 				getScenes()->loadSceneFromPosition(kCarBaggageRear, 96);
 				setup_knockedOut();

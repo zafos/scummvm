@@ -10,19 +10,21 @@ MODULE_OBJS = \
 	ambient_sounds.o \
 	archive.o \
 	aud_stream.o \
+	audio_cache.o \
 	audio_mixer.o \
 	audio_player.o \
 	audio_speech.o \
 	bladerunner.o \
 	boundingbox.o \
 	chapters.o \
+	color.o \
 	combat.o \
 	crimes_database.o \
 	debugger.o \
 	decompress_lcw.o \
 	decompress_lzo.o \
-	detection.o \
 	dialogue_menu.o \
+	framelimiter.o \
 	fog.o \
 	font.o \
 	game_flags.o \
@@ -34,6 +36,7 @@ MODULE_OBJS = \
 	light.o \
 	lights.o \
 	matrix.o \
+	metaengine.o \
 	mouse.o \
 	movement_track.o \
 	music.o \
@@ -244,6 +247,7 @@ MODULE_OBJS = \
 	shape.o \
 	slice_animations.o \
 	slice_renderer.o \
+	subtitles.o \
 	suspects_database.o \
 	text_resource.o \
 	time.o \
@@ -257,10 +261,11 @@ MODULE_OBJS = \
 	ui/kia_section_crimes.o \
 	ui/kia_section_diagnostic.o \
 	ui/kia_section_help.o \
+	ui/kia_section_load.o \
 	ui/kia_section_pogo.o \
+	ui/kia_section_save.o \
 	ui/kia_section_settings.o \
 	ui/kia_section_suspects.o \
-	ui/kia_shapes.o \
 	ui/scores.o \
 	ui/spinner.o \
 	ui/ui_check_box.o \
@@ -269,6 +274,7 @@ MODULE_OBJS = \
 	ui/ui_input_box.o \
 	ui/ui_scroll_box.o \
 	ui/ui_slider.o \
+	ui/ui_dropdown.o \
 	ui/vk.o \
 	view.o \
 	vqa_decoder.o \
@@ -283,3 +289,6 @@ endif
 
 # Include common rules
 include $(srcdir)/rules.mk
+
+# Detection objects
+DETECT_OBJS += $(MODULE)/detection.o

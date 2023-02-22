@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -39,8 +38,8 @@ public:
 	//static bool compareNoCase(const WideString &str1, const WideString &str2);
 	static WideString utf8ToWide(const Utf8String &Utf8Str);
 	static Utf8String wideToUtf8(const WideString &WideStr);
-	static WideString ansiToWide(const AnsiString &str);
-	static AnsiString wideToAnsi(const WideString &str);
+	static WideString ansiToWide(const AnsiString &str, TTextCharset charset = CHARSET_ANSI);
+	static AnsiString wideToAnsi(const WideString &str, TTextCharset charset = CHARSET_ANSI);
 
 	static bool isUtf8BOM(const byte *buffer, uint32 bufferSize);
 	static int indexOf(const WideString &str, const WideString &toFind, size_t startFrom);
@@ -51,7 +50,7 @@ public:
 	static AnsiString toString(int val);
 
 private:
-	static uint32 _ansiToUTF32[32];
+	static Common::CodePage mapCodePage(TTextCharset charset);
 };
 
 } // End of namespace Wintermute

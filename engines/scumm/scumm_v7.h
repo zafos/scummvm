@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,19 +25,22 @@
 #ifdef ENABLE_SCUMM_7_8
 
 #include "scumm/scumm_v6.h"
+#include "scumm/charset_v7.h"
+#include "scumm/insane/insane.h"
 
 namespace Scumm {
 
 class Insane;
 class SmushMixer;
 class SmushPlayer;
+class TextRenderer_v7;
 
 class ScummEngine_v7 : public ScummEngine_v6 {
 	friend class SmushPlayer;
 	friend class Insane;
 public:
 	ScummEngine_v7(OSystem *syst, const DetectorResult &dr);
-	~ScummEngine_v7();
+	~ScummEngine_v7() override;
 
 
 protected:
@@ -65,6 +67,12 @@ public:
 	};
 
 protected:
+	TextRenderer_v7 *_textV7;
+	Common::Rect _defaultTextClipRect;
+	Common::Rect _wrappedTextClipRect;
+	bool _newTextRenderStyle;
+	int _blastTextRectsQueue = 0;
+
 	int _verbLineSpacing;
 	bool _existLanguageFile;
 	char *_languageBuffer;
@@ -72,68 +80,110 @@ protected:
 	int _languageIndexSize;
 	char _lastStringTag[12+1];
 
-#if defined(__SYMBIAN32__) || defined(_WIN32_WCE) // for some reason VC6 cannot find the base class TextObject
-	struct SubtitleText {
-		int16 xpos, ypos;
-		byte color;
-		byte charset;
-		byte text[256];
-		bool actorSpeechMsg;
-	};
-#else
 	struct SubtitleText : TextObject {
+		void clear() {
+			TextObject::clear();
+			actorSpeechMsg = center = wrap = false;
+		}
 		bool actorSpeechMsg;
+		bool center;
+		bool wrap;
 	};
+
 	friend void syncWithSerializer(Common::Serializer &, SubtitleText &);
-#endif
 
 	int _subtitleQueuePos;
 	SubtitleText _subtitleQueue[20];
 
 public:
 	void processSubtitleQueue();
-	void addSubtitleToQueue(const byte *text, const Common::Point &pos, byte color, byte charset);
+	void addSubtitleToQueue(const byte *text, const Common::Point &pos, byte color, byte charset, bool center, bool wrap);
 	void clearSubtitleQueue();
-	virtual void CHARSET_1();
-	bool isSmushActive() { return _smushActive; }
+	void CHARSET_1() override;
+	bool isSmushActive() override { return _smushActive; }
+	bool isInsaneActive() override { return _insane ? _insane->isInsaneActive() : false; }
+	void removeBlastTexts() override;
+	void restoreBlastTextsRects();
 
 protected:
-	virtual int runDialog(Dialog &dialog);
 
-	virtual void scummLoop_handleSound();
-	virtual void scummLoop_handleDrawing();
-	virtual void processInput();
-	virtual void processKeyboard(Common::KeyState lastKeyHit);
+	void scummLoop_handleSound() override;
+	void scummLoop_handleDrawing() override;
+	void processInput() override;
+	void processKeyboard(Common::KeyState lastKeyHit) override;
 
-	virtual void setupScumm();
+	void setupScumm(const Common::String &macResourceFile) override;
+	void resetScumm() override;
 
-	virtual void setupScummVars();
-	virtual void resetScummVars();
+	void setupScummVars() override;
+	void resetScummVars() override;
 
-	virtual void akos_processQueue();
+	void akos_processQueue() override;
 
-	virtual void saveLoadWithSerializer(Common::Serializer &s);
+	void saveLoadWithSerializer(Common::Serializer &s) override;
 
-	virtual void readMAXS(int blockSize);
-	virtual void readGlobalObjects();
-	virtual void readIndexBlock(uint32 blocktype, uint32 itemsize);
+	void readMAXS(int blockSize) override;
+	void readGlobalObjects() override;
+	void readIndexBlock(uint32 blocktype, uint32 itemsize) override;
 
-	virtual void setCameraAt(int pos_x, int pos_y);
-	virtual void setCameraFollows(Actor *a, bool setCamera = false);
-	virtual void moveCamera();
-	virtual void panCameraTo(int x, int y);
+	void setCameraAt(int pos_x, int pos_y) override;
+	void setCameraFollows(Actor *a, bool setCamera = false) override;
+	void moveCamera() override;
+	void panCameraTo(int x, int y) override;
 
-	virtual int getObjectIdFromOBIM(const byte *obim);
+	int getObjectIdFromOBIM(const byte *obim) override;
 
-	virtual void actorTalk(const byte *msg);
-	virtual void translateText(const byte *text, byte *trans_buff);
-	virtual void loadLanguageBundle();
+	void createTextRenderer(GlyphRenderer_v7 *gr) override;
+	void enqueueText(const byte *text, int x, int y, byte color, byte charset, TextStyleFlags flags);
+	void drawTextImmediately(const byte *text, Common::Rect *clipRect, int x, int y, byte color, byte charset, TextStyleFlags flags);
+	void drawBlastTexts() override;
+	void showMessageDialog(const byte *msg) override;
+
+	void actorTalk(const byte *msg) override;
+	void translateText(const byte *text, byte *trans_buff, int transBufferSize) override;
+	void loadLanguageBundle() override;
 	void playSpeech(const byte *ptr);
 
-	virtual void drawVerb(int verb, int mode);
+	void queryQuit(bool returnToLauncher) override;
+	int getBannerColor(int bannerId) override;
+	const char *getGUIString(int stringId) override;
+	int getGUIStringHeight(const char *str) override;
+	int getGUIStringWidth(const char *str) override;
+	void drawGUIText(const char *buttonString, Common::Rect *clipRect, int textXPos, int textYPos, int textColor, bool centerFlag) override;
+	int getMusicVolume() override;
+	int getSpeechVolume() override;
+	int getSFXVolume() override;
+	void setMusicVolume(int volume) override;
+	void setSpeechVolume(int volume) override;
+	void setSFXVolume(int volume) override;
+	void toggleVoiceMode() override;
+	void handleLoadDuringSmush() override;
 
+	void setDefaultCursor() override;
+	void updateCursor() override;
+	void setCursorTransparency(int a) override;
+	void setCursorFromImg(uint img, uint room, uint imgindex) override;
 
-	virtual void o6_kernelSetFunctions();
+	void drawVerb(int verb, int mode) override;
+
+	void pauseEngineIntern(bool pause) override;
+
+	void o6_kernelSetFunctions() override;
+
+	struct BlastText : TextObject {
+		Common::Rect rect;
+		TextStyleFlags flags;
+
+		void clear() {
+			this->TextObject::clear();
+			rect = Common::Rect();
+		}
+	};
+
+	int _blastTextQueuePos;
+	BlastText _blastTextQueue[50];
+
+	byte *_guiStringTransBuff = nullptr;
 };
 
 

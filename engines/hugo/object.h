@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -124,42 +123,42 @@ protected:
 class ObjectHandler_v1d : public ObjectHandler {
 public:
 	ObjectHandler_v1d(HugoEngine *vm);
-	virtual ~ObjectHandler_v1d();
+	~ObjectHandler_v1d() override;
 
-	virtual void homeIn(const int objIndex1, const int objIndex2, const int8 objDx, const int8 objDy);
-	virtual void moveObjects();
-	virtual void updateImages();
-	virtual void swapImages(int objIndex1, int objIndex2);
+	void homeIn(const int objIndex1, const int objIndex2, const int8 objDx, const int8 objDy) override;
+	void moveObjects() override;
+	void updateImages() override;
+	void swapImages(int objIndex1, int objIndex2) override;
 };
 
 class ObjectHandler_v2d : public ObjectHandler_v1d {
 public:
 	ObjectHandler_v2d(HugoEngine *vm);
-	virtual ~ObjectHandler_v2d();
+	~ObjectHandler_v2d() override;
 
-	virtual void moveObjects();
-	virtual void updateImages();
+	void moveObjects() override;
+	void updateImages() override;
 
-	void homeIn(const int objIndex1, const int objIndex2, const int8 objDx, const int8 objDy);
+	void homeIn(const int objIndex1, const int objIndex2, const int8 objDx, const int8 objDy) override;
 };
 
 class ObjectHandler_v3d : public ObjectHandler_v2d {
 public:
 	ObjectHandler_v3d(HugoEngine *vm);
-	~ObjectHandler_v3d();
+	~ObjectHandler_v3d() override;
 
-	virtual void moveObjects();
-	virtual void swapImages(int objIndex1, int objIndex2);
+	void moveObjects() override;
+	void swapImages(int objIndex1, int objIndex2) override;
 };
 
 class ObjectHandler_v1w : public ObjectHandler_v3d {
 public:
 	ObjectHandler_v1w(HugoEngine *vm);
-	~ObjectHandler_v1w();
+	~ObjectHandler_v1w() override;
 
-	void moveObjects();
-	void updateImages();
-	void swapImages(int objIndex1, int objIndex2);
+	void moveObjects() override;
+	void updateImages() override;
+	void swapImages(int objIndex1, int objIndex2) override;
 };
 
 } // End of namespace Hugo

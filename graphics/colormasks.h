@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef GRAPHICS_COLORMASKS_H
 #define GRAPHICS_COLORMASKS_H
 
-#include "graphics/pixelformat.h"
+#include "common/scummsys.h"
 
 namespace Graphics {
 
@@ -59,14 +58,14 @@ The meaning of these is masks is the following:
  To be specific: They pack the masks for two 16 bit pixels at once. The pixels
  are split into "high" and "low" bits, which are then separately interpolated
  and finally re-composed. That way, 2x2 pixels or even 4x2 pixels can
- be interpolated in one go.
-
+ be interpolated in one go. They are also included in 888 and 8888 to make
+ the same functions compatible when interpolating 2 32-bit pixels.
 */
 
 
 template<>
 struct ColorMasks<565> {
-	enum {
+	enum : uint {
 		kHighBitsMask    = 0xF7DEF7DE,
 		kLowBitsMask     = 0x08210821,
 		qhighBits   = 0xE79CE79C,
@@ -96,6 +95,8 @@ struct ColorMasks<565> {
 		kLow2Bits   = (3 << kRedShift) | (3 << kGreenShift) | (3 << kBlueShift),
 		kLow3Bits   = (7 << kRedShift) | (7 << kGreenShift) | (7 << kBlueShift)
 	};
+
+	typedef uint16 PixelType;
 };
 
 template<>
@@ -114,18 +115,10 @@ struct ColorMasks<555> {
 		kGreenBits  = 5,
 		kBlueBits   = 5,
 
-#ifdef __N64__
-		/* Nintendo 64 uses a BGR555 color format for 16bit display */
-		kAlphaShift = 0,
-		kRedShift   = kBlueBits+kGreenBits+1,
-		kGreenShift = kBlueBits + 1,
-		kBlueShift  = 1,
-#else   /* RGB555 */
 		kAlphaShift = 0,
 		kRedShift   = kGreenBits+kBlueBits,
 		kGreenShift = kBlueBits,
 		kBlueShift  = 0,
-#endif
 
 		kAlphaMask = ((1 << kAlphaBits) - 1) << kAlphaShift,
 		kRedMask   = ((1 << kRedBits) - 1) << kRedShift,
@@ -138,6 +131,8 @@ struct ColorMasks<555> {
 		kLow2Bits   = (3 << kRedShift) | (3 << kGreenShift) | (3 << kBlueShift),
 		kLow3Bits   = (7 << kRedShift) | (7 << kGreenShift) | (7 << kBlueShift)
 	};
+
+	typedef uint16 PixelType;
 };
 
 template<>
@@ -162,6 +157,8 @@ struct ColorMasks<1555> {
 
 		kRedBlueMask = kRedMask | kBlueMask
 	};
+
+	typedef uint16 PixelType;
 };
 
 template<>
@@ -186,6 +183,8 @@ struct ColorMasks<5551> {
 
 		kRedBlueMask = kRedMask | kBlueMask
 	};
+
+	typedef uint16 PixelType;
 };
 
 template<>
@@ -198,17 +197,10 @@ struct ColorMasks<4444> {
 		kGreenBits  = 4,
 		kBlueBits   = 4,
 
-#ifdef __PSP__	//PSP uses ABGR
-		kAlphaShift = kRedBits+kGreenBits+kBlueBits,
-		kRedShift   = 0,
-		kGreenShift = kRedBits,
-		kBlueShift  = kRedBits+kGreenBits,
-#else		//ARGB
 		kAlphaShift = kRedBits+kGreenBits+kBlueBits,
 		kRedShift   = kGreenBits+kBlueBits,
 		kGreenShift = kBlueBits,
 		kBlueShift  = 0,
-#endif
 
 		kAlphaMask = ((1 << kAlphaBits) - 1) << kAlphaShift,
 		kRedMask   = ((1 << kRedBits) - 1) << kRedShift,
@@ -217,6 +209,8 @@ struct ColorMasks<4444> {
 
 		kRedBlueMask = kRedMask | kBlueMask
 	};
+
+	typedef uint16 PixelType;
 };
 
 template<>
@@ -239,8 +233,21 @@ struct ColorMasks<888> {
 		kGreenMask = ((1 << kGreenBits) - 1) << kGreenShift,
 		kBlueMask  = ((1 << kBlueBits) - 1) << kBlueShift,
 
-		kRedBlueMask = kRedMask | kBlueMask
+		kRedBlueMask = kRedMask | kBlueMask,
+
+		kLowBits    = (1 << kRedShift) | (1 << kGreenShift) | (1 << kBlueShift),
+		kLow2Bits   = (3 << kRedShift) | (3 << kGreenShift) | (3 << kBlueShift),
+		kLow3Bits   = (7 << kRedShift) | (7 << kGreenShift) | (7 << kBlueShift),
+		kLow4Bits   = (15 << kRedShift) | (15 << kGreenShift) | (15 << kBlueShift),
+
+		kLowBitsMask = kLowBits,
+		// Prevent mask from including padding byte
+		kHighBitsMask = (~kLowBits) & (kRedMask | kBlueMask | kGreenMask),
+		qlowBits = kLow2Bits,
+		qhighBits = (~kLowBits) & (kRedMask | kBlueMask | kGreenMask)
 	};
+
+	typedef uint32 PixelType;
 };
 
 template<>
@@ -263,93 +270,57 @@ struct ColorMasks<8888> {
 		kGreenMask = ((1 << kGreenBits) - 1) << kGreenShift,
 		kBlueMask  = ((1 << kBlueBits) - 1) << kBlueShift,
 
-		kRedBlueMask = kRedMask | kBlueMask
+		kRedBlueMask = kRedMask | kBlueMask,
+
+		kLowBits    = (1 << kRedShift) | (1 << kGreenShift) | (1 << kBlueShift) | (1 << kAlphaShift),
+		kLow2Bits   = (3 << kRedShift) | (3 << kGreenShift) | (3 << kBlueShift) | (3 << kAlphaShift),
+		kLow3Bits   = (7 << kRedShift) | (7 << kGreenShift) | (7 << kBlueShift) | (7 << kAlphaShift),
+		kLow4Bits   = (15 << kRedShift) | (15 << kGreenShift) | (15 << kBlueShift) | (15 << kAlphaShift),
+
+		kLowBitsMask = kLowBits,
+		kHighBitsMask = ~kLowBits,
+		qlowBits = kLow2Bits,
+		qhighBits = ~kLow2Bits
 	};
+
+	typedef uint32 PixelType;
 };
 
-#ifdef __WII__
-/* Gamecube/Wii specific ColorMask ARGB3444 */
 template<>
-struct ColorMasks<3444> {
-	enum {
-		kBytesPerPixel = 2,
+struct ColorMasks<-8888> {
+	enum : uint {
+		kBytesPerPixel = 4,
 
-		kAlphaBits  = 3,
-		kRedBits    = 4,
-		kGreenBits  = 4,
-		kBlueBits   = 4,
+		kAlphaBits  = 8,
+		kRedBits    = 8,
+		kGreenBits  = 8,
+		kBlueBits   = 8,
 
-		kBlueShift  = 0,
-		kGreenShift = kBlueBits,
-		kRedShift   = kGreenBits+kBlueBits,
-		kAlphaShift = kGreenBits+kBlueBits+kRedBits,
+		kAlphaShift = 0,
+		kRedShift   = kAlphaBits,
+		kGreenShift = kRedBits+kAlphaBits,
+		kBlueShift  = kGreenBits+kRedBits+kAlphaBits,
 
-		kAlphaMask = ((1 << kAlphaBits) - 1) << kAlphaShift,
-		kRedMask   = ((1 << kRedBits) - 1) << kRedShift,
-		kGreenMask = ((1 << kGreenBits) - 1) << kGreenShift,
-		kBlueMask  = ((1 << kBlueBits) - 1) << kBlueShift,
+		kAlphaMask = ((1u << kAlphaBits) - 1) << kAlphaShift,
+		kRedMask   = ((1u << kRedBits) - 1) << kRedShift,
+		kGreenMask = ((1u << kGreenBits) - 1) << kGreenShift,
+		kBlueMask  = ((1u << kBlueBits) - 1) << kBlueShift,
 
-		kRedBlueMask = kRedMask | kBlueMask
+		kRedBlueMask = kRedMask | kBlueMask,
+
+		kLowBits    = (1 << kRedShift) | (1 << kGreenShift) | (1 << kBlueShift) | (1 << kAlphaShift),
+		kLow2Bits   = (3 << kRedShift) | (3 << kGreenShift) | (3 << kBlueShift) | (3 << kAlphaShift),
+		kLow3Bits   = (7 << kRedShift) | (7 << kGreenShift) | (7 << kBlueShift) | (7 << kAlphaShift),
+		kLow4Bits   = (15 << kRedShift) | (15 << kGreenShift) | (15 << kBlueShift) | (15 << kAlphaShift),
+
+		kLowBitsMask = kLowBits,
+		kHighBitsMask = (uint) ~kLowBits,
+		qlowBits = kLow2Bits,
+		qhighBits = (uint) ~kLow2Bits
 	};
+
+	typedef uint32 PixelType;
 };
-#endif
-
-template<class T>
-uint32 RGBToColor(uint8 r, uint8 g, uint8 b) {
-	return T::kAlphaMask |
-	       (((r << T::kRedShift) >> (8 - T::kRedBits)) & T::kRedMask) |
-	       (((g << T::kGreenShift) >> (8 - T::kGreenBits)) & T::kGreenMask) |
-	       (((b << T::kBlueShift) >> (8 - T::kBlueBits)) & T::kBlueMask);
-}
-
-template<class T>
-uint32 ARGBToColor(uint8 a, uint8 r, uint8 g, uint8 b) {
-	return (((a << T::kAlphaShift) >> (8 - T::kAlphaBits)) & T::kAlphaMask) |
-	       (((r << T::kRedShift) >> (8 - T::kRedBits)) & T::kRedMask) |
-	       (((g << T::kGreenShift) >> (8 - T::kGreenBits)) & T::kGreenMask) |
-	       (((b << T::kBlueShift) >> (8 - T::kBlueBits)) & T::kBlueMask);
-}
-
-template<class T>
-void colorToRGB(uint32 color, uint8 &r, uint8 &g, uint8 &b) {
-	r = ((color & T::kRedMask) >> T::kRedShift) << (8 - T::kRedBits);
-	g = ((color & T::kGreenMask) >> T::kGreenShift) << (8 - T::kGreenBits);
-	b = ((color & T::kBlueMask) >> T::kBlueShift) << (8 - T::kBlueBits);
-}
-
-template<class T>
-void colorToARGB(uint32 color, uint8 &a, uint8 &r, uint8 &g, uint8 &b) {
-	a = ((color & T::kAlphaMask) >> T::kAlphaShift) << (8 - T::kAlphaBits);
-	r = ((color & T::kRedMask) >> T::kRedShift) << (8 - T::kRedBits);
-	g = ((color & T::kGreenMask) >> T::kGreenShift) << (8 - T::kGreenBits);
-	b = ((color & T::kBlueMask) >> T::kBlueShift) << (8 - T::kBlueBits);
-}
-
-
-
-/**
- * Convert a 'bitFormat' as defined by one of the ColorMasks
- * into a PixelFormat.
- */
-template<int bitFormat>
-PixelFormat createPixelFormat() {
-	PixelFormat format;
-
-	format.bytesPerPixel = ColorMasks<bitFormat>::kBytesPerPixel;
-
-	format.rLoss = 8 - ColorMasks<bitFormat>::kRedBits;
-	format.gLoss = 8 - ColorMasks<bitFormat>::kGreenBits;
-	format.bLoss = 8 - ColorMasks<bitFormat>::kBlueBits;
-	format.aLoss = 8 - ColorMasks<bitFormat>::kAlphaBits;
-
-	format.rShift = ColorMasks<bitFormat>::kRedShift;
-	format.gShift = ColorMasks<bitFormat>::kGreenShift;
-	format.bShift = ColorMasks<bitFormat>::kBlueShift;
-	format.aShift = ColorMasks<bitFormat>::kAlphaShift;
-
-	return format;
-}
-
 
 } // End of namespace Graphics
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,7 +46,7 @@ public:
 
 class PackageSet : public Common::Archive {
 public:
-	virtual ~PackageSet();
+	~PackageSet() override;
 
 	PackageSet(Common::FSNode package, const Common::String &filename = "", bool searchSignature = false);
 	/**
@@ -55,7 +54,7 @@ public:
 	 * Patterns are not allowed, as this is meant to be a quick File::exists()
 	 * replacement.
 	 */
-	virtual bool hasFile(const Common::String &name) const;
+	bool hasFile(const Common::Path &path) const override;
 
 	/**
 	 * Add all members of the Archive to list.
@@ -63,23 +62,26 @@ public:
 	 *
 	 * @return the number of names added to list
 	 */
-	virtual int listMembers(Common::ArchiveMemberList &list) const;
+	int listMembers(Common::ArchiveMemberList &list) const override;
 
 	/**
 	 * Returns a ArchiveMember representation of the given file.
 	 */
-	virtual const Common::ArchiveMemberPtr getMember(const Common::String &name) const;
+	const Common::ArchiveMemberPtr getMember(const Common::Path &path) const override;
 
 	/**
 	 * Create a stream bound to a member with the specified name in the
 	 * archive. If no member with this name exists, 0 is returned.
 	 * @return the newly created input stream
 	 */
-	virtual Common::SeekableReadStream *createReadStreamForMember(const Common::String &name) const;
+	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override;
 
 	int getPriority() const { return _priority; }
+	uint32 getVersion() const { return _version; }
+
 private:
 	byte _priority;
+	uint32 _version;
 	Common::Array<BasePackage *> _packages;
 	Common::HashMap<Common::String, Common::ArchiveMemberPtr> _files;
 	Common::HashMap<Common::String, Common::ArchiveMemberPtr>::iterator _filesIter;

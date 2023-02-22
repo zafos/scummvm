@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -109,6 +108,8 @@ void Scene30::run() {
 					case PLAT_CURSOR:
 						gnap.playImpossible();
 						break;
+					default:
+						break;
 					}
 				}
 			}
@@ -136,6 +137,8 @@ void Scene30::run() {
 					case TALK_CURSOR:
 					case PLAT_CURSOR:
 						gnap.playImpossible(Common::Point(8, 5));
+						break;
+					default:
 						break;
 					}
 				}
@@ -268,6 +271,8 @@ void Scene30::updateAnimations() {
 				_vm->showFullScreenSprite(0xE2);
 			gnap._actionStatus = -1;
 			break;
+		default:
+			break;
 		}
 	}
 }
@@ -367,6 +372,8 @@ void Scene31::run() {
 					case PLAT_CURSOR:
 						gnap.playImpossible();
 						break;
+					default:
+						break;
 					}
 				}
 			}
@@ -410,6 +417,8 @@ void Scene31::run() {
 						} else
 							gnap.playImpossible();
 						break;
+					default:
+						break;
 					}
 				}
 			}
@@ -446,6 +455,8 @@ void Scene31::run() {
 					case TALK_CURSOR:
 					case PLAT_CURSOR:
 						gnap.playImpossible();
+						break;
+					default:
 						break;
 					}
 				}
@@ -575,6 +586,8 @@ void Scene31::updateAnimations() {
 		case kAS31LeaveScene:
 			_vm->_sceneDone = true;
 			gnap._actionStatus = -1;
+			break;
+		default:
 			break;
 		}
 	}
@@ -720,6 +733,8 @@ void Scene32::run() {
 					case PLAT_CURSOR:
 						gnap.playImpossible(plat._pos);
 						break;
+					default:
+						break;
 					}
 				}
 			}
@@ -748,6 +763,8 @@ void Scene32::run() {
 				gnap.walkTo(Common::Point(-1, -1), -1, -1, 1);
 			break;
 
+		default:
+			break;
 		}
 
 		if (_vm->_mouseClickState._left && gnap._actionStatus < 0) {
@@ -898,6 +915,8 @@ void Scene33::run() {
 					case PLAT_CURSOR:
 						gnap.playImpossible(plat._pos);
 						break;
+					default:
+						break;
 					}
 				}
 			}
@@ -924,6 +943,8 @@ void Scene33::run() {
 					case LOOK_CURSOR:
 					case PLAT_CURSOR:
 						gnap.playImpossible();
+						break;
+					default:
 						break;
 					}
 				}
@@ -1182,6 +1203,8 @@ void Scene38::run() {
 				case PLAT_CURSOR:
 					gnap.playImpossible(plat._pos);
 					break;
+				default:
+					break;
 				}
 			}
 			break;
@@ -1244,6 +1267,8 @@ void Scene38::run() {
 						break;
 					case PLAT_CURSOR:
 						gnap.playImpossible();
+						break;
+					default:
 						break;
 					}
 				}
@@ -1385,6 +1410,8 @@ void Scene38::updateAnimations() {
 			plat._actionStatus = kAS38PlatypusHoldingTrapDoor;
 			updateHotspots();
 			break;
+		default:
+			break;
 		}
 	}
 
@@ -1492,6 +1519,8 @@ void Scene39::run() {
 					case PLAT_CURSOR:
 						gnap.playImpossible(plat._pos);
 						break;
+					default:
+						break;
 					}
 				}
 			}
@@ -1522,6 +1551,8 @@ void Scene39::run() {
 					case TALK_CURSOR:
 					case PLAT_CURSOR:
 						gnap.playImpossible();
+						break;
+					default:
 						break;
 					}
 				}
@@ -1571,6 +1602,8 @@ void Scene39::run() {
 					break;
 				case 3:
 					_nextGuySequenceId = 0x33;
+					break;
+				default:
 					break;
 				}
 			}

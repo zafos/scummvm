@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -63,7 +62,8 @@ namespace Hopkins {
 #define SCREEN_HEIGHT 480
 
 enum HopkinsDebugChannels {
-	kDebugPath      = 1 <<  0
+	kDebugPath     = 1 << 0,
+	kDebugGraphics = 1 << 1
 };
 
 /**
@@ -127,16 +127,13 @@ private:
 	bool displayAdultDisclaimer();
 protected:
 	// Engine APIs
-	virtual Common::Error run();
-	virtual bool hasFeature(EngineFeature f) const;
-
-	GUI::Debugger *getDebugger() { return _debug; }
+	Common::Error run() override;
+	bool hasFeature(EngineFeature f) const override;
 
 public:
 	AnimationManager *_animMan;
 	ComputerManager *_computer;
 	DialogsManager *_dialog;
-	Debugger *_debug;
 	EventsManager *_events;
 	FileManager *_fileIO;
 	FontManager *_fontMan;
@@ -152,7 +149,7 @@ public:
 
 public:
 	HopkinsEngine(OSystem *syst, const HopkinsGameDescription *gameDesc);
-	virtual ~HopkinsEngine();
+	~HopkinsEngine() override;
 	void GUIError(const Common::String &msg);
 
 	uint32 getFeatures() const;
@@ -163,12 +160,13 @@ public:
 	const Common::String &getTargetName() const;
 
 	int getRandomNumber(int maxNumber);
-	Common::String generateSaveName(int slotNumber);
-	virtual bool canLoadGameStateCurrently();
-	virtual bool canSaveGameStateCurrently();
-	virtual Common::Error loadGameState(int slot);
-	virtual Common::Error saveGameState(int slot, const Common::String &desc);
+	bool canLoadGameStateCurrently() override;
+	bool canSaveGameStateCurrently() override;
+	Common::Error loadGameState(int slot) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+
 	int _startGameSlot;
+
 	/**
 	 * Run the introduction sequence
 	 */
@@ -177,7 +175,7 @@ public:
 	/**
 	 * Synchronizes the sound settings from ScummVM into the engine
 	 */
-	virtual void syncSoundSettings();
+	void syncSoundSettings() override;
 };
 
 } // End of namespace Hopkins

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -79,8 +78,11 @@
 
 namespace LastExpress {
 
+// our own hack until compression code will be confirmed stable
+#define DISABLE_COMPRESSION 1
+
 // Savegame signatures
-#define SAVEGAME_SIGNATURE       0x12001200    // 301994496
+#define SAVEGAME_SIGNATURE       (0x12001200 ^ DISABLE_COMPRESSION)    // 301994496
 #define SAVEGAME_ENTRY_SIGNATURE 0xE660E660    // 3865110112
 
 #define WRAP_SYNC_FUNCTION(instance, className, method) \
@@ -102,12 +104,12 @@ public:
 		memset(_buffer, 0, 256);
 	}
 
-	int32 pos() const { return MemoryWriteStreamDynamic::pos(); }
-	int32 size() const { return MemoryWriteStreamDynamic::size(); }
-	bool seek(int32 offset, int whence = SEEK_SET) { return MemoryWriteStreamDynamic::seek(offset, whence); }
-	bool eos() const { return _eos; }
-	uint32 read(void *dataPtr, uint32 dataSize);
-	uint32 write(const void *dataPtr, uint32 dataSize);
+	int64 pos() const override { return MemoryWriteStreamDynamic::pos(); }
+	int64 size() const override { return MemoryWriteStreamDynamic::size(); }
+	bool seek(int64 offset, int whence = SEEK_SET) override { return MemoryWriteStreamDynamic::seek(offset, whence); }
+	bool eos() const override { return _eos; }
+	uint32 read(void *dataPtr, uint32 dataSize) override;
+	uint32 write(const void *dataPtr, uint32 dataSize) override;
 
 	uint32 process();
 
@@ -196,7 +198,7 @@ private:
 			field_1C = 9;
 		}
 
-		void saveLoadWithSerializer(Common::Serializer &s) {
+		void saveLoadWithSerializer(Common::Serializer &s) override {
 			s.syncAsUint32LE(signature);
 			s.syncAsUint32LE(count);
 			s.syncAsUint32LE(offset);
@@ -258,7 +260,7 @@ private:
 			field_1C = 0;
 		}
 
-		void saveLoadWithSerializer(Common::Serializer &s) {
+		void saveLoadWithSerializer(Common::Serializer &s) override {
 			s.syncAsUint32LE(signature);
 			s.syncAsUint32LE(type);
 			s.syncAsUint32LE(time);

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,7 +26,6 @@
 #include "common/scummsys.h"
 #include "common/serializer.h"
 #include "scumm/scumm.h"
-
 
 namespace Scumm {
 
@@ -48,7 +46,7 @@ enum MoveFlags {
 };
 
 struct CostumeData {
-	byte active[16];
+	byte animType[16];
 	uint16 animCounter;
 	byte soundCounter;
 	byte soundPos;
@@ -66,7 +64,7 @@ struct CostumeData {
 	void reset() {
 		stopped = 0;
 		for (int i = 0; i < 16; i++) {
-			active[i] = 0;
+			animType[i] = 0; // AKAT_Empty
 			curpos[i] = start[i] = end[i] = frame[i] = 0xFFFF;
 		}
 	}
@@ -78,8 +76,8 @@ struct AdjustBoxResult {	/* Result type of AdjustBox functions */
 };
 
 enum {
-	kOldInvalidBox = 255,	// For small header games
-	kNewInavlidBox = 0
+	kOldInvalidBox = 255,	// For GF_SMALL_HEADER games
+	kNewInvalidBox = 0
 };
 
 class Actor : public Common::Serializable {
@@ -110,6 +108,7 @@ public:
 	byte _moving;
 	bool _ignoreBoxes;
 	byte _forceClip;
+	uint16 _lastValidX, _lastValidY;
 
 	byte _initFrame;
 	byte _walkFrame;
@@ -151,6 +150,23 @@ protected:
 		Common::Point point3;
 		int32 deltaXFactor, deltaYFactor;
 		uint16 xfrac, yfrac;
+		uint16 xAdd, yAdd;
+
+		void reset() {
+			dest.x = dest.y = 0;
+			destbox = 0;
+			destdir = 0;
+			cur.x = cur.y = 0;
+			curbox = 0;
+			next.x = next.y = 0;
+			point3.x = point3.y = 0;
+			deltaXFactor = 0;
+			deltaYFactor = 0;
+			xfrac = 0;
+			yfrac = 0;
+			xAdd = 0;
+			yAdd = 0;
+		}
 	};
 
 
@@ -167,7 +183,7 @@ protected:
 public:
 
 	Actor(ScummEngine *scumm, int id);
-	virtual ~Actor() {}
+	~Actor() override {}
 
 //protected:
 	virtual void hideActor();
@@ -190,7 +206,7 @@ public:
 	void putActor(int x, int y, int room);
 	void setActorWalkSpeed(uint newSpeedX, uint newSpeedY);
 protected:
-	int calcMovementFactor(const Common::Point& next);
+	virtual int calcMovementFactor(const Common::Point& next);
 	int actorWalkStep();
 	int remapDirection(int dir, bool is_walking);
 	virtual void setupActorScale();
@@ -300,7 +316,7 @@ public:
 
 	void classChanged(int cls, bool value);
 
-	virtual void saveLoadWithSerializer(Common::Serializer &ser);
+	void saveLoadWithSerializer(Common::Serializer &ser) override;
 
 protected:
 	bool isInClass(int cls);
@@ -312,26 +328,36 @@ protected:
 
 class Actor_v3 : public Actor {
 public:
-	Actor_v3(ScummEngine *scumm, int id) : Actor(scumm, id) {}
+	Actor_v3(ScummEngine *scumm, int id) : Actor(scumm, id), _stepX(1), _stepThreshold(0), _facingXYratio(scumm->_game.version == 3 ? 3 : 1) {}
 
-	virtual void walkActor();
+	void initActor(int mode) override;
+	void walkActor() override;
+
+	void saveLoadWithSerializer(Common::Serializer &ser) override;
 
 protected:
-	virtual void setupActorScale();
+	int calcMovementFactor(const Common::Point& next) override;
+	int actorWalkStep();
+
+	void setupActorScale() override;
 	void findPathTowardsOld(byte box, byte box2, byte box3, Common::Point &p2, Common::Point &p3);
+
+private:
+	uint _stepX, _stepThreshold;
+	const int _facingXYratio;
 };
 
 class Actor_v2 : public Actor_v3 {
 public:
 	Actor_v2(ScummEngine *scumm, int id) : Actor_v3(scumm, id) {}
 
-	virtual void initActor(int mode);
-	virtual void walkActor();
-	virtual AdjustBoxResult adjustXYToBeInBox(int dstX, int dstY);
+	void initActor(int mode) override;
+	void walkActor() override;
+	AdjustBoxResult adjustXYToBeInBox(int dstX, int dstY) override;
 
 protected:
-	virtual bool isPlayer();
-	virtual void prepareDrawActorCostume(BaseCostumeRenderer *bcr);
+	bool isPlayer() override;
+	void prepareDrawActorCostume(BaseCostumeRenderer *bcr) override;
 };
 
 enum ActorV0MiscFlags {
@@ -393,19 +419,19 @@ private:
 public:
 	Actor_v0(ScummEngine *scumm, int id) : Actor_v2(scumm, id) {}
 
-	void initActor(int mode);
+	void initActor(int mode) override;
 	void animateActor(int anim);
-	void animateCostume();
+	void animateCostume() override;
 
 	void limbFrameCheck(int limb);
 
 	void directionUpdate();
 	void speakCheck();
-	void setDirection(int direction);
-	void startAnimActor(int f);
+	void setDirection(int direction) override;
+	void startAnimActor(int f) override;
 
 	bool calcWalkDistances();
-	void walkActor();
+	void walkActor() override;
 	void actorSetWalkTo();
 	byte actorWalkXCalculate();
 	byte actorWalkYCalculate();
@@ -414,13 +440,13 @@ public:
 	void walkBoxQueueReset();
 	bool walkBoxQueuePrepare();
 
-	AdjustBoxResult adjustXYToBeInBox(int dstX, int dstY);
+	AdjustBoxResult adjustXYToBeInBox(int dstX, int dstY) override;
 	AdjustBoxResult adjustPosInBorderWalkbox(AdjustBoxResult box);
 
 	void setActorToTempPosition();
 	void setActorToOriginalPosition();
 
-	virtual void saveLoadWithSerializer(Common::Serializer &ser);
+	void saveLoadWithSerializer(Common::Serializer &ser) override;
 };
 
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -38,6 +37,7 @@
 #include "tinsel/graphics.h"
 #include "tinsel/sound.h"
 #include "tinsel/dw.h"
+#include "tinsel/detection.h"
 
 /**
  * This is the namespace of the Tinsel engine.
@@ -55,44 +55,19 @@ class Config;
 class MidiDriver;
 class MidiMusicPlayer;
 class PCMMusicPlayer;
+class Music;
 class SoundManager;
+class Background;
+class Font;
+class Cursor;
+class Actor;
+class Handle;
+class Scroll;
+class Dialogs;
+class Notebook;
+class SystemReel;
 
 typedef Common::List<Common::Rect> RectList;
-
-enum TinselGameID {
-	GID_DW1 = 0,
-	GID_DW2 = 1
-};
-
-enum TinselGameFeatures {
-	GF_SCNFILES = 1 << 0,
-	GF_ENHANCED_AUDIO_SUPPORT = 1 << 1,
-	GF_ALT_MIDI = 1 << 2,		// Alternate sequence in midi.dat file
-
-	// The GF_USE_?FLAGS values specify how many country flags are displayed
-	// in the subtitles options dialog.
-	// None of these defined -> 1 language, in ENGLISH.TXT
-	GF_USE_3FLAGS = 1 << 3,	// French, German, Spanish
-	GF_USE_4FLAGS = 1 << 4,	// French, German, Spanish, Italian
-	GF_USE_5FLAGS = 1 << 5	// All 5 flags
-};
-
-/**
- * The following is the ScummVM definitions of the various Tinsel versions:
- * TINSEL_V0 - This was an early engine version that was only used in the Discworld 1
- *			demo.
- * TINSEL_V1 - This was the engine version used by Discworld 1. Note that there were two
- *			major releases: an earlier version that used *.gra files, and a later one that
- *			used *.scn files, and contained certain script and engine bugfixes. In ScummVM,
- *			we treat both releases as 'Tinsel 1', since the engine fixes from the later
- *			version work equally well the earlier version data.
- * TINSEL_V2 - This is the engine used for the Discworld 2 game.
- */
-enum TinselEngineVersion {
-	TINSEL_V0 = 0,
-	TINSEL_V1 = 1,
-	TINSEL_V2 = 2
-};
 
 enum {
 	kTinselDebugAnimations = 1 << 0,
@@ -104,8 +79,6 @@ enum {
 #define DEBUG_BASIC 1
 #define DEBUG_INTERMEDIATE 2
 #define DEBUG_DETAILED 3
-
-struct TinselGameDescription;
 
 enum TinselKeyDirection {
 	MSK_LEFT = 1, MSK_RIGHT = 2, MSK_UP = 4, MSK_DOWN = 8,
@@ -128,18 +101,17 @@ typedef bool (*KEYFPTR)(const Common::KeyState &);
 #define GAME_FRAME_DELAY (1000 / ONE_SECOND)
 
 #define TinselVersion (_vm->getVersion())
-#define TinselV0 (TinselVersion == TINSEL_V0)
-#define TinselV1 (TinselVersion == TINSEL_V1)
-#define TinselV2 (TinselVersion == TINSEL_V2)
-#define TinselV2Demo (TinselVersion == TINSEL_V2 && _vm->getIsADGFDemo())
-#define TinselV1PSX (TinselVersion == TINSEL_V1 && _vm->getPlatform() == Common::kPlatformPSX)
-#define TinselV1Mac (TinselVersion == TINSEL_V1 && _vm->getPlatform() == Common::kPlatformMacintosh)
+#define TinselV2Demo (TinselVersion == 2 && _vm->getIsADGFDemo())
+#define TinselV1PSX (TinselVersion == 1 && _vm->getPlatform() == Common::kPlatformPSX)
+#define TinselV1Mac (TinselVersion == 1 && _vm->getPlatform() == Common::kPlatformMacintosh)
+#define TinselV1Saturn (TinselVersion == 1 && _vm->getPlatform() == Common::kPlatformSaturn)
 
-#define READ_16(v) (TinselV1Mac ? READ_BE_UINT16(v) : READ_LE_UINT16(v))
-#define READ_32(v) (TinselV1Mac ? READ_BE_UINT32(v) : READ_LE_UINT32(v))
-#define FROM_16(v) (TinselV1Mac ? FROM_BE_16(v) : FROM_LE_16(v))
-#define FROM_32(v) (TinselV1Mac ? FROM_BE_32(v) : FROM_LE_32(v))
-#define TO_32(v)   (TinselV1Mac ? TO_BE_32(v) : TO_LE_32(v))
+#define READ_16(v) (TinselV1Mac || TinselV1Saturn ? READ_BE_UINT16(v) : READ_LE_UINT16(v))
+#define READ_32(v) (TinselV1Mac || TinselV1Saturn ? READ_BE_UINT32(v) : READ_LE_UINT32(v))
+#define WRITE_32(p, v) (TinselV1Mac || TinselV1Saturn ? WRITE_BE_UINT32(p, v) : WRITE_LE_UINT32(p, v))
+#define FROM_16(v) (TinselV1Mac || TinselV1Saturn ? FROM_BE_16(v) : FROM_LE_16(v))
+#define FROM_32(v) (TinselV1Mac || TinselV1Saturn ? FROM_BE_32(v) : FROM_LE_32(v))
+#define TO_32(v)   (TinselV1Mac || TinselV1Saturn ? TO_BE_32(v) : TO_LE_32(v))
 
 // Global reference to the TinselEngine object
 extern TinselEngine *_vm;
@@ -151,31 +123,30 @@ class TinselEngine : public Engine {
 	Graphics::Surface _screenSurface;
 	Common::Point _mousePos;
 	uint8 _dosPlayerDir;
-	Console *_console;
-	GUI::Debugger *getDebugger() { return _console; }
 
 	static const char *const _sampleIndices[][3];
 	static const char *const _sampleFiles[][3];
 	static const char *const _textFiles[][3];
+	static const char *const _sceneFiles[];
 
 protected:
 
 	// Engine APIs
-	virtual void initializePath(const Common::FSNode &gamePath);
-	virtual Common::Error run();
-	virtual bool hasFeature(EngineFeature f) const;
-	Common::Error loadGameState(int slot);
+	void initializePath(const Common::FSNode &gamePath) override;
+	Common::Error run() override;
+	bool hasFeature(EngineFeature f) const override;
+	Common::Error loadGameState(int slot) override;
 #if 0
-	Common::Error saveGameState(int slot, const Common::String &desc);
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false);
 #endif
-	bool canLoadGameStateCurrently();
+	bool canLoadGameStateCurrently() override;
 #if 0
 	bool canSaveGameStateCurrently();
 #endif
 
 public:
 	TinselEngine(OSystem *syst, const TinselGameDescription *gameDesc);
-	virtual ~TinselEngine();
+	~TinselEngine() override;
 	int getGameId() {
 		return _gameId;
 	}
@@ -185,7 +156,6 @@ public:
 	uint32 getFeatures() const;
 	Common::Language getLanguage() const;
 	uint16 getVersion() const;
-	uint32 getFlags() const;
 	Common::Platform getPlatform() const;
 	bool getIsADGFDemo() const;
 	bool isV1CD() const;
@@ -193,14 +163,25 @@ public:
 	const char *getSampleIndex(LANGUAGE lang);
 	const char *getSampleFile(LANGUAGE lang);
 	const char *getTextFile(LANGUAGE lang);
+	// Noir
+	const char *getSceneFile(LANGUAGE lang);
 
 	MidiDriver *_driver;
 	SoundManager *_sound;
 	MidiMusicPlayer *_midiMusic;
 	PCMMusicPlayer *_pcmMusic;
+	Music *_music;
 	BMVPlayer *_bmv;
-
+	Background* _bg;
+	Font *_font;
+	Cursor *_cursor;
+	Actor *_actor;
+	Handle *_handle;
 	Config *_config;
+	Scroll *_scroll;
+	Dialogs *_dialogs;
+	Notebook *_notebook = nullptr;
+	SystemReel *_systemReel = nullptr;
 
 	KEYFPTR _keyHandler;
 
@@ -235,7 +216,7 @@ public:
 		pt.x = CLIP<int16>(pt.x, 0, SCREEN_WIDTH - 1);
 		pt.y = CLIP<int16>(pt.y, 0, SCREEN_HEIGHT - 1);
 
-		int yOffset = TinselV2 ? (g_system->getHeight() - _screenSurface.h) / 2 : 0;
+		int yOffset = (TinselVersion >= 2) ? (g_system->getHeight() - _screenSurface.h) / 2 : 0;
 		g_system->warpMouse(pt.x, pt.y + yOffset);
 		_mousePos = pt;
 	}

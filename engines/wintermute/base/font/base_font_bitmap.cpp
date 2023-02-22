@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,6 +27,7 @@
 
 #include "engines/wintermute/base/font/base_font_bitmap.h"
 #include "engines/wintermute/utils/string_util.h"
+#include "engines/wintermute/base/base_engine.h"
 #include "engines/wintermute/base/base_parser.h"
 #include "engines/wintermute/base/base_frame.h"
 #include "engines/wintermute/base/gfx/base_surface.h"
@@ -141,6 +141,9 @@ int BaseFontBitmap::textHeightDraw(const byte *text, int x, int y, int width, TT
 	bool done = false;
 	bool newLine = false;
 	bool longLine = false;
+#ifdef ENABLE_FOXTAIL
+	bool minimizeSpacing = BaseEngine::instance().isFoxTail();
+#endif
 
 	if (draw) {
 		_gameRef->_renderer->startSpriteBatch();
@@ -211,6 +214,11 @@ int BaseFontBitmap::textHeightDraw(const byte *text, int x, int y, int width, TT
 				startX += getCharWidth(str[i]);
 			}
 			y += _tileHeight;
+#ifdef ENABLE_FOXTAIL
+			if (minimizeSpacing) {
+				y -= 3;
+			}
+#endif
 			last_end = end;
 			if (longLine) {
 				end--;
@@ -264,7 +272,7 @@ void BaseFontBitmap::drawChar(byte c, int x, int y) {
 		}
 	}
 	if (!handled && _subframe) {
-		_subframe->_surface->displayTrans(x, y, rect);
+		_subframe->_surface->displayTrans(x, y, rect, _subframe->_alpha);
 	}
 }
 
@@ -308,6 +316,9 @@ TOKEN_DEF(EDITOR_PROPERTY)
 TOKEN_DEF(SPRITE)
 TOKEN_DEF(WIDTHS_FRAME)
 TOKEN_DEF(PAINT_WHOLE_CELL)
+#ifdef ENABLE_FOXTAIL
+TOKEN_DEF(COLOR)
+#endif
 TOKEN_DEF_END
 //////////////////////////////////////////////////////////////////////
 bool BaseFontBitmap::loadBuffer(char *buffer) {
@@ -328,6 +339,9 @@ bool BaseFontBitmap::loadBuffer(char *buffer) {
 	TOKEN_TABLE(SPRITE)
 	TOKEN_TABLE(WIDTHS_FRAME)
 	TOKEN_TABLE(PAINT_WHOLE_CELL)
+#ifdef ENABLE_FOXTAIL
+	TOKEN_TABLE(COLOR)
+#endif
 	TOKEN_TABLE_END
 
 	char *params;
@@ -345,7 +359,11 @@ bool BaseFontBitmap::loadBuffer(char *buffer) {
 	int lastWidth = 0;
 	int i;
 	int r = 255, g = 255, b = 255;
-	bool custoTrans = false;
+	bool customTrans = false;
+#ifdef ENABLE_FOXTAIL
+	int ar = 255, ag = 255, ab = 255;
+	bool customAlpha = false;
+#endif
 	char *surfaceFile = nullptr;
 	char *spriteFile = nullptr;
 
@@ -366,8 +384,15 @@ bool BaseFontBitmap::loadBuffer(char *buffer) {
 
 		case TOKEN_TRANSPARENT:
 			parser.scanStr(params, "%d,%d,%d", &r, &g, &b);
-			custoTrans = true;
+			customTrans = true;
 			break;
+
+#ifdef ENABLE_FOXTAIL
+		case TOKEN_COLOR:
+			parser.scanStr(params, "%d,%d,%d", &ar, &ag, &ab);
+			customAlpha = true;
+			break;
+#endif
 
 		case TOKEN_WIDTHS:
 			parser.scanStr(params, "%D", widths, &num);
@@ -419,6 +444,9 @@ bool BaseFontBitmap::loadBuffer(char *buffer) {
 		case TOKEN_EDITOR_PROPERTY:
 			parseEditorProperty(params, false);
 			break;
+
+		default:
+			break;
 		}
 
 	}
@@ -438,11 +466,16 @@ bool BaseFontBitmap::loadBuffer(char *buffer) {
 
 	if (surfaceFile != nullptr && !_sprite) {
 		_subframe = new BaseSubFrame(_gameRef);
-		if (custoTrans) {
+		if (customTrans) {
 			_subframe->setSurface(surfaceFile, false, r, g, b);
 		} else {
 			_subframe->setSurface(surfaceFile);
 		}
+#ifdef ENABLE_FOXTAIL
+		if (customAlpha) {
+			_subframe->_alpha = BYTETORGBA(ar, ag, ab, 255);
+		}
+#endif
 	}
 
 
@@ -485,6 +518,14 @@ bool BaseFontBitmap::loadBuffer(char *buffer) {
 			_widths[i] = defaultWidth;
 		}
 	}
+
+#ifdef ENABLE_FOXTAIL
+	if (BaseEngine::instance().isFoxTail()) {
+		for (i = lastWidth; i < NUM_CHARACTERS; i++) {
+			_widths[i]--;
+		}
+	}
+#endif
 
 
 	return STATUS_OK;

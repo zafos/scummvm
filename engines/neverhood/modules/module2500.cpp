@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -136,6 +135,8 @@ void Module2500::createScene(int sceneNum, int which) {
 		else
 			createStaticScene(0x7A343546, 0x435427AB);
 		break;
+	default:
+		break;
 	}
 	SetUpdateHandler(&Module2500::updateScene);
 	_childObject->handleUpdate();
@@ -200,6 +201,8 @@ void Module2500::updateScene() {
 		case 9:
 			createScene(8, 2);
 			break;
+		default:
+			break;
 		}
 	}
 }
@@ -212,6 +215,8 @@ uint32 Module2500::handleMessage(int messageNum, const MessageParam &param, Enti
 		_soundIndex++;
 		if (_soundIndex >= 4)
 			_soundIndex = 0;
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -331,7 +336,7 @@ void Scene2501::update() {
 		_asCar->setVisible(true);
 		sendMessage(_asCar, NM_CAR_ENTER, 0);
 		_asCar->handleUpdate();
-		_klaymen = NULL;
+		_klaymen = nullptr;
 		_carStatus = 0;
 	}
 	updateKlaymenClipRect();
@@ -392,6 +397,8 @@ uint32 Scene2501::handleMessage(int messageNum, const MessageParam &param, Entit
 	case 0x200D:
 		sendMessage(_parentModule, 0x200D, 0);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -422,6 +429,8 @@ uint32 Scene2501::hmRidingCar(int messageNum, const MessageParam &param, Entity 
 	case 0x200D:
 		sendMessage(_parentModule, 0x200D, 0);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -434,6 +443,8 @@ uint32 Scene2501::hmCarAtHome(int messageNum, const MessageParam &param, Entity 
 		break;
 	case 0x200D:
 		sendMessage(_parentModule, 0x200D, 0);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -494,6 +505,8 @@ uint32 Scene2504::handleMessage(int messageNum, const MessageParam &param, Entit
 	case NM_MOUSE_CLICK:
 		if (param.asPoint().x <= 20 || param.asPoint().x >= 620)
 			leaveScene(0);
+		break;
+	default:
 		break;
 	}
 	return messageResult;

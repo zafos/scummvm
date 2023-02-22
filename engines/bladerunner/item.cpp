@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -52,7 +51,7 @@ Item::Item(BladeRunnerEngine *vm) {
 	_isSpinning = false;
 	_facingChange = 0;
 	_isVisible = true;
-	_isPoliceMazeEnemy = true;
+	_isPoliceMazeEnemy = false;
 	_screenRectangle.bottom = -1;
 	_screenRectangle.right = -1;
 	_screenRectangle.top = -1;
@@ -70,12 +69,13 @@ void Item::getWidthHeight(int *width, int *height) const {
 	*height = _height;
 }
 
-bool Item::isTarget() const {
-	return _isTarget;
+void Item::getAnimationId(int *animationId) const {
+	*animationId = _animationId;
 }
 
-bool Item::isPoliceMazeEnemy() const {
-	return _isPoliceMazeEnemy;
+void Item::setFacing(int facing) {
+	_facing = facing;
+	_angle = _facing * (M_PI / 512.0f);
 }
 
 bool Item::tick(Common::Rect *screenRect, bool special) {
@@ -128,6 +128,9 @@ bool Item::tick(Common::Rect *screenRect, bool special) {
 	return isVisibleFlag;
 }
 
+// setXYZ() recalculates the item's bounding box,
+// but in addition to the item's (Vector3) position
+// it takes into account the item's width and height
 void Item::setXYZ(Vector3 position) {
 	_position = position;
 	int halfWidth = _width / 2;
@@ -177,7 +180,7 @@ bool Item::isUnderMouse(int mouseX, int mouseY) const {
 void Item::save(SaveFileWriteStream &f) {
 	f.writeInt(_setId);
 	f.writeInt(_itemId);
-	f.writeBoundingBox(_boundingBox);
+	f.writeBoundingBox(_boundingBox, false);
 	f.writeRect(_screenRectangle);
 	f.writeInt(_animationId);
 	f.writeVector3(_position);
@@ -199,7 +202,7 @@ void Item::save(SaveFileWriteStream &f) {
 void Item::load(SaveFileReadStream &f) {
 	_setId = f.readInt();
 	_itemId = f.readInt();
-	_boundingBox = f.readBoundingBox();
+	_boundingBox = f.readBoundingBox(false);
 	_screenRectangle = f.readRect();
 	_animationId = f.readInt();
 	_position = f.readVector3();

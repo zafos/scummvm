@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -97,9 +96,9 @@ private:
 public:
 	AntiAirUnit(AI *ai);
 	AntiAirUnit(DefenseUnit *inUnit, AI *ai);
-	int getType() const { return DUT_ANTI_AIR; }
-	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY);
-	int selectWeapon(int index);
+	int getType() const override { return DUT_ANTI_AIR; }
+	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY) override;
+	int selectWeapon(int index) override;
 };
 
 class ShieldUnit : public DefenseUnit {
@@ -108,9 +107,9 @@ private:
 public:
 	ShieldUnit(AI *ai);
 	ShieldUnit(DefenseUnit *inUnit, AI *ai);
-	int getType() const { return DUT_SHIELD; }
-	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY);
-	int selectWeapon(int index);
+	int getType() const override { return DUT_SHIELD; }
+	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY) override;
+	int selectWeapon(int index) override;
 };
 
 class MineUnit : public DefenseUnit {
@@ -119,9 +118,9 @@ private:
 public:
 	MineUnit(AI *ai);
 	MineUnit(DefenseUnit *inUnit, AI *ai);
-	int getType() const { return DUT_MINE; }
-	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY);
-	int selectWeapon(int index);
+	int getType() const override { return DUT_MINE; }
+	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY) override;
+	int selectWeapon(int index) override;
 };
 
 class HubUnit : public DefenseUnit {
@@ -130,9 +129,9 @@ private:
 public:
 	HubUnit(AI *ai);
 	HubUnit(DefenseUnit *inUnit, AI *ai);
-	int getType() const { return DUT_HUB; }
-	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY);
-	int selectWeapon(int index);
+	int getType() const override { return DUT_HUB; }
+	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY) override;
+	int selectWeapon(int index) override;
 };
 
 class TowerUnit : public DefenseUnit {
@@ -141,9 +140,9 @@ private:
 public:
 	TowerUnit(AI *ai);
 	TowerUnit(DefenseUnit *inUnit, AI *ai);
-	int getType() const { return DUT_TOWER; }
-	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY);
-	int selectWeapon(int index);
+	int getType() const override { return DUT_TOWER; }
+	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY) override;
+	int selectWeapon(int index) override;
 };
 
 class BridgeUnit : public DefenseUnit {
@@ -152,9 +151,9 @@ private:
 public:
 	BridgeUnit(AI *ai);
 	BridgeUnit(DefenseUnit *inUnit, AI *ai);
-	int getType() const { return DUT_BRIDGE; }
-	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY);
-	int selectWeapon(int index);
+	int getType() const override { return DUT_BRIDGE; }
+	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY) override;
+	int selectWeapon(int index) override;
 };
 
 class EnergyUnit : public DefenseUnit {
@@ -163,9 +162,9 @@ private:
 public:
 	EnergyUnit(AI *ai);
 	EnergyUnit(DefenseUnit *inUnit, AI *ai);
-	int getType() const { return DUT_ENERGY; }
-	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY);
-	int selectWeapon(int index);
+	int getType() const override { return DUT_ENERGY; }
+	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY) override;
+	int selectWeapon(int index) override;
 };
 
 class OffenseUnit : public DefenseUnit {
@@ -174,9 +173,9 @@ private:
 public:
 	OffenseUnit(AI *ai);
 	OffenseUnit(DefenseUnit *inUnit, AI *ai);
-	int getType() const { return DUT_OFFENSE; }
-	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY);
-	int selectWeapon(int index);
+	int getType() const override { return DUT_OFFENSE; }
+	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY) override;
+	int selectWeapon(int index) override;
 };
 
 class CrawlerUnit : public DefenseUnit {
@@ -185,9 +184,9 @@ private:
 public:
 	CrawlerUnit(AI *ai);
 	CrawlerUnit(DefenseUnit *inUnit, AI *ai);
-	int getType() const { return DUT_CRAWLER; }
-	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY);
-	int selectWeapon(int index);
+	int getType() const override { return DUT_CRAWLER; }
+	Common::Point *createTargetPos(int index, int distance, int weaponType, int sourceX, int sourceY) override;
+	int selectWeapon(int index) override;
 };
 
 } // End of namespace Scumm

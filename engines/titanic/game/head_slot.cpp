@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "titanic/game/head_slot.h"
 #include "titanic/core/project_item.h"
 #include "titanic/game/brain_slot.h"
+#include "titanic/game_manager.h"
 
 namespace Titanic {
 
@@ -139,11 +139,15 @@ bool CHeadSlot::LoadSuccessMsg(CLoadSuccessMsg *msg) {
 bool CHeadSlot::TimerMsg(CTimerMsg *msg) {
 	if (compareViewNameTo("Titania.Node 15.S") && CBrainSlot::_numAdded == 5
 			&& _occupied) {
-		if (_senseState == "Working" && !_workingFlag) {
-			playMovie(_frameNum2, _frameNum3, 0);
-			_workingFlag = true;
-		} else if (_senseState == "Random") {
-			playMovie(_frameNum2, _frameNum4, 0);
+		// WORKAROUND: Fix original bug where returning to Titania closeup when all the brain slots
+		// were inserted in an incorrect order, would result in endless busy cursor
+		if (getGameManager()->_gameState._mode != GSMODE_CUTSCENE) {
+			if (_senseState == "Working" && !_workingFlag) {
+				playMovie(_frameNum2, _frameNum3, 0);
+				_workingFlag = true;
+			} else if (_senseState == "Random") {
+				playMovie(_frameNum2, _frameNum4, 0);
+			}
 		}
 	}
 

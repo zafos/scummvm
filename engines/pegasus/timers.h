@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995-1997 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -177,12 +176,12 @@ private:
 class IdlerTimeBase : public Idler, public TimeBase {
 public:
 	IdlerTimeBase();
-	virtual ~IdlerTimeBase() { stopIdling(); }
+	~IdlerTimeBase() override { stopIdling(); }
 
 	TimeValue getLastTime() const { return _lastTime; }
 
 protected:
-	virtual void useIdleTime();
+	void useIdleTime() override;
 	virtual void timeChanged(const TimeValue) {}
 
 	TimeValue _lastTime;
@@ -192,7 +191,7 @@ protected:
 class NotificationCallBack : public TimeBaseCallBack {
 public:
 	NotificationCallBack();
-	virtual ~NotificationCallBack() {}
+	~NotificationCallBack() override {}
 
 	void setNotification(Notification *notifier) { _notifier = notifier; }
 
@@ -200,7 +199,7 @@ public:
 	NotificationFlags getCallBackFlag() const { return _callBackFlag; }
 
 protected:
-	void callBack();
+	void callBack() override;
 
 	Notification *_notifier;
 	NotificationFlags _callBackFlag;
@@ -214,7 +213,7 @@ public:
 class Fuse : private NotificationReceiver {
 public:
 	Fuse();
-	virtual ~Fuse() {}
+	~Fuse() override {}
 
 	void primeFuse(const TimeValue, const TimeScale = 1); // An appropriately named function :P
 	void lightFuse();
@@ -229,7 +228,7 @@ public:
 	bool isFusePaused() { return _fuseTimer.isPaused(); }
 
 protected:
-	virtual void receiveNotification(Notification *, const NotificationFlags);
+	void receiveNotification(Notification *, const NotificationFlags) override;
 	virtual void invokeAction() {}
 
 	TimeBase _fuseTimer;
@@ -240,11 +239,11 @@ protected:
 class FuseFunction : public Fuse {
 public:
 	FuseFunction() : _functor(0) {}
-	virtual ~FuseFunction() { delete _functor; }
+	~FuseFunction() override { delete _functor; }
 
 	void setFunctor(Common::Functor0<void> *functor) { delete _functor; _functor = functor; }
 protected:
-	virtual void invokeAction() { if (_functor && _functor->isValid()) (*_functor)(); }
+	void invokeAction() override { if (_functor && _functor->isValid()) (*_functor)(); }
 
 	Common::Functor0<void> *_functor;
 };

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,7 +24,6 @@
 
 #include "common/scummsys.h"
 #include "graphics/surface.h"
-#include "graphics/colormasks.h"
 #include "graphics/palette.h"
 #include "audio/mixer_intern.h"
 #include "backends/base-backend.h"
@@ -39,7 +37,6 @@
 #include "backends/platform/psp/display_manager.h"
 #include "backends/platform/psp/input.h"
 #include "backends/platform/psp/audio.h"
-#include "backends/timer/psp/timer.h"
 #include "backends/platform/psp/thread.h"
 
 class OSystem_PSP : public EventsBaseBackend, public PaletteManager {
@@ -57,7 +54,6 @@ private:
 	PSPKeyboard _keyboard;
 	InputHandler _inputHandler;
 	PspAudio _audio;
-	PspTimer _pspTimer;
 	ImageViewer _imageViewer;
 
 public:
@@ -76,8 +72,7 @@ public:
 	// Graphics related
 	const GraphicsMode *getSupportedGraphicsModes() const;
 	int getDefaultGraphicsMode() const;
-	bool setGraphicsMode(int mode);
-	bool setGraphicsMode(const char *name);
+	bool setGraphicsMode(int mode, uint flags);
 	int getGraphicsMode() const;
 #ifdef USE_RGB_COLOR
 	virtual Graphics::PixelFormat getScreenFormat() const;
@@ -103,22 +98,23 @@ public:
 	Graphics::Surface *lockScreen();
 	void unlockScreen();
 	void updateScreen();
-	void setShakePos(int shakeOffset);
+	void setShakePos(int shakeXOffset, int shakeYOffset);
 
 	// Overlay related
-	void showOverlay();
+	void showOverlay(bool inGUI);
 	void hideOverlay();
+	bool isOverlayVisible() const;
 	void clearOverlay();
-	void grabOverlay(void *buf, int pitch);
+	void grabOverlay(Graphics::Surface &surface);
 	void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h);
 	int16 getOverlayHeight();
 	int16 getOverlayWidth();
-	Graphics::PixelFormat getOverlayFormat() const { return Graphics::createPixelFormat<4444>(); }
+	Graphics::PixelFormat getOverlayFormat() const { return Graphics::PixelFormat(2, 4, 4, 4, 4, 0, 4, 8, 12); }
 
 	// Mouse related
 	bool showMouse(bool visible);
 	void warpMouse(int x, int y);
-	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format);
+	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask);
 
 	// Events and input
 	bool pollEvent(Common::Event &event);
@@ -128,15 +124,8 @@ public:
 	uint32 getMillis(bool skipRecord = false);
 	void delayMillis(uint msecs);
 
-	// Timer
-	typedef int (*TimerProc)(int interval);
-	void setTimerCallback(TimerProc callback, int interval);
-
 	// Mutex
-	MutexRef createMutex(void);
-	void lockMutex(MutexRef mutex);
-	void unlockMutex(MutexRef mutex);
-	void deleteMutex(MutexRef mutex);
+	Common::MutexInternal *createMutex(void);
 
 	// Sound
 	static void mixCallback(void *sys, byte *samples, int len);
@@ -145,7 +134,7 @@ public:
 
 	// Misc
 	FilesystemFactory *getFilesystemFactory() { return &PSPFilesystemFactory::instance(); }
-	void getTimeAndDate(TimeDate &t) const;
+	void getTimeAndDate(TimeDate &td, bool skipRecord = false) const;
 	virtual void engineDone();
 
 	void quit();

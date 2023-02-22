@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,8 +46,9 @@ struct ADGameDescription;
 
 #define TOON_DAT_VER_MAJ 0  // 1 byte
 #define TOON_DAT_VER_MIN 3  // 1 byte
-#define TOON_SAVEGAME_VERSION 4
+#define TOON_SAVEGAME_VERSION 5
 #define DATAALIGNMENT 4
+#define MAX_SAVE_SLOT 99
 
 #define TOON_SCREEN_WIDTH 640
 #define TOON_SCREEN_HEIGHT 400
@@ -98,7 +98,7 @@ class PathFinding;
 class ToonEngine : public Engine {
 public:
 	ToonEngine(OSystem *syst, const ADGameDescription *gameDescription);
-	~ToonEngine();
+	~ToonEngine() override;
 
 	const ADGameDescription *_gameDescription;
 	Common::Language _language;
@@ -108,10 +108,10 @@ public:
 	char **_locationDirVisited;
 	char **_specialInfoLine;
 
-	Common::Error run();
-	GUI::Debugger *getDebugger() { return _console; }
+	Common::Error run() override;
 	bool showMainmenu(bool &loadedGame);
 	bool showOptions();
+	bool showQuitConfirmationDialogue();
 	void init();
 	bool loadToonDat();
 	char **loadTextsVariants(Common::File &in);
@@ -210,10 +210,12 @@ public:
 	void playRoomMusic();
 	void waitForScriptStep();
 	void doMagnifierEffect();
-
-	bool canSaveGameStateCurrently();
-	bool canLoadGameStateCurrently();
-	void pauseEngineIntern(bool pause);
+	void drawCustomText(int16 x, int16 y, const char *line, Graphics::Surface *frame, byte color);
+	bool showConversationText() const;
+	bool canSaveGameStateCurrently() override;
+	bool canLoadGameStateCurrently() override;
+	void pauseEngineIntern(bool pause) override;
+	void syncSoundSettings() override;
 
 	Resources *resources() {
 		return _resources;
@@ -311,23 +313,28 @@ public:
 		return _pathFinding;
 	}
 
+	bool isEnglishDemo() {
+		return _isEnglishDemo;
+	}
+
 	Common::WriteStream *getSaveBufferStream();
 
 	bool shouldQuitGame() const {
 		return _shouldQuit;
 	}
 
-	Common::Error saveGameState(int slot, const Common::String &desc) {
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override {
 		return (saveGame(slot, desc) ? Common::kNoError : Common::kWritingFailed);
 	}
 
-	Common::Error loadGameState(int slot) {
+	Common::Error loadGameState(int slot) override {
 		return (loadGame(slot) ? Common::kNoError : Common::kReadingFailed);
 	}
 
-	bool hasFeature(EngineFeature f) const {
+	bool hasFeature(EngineFeature f) const override {
 		return
-			(f == kSupportsRTL) ||
+			(f == kSupportsSubtitleOptions) ||
+			(f == kSupportsReturnToLauncher) ||
 			(f == kSupportsLoadingDuringRuntime) ||
 			(f == kSupportsSavingDuringRuntime);
 	}
@@ -424,6 +431,7 @@ protected:
 	Animation *_fontToon;
 	Animation *_fontEZ;
 	Animation *_currentFont;
+	Common::String *_currentDemoFont;
 
 	AudioManager *_audioManager;
 
@@ -433,11 +441,12 @@ protected:
 
 	bool _firstFrame;
 	bool _isDemo;
+	bool _isEnglishDemo;
 	bool _showConversationText;
+	int  _textSpeed;
 	bool _useAlternativeFont;
 	bool _needPaletteFlush;
-private:
-	ToonConsole *_console;
+	bool _noMusicDriver; // If "Music Device" is set to "No Music" from Audio tab
 };
 
 } // End of namespace Toon

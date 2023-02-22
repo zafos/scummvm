@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -76,77 +75,77 @@ public:
 	/**
 	 * Sets up the section
 	 */
-	virtual bool setup(CPetControl *petControl);
+	bool setup(CPetControl *petControl) override;
 
 	/**
 	 * Reset the section
 	 */
-	virtual bool reset();
+	bool reset() override;
 
 	/**
 	 * Draw the section
 	 */
-	virtual void draw(CScreenManager *screenManager);
+	void draw(CScreenManager *screenManager) override;
 
 	/**
 	 * Following are handlers for the various messages that the PET can
 	 * pass onto the currently active section/area
 	 */
-	virtual bool MouseButtonDownMsg(CMouseButtonDownMsg *msg);
-	virtual bool MouseDragStartMsg(CMouseDragStartMsg *msg);
-	virtual bool MouseButtonUpMsg(CMouseButtonUpMsg *msg);
-	virtual bool MouseDoubleClickMsg(CMouseDoubleClickMsg *msg);
-	virtual bool VirtualKeyCharMsg(CVirtualKeyCharMsg *msg);
+	bool MouseButtonDownMsg(CMouseButtonDownMsg *msg) override;
+	bool MouseDragStartMsg(CMouseDragStartMsg *msg) override;
+	bool MouseButtonUpMsg(CMouseButtonUpMsg *msg) override;
+	bool MouseDoubleClickMsg(CMouseDoubleClickMsg *msg) override;
+	bool VirtualKeyCharMsg(CVirtualKeyCharMsg *msg) override;
 
 	/**
 	 * Check whether a drag drop can occur
 	 */
-	virtual bool checkDragEnd(CGameObject *item);
+	bool checkDragEnd(CGameObject *item) override;
 
 	/**
 	 * Display a message
 	 */
-	virtual void displayMessage(const CString &msg);
+	void displayMessage(const CString &msg) override;
 
 	/**
 	 * Returns true if the object is in a valid state
 	 */
-	virtual bool isValid(CPetControl *petControl);
+	bool isValid(CPetControl *petControl) override;
 
 	/**
 	 * Load the data for the class from file
 	 */
-	virtual void load(SimpleFile *file, int param);
+	void load(SimpleFile *file, int param) override;
 
 	/**
 	 * Called after a game has been loaded
 	 */
-	virtual void postLoad();
+	void postLoad() override;
 
 	/**
 	 * Save the data for the class to file
 	 */
-	virtual void save(SimpleFile *file, int indent);
+	void save(SimpleFile *file, int indent) override;
 
 	/**
 	 * Called when a section is switched to
 	 */
-	virtual void enter(PetArea oldArea);
+	void enter(PetArea oldArea) override;
 
 	/**
 	 * Called when a new room is entered
 	 */
-	virtual void enterRoom(CRoomItem *room);
+	void enterRoom(CRoomItem *room) override;
 
 	/**
 	 * Get a reference to the tooltip text associated with the section
 	 */
-	virtual CTextControl *getText();
+	CTextControl *getText() override;
 
 	/**
 	 * Special retrieval of glyph background image
 	 */
-	virtual CGameObject *getBackground(int index) const;
+	CGameObject *getBackground(int index) const override;
 
 	/**
 	 * Reset the highlight

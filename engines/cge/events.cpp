@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,20 +15,18 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 /*
  * This code is based on original Soltys source code
- * Copyright (c) 1994-1995 Janus B. Wisniewski and L.K. Avalon
+ * Copyright (c) 1994-1995 Janusz B. Wisniewski and L.K. Avalon
  */
 
 #include "gui/saveload.h"
 #include "common/config-manager.h"
 #include "common/events.h"
-#include "common/translation.h"
 #include "engines/advancedDetector.h"
 #include "cge/events.h"
 #include "cge/events.h"
@@ -39,7 +37,7 @@ namespace CGE {
 
 /*----------------- KEYBOARD interface -----------------*/
 
-Keyboard::Keyboard(CGEEngine *vm) : _client(NULL), _vm(vm) {
+Keyboard::Keyboard(CGEEngine *vm) : _client(nullptr), _vm(vm) {
 	_keyAlt = false;
 }
 
@@ -65,37 +63,14 @@ bool Keyboard::getKey(Common::Event &event) {
 			return false;
 		// Display ScummVM version and translation strings
 		for (int i = 0; i < 5; i++)
-			_vm->_commandHandler->addCommand(kCmdInf, 1, kShowScummVMVersion + i, NULL);
+			_vm->_commandHandler->addCommand(kCmdInf, 1, kShowScummVMVersion + i, nullptr);
 		return false;
 	case Common::KEYCODE_F5:
-		if (_vm->canSaveGameStateCurrently()) {
-			GUI::SaveLoadChooser *dialog = new GUI::SaveLoadChooser(_("Save game:"), _("Save"), true);
-			int16 savegameId = dialog->runModalWithCurrentTarget();
-			Common::String savegameDescription = dialog->getResultString();
-			delete dialog;
-
-			if (savegameId != -1)
-				_vm->saveGameState(savegameId, savegameDescription);
-			}
+		_vm->saveGameDialog();
 		return false;
 	case Common::KEYCODE_F7:
-		if (_vm->canLoadGameStateCurrently()) {
-			GUI::SaveLoadChooser *dialog = new GUI::SaveLoadChooser(_("Restore game:"), _("Restore"), false);
-			int16 savegameId = dialog->runModalWithCurrentTarget();
-			delete dialog;
-
-			if (savegameId != -1)
-				_vm->loadGameState(savegameId);
-		}
+		_vm->loadGameDialog();
 		return false;
-	case Common::KEYCODE_d:
-		if (event.kbd.flags & Common::KBD_CTRL) {
-		// Start the debugger
-			_vm->getDebugger()->attach();
-			_vm->getDebugger()->onFrame();
-			return false;
-		}
-		break;
 	case Common::KEYCODE_x:
 		if (event.kbd.flags & Common::KBD_ALT) {
 			_vm->quit();
@@ -108,7 +83,7 @@ bool Keyboard::getKey(Common::Event &event) {
 	case Common::KEYCODE_3:
 	case Common::KEYCODE_4:
 		if (event.kbd.flags & Common::KBD_ALT) {
-			_vm->_commandHandler->addCommand(kCmdLevel, -1, keycode - Common::KEYCODE_0, NULL);
+			_vm->_commandHandler->addCommand(kCmdLevel, -1, keycode - Common::KEYCODE_0, nullptr);
 			return false;
 		}
 		// fall through
@@ -144,13 +119,13 @@ void Keyboard::newKeyboard(Common::Event &event) {
 
 /*----------------- MOUSE interface -----------------*/
 
-Mouse::Mouse(CGEEngine *vm) : Sprite(vm, NULL), _busy(NULL), _hold(NULL), _hx(0), _vm(vm) {
-	_hold = NULL;
+Mouse::Mouse(CGEEngine *vm) : Sprite(vm, nullptr), _busy(nullptr), _hold(nullptr), _hx(0), _vm(vm) {
+	_hold = nullptr;
 	_hx = 0;
 	_hy = 0;
 	_exist = true;
 	_buttons = 0;
-	_busy = NULL;
+	_busy = nullptr;
 	_active = false;
 	_flags._kill = false;
 
@@ -165,7 +140,7 @@ Mouse::Mouse(CGEEngine *vm) : Sprite(vm, NULL), _busy(NULL), _hold(NULL), _hx(0)
 	BitmapPtr *MC = new BitmapPtr[3];
 	MC[0] = new Bitmap(_vm, "MOUSE");
 	MC[1] = new Bitmap(_vm, "DUMMY");
-	MC[2] = NULL;
+	MC[2] = nullptr;
 	setShapeList(MC);
 
 	gotoxy(kScrWidth / 2, kScrHeight / 2);
@@ -238,8 +213,15 @@ void Mouse::newMouse(Common::Event &event) {
 EventManager::EventManager(CGEEngine *vm) : _vm(vm){
 	_eventQueueHead = 0;
 	_eventQueueTail = 0;
-	memset(&_eventQueue, 0, kEventMax * sizeof(CGEEvent));
-	memset(&_event, 0, sizeof(Common::Event));
+	for (uint16 k = 0; k < kEventMax; k++) {
+		_eventQueue[k]._mask = 0;
+		_eventQueue[k]._x = 0;
+		_eventQueue[k]._y = 0;
+		_eventQueue[k]._spritePtr = nullptr;
+	}
+	_event.joystick.axis = 0;
+	_event.joystick.position = 0;
+	_event.joystick.button = 0;
 }
 
 void EventManager::poll() {
@@ -301,7 +283,7 @@ void EventManager::handleEvents() {
 			if (e._mask & kMouseLeftUp) {
 				if (_vm->_mouse->_hold) {
 					_vm->_mouse->_hold->_flags._hold = false;
-					_vm->_mouse->_hold = NULL;
+					_vm->_mouse->_hold = nullptr;
 				}
 			}
 			///Touched = e.Ptr;

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -54,7 +53,7 @@
 
 namespace LastExpress {
 
-Debugger::Debugger(LastExpressEngine *engine) : _engine(engine), _command(NULL), _numParams(0), _commandParams(NULL) {
+Debugger::Debugger(LastExpressEngine *engine) : _engine(engine), _command(nullptr), _numParams(0), _commandParams(nullptr) {
 
 	//////////////////////////////////////////////////////////////////////////
 	// Register the debugger commands
@@ -94,16 +93,14 @@ Debugger::Debugger(LastExpressEngine *engine) : _engine(engine), _command(NULL),
 }
 
 Debugger::~Debugger() {
-	DebugMan.clearAllDebugChannels();
-
 	SAFE_DELETE(_soundStream);
 	resetCommand();
 
-	_command = NULL;
-	_commandParams = NULL;
+	_command = nullptr;
+	_commandParams = nullptr;
 
 	// Zero passed pointers
-	_engine = NULL;
+	_engine = nullptr;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -121,12 +118,12 @@ void Debugger::resetCommand() {
 			free(_commandParams[i]);
 
 	free(_commandParams);
-	_commandParams = NULL;
+	_commandParams = nullptr;
 	_numParams = 0;
 }
 
 int Debugger::getNumber(const char *arg) const {
-	return strtol(arg, (char **)NULL, 0);
+	return strtol(arg, (char **)nullptr, 0);
 }
 
 void Debugger::copyCommand(int argc, const char **argv) {
@@ -137,16 +134,17 @@ void Debugger::copyCommand(int argc, const char **argv) {
 	_numParams = argc;
 
 	for (int i = 0; i < _numParams; i++) {
-		_commandParams[i] = (char *)malloc(strlen(argv[i]) + 1);
-		if (_commandParams[i] == NULL)
+		size_t ln = strlen(argv[i]) + 1;
+		_commandParams[i] = (char *)malloc(ln);
+		if (_commandParams[i] == nullptr)
 			error("[Debugger::copyCommand] Cannot allocate memory for command parameters");
 
 		memset(_commandParams[i], 0, strlen(argv[i]) + 1);
-		strcpy(_commandParams[i], argv[i]);
+		Common::strcpy_s(_commandParams[i], ln, argv[i]);
 	}
 
 	// Exit the debugger!
-	cmdExit(0, 0);
+	cmdExit(0, nullptr);
 }
 
 void Debugger::callCommand() {
@@ -285,14 +283,14 @@ bool Debugger::cmdDumpFiles(int argc, const char **) {
 	debugC(1, kLastExpressDebugResource, "--------------------------------------------------------------------\n\n"); \
 	debugC(1, kLastExpressDebugResource, "Filename,Size,MD5\n"); \
 	for (Common::ArchiveMemberList::iterator it = list.begin(); it != list.end(); ++it) { \
-		Common::SeekableReadStream *stream = getArchive((*it)->getName()); \
+		Common::SeekableReadStream *stream = getArchiveMember((*it)->getName()); \
 		if (!stream) { \
 			debugPrintf("ERROR: Cannot create stream for file: %s\n", (*it)->getName().c_str()); \
 			restoreArchive(); \
 			return true; \
 		} \
 		Common::String md5str = Common::computeStreamMD5AsString(*stream); \
-		debugC(1, kLastExpressDebugResource, "%s, %d, %s", (*it)->getName().c_str(), stream->size(), md5str.c_str()); \
+		debugC(1, kLastExpressDebugResource, "%s, %d, %s", (*it)->getName().c_str(), (int)stream->size(), md5str.c_str()); \
 		delete stream; \
 	} \
 }
@@ -345,10 +343,10 @@ bool Debugger::cmdShowFrame(int argc, const char **argv) {
 			_command = WRAP_METHOD(Debugger, cmdShowFrame);
 			copyCommand(argc, argv);
 
-			return cmdExit(0, 0);
+			return cmdExit(0, nullptr);
 		} else {
 			Sequence sequence(filename);
-			if (sequence.load(getArchive(filename))) {
+			if (sequence.load(getArchiveMember(filename))) {
 				_engine->getCursor()->show(false);
 				clearBg(GraphicsManager::kBackgroundOverlay);
 
@@ -407,7 +405,7 @@ bool Debugger::cmdShowBg(int argc, const char **argv) {
 			_command = WRAP_METHOD(Debugger, cmdShowBg);
 			copyCommand(argc, argv);
 
-			return cmdExit(0, 0);
+			return cmdExit(0, nullptr);
 		} else {
 			clearBg(GraphicsManager::kBackgroundC);
 
@@ -462,10 +460,10 @@ bool Debugger::cmdPlaySeq(int argc, const char **argv) {
 			_command = WRAP_METHOD(Debugger, cmdPlaySeq);
 			copyCommand(argc, argv);
 
-			return cmdExit(0, 0);
+			return cmdExit(0, nullptr);
 		} else {
 			Sequence *sequence = new Sequence(filename);
-			if (sequence->load(getArchive(filename))) {
+			if (sequence->load(getArchiveMember(filename))) {
 
 				// Check that we have at least a frame to show
 				if (sequence->count() == 0) {
@@ -487,10 +485,7 @@ bool Debugger::cmdPlaySeq(int argc, const char **argv) {
 
 					// Handle right-click to interrupt sequence
 					Common::Event ev;
-					if (!_engine->getEventManager()->pollEvent(ev))
-						break;
-
-					if (ev.type == Common::EVENT_RBUTTONUP)
+					if (_engine->getEventManager()->pollEvent(ev) && ev.type == Common::EVENT_RBUTTONUP)
 						break;
 
 					_engine->_system->delayMillis(175);
@@ -543,7 +538,7 @@ bool Debugger::cmdPlaySnd(int argc, const char **argv) {
 
 		_engine->_system->getMixer()->stopAll();
 
-		_soundStream->load(getArchive(name), 16);
+		_soundStream->load(getArchiveMember(name), kVolumeFull, false);
 
 		if (argc == 3)
 			restoreArchive();
@@ -582,10 +577,10 @@ bool Debugger::cmdPlaySbe(int argc, const char **argv) {
 			_command = WRAP_METHOD(Debugger, cmdPlaySbe);
 			copyCommand(argc, argv);
 
-			return cmdExit(0, 0);
+			return cmdExit(0, nullptr);
 		} else {
 			SubtitleManager subtitle(_engine->getFont());
-			if (subtitle.load(getArchive(filename))) {
+			if (subtitle.load(getArchiveMember(filename))) {
 				_engine->getCursor()->show(false);
 				for (uint16 i = 0; i < subtitle.getMaxTime(); i += 25) {
 					clearBg(GraphicsManager::kBackgroundAll);
@@ -648,7 +643,7 @@ bool Debugger::cmdPlayNis(int argc, const char **argv) {
 			_command = WRAP_METHOD(Debugger, cmdPlayNis);
 			copyCommand(argc, argv);
 
-			return cmdExit(0, 0);
+			return cmdExit(0, nullptr);
 		} else {
 			// Make sure we are not called in a loop
 			_numParams = 0;
@@ -656,7 +651,7 @@ bool Debugger::cmdPlayNis(int argc, const char **argv) {
 			// Check if we got a nis filename or an animation index
 			if (name.contains('.')) {
 				Animation animation;
-				if (animation.load(getArchive(name))) {
+				if (animation.load(getArchiveMember(name))) {
 					_engine->getCursor()->show(false);
 					animation.play();
 					_engine->getCursor()->show(true);
@@ -705,7 +700,7 @@ bool Debugger::cmdLoadScene(int argc, const char **argv) {
 			_command = WRAP_METHOD(Debugger, cmdLoadScene);
 			copyCommand(argc, argv);
 
-			return cmdExit(0, 0);
+			return cmdExit(0, nullptr);
 		} else {
 
 			clearBg(GraphicsManager::kBackgroundAll);
@@ -886,7 +881,7 @@ bool Debugger::cmdBeetle(int argc, const char **argv) {
 			redrawScreen();
 
 			// Load the beetle game
-			Action *action = NULL;
+			Action *action = nullptr;
 			Beetle *beetle = new Beetle(_engine);
 			if (!beetle->isLoaded())
 				beetle->load();
@@ -917,7 +912,7 @@ bool Debugger::cmdBeetle(int argc, const char **argv) {
 					case Common::EVENT_MOUSEMOVE: {
 						// Update cursor
 						CursorStyle style = kCursorNormal;
-						SceneHotspot *hotspot = NULL;
+						SceneHotspot *hotspot = nullptr;
 						if (scene->checkHotSpot(ev.mouse, &hotspot)) {
 							if (!action)
 								action = new Action(_engine);

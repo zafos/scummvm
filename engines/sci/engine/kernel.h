@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,13 +33,20 @@
 
 namespace Sci {
 
+/**
+ * @defgroup engine_sci SCI engine
+ * @ingroup engines_engines
+ * @{
+ */
+
 struct Node;	// from segment.h
 struct List;	// from segment.h
 struct SelectorCache;	// from selector.h
 struct SciWorkaroundEntry;	// from workarounds.h
 
 /**
- * @defgroup VocabularyResources	Vocabulary resources in SCI
+ * @defgroup vocabulary_resources_sci Vocabulary resources in SCI
+ * @ingroup engine_sci
  *
  * vocab.999 / 999.voc (unneeded) contains names of the kernel functions which
  * are implemented by the interpreter. In Sierra SCI, they are used exclusively
@@ -98,9 +104,12 @@ struct SciWorkaroundEntry;	// from workarounds.h
 
 // ---- Kernel signatures -----------------------------------------------------
 
+// Kernel functions that have been added for ScummVM script patches to call
 enum {
-	kScummVMWaitId     = 0xe0,
-	kScummVMSaveLoadId = 0xe1
+	kScummVMSleepId    = 0xe0, // sleeps for a delay while remaining responsive
+#ifdef ENABLE_SCI32
+	kScummVMSaveLoadId = 0xe1  // launches ScummVM's save/load dialog
+#endif
 };
 
 // internal kernel signature data
@@ -153,8 +162,6 @@ public:
 	Kernel(ResourceManager *resMan, SegManager *segMan);
 	~Kernel();
 
-	void init();
-
 	uint getSelectorNamesSize() const;
 	const Common::String &getSelectorName(uint selector);
 	int findKernelFuncPos(Common::String kernelFuncName);
@@ -169,8 +176,6 @@ public:
 	 * @return The appropriate selector ID, or -1 on error
 	 */
 	int findSelector(const char *selectorName) const;
-
-	bool selectorNamesAvailable();
 
 	// Script dissection/dumping functions
 	void dissectScript(int scriptNumber, Vocabulary *vocab);
@@ -254,7 +259,7 @@ private:
 	/**
 	 * Maps kernel functions.
 	 */
-	void mapFunctions();
+	void mapFunctions(GameFeatures *features);
 
 	ResourceManager *_resMan;
 	SegManager *_segMan;
@@ -317,7 +322,7 @@ reg_t kMapKeyToDir(EngineState *s, int argc, reg_t *argv);
 reg_t kGlobalToLocal(EngineState *s, int argc, reg_t *argv);
 reg_t kLocalToGlobal(EngineState *s, int argc, reg_t *argv);
 reg_t kWait(EngineState *s, int argc, reg_t *argv);
-reg_t kRestartGame(EngineState *s, int argc, reg_t *argv);
+reg_t kRestartGame16(EngineState *s, int argc, reg_t *argv);
 reg_t kDeviceInfo(EngineState *s, int argc, reg_t *argv);
 reg_t kGetEvent(EngineState *s, int argc, reg_t *argv);
 reg_t kCheckFreeSpace(EngineState *s, int argc, reg_t *argv);
@@ -406,10 +411,13 @@ reg_t kTextColors(EngineState *s, int argc, reg_t *argv);
 reg_t kTextFonts(EngineState *s, int argc, reg_t *argv);
 reg_t kShow(EngineState *s, int argc, reg_t *argv);
 reg_t kRemapColors(EngineState *s, int argc, reg_t *argv);
+reg_t kRemapColorsKawa(EngineState *s, int argc, reg_t *argv);
 reg_t kDummy(EngineState *s, int argc, reg_t *argv);
 reg_t kEmpty(EngineState *s, int argc, reg_t *argv);
 reg_t kStub(EngineState *s, int argc, reg_t *argv);
 reg_t kStubNull(EngineState *s, int argc, reg_t *argv);
+reg_t kKawaHacks(EngineState *s, int argc, reg_t *argv);
+reg_t kKawaDbugStr(EngineState *s, int argc, reg_t *argv);
 
 #ifdef ENABLE_SCI32
 // SCI2 Kernel Functions
@@ -449,7 +457,7 @@ reg_t kRobotShowFrame(EngineState *s, int argc, reg_t *argv);
 reg_t kRobotGetFrameSize(EngineState *s, int argc, reg_t *argv);
 reg_t kRobotPlay(EngineState *s, int argc, reg_t *argv);
 reg_t kRobotGetIsFinished(EngineState *s, int argc, reg_t *argv);
-reg_t kRobotGetIsPlaying(EngineState *s, int argc, reg_t *argv);
+reg_t kRobotGetIsInitialized(EngineState *s, int argc, reg_t *argv);
 reg_t kRobotClose(EngineState *s, int argc, reg_t *argv);
 reg_t kRobotGetCue(EngineState *s, int argc, reg_t *argv);
 reg_t kRobotPause(EngineState *s, int argc, reg_t *argv);
@@ -464,6 +472,10 @@ reg_t kPlayVMDIgnorePalettes(EngineState *s, int argc, reg_t *argv);
 reg_t kPlayVMDGetStatus(EngineState *s, int argc, reg_t *argv);
 reg_t kPlayVMDPlayUntilEvent(EngineState *s, int argc, reg_t *argv);
 reg_t kPlayVMDShowCursor(EngineState *s, int argc, reg_t *argv);
+reg_t kPlayVMDStartBlob(EngineState *s, int argc, reg_t *argv);
+reg_t kPlayVMDStopBlobs(EngineState *s, int argc, reg_t *argv);
+reg_t kPlayVMDAddBlob(EngineState *s, int argc, reg_t *argv);
+reg_t kPlayVMDDeleteBlob(EngineState *s, int argc, reg_t *argv);
 reg_t kPlayVMDSetBlackoutArea(EngineState *s, int argc, reg_t *argv);
 reg_t kPlayVMDRestrictPalette(EngineState *s, int argc, reg_t *argv);
 reg_t kPlayVMDSetPlane(EngineState *s, int argc, reg_t *argv);
@@ -486,7 +498,6 @@ reg_t kGetSaveFiles32(EngineState *s, int argc, reg_t *argv);
 reg_t kCheckSaveGame32(EngineState *s, int argc, reg_t *argv);
 reg_t kMakeSaveCatName(EngineState *s, int argc, reg_t *argv);
 reg_t kMakeSaveFileName(EngineState *s, int argc, reg_t *argv);
-reg_t kScummVMSaveLoad(EngineState *s, int argc, reg_t *argv);
 
 reg_t kSetHotRectangles(EngineState *s, int argc, reg_t *argv);
 reg_t kIsHiRes(EngineState *s, int argc, reg_t *argv);
@@ -582,6 +593,7 @@ reg_t kListAllTrue(EngineState *s, int argc, reg_t *argv);
 reg_t kListSort(EngineState *s, int argc, reg_t *argv);
 
 reg_t kEditText(EngineState *s, int argc, reg_t *argv);
+reg_t kInputText(EngineState *s, int argc, reg_t *argv);
 reg_t kSetScroll(EngineState *s, int argc, reg_t *argv);
 
 reg_t kPaletteSetFromResource32(EngineState *s, int argc, reg_t *argv);
@@ -643,10 +655,10 @@ reg_t kAddLine(EngineState *s, int argc, reg_t *argv);
 reg_t kUpdateLine(EngineState *s, int argc, reg_t *argv);
 reg_t kDeleteLine(EngineState *s, int argc, reg_t *argv);
 
-#ifdef ENABLE_SCI32_MAC
-// Phantasmagoria Mac Special Kernel Function
-reg_t kDoSoundPhantasmagoriaMac(EngineState *s, int argc, reg_t *argv);
-#endif
+reg_t kWinDLL(EngineState *s, int argc, reg_t *argv);
+
+// SCI 2.1 Middle Mac modified kDoSound
+reg_t kDoSoundMac32(EngineState *s, int argc, reg_t *argv);
 
 // SCI3 Kernel functions
 reg_t kPlayDuck(EngineState *s, int argc, reg_t *argv);
@@ -722,6 +734,7 @@ reg_t kFileIOFindFirst(EngineState *s, int argc, reg_t *argv);
 reg_t kFileIOFindNext(EngineState *s, int argc, reg_t *argv);
 reg_t kFileIOExists(EngineState *s, int argc, reg_t *argv);
 reg_t kFileIORename(EngineState *s, int argc, reg_t *argv);
+reg_t kFileIOCopy(EngineState *s, int argc, reg_t *argv);
 #ifdef ENABLE_SCI32
 reg_t kFileIOReadByte(EngineState *s, int argc, reg_t *argv);
 reg_t kFileIOWriteByte(EngineState *s, int argc, reg_t *argv);
@@ -731,7 +744,13 @@ reg_t kFileIOGetCWD(EngineState *s, int argc, reg_t *argv);
 reg_t kFileIOIsValidDirectory(EngineState *s, int argc, reg_t *argv);
 #endif
 
-//@}
+// Custom ScummVM kernel functions
+reg_t kScummVMSleep(EngineState *s, int argc, reg_t *argv);
+#ifdef ENABLE_SCI32
+reg_t kScummVMSaveLoad(EngineState *s, int argc, reg_t *argv);
+#endif
+
+/** @} */
 
 } // End of namespace Sci
 

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,38 +15,42 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef BACKENDS_CLOUD_DROPBOX_STORAGE_H
 #define BACKENDS_CLOUD_DROPBOX_STORAGE_H
 
-#include "backends/cloud/storage.h"
+#include "backends/cloud/basestorage.h"
 #include "common/callback.h"
 #include "backends/networking/curl/curljsonrequest.h"
 
 namespace Cloud {
 namespace Dropbox {
 
-class DropboxStorage: public Cloud::Storage {
-	static char *KEY, *SECRET;
-
-	static void loadKeyAndSecret();
-
-	Common::String _token, _uid;
-
+class DropboxStorage: public Cloud::BaseStorage {
 	/** This private constructor is called from loadFromConfig(). */
-	DropboxStorage(Common::String token, Common::String uid);
+	DropboxStorage(Common::String token, Common::String refreshToken, bool enabled);
 
-	void getAccessToken(Common::String code);
-	void codeFlowComplete(Networking::JsonResponse response);
-	void codeFlowFailed(Networking::ErrorResponse error);
+protected:
+	/**
+	 * @return "dropbox"
+	 */
+	virtual Common::String cloudProvider();
+
+	/**
+	 * @return kStorageDropboxId
+	 */
+	virtual uint32 storageIndex();
+
+	virtual bool needsRefreshToken();
+
+	virtual bool canReuseRefreshToken();
 
 public:
 	/** This constructor uses OAuth code flow to get tokens. */
-	DropboxStorage(Common::String code);
+	DropboxStorage(Common::String code, Networking::ErrorCallback cb);
 	virtual ~DropboxStorage();
 
 	/**
@@ -90,9 +94,16 @@ public:
 
 	/**
 	 * Load token and user id from configs and return DropboxStorage for those.
-	 * @return pointer to the newly created DropboxStorage or 0 if some problem occured.
+	 * @return pointer to the newly created DropboxStorage or 0 if some problem occurred.
 	 */
 	static DropboxStorage *loadFromConfig(Common::String keyPrefix);
+
+	/**
+	 * Remove all DropboxStorage-related data from config.
+	 */
+	static void removeFromConfig(Common::String keyPrefix);
+
+	Common::String accessToken() const { return _token; }
 };
 
 } // End of namespace Dropbox

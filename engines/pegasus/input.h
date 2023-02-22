@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995-1997 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,7 +26,6 @@
 #define PEGASUS_INPUT_H
 
 #include "common/events.h"
-#include "common/hashmap.h"
 #include "common/rect.h"
 #include "common/singleton.h"
 
@@ -39,12 +37,32 @@ namespace Pegasus {
 class Hotspot;
 class Input;
 
+enum PegasusAction {
+	kPegasusActionNone,
+	kPegasusActionUp,
+	kPegasusActionDown,
+	kPegasusActionLeft,
+	kPegasusActionRight,
+	kPegasusActionInteract,
+	kPegasusActionShowInventory,
+	kPegasusActionShowBiochip,
+	kPegasusActionToggleCenterDisplay,
+	kPegasusActionShowInfoScreen,
+	kPegasusActionShowPauseMenu,
+	kPegasusActionSaveGameState,
+	kPegasusActionLoadGameState,
+	kPegasusActionEnableEasterEgg,
+	kPegasusActionToggleChattyAI,
+
+	kPegasusActionCount
+};
+
 class InputDeviceManager : public Common::Singleton<InputDeviceManager>, public Common::EventObserver {
 public:
 	InputDeviceManager();
-	~InputDeviceManager();
+	~InputDeviceManager() override;
 
-	bool notifyEvent(const Common::Event &event);
+	bool notifyEvent(const Common::Event &event) override;
 
 	void getInput(Input &, const InputBits);
 
@@ -56,9 +74,9 @@ protected:
 	friend class Common::Singleton<SingletonBaseType>;
 
 	// Keep track of which keys are down (= true) or not
-	Common::HashMap<uint, bool> _keyMap;
+	bool _keysDown[kPegasusActionCount];
 	InputBits _lastRawBits;
-	bool _consoleRequested;
+	bool _AKeyWasDown;
 };
 
 enum {
@@ -280,7 +298,7 @@ enum {
 };
 
 static const InputBits kHintInterruption = kFilterAllInputNoAuto;
-static const InputBits kWarningInterruption = kFilterNoInput;
+static const InputBits kWarningInterruption = kFilterAllInputNoAuto;
 static const InputBits kOpticalInterruption = kFilterAllInputNoAuto;
 
 /*
@@ -371,25 +389,21 @@ public:
 	bool anyInputBitSet(const InputBits bits) const { return (_inputState & bits) != 0; }
 
 	bool isAltDown() const { return _altDown; }
-	bool isConsoleRequested() const { return _consoleRequested; }
 
 	void clearInput() {
 		_inputState = kAllUpBits;
 		_inputLocation.x = 0;
 		_inputLocation.y = 0;
-		_consoleRequested = false;
 		_altDown = false;
 	}
 
 protected:
 	void setInputBits(const InputBits state) { _inputState = state; }
 	void setInputLocation(const Common::Point &where) { _inputLocation = where; }
-	void setConsoleRequested(bool consoleRequested) { _consoleRequested = consoleRequested; }
 	void setAltDown(bool altDown) { _altDown = altDown; }
 
 	InputBits _inputState;
 	Common::Point _inputLocation;
-	bool _consoleRequested;
 	bool _altDown;
 };
 
@@ -452,9 +466,9 @@ protected:
 class Tracker : public InputHandler {
 public:
 	Tracker() : InputHandler(0), _savedHandler(nullptr) {}
-	virtual ~Tracker() {}
+	~Tracker() override {}
 
-	virtual void handleInput(const Input &, const Hotspot *);
+	void handleInput(const Input &, const Hotspot *) override;
 	virtual bool stopTrackingInput(const Input &) { return false; }
 
 	virtual void startTracking(const Input &);
@@ -462,9 +476,9 @@ public:
 	virtual void continueTracking(const Input &) {}
 
 	bool isTracking() { return this == _currentTracker; }
-	bool isClickInput(const Input &, const Hotspot *);
+	bool isClickInput(const Input &, const Hotspot *) override;
 
-	bool releaseInputFocus() { return !isTracking(); }
+	bool releaseInputFocus() override { return !isTracking(); }
 
 protected:
 	static Tracker *_currentTracker;
@@ -483,7 +497,7 @@ public:
 
 	static bool isRaiseInventoryInput(const Input &input) { return input.leftFireButtonDown(); }
 	static bool isRaiseBiochipsInput(const Input &input) { return input.rightFireButtonDown(); }
-	static InputBits getItemPanelsInputFilter() { return kFilterLeftFireButton | kFilterRightFireButton; }
+	static InputBits getItemPanelsInputFilter() { return kFilterFourButton | kFilterLeftFireButton | kFilterRightFireButton; }
 
 	static bool isToggleAIMiddleInput(const Input &input) { return input.threeButtonDown(); }
 

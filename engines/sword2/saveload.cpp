@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1994-1998 Revolution Software Ltd.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 // ---------------------------------------------------------------------------
@@ -49,8 +48,8 @@
 
 namespace Sword2 {
 
-Common::String Sword2Engine::getSaveFileName(uint16 slotNo) {
-	return Common::String::format("%s.%.3d", _targetName.c_str(), slotNo);
+Common::String Sword2Engine::getSaveStateName(int slot) const {
+	return Common::String::format("%s.%.3d", _targetName.c_str(), slot);
 }
 
 /**
@@ -125,7 +124,7 @@ uint32 Sword2Engine::saveGame(uint16 slotNo, const byte *desc) {
 }
 
 uint32 Sword2Engine::saveData(uint16 slotNo, byte *buffer, uint32 bufferSize) {
-	Common::String saveFileName = getSaveFileName(slotNo);
+	Common::String saveFileName = getSaveStateName(slotNo);
 
 	Common::OutSaveFile *out;
 
@@ -203,7 +202,7 @@ uint32 Sword2Engine::restoreGame(uint16 slotNo) {
 }
 
 uint32 Sword2Engine::restoreData(uint16 slotNo, byte *buffer, uint32 bufferSize) {
-	Common::String saveFileName = getSaveFileName(slotNo);
+	Common::String saveFileName = getSaveStateName(slotNo);
 
 	Common::InSaveFile *in;
 
@@ -300,6 +299,8 @@ uint32 Sword2Engine::restoreFromBuffer(byte *buffer, uint32 size) {
 	case 1575:		// NicMegaC:
 		scriptNo = 10;	// script no.10 - 'player_is_nicoC'
 		break;
+	default:
+		break;
 	}
 
 	_logic->runResScript(CUR_PLAYER_ID, scriptNo);
@@ -368,7 +369,7 @@ uint32 Sword2Engine::restoreFromBuffer(byte *buffer, uint32 size) {
  */
 
 uint32 Sword2Engine::getSaveDescription(uint16 slotNo, byte *description) {
-	Common::String saveFileName = getSaveFileName(slotNo);
+	Common::String saveFileName = getSaveStateName(slotNo);
 
 	Common::InSaveFile *in;
 
@@ -391,7 +392,7 @@ bool Sword2Engine::saveExists() {
 }
 
 bool Sword2Engine::saveExists(uint16 slotNo) {
-	Common::String saveFileName = getSaveFileName(slotNo);
+	Common::String saveFileName = getSaveStateName(slotNo);
 	Common::InSaveFile *in;
 
 	if (!(in = _saveFileMan->openForLoading(saveFileName))) {

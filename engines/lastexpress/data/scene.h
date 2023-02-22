@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -83,7 +82,7 @@ class Scene;
 class SceneHotspot {
 public:
 	enum Action {
-		kActionNone = 0,
+		kActionNoneHS = 0,
 		kActionInventory = 1,
 		kActionSavePoint = 2,
 		kActionPlaySound = 3,
@@ -112,8 +111,8 @@ public:
 		kAction27 = 27,
 		kActionConcertSitCough = 28,
 		kAction29 = 29,
-		kActionCatchBeetle = 30,
-		kActionExitCompartment = 31,
+		kActionCatchBeetleHS = 30,
+		kActionExitCompartmentHS = 31,
 		kAction32 = 32,
 		KActionUseWhistle = 33,
 		kActionOpenMatchBox = 34,
@@ -157,7 +156,7 @@ public:
 		coordsOffset = 0;
 		scene = kSceneNone;
 		location = 0;
-		action = kActionNone;
+		action = kActionNoneHS;
 		param1 = 0;
 		param2 = 0;
 		param3 = 0;
@@ -226,9 +225,9 @@ public:
 	byte param2;
 	byte param3;
 
-	~Scene();
+	~Scene() override;
 
-	Common::Rect draw(Graphics::Surface *surface);
+	Common::Rect draw(Graphics::Surface *surface) override;
 
 	// Hotspots
 	Common::Array<SceneHotspot *> *getHotspots() { return &_hotspots; }

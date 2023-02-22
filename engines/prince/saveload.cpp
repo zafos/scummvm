@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -144,9 +143,9 @@ bool PrinceEngine::canLoadGameStateCurrently() {
 	return false;
 }
 
-Common::Error PrinceEngine::saveGameState(int slot, const Common::String &desc) {
+Common::Error PrinceEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	// Set up the serializer
-	Common::String slotName = generateSaveName(slot);
+	Common::String slotName = getSaveStateName(slot);
 	Common::OutSaveFile *saveFile = g_system->getSavefileManager()->openForSaving(slotName);
 
 	// Write out the ScummVM savegame header
@@ -163,10 +162,6 @@ Common::Error PrinceEngine::saveGameState(int slot, const Common::String &desc) 
 	delete saveFile;
 
 	return Common::kNoError;
-}
-
-Common::String PrinceEngine::generateSaveName(int slot) {
-	return Common::String::format("%s.%03d", _targetName.c_str(), slot);
 }
 
 void PrinceEngine::writeSavegameHeader(Common::OutSaveFile *out, SavegameHeader &header) {
@@ -435,8 +430,11 @@ bool PrinceEngine::loadGame(int slotNumber) {
 	Common::MemoryReadStream *readStream;
 
 	// Open up the savegame file
-	Common::String slotName = generateSaveName(slotNumber);
+	Common::String slotName = getSaveStateName(slotNumber);
 	Common::InSaveFile *saveFile = g_system->getSavefileManager()->openForLoading(slotName);
+
+	if (!saveFile)
+		return false;
 
 	// Read the data into a data buffer
 	int size = saveFile->size();

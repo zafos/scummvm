@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,10 +42,28 @@ namespace Titanic {
 enum Find { FIND_GLOBAL = 1, FIND_ROOM = 2, FIND_PET = 4, FIND_MAILMAN = 8 };
 enum Found { FOUND_NONE = 0, FOUND_GLOBAL = 1, FOUND_ROOM = 2, FOUND_PET = 3, FOUND_MAILMAN = 4 };
 enum RoomFlagsComparison { RFC_LOCATION = 1, RFC_CLASS_ELEVATOR = 2, RFC_TITANIA = 3 };
+
 enum StarControlAction {
-	STAR_SHOW = 0, STAR_HIDE, STAR_2, STAR_RESET_POS, STAR_4, STAR_5, STAR_6, STAR_FULL_SPEED,
-	STAR_8, STAR_TOGGLE_MODE, STAR_10, STAR_11, STAR_12, STAR_13, STAR_SET_REFERENCE, STAR_FADE_IN,
-	STAR_FADE_OUT, LOCK_STAR, UNLOCK_STAR, STAR_19
+	STAR_SHOW = 0,			///< Show the starfield
+	STAR_HIDE,				///< Hide the starfield
+	STAR_VIEW_EARTH,		///< View the solar system
+	STAR_VIEW_FROM_EARTH,	///< View from the solar system
+	STAR_VIEW_BOUNDARIES,		///< Turn on constellation boundaries
+	STAR_VIEW_CONSTELLATIONS,	///< Turn on the constellation lines
+	STAR_VIEW_RANDOM_STAR,		///< Look at a random star
+	STAR_FULL_SPEED,			///< Accellerate to full speed
+	STAR_TOGGLE_STEREO_PAIR,	///< Enable stero pair vision
+	STAR_TOGGLE_HOME_PHOTO,		///< Turn on/off the home photo
+	STAR_TOGGLE_SOLAR_RENDERING,///< Turn on/off the solar object rendering
+	STAR_TOGGLE_POS_FRAME,		///< Turn on/off the pilot's position frame
+	STAR_STEREO_PAIR_ON,		///< Turn on Stereo Pair imaging
+	STAR_STEREO_PAIR_OFF,		///< Turn off Stero Pair imaging
+	STAR_SET_REFERENCE,			///< Take a photo of the current star line
+	STAR_FADE_IN,				///< Fade in
+	STAR_FADE_OUT,				///< Fade out
+	LOCK_STAR,					///< Lock in the currently selected sar
+	UNLOCK_STAR,				///< Unlock the last locked star
+	STAR_CLEAR_MODIFIED			///< Clear the modified flag
 };
 
 class CDontSaveFileItem;
@@ -529,6 +546,13 @@ protected:
 	 * Gets a new random number
 	 */
 	int getRandomNumber(int max, int *oldVal = nullptr);
+
+	/**
+	 * Returns true if the current location is one that Doorbot/Bellbot
+	 * shouldn't be allowed to be summoned to, but isn't disallowed by
+	 * the original game
+	 */
+	bool isBotDisallowedLocation();
 public:
 	Rect _bounds;
 	bool _isPendingMail;
@@ -550,37 +574,37 @@ public:
 public:
 	CLASSDEF;
 	CGameObject();
-	~CGameObject();
+	~CGameObject() override;
 
 	/**
 	 * Save the data for the class to file
 	 */
-	virtual void save(SimpleFile *file, int indent);
+	void save(SimpleFile *file, int indent) override;
 
 	/**
 	 * Load the data for the class from file
 	 */
-	virtual void load(SimpleFile *file);
+	void load(SimpleFile *file) override;
 
 	/**
 	 * Returns the clip list, if any, associated with the item
 	 */
-	virtual const CMovieClipList *getMovieClips() const { return &_movieClips; }
+	const CMovieClipList *getMovieClips() const override { return &_movieClips; }
 
 	/**
 	 * Allows the item to draw itself
 	 */
-	virtual void draw(CScreenManager *screenManager);
+	void draw(CScreenManager *screenManager) override;
 
 	/**
 	 * Gets the bounds occupied by the item
 	 */
-	virtual Rect getBounds() const;
+	Rect getBounds() const override;
 
 	/**
 	 * Free up any surface the object used
 	 */
-	virtual void freeSurface();
+	void freeSurface() override;
 
 	/**
 	 * Allows the item to draw itself

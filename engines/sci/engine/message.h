@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef SCI_ENGINE_MESSAGE_H
 #define SCI_ENGINE_MESSAGE_H
 
-#include "sci/resource.h"
+#include "sci/resource/resource.h"
 #include "sci/engine/vm_types.h"
 #include "common/stack.h"
 
@@ -56,6 +55,7 @@ public:
 	}
 
 	int getModule() const { return _module; }
+	void setModule(int module) { _module = module; }
 
 private:
 	int _module;
@@ -77,7 +77,7 @@ public:
 private:
 	bool getRecord(CursorStack &stack, bool recurse, MessageRecord &record);
 	void outputString(reg_t buf, const Common::String &str);
-	Common::String processString(const char *s);
+	Common::String processString(const char *s, uint32 maxLength);
 	int hexDigitToWrongInt(char h);
 	bool stringHex(Common::String &outStr, const Common::String &inStr, uint &index);
 	bool stringLit(Common::String &outStr, const Common::String &inStr, uint &index);

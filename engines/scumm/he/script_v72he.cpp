@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,6 +30,7 @@
 #include "scumm/dialogs.h"
 #include "scumm/file.h"
 #include "scumm/he/intern_he.h"
+#include "scumm/he/localizer.h"
 #include "scumm/object.h"
 #include "scumm/resource.h"
 #include "scumm/scumm.h"
@@ -102,7 +102,7 @@ void ScummEngine_v72he::setupOpcodes() {
 static const int arrayDataSizes[] = { 0, 1, 4, 8, 8, 16, 32 };
 
 byte *ScummEngine_v72he::defineArray(int array, int type, int dim2start, int dim2end,
-											int dim1start, int dim1end) {
+											int dim1start, int dim1end, bool newArray, int *newid) {
 	int id;
 	int size;
 	ArrayHeader *ah;
@@ -115,13 +115,17 @@ byte *ScummEngine_v72he::defineArray(int array, int type, int dim2start, int dim
 	if (type == kBitArray || type == kNibbleArray)
 		type = kByteArray;
 
-	nukeArray(array);
+	if (!newArray)
+		nukeArray(array);
 
 	id = findFreeArrayId();
 
+	if (newid != NULL)
+		*newid = id;
+
 	debug(9, "defineArray (array %d, dim2start %d, dim2end %d dim1start %d dim1end %d", id, dim2start, dim2end, dim1start, dim1end);
 
-	if (array & 0x80000000) {
+	if (!newArray && (array & 0x80000000)) {
 		error("Can't define bit variable as array pointer");
 	}
 
@@ -130,7 +134,8 @@ byte *ScummEngine_v72he::defineArray(int array, int type, int dim2start, int dim
 	if (_game.heversion >= 80)
 		id |= 0x33539000;
 
-	writeVar(array, id);
+	if (!newArray)
+		writeVar(array, id);
 
 	if (_game.heversion >= 80)
 		id &= ~0x33539000;
@@ -181,6 +186,9 @@ int ScummEngine_v72he::readArray(int array, int idx2, int idx1) {
 
 	case kDwordArray:
 		return (int32)READ_LE_UINT32(ah->data + offset * 4);
+
+	default:
+		break;
 	}
 
 	return 0;
@@ -219,6 +227,9 @@ void ScummEngine_v72he::writeArray(int array, int idx2, int idx1, int value) {
 
 	case kDwordArray:
 		WRITE_LE_UINT32(ah->data + offset * 4, value);
+		break;
+
+	default:
 		break;
 	}
 }
@@ -306,6 +317,7 @@ void ScummEngine_v72he::decodeScriptString(byte *dst, bool scriptString) {
 	int args[31];
 	int num, len, val;
 	byte chr, string[1024];
+	byte *dst0 = dst;
 	memset(args, 0, sizeof(args));
 	memset(string, 0, sizeof(string));
 
@@ -324,6 +336,10 @@ void ScummEngine_v72he::decodeScriptString(byte *dst, bool scriptString) {
 		len = resStrLen(string) + 1;
 	}
 
+	if (_localizer) {
+		strncpy((char *) string, _localizer->translate((char *) string).c_str(), sizeof(string) - 1);
+	}
+
 	// Decode string
 	num = 0;
 	val = 0;
@@ -333,13 +349,13 @@ void ScummEngine_v72he::decodeScriptString(byte *dst, bool scriptString) {
 			chr = string[num++];
 			switch (chr) {
 			case 'b':
-				//dst += sprintf((char *)dst, "%b", args[val++]);
+				//dst += Common::sprintf_s((char *)dst, "%b", args[val++]);
 				break;
 			case 'c':
 				*dst++ = args[val++];
 				break;
 			case 'd':
-				dst += sprintf((char *)dst, "%d", args[val++]);
+				dst += Common::sprintf_s((char *)dst, sizeof(string) - (dst - dst0), "%d", args[val++]);
 				break;
 			case 's':
 				src = getStringAddress(args[val++]);
@@ -349,7 +365,7 @@ void ScummEngine_v72he::decodeScriptString(byte *dst, bool scriptString) {
 				}
 				break;
 			case 'x':
-				dst += sprintf((char *)dst, "%x", args[val++]);
+				dst += Common::sprintf_s((char *)dst, sizeof(string) - (dst - dst0), "%x", args[val++]);
 				break;
 			default:
 				*dst++ = '%';
@@ -361,6 +377,10 @@ void ScummEngine_v72he::decodeScriptString(byte *dst, bool scriptString) {
 		}
 	}
 	*dst = 0;
+
+	if (_localizer) {
+		strncpy((char *) dst0, _localizer->translate((char *) dst0).c_str(), sizeof(string) - 1);
+	}
 }
 
 int ScummEngine_v72he::findObject(int x, int y, int num, int *args) {
@@ -860,6 +880,10 @@ void ScummEngine_v72he::o72_actorOps() {
 		break;
 	case 87:		// SO_TALK_COLOR
 		a->_talkColor = pop();
+		// WORKAROUND bug #13730: defined subtitles color 16 is very dark and hard to read on the dark background.
+		// we change it to brighter color to ease reading.
+		if (_game.id == GID_FREDDI4 && _game.heversion == 98 && _currentRoom == 43 && a->_talkColor == 16)
+			a->_talkColor = 200;
 		break;
 	case 88:		// SO_ACTOR_NAME
 		copyScriptString(string, sizeof(string));
@@ -1150,14 +1174,14 @@ void ScummEngine_v72he::o72_arrayOps() {
 
 		offs = (b >= c) ? 1 : -1;
 		tmp2 = c;
-		tmp3 = c - b + 1;
+		tmp3 = ABS(c - b) + 1;
 		while (dim2start <= dim2end) {
 			tmp = dim1start;
 			while (tmp <= dim1end) {
 				writeArray(array, dim2start, tmp, tmp2);
 				if (--tmp3 == 0) {
 					tmp2 = c;
-					tmp3 = c - b + 1;
+					tmp3 = ABS(c - b) + 1;
 				} else {
 					tmp2 += offs;
 				}
@@ -1982,18 +2006,12 @@ void ScummEngine_v72he::o72_setSystemMessage() {
 		break;
 	case 243: // Set Window Caption
 		// TODO: The 'name' string can contain non-ASCII data. This can lead to
-		// problems, because (a) the encoding used for "name" is not clear,
-		// (b) OSystem::setWindowCaption only supports ASCII. As a result, odd
-		// behavior can occur, from strange wrong titles, up to crashes (happens
-		// under Mac OS X).
+		// problems, because the encoding used for "name" is not clear.
 		//
 		// Possible fixes/workarounds:
 		// - Simply stop using this. It's a rather unimportant "feature" anyway.
-		// - Try to translate the text to ASCII.
-		// - Refine OSystem to accept window captions that are non-ASCII, e.g.
-		//   by enhancing all backends to deal with UTF-8 data. Of course, then
-		//   one still would have to convert 'name' to the correct encoding.
-		//_system->setWindowCaption((const char *)name);
+		// - Try to translate the text to UTF-32.
+		//_system->setWindowCaption(Common::U32String((const char *)name));
 		break;
 	default:
 		error("o72_setSystemMessage: default case %d", subOp);
@@ -2056,6 +2074,10 @@ void ScummEngine_v72he::decodeParseString(int m, int n) {
 		colors = pop();
 		if (colors == 1) {
 			_string[m].color = pop();
+			// WORKAROUND bug #13730: defined subtitles color 16 is very dark and hard to read on the dark background.
+			// we change it to brighter color to ease reading.
+			if (_game.id == GID_FREDDI4 && _game.heversion == 98 && _currentRoom == 43 && _string[m].color == 16)
+				_string[m].color = 200;
 		} else {
 			push(colors);
 			getStackList(args, ARRAYSIZE(args));

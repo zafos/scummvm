@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,6 +23,8 @@
 #define LURE_LURE_H
 
 #include "engines/engine.h"
+#include "engines/advancedDetector.h"
+
 #include "common/rect.h"
 #include "common/file.h"
 #include "common/savefile.h"
@@ -38,6 +39,7 @@
 #include "lure/strings.h"
 #include "lure/room.h"
 #include "lure/fights.h"
+#include "lure/detection.h"
 
 /**
  * This is the namespace of the Lure engine.
@@ -58,6 +60,7 @@ enum LureLanguage {
 	LANG_ES_ESP = 17,
 	LANG_EN_ANY = 3,
 	LANG_RU_RUS = 3,	// English data has been overridden
+	LANG_EN_KONAMI = 4,
 	LANG_UNKNOWN = -1
 };
 
@@ -85,23 +88,23 @@ private:
 
 public:
 	LureEngine(OSystem *system, const LureGameDescription *gameDesc);
-	~LureEngine();
+	~LureEngine() override;
 	static LureEngine &getReference();
 	bool _saveLoadAllowed;
 
 	// Engine APIs
 	Common::Error init();
 	Common::Error go();
-	virtual Common::Error run() {
+	Common::Error run() override {
 		Common::Error err;
 		err = init();
 		if (err.getCode() != Common::kNoError)
 			return err;
 		return go();
 	}
-	virtual bool hasFeature(EngineFeature f) const;
-	virtual void syncSoundSettings();
-	virtual void pauseEngineIntern(bool pause);
+	bool hasFeature(EngineFeature f) const override;
+	void syncSoundSettings() override;
+	void pauseEngineIntern(bool pause) override;
 
 	Disk &disk() { return *_disk; }
 
@@ -111,30 +114,31 @@ public:
 	bool saveGame(uint8 slotNumber, Common::String &caption);
 	Common::String *detectSave(int slotNumber);
 	uint8 saveVersion() { return _saveVersion; }
-	void GUIError(const char *msg, ...) GCC_PRINTF(2, 3);
 
 	uint32 getFeatures() const;
 	LureLanguage getLureLanguage() const;
 	Common::Language getLanguage() const;
 	Common::Platform getPlatform() const;
-	virtual GUI::Debugger *getDebugger();
 	bool isEGA() const { return (getFeatures() & GF_EGA) != 0; }
+	bool isKonami() const { return (getFeatures() & GF_KONAMI) != 0; }
 
-	virtual Common::Error loadGameState(int slot) {
-		return loadGame(slot) ? Common::kReadingFailed : Common::kNoError;
+	Common::Error loadGameState(int slot) override {
+		return loadGame(slot) ? Common::kNoError : Common::kReadingFailed;
 	}
-	virtual Common::Error saveGameState(int slot, const Common::String &desc) {
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override {
 		Common::String s(desc);
-		return saveGame(slot, s) ? Common::kReadingFailed : Common::kNoError;
+		return saveGame(slot, s) ? Common::kNoError : Common::kReadingFailed;
 	}
-	virtual bool canLoadGameStateCurrently() {
+	bool canLoadGameStateCurrently() override {
 		return _saveLoadAllowed && !Fights.isFighting();
 	}
-	virtual bool canSaveGameStateCurrently() {
+	bool canSaveGameStateCurrently() override {
 		return _saveLoadAllowed && !Fights.isFighting();
 	}
 };
-	Common::String getSaveName(Common::InSaveFile *in);
+
+Common::String getSaveName(Common::InSaveFile *in);
+
 } // End of namespace Lure
 
 #endif

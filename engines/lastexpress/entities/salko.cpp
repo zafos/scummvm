@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,12 +39,12 @@ namespace LastExpress {
 
 Salko::Salko(LastExpressEngine *engine) : Entity(engine, kEntitySalko) {
 	ADD_CALLBACK_FUNCTION(Salko, reset);
-	ADD_CALLBACK_FUNCTION(Salko, enterExitCompartment);
-	ADD_CALLBACK_FUNCTION(Salko, draw);
-	ADD_CALLBACK_FUNCTION(Salko, updateEntity);
-	ADD_CALLBACK_FUNCTION(Salko, updateFromTime);
-	ADD_CALLBACK_FUNCTION(Salko, savegame);
-	ADD_CALLBACK_FUNCTION(Salko, function7);
+	ADD_CALLBACK_FUNCTION_SI(Salko, enterExitCompartment);
+	ADD_CALLBACK_FUNCTION_S(Salko, draw);
+	ADD_CALLBACK_FUNCTION_II(Salko, updateEntity);
+	ADD_CALLBACK_FUNCTION_I(Salko, updateFromTime);
+	ADD_CALLBACK_FUNCTION_II(Salko, savegame);
+	ADD_CALLBACK_FUNCTION_II(Salko, function7);
 	ADD_CALLBACK_FUNCTION(Salko, function8);
 	ADD_CALLBACK_FUNCTION(Salko, chapter1);
 	ADD_CALLBACK_FUNCTION(Salko, chapter1Handler);
@@ -176,11 +175,12 @@ IMPLEMENT_FUNCTION(10, Salko, chapter1Handler)
 	case kActionNone:
 		getData()->entityPosition = getEntityData(kEntityIvo)->entityPosition;
 		getData()->location = getEntityData(kEntityIvo)->location;
+		getData()->car = getEntityData(kEntityIvo)->car;
 		break;
 
 	case kActionCallback:
 		if (getCallback() == 1) {
-			getEntities()->clearSequences(kEntitySalko);
+			getEntities()->drawSequenceLeft(kEntitySalko, "BLANK");
 			setup_function8();
 		}
 		break;
@@ -357,6 +357,8 @@ label_callback3:
 			break;
 
 		case 2:
+			getEntities()->drawSequenceLeft(kEntitySalko, "612AF");
+			getEntities()->enterCompartment(kEntitySalko, kObjectCompartmentF, true);
 			break;
 
 		case 3:
@@ -416,7 +418,7 @@ IMPLEMENT_FUNCTION(17, Salko, function17)
 		getData()->inventoryItem = kItemNone;
 
 		setCallback(1);
-		setup_updateEntity(kCarGreenSleeping, kPosition_2740);
+		setup_updateEntity(kCarRedSleeping, kPosition_2740);
 		break;
 
 	case kActionCallback:
@@ -599,7 +601,7 @@ IMPLEMENT_FUNCTION(24, Salko, chapter5Handler)
 
 		case 1:
 			if (getSoundQueue()->isBuffered("MUS050"))
-				getSoundQueue()->processEntry("MUS050");
+				getSoundQueue()->fade("MUS050");
 
 			getAction()->playAnimation(kEventCathSalkoTrainTopFight);
 

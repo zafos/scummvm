@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,32 +15,36 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
+
+#include "common/formats/winexe_pe.h"
 
 #include "scumm/he/intern_he.h"
 #include "scumm/he/moonbase/moonbase.h"
 #include "scumm/he/moonbase/ai_main.h"
-#ifdef USE_SDL_NET
+#ifdef USE_LIBCURL
 #include "scumm/he/moonbase/net_main.h"
 #endif
 
 namespace Scumm {
 
 Moonbase::Moonbase(ScummEngine_v100he *vm) : _vm(vm) {
+	_exe = new Common::PEResources();
+
 	initFOW();
 
 	_ai = new AI(_vm);
-#ifdef USE_SDL_NET
+#ifdef USE_LIBCURL
 	_net = new Net(_vm);
 #endif
 }
 
 Moonbase::~Moonbase() {
+	delete _exe;
 	delete _ai;
-#ifdef USE_SDL_NET
+#ifdef USE_LIBCURL
 	delete _net;
 #endif
 }
@@ -65,7 +69,7 @@ int Moonbase::callScummFunction(int scriptNumber, int paramCount,...) {
 	memset(args, 0, sizeof(args));
 
 	Common::String str;
-	str = Common::String::format("callScummFunction(%d, [", scriptNumber);
+	str = Common::String::format("Moonbase::callScummFunction(%d, [", scriptNumber);
 
 	for (int i = 0; i < paramCount; i++) {
 		args[i] = va_arg(va_params, int);
@@ -74,7 +78,7 @@ int Moonbase::callScummFunction(int scriptNumber, int paramCount,...) {
 	}
 	str += "])";
 
-	debug(0, "%s", str.c_str());
+	debug(3, "%s", str.c_str());
 
 
 	va_end(va_params);
@@ -175,6 +179,8 @@ void Moonbase::blitT14WizImage(uint8 *dst, int dstw, int dsth, int dstPitch, con
 					}
 					src += 2;
 					pixels++;
+					if (pixels >= cx + sx)
+						break;
 				}
 			} else { // skip
 				if ((code & 1) == 0) {
@@ -184,6 +190,8 @@ void Moonbase::blitT14WizImage(uint8 *dst, int dstw, int dsth, int dstPitch, con
 						if (pixels >= sx)
 							dst1 += 2;
 						pixels++;
+						if (pixels >= cx + sx)
+							break;
 					}
 				} else { // special case
 					if (pixels >= sx) {

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,9 +24,10 @@
 namespace BladeRunner {
 
 AIScriptHanoi::AIScriptHanoi(BladeRunnerEngine *vm) : AIScriptBase(vm) {
-	_var1 = 0;
-	_var2 = 0;
-	_var3 = 0;
+	_resumeIdleAfterFramesetCompletesFlag = false;
+	// _varChooseIdleAnimation can have valid values: 0, 1
+	_varChooseIdleAnimation = 0;
+	_varNumOfTimesToHoldCurrentFrame = 0;
 	_var4 = 1;
 }
 
@@ -37,47 +37,61 @@ void AIScriptHanoi::Initialize() {
 	_animationStateNext = 0;
 	_animationNext = 0;
 
-	_var1 = 0;
-	_var2 = 0;
-	_var3 = 0;
+	_resumeIdleAfterFramesetCompletesFlag = false;
+	_varChooseIdleAnimation = 0;
+	_varNumOfTimesToHoldCurrentFrame = 0;
 	_var4 = 1;
 
 	Actor_Set_Goal_Number(kActorHanoi, 0);
 }
 
 bool AIScriptHanoi::Update() {
-	if (Actor_Query_Goal_Number(kActorHolloway) == 240) {
-		AI_Countdown_Timer_Reset(kActorHanoi, 0);
+	if (Actor_Query_Goal_Number(kActorHolloway) == kGoalHollowayGoToNR07) {
+		AI_Countdown_Timer_Reset(kActorHanoi, kActorTimerAIScriptCustomTask0);
 	}
-	if (Global_Variable_Query(kVariableChapter) == 3 && Actor_Query_Goal_Number(kActorHanoi) < 200) {
-		Actor_Set_Goal_Number(kActorHanoi, 210);
+
+	if (Global_Variable_Query(kVariableChapter) == 3
+	 && Actor_Query_Goal_Number(kActorHanoi) < kGoalHanoiDefault
+	) {
+		Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR03GoToDefaultPosition);
 	}
-	if (Player_Query_Current_Scene() != 56 && Actor_Query_Goal_Number(kActorHanoi) == 236) {
-		Actor_Set_Goal_Number(kActorHanoi, 210);
+
+	if (Player_Query_Current_Scene() != kSceneNR03
+	 && Actor_Query_Goal_Number(kActorHanoi) == kGoalHanoiNR08Left
+	) {
+		Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR03GoToDefaultPosition);
 	}
-	if (Player_Query_Current_Scene() == 56
-			&& Actor_Query_Goal_Number(kActorHanoi) != 215
-			&& Actor_Query_Goal_Number(kActorHanoi) != 230
-			&& Actor_Query_Goal_Number(kActorHanoi) != 235
-			&& Actor_Query_Goal_Number(kActorHanoi) != 236) {
+
+	if (Player_Query_Current_Scene() == kSceneNR03
+	 && Actor_Query_Goal_Number(kActorHanoi) != kGoalHanoiNR03StartGuarding
+	 && Actor_Query_Goal_Number(kActorHanoi) != kGoalHanoiNR08WatchShow
+	 && Actor_Query_Goal_Number(kActorHanoi) != kGoalHanoiNR08Leave
+	 && Actor_Query_Goal_Number(kActorHanoi) != kGoalHanoiNR08Left
+	) {
+		// McCoy close to table swivel
 		if (Actor_Query_Inch_Distance_From_Waypoint(kActorMcCoy, 364) < 420) {
-			if (Actor_Query_Goal_Number(kActorHanoi) == 210) {
-				Actor_Set_Goal_Number(kActorHanoi, 211);
+			if (Actor_Query_Goal_Number(kActorHanoi) == kGoalHanoiNR03GoToDefaultPosition) {
+				Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR03GoToSwivelTable);
 			}
-		} else if (Actor_Query_Goal_Number(kActorHanoi) == 211) {
-			Actor_Set_Goal_Number(kActorHanoi, 210);
+		} else if (Actor_Query_Goal_Number(kActorHanoi) == kGoalHanoiNR03GoToSwivelTable) {
+			Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR03GoToDefaultPosition);
 		}
+
+		// McCoy close to office door
 		if (Actor_Query_Inch_Distance_From_Waypoint(kActorMcCoy, 361) < 240) {
-			if (Actor_Query_Goal_Number(kActorHanoi) == 210) {
-				Actor_Set_Goal_Number(kActorHanoi, 212);
+			if (Actor_Query_Goal_Number(kActorHanoi) == kGoalHanoiNR03GoToDefaultPosition) {
+				Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR03GoToOfficeDoor);
 			}
-		} else if (Actor_Query_Goal_Number(kActorHanoi) == 212) {
-			Actor_Set_Goal_Number(kActorHanoi, 210);
+		} else if (Actor_Query_Goal_Number(kActorHanoi) == kGoalHanoiNR03GoToOfficeDoor) {
+			Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR03GoToDefaultPosition);
 		}
+
+		// McCoy close to dancer
 		if (Actor_Query_Inch_Distance_From_Actor(kActorMcCoy, kActorHysteriaPatron1) < 120
-				&& Actor_Query_Which_Set_In(kActorHanoi) == 55
-				&& Actor_Query_Goal_Number(kActorHanoi) != 213) {
-			Actor_Set_Goal_Number(kActorHanoi, 213);
+		 && Actor_Query_Which_Set_In(kActorHanoi) == kSetNR03
+		 && Actor_Query_Goal_Number(kActorHanoi) != kGoalHanoiNR03GoToDancer
+		) {
+			Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR03GoToDancer);
 		}
 	}
 
@@ -85,49 +99,48 @@ bool AIScriptHanoi::Update() {
 }
 
 void AIScriptHanoi::TimerExpired(int timer) {
-	if (timer == 0) {
-		if (Actor_Query_Goal_Number(kActorHanoi) == 215) {
-			Actor_Set_Goal_Number(kActorHanoi, 210);
+	if (timer == kActorTimerAIScriptCustomTask0) {
+		if (Actor_Query_Goal_Number(kActorHanoi) == kGoalHanoiNR03StartGuarding) {
+			Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR03GoToDefaultPosition);
 			return; //true;
 		}
 
-		if (Actor_Query_Goal_Number(kActorHanoi) == 220)
-			return; //false;
-
-		Actor_Set_Goal_Number(kActorHanoi, 202);
-		return; //true;
+		if (Actor_Query_Goal_Number(kActorHanoi) != kGoalHanoiThrowOutMcCoy) {
+			Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR07TalkToMcCoy);
+			return; //true;
+		}
 	}
 	return; //false;
 }
 
 void AIScriptHanoi::CompletedMovementTrack() {
 	switch (Actor_Query_Goal_Number(kActorHanoi)) {
-	case 235:
-		Actor_Set_Goal_Number(kActorHanoi, 236);
-		break;
-
-	case 240:
-		Actor_Set_Goal_Number(kActorHanoi, 241);
-		break;
-
-	case 202:
+	case kGoalHanoiNR07TalkToMcCoy:
 		Actor_Says(kActorHanoi, 130, 3);
 		Actor_Says(kActorDektora, 540, 30);
-		Actor_Set_Goal_Number(kActorHanoi, 203);
+		Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR07GrabMcCoy);
 		break;
 
-	case 203:
-		Actor_Face_Actor(kActorHanoi, kActorMcCoy, 1);
-		Actor_Face_Actor(kActorMcCoy, kActorHanoi, 1);
+	case kGoalHanoiNR07GrabMcCoy:
+		Actor_Face_Actor(kActorHanoi, kActorMcCoy, true);
+		Actor_Face_Actor(kActorMcCoy, kActorHanoi, true);
 		Actor_Change_Animation_Mode(kActorHanoi, 23);
-		Actor_Set_Invisible(kActorMcCoy, 1);
-		Actor_Says(kActorMcCoy, 3595, 3);
-		Actor_Says(kActorHanoi, 140, 3);
-		Actor_Set_Goal_Number(kActorHanoi, 220);
+		Actor_Set_Invisible(kActorMcCoy, true);
+		Actor_Says(kActorMcCoy, 3595, kAnimationModeTalk);
+		Actor_Says(kActorHanoi, 140, kAnimationModeTalk);
+		Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiThrowOutMcCoy);
 		break;
 
-	case 213:
-		Actor_Set_Goal_Number(kActorHanoi, 210);
+	case kGoalHanoiNR03GoToDancer:
+		Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR03GoToDefaultPosition);
+		break;
+
+	case kGoalHanoiNR08Leave:
+		Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR08Left);
+		break;
+
+	case kGoalHanoiNR04Enter:
+		Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR04ShootMcCoy);
 		break;
 
 	default:
@@ -142,37 +155,44 @@ void AIScriptHanoi::ReceivedClue(int clueId, int fromActorId) {
 }
 
 void AIScriptHanoi::ClickedByPlayer() {
-	if (Actor_Query_Goal_Number(kActorHanoi) == 230 || Actor_Query_Goal_Number(kActorHanoi) == 235) {
-		Actor_Face_Actor(kActorMcCoy, kActorHanoi, 1);
+	if (Actor_Query_Goal_Number(kActorHanoi) == kGoalHanoiNR08WatchShow
+	 || Actor_Query_Goal_Number(kActorHanoi) == kGoalHanoiNR08Leave
+	) {
+		Actor_Face_Actor(kActorMcCoy, kActorHanoi, true);
 		Actor_Says(kActorMcCoy, 8915, 11);
 
-		if (Actor_Query_Goal_Number(kActorHanoi) == 230) {
-			Actor_Says(kActorHanoi, 210, 3);
+		if (Actor_Query_Goal_Number(kActorHanoi) == kGoalHanoiNR08WatchShow) {
+			Actor_Says(kActorHanoi, 210, kAnimationModeTalk);
 		}
 	}
 }
 
-void AIScriptHanoi::EnteredScene(int sceneId) {
+void AIScriptHanoi::EnteredSet(int setId) {
 	// return false;
 }
 
-void AIScriptHanoi::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptHanoi::OtherAgentEnteredThisSet(int otherActorId) {
 	// return false;
 }
 
-void AIScriptHanoi::OtherAgentExitedThisScene(int otherActorId) {
+void AIScriptHanoi::OtherAgentExitedThisSet(int otherActorId) {
 	// return false;
 }
 
 void AIScriptHanoi::OtherAgentEnteredCombatMode(int otherActorId, int combatMode) {
-	if (Player_Query_Current_Scene() != 56 || otherActorId || combatMode != 1) {
-		return; //false;
+	if (Player_Query_Current_Scene() == kSceneNR03
+	 && otherActorId == kActorMcCoy
+	 && combatMode
+	) {
+		Player_Set_Combat_Mode(false);
+#if BLADERUNNER_ORIGINAL_BUGS
+		// redundant call to lose control here
+		Player_Loses_Control();
+#endif
+		Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiThrowOutMcCoy);
+		return; //true;
 	}
-	Player_Set_Combat_Mode(0);
-	Player_Loses_Control();
-	Actor_Set_Goal_Number(kActorHanoi, 220);
-
-	return; //true;
+	return; //false;
 }
 
 void AIScriptHanoi::ShotAtAndMissed() {
@@ -192,7 +212,7 @@ int AIScriptHanoi::GetFriendlinessModifierIfGetsClue(int otherActorId, int clueI
 }
 
 bool AIScriptHanoi::GoalChanged(int currentGoalNumber, int newGoalNumber) {
-	if (!newGoalNumber) {
+	if (newGoalNumber == 0) {
 		AI_Movement_Track_Flush(kActorHanoi);
 		AI_Movement_Track_Append(kActorHanoi, 39, 0);
 		AI_Movement_Track_Repeat(kActorHanoi);
@@ -201,20 +221,22 @@ bool AIScriptHanoi::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 	}
 
 	switch (newGoalNumber) {
-	case 200:
-		AI_Countdown_Timer_Start(kActorHanoi, 0, 45);
+	case kGoalHanoiDefault:
+		AI_Countdown_Timer_Start(kActorHanoi, kActorTimerAIScriptCustomTask0, 45);
 		break;
 
-	case 201:
-		AI_Countdown_Timer_Reset(kActorHanoi, 0);
+	case kGoalHanoiResetTimer:
+		AI_Countdown_Timer_Reset(kActorHanoi, kActorTimerAIScriptCustomTask0);
 		break;
 
-	case 202:
-		if (Actor_Query_Which_Set_In(kActorMcCoy) == kSetNR07 && Actor_Query_In_Set(kActorDektora, kSetNR07)) {
+	case kGoalHanoiNR07TalkToMcCoy:
+		if (Actor_Query_Which_Set_In(kActorMcCoy) == kSetNR07
+		 && Actor_Query_In_Set(kActorDektora, kSetNR07)
+		) {
 			Player_Loses_Control();
 			Actor_Put_In_Set(kActorHanoi, kSetNR07);
 			Actor_Set_At_XYZ(kActorHanoi, -102.0f, -73.5f, -233.0f, 0);
-			Async_Actor_Walk_To_Waypoint(kActorMcCoy, 338, 0, 0);
+			Async_Actor_Walk_To_Waypoint(kActorMcCoy, 338, 0, false);
 			AI_Movement_Track_Flush(kActorHanoi);
 			AI_Movement_Track_Append(kActorHanoi, 336, 1);
 			AI_Movement_Track_Repeat(kActorHanoi);
@@ -223,7 +245,7 @@ bool AIScriptHanoi::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 		}
 		break;
 
-	case 203:
+	case kGoalHanoiNR07GrabMcCoy:
 		if (Actor_Query_Which_Set_In(kActorMcCoy) != kSetNR07) {
 			return false;
 		}
@@ -233,73 +255,80 @@ bool AIScriptHanoi::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 		break;
 
 	case 204:
-		Actor_Says(kActorHanoi, 210, 3);
+		Actor_Says(kActorHanoi, 210, kAnimationModeTalk);
 		Actor_Change_Animation_Mode(kActorHanoi, 23);
 		break;
 
-	case 210:
+	case kGoalHanoiNR03GoToDefaultPosition:
 		AI_Movement_Track_Flush(kActorHanoi);
 		AI_Movement_Track_Append_With_Facing(kActorHanoi, 362, 0, 300);
 		AI_Movement_Track_Repeat(kActorHanoi);
 		break;
 
-	case 211:
+	case kGoalHanoiNR03GoToSwivelTable:
 		AI_Movement_Track_Flush(kActorHanoi);
 		AI_Movement_Track_Append_With_Facing(kActorHanoi, 363, 0, 500);
 		AI_Movement_Track_Repeat(kActorHanoi);
 		break;
 
-	case 212:
+	case kGoalHanoiNR03GoToOfficeDoor:
 		AI_Movement_Track_Flush(kActorHanoi);
 		AI_Movement_Track_Append_With_Facing(kActorHanoi, 361, 0, 457);
 		AI_Movement_Track_Repeat(kActorHanoi);
 		break;
 
-	case 213:
+	case kGoalHanoiNR03GoToDancer:
 		AI_Movement_Track_Flush(kActorHanoi);
 		AI_Movement_Track_Append_With_Facing(kActorHanoi, 365, Random_Query(15, 20), 600);
 		AI_Movement_Track_Repeat(kActorHanoi);
 		break;
 
-	case 215:
+	case kGoalHanoiNR03StartGuarding:
 		Actor_Put_In_Set(kActorHanoi, kSetNR03);
 		Actor_Set_At_Waypoint(kActorHanoi, 362, 300);
-		AI_Countdown_Timer_Reset(kActorHanoi, 0);
-		AI_Countdown_Timer_Start(kActorHanoi, 0, 6);
+		AI_Countdown_Timer_Reset(kActorHanoi, kActorTimerAIScriptCustomTask0);
+		AI_Countdown_Timer_Start(kActorHanoi, kActorTimerAIScriptCustomTask0, 6);
 		break;
 
-	case 220:
-		Game_Flag_Set(604);
-		AI_Countdown_Timer_Reset(kActorHanoi, 0);
+	case kGoalHanoiThrowOutMcCoy:
+		Game_Flag_Set(kFlagNR03McCoyThrownOut);
+		AI_Countdown_Timer_Reset(kActorHanoi, kActorTimerAIScriptCustomTask0);
+#if BLADERUNNER_ORIGINAL_BUGS
 		Player_Loses_Control();
-		Player_Set_Combat_Mode(0);
+#else
+		// Lose control only if not already lost control (like in the case of Dektora's dressing room NR07 time-out)
+		if (Player_Has_Control()) {
+			Player_Loses_Control();
+		}
+#endif
+		Player_Set_Combat_Mode(false); // this is missing in ITA and ESP versions of the game
 		Actor_Force_Stop_Walking(kActorMcCoy);
-		Actor_Change_Animation_Mode(kActorMcCoy, 48);
-		Actor_Set_Invisible(kActorMcCoy, 1);
+		Actor_Change_Animation_Mode(kActorMcCoy, kAnimationModeDie);
+		Actor_Set_Invisible(kActorMcCoy, true);
 		AI_Movement_Track_Flush(kActorHanoi);
 		Actor_Put_In_Set(kActorHanoi, kSetNR01);
 		Actor_Set_At_XYZ(kActorHanoi, -444.0f, 24.0f, -845.0f, 512);
 		Actor_Change_Animation_Mode(kActorHanoi, 78);
-		Set_Enter(kSetNR01, kSetNR01);
+		Set_Enter(kSetNR01, kSceneNR01);
 		break;
 
-	case 230:
+	case kGoalHanoiNR08WatchShow:
 		AI_Movement_Track_Flush(kActorHanoi);
 		Actor_Put_In_Set(kActorHanoi, kSetNR05_NR08);
 		Actor_Set_At_XYZ(kActorHanoi, -1387.51f, 0.32f, 288.16f, 292);
 		break;
 
-	case 235:
+	case kGoalHanoiNR08Leave:
 		AI_Movement_Track_Flush(kActorHanoi);
 		AI_Movement_Track_Append(kActorHanoi, 439, 0);
 		AI_Movement_Track_Append(kActorHanoi, 39, 45);
 		AI_Movement_Track_Repeat(kActorHanoi);
 		break;
 
-	case 236:
+	case kGoalHanoiNR08Left:
 		break;
 
-	case 240:
+	case kGoalHanoiNR04Enter:
 		Actor_Put_In_Set(kActorHanoi, kSetNR04);
 		Actor_Set_At_XYZ(kActorHanoi, -47.0f, 0.0f, 334.0f, 535);
 		AI_Movement_Track_Flush(kActorHanoi);
@@ -307,10 +336,10 @@ bool AIScriptHanoi::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 		AI_Movement_Track_Repeat(kActorHanoi);
 		break;
 
-	case 241:
-		Actor_Face_Actor(kActorHanoi, kActorMcCoy, 1);
-		Actor_Change_Animation_Mode(kActorHanoi, 6);
-		Actor_Retired_Here(kActorMcCoy, 12, 12, 1, -1);
+	case kGoalHanoiNR04ShootMcCoy:
+		Actor_Face_Actor(kActorHanoi, kActorMcCoy, true);
+		Actor_Change_Animation_Mode(kActorHanoi, kAnimationModeCombatAttack);
+		Actor_Retired_Here(kActorMcCoy, 12, 12, true, -1);
 		break;
 
 	case 9999:
@@ -327,54 +356,67 @@ bool AIScriptHanoi::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 bool AIScriptHanoi::UpdateAnimation(int *animation, int *frame) {
 	switch (_animationState) {
 	case 0:
-		if (_var2 == 1) {
-			*animation = 649;
-			_animationFrame++;
-			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(649)) {
-				*animation = 648;
+		if (_varChooseIdleAnimation > 0) {
+			*animation = kModelAnimationHanoiScratchesBackIdle;
+			++_animationFrame;
+			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
+				*animation = kModelAnimationHanoiLooksAroundIdle;
 				_animationFrame = 0;
-				_var2 = 0;
+				_varChooseIdleAnimation = 0;
 			}
-		} else if (_var2 == 0) {
-			*animation = 648;
-			if (_var3) {
-				_var3--;
-				if (!Random_Query(0, 6)) {
-					_var4 = -_var4;
-				}
-			} else {
-				_animationFrame += _var4;
-				if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(648)) {
-					_animationFrame = 0;
-				}
-				if (_animationFrame < 0) {
-					_animationFrame = Slice_Animation_Query_Number_Of_Frames(648) - 1;
-				}
-				if (_animationFrame == 5 || _animationFrame == 15 || _animationFrame == 11 || !_animationFrame) {
-					_var3 = Random_Query(5, 12);
-				}
-				if (_animationFrame >= 10 && _animationFrame <= 13) {
-					_var3 = Random_Query(0, 1);
-				}
-				if (!_animationFrame) {
-					if (!Random_Query(0, 4)) {
-						_var2 = 1;
-					}
+			break;
+		}
+
+		*animation = kModelAnimationHanoiLooksAroundIdle;
+		if (_varNumOfTimesToHoldCurrentFrame != 0) {
+			--_varNumOfTimesToHoldCurrentFrame;
+			if (!Random_Query(0, 6)) {
+				_var4 = -_var4;
+			}
+		} else {
+			_animationFrame += _var4;
+			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
+				_animationFrame = 0;
+			}
+
+			if (_animationFrame < 0) {
+				_animationFrame = Slice_Animation_Query_Number_Of_Frames(*animation) - 1;
+			}
+
+			if (_animationFrame == 5
+			 || _animationFrame == 15
+			 || _animationFrame == 11
+			 || _animationFrame == 0
+			) {
+				_varNumOfTimesToHoldCurrentFrame = Random_Query(5, 12);
+			}
+
+			if (_animationFrame >= 10
+			 && _animationFrame <= 13
+			) {
+				_varNumOfTimesToHoldCurrentFrame = Random_Query(0, 1);
+			}
+
+			if (_animationFrame == 0) {
+				if (!Random_Query(0, 4)) {
+					_varChooseIdleAnimation = 1;
 				}
 			}
 		}
 		break;
 
 	case 1:
-		if (_var2) {
-			*animation = 649;
-			if ( Slice_Animation_Query_Number_Of_Frames(649) < Slice_Animation_Query_Number_Of_Frames(649)) {
+		if (_varChooseIdleAnimation > 0) {
+			*animation = kModelAnimationHanoiScratchesBackIdle;
+			if (_animationFrame > Slice_Animation_Query_Number_Of_Frames(*animation) / 2) {
 				_animationFrame += 2;
 			} else {
 				_animationFrame -= 2;
 			}
-			if (_animationFrame > Slice_Animation_Query_Number_Of_Frames(649) - 1
-					|| _animationFrame <= 0) {
+
+			if (_animationFrame > Slice_Animation_Query_Number_Of_Frames(*animation) - 1
+			 || _animationFrame <= 0
+			) {
 				_animationFrame = 0;
 				_animationState = _animationStateNext;
 				*animation = _animationNext;
@@ -387,44 +429,45 @@ bool AIScriptHanoi::UpdateAnimation(int *animation, int *frame) {
 		break;
 
 	case 2:
-		*animation = 657;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(657)) {
+		*animation = kModelAnimationHanoiGrabsMcCoy;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 			_animationFrame = 0;
 			_animationState = 3;
-			*animation = 658;
+			*animation = kModelAnimationHanoiHoldsMcCoyUp;
 		}
 		break;
 
 	case 3:
-		*animation = 658;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(658)) {
+		*animation = kModelAnimationHanoiHoldsMcCoyUp;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 4:
-		*animation = 659;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(659)) {
+		*animation = kModelAnimationHanoiHoldsMcCoyUpAndTalks;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 			_animationFrame = 0;
 			_animationState = 3;
-			*animation = 658;
+			*animation = kModelAnimationHanoiHoldsMcCoyUp;
 		}
 		break;
 
 	case 5:
-		*animation = 657;
-		_animationFrame--;
+		*animation = kModelAnimationHanoiGrabsMcCoy;
+		--_animationFrame;
 		if (_animationFrame == 0) {
 			_animationState = 0;
 			_animationFrame = 0;
-			*animation = 648;
-			Actor_Face_Actor(kActorMcCoy, kActorHanoi, 1);
-			Actor_Set_Invisible(kActorMcCoy, 0);
+			*animation = kModelAnimationHanoiLooksAroundIdle;
 
-			if (Actor_Query_In_Set(kActorHanoi, kSetNR01) == 1) {
+			Actor_Face_Actor(kActorMcCoy, kActorHanoi, true);
+			Actor_Set_Invisible(kActorMcCoy, false);
+
+			if (Actor_Query_In_Set(kActorHanoi, kSetNR01)) {
 				AI_Movement_Track_Flush(kActorHanoi);
 				AI_Movement_Track_Append(kActorHanoi, 350, 0);
 				AI_Movement_Track_Append(kActorHanoi, 39, 0);
@@ -434,163 +477,168 @@ bool AIScriptHanoi::UpdateAnimation(int *animation, int *frame) {
 		break;
 
 	case 6:
-		*animation = 345;
-		_animationFrame++;
+		*animation = kModelAnimationSadikPicksUpAndThrowsMcCoy;  // Sadik is used in this animation, but he is well hidden
+		++_animationFrame;
 		if (_animationFrame > 26) {
-			Actor_Change_Animation_Mode(kActorHanoi, 0);
+			Actor_Change_Animation_Mode(kActorHanoi, kAnimationModeIdle);
 			_animationState = 0;
 			_animationFrame = 0;
-			*animation = 648;
-			Actor_Set_Goal_Number(kActorMcCoy, 210);
-			Actor_Set_Goal_Number(kActorHanoi, 210);
+			*animation = kModelAnimationHanoiLooksAroundIdle;
+			Actor_Set_Goal_Number(kActorMcCoy, kGoalMcCoyNR01ThrownOut);
+			Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR03GoToDefaultPosition);
 		}
 		break;
 
 	case 7:
-		*animation = 645;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(645)) {
+		*animation = kModelAnimationHanoiWalking;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 8:
-		*animation = 642;
-		_animationFrame++;
-		if (_animationFrame > Slice_Animation_Query_Number_Of_Frames(642) - 1) {
+		*animation = kModelAnimationHanoiCombatIdle;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 9:
-		*animation = 643;
-		_animationFrame++;
-		if (_animationFrame > Slice_Animation_Query_Number_Of_Frames(643) - 1) {
-			Actor_Change_Animation_Mode(kActorHanoi, 4);
+		*animation = kModelAnimationHanoiCombatKicksDoorIn;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
+			Actor_Change_Animation_Mode(kActorHanoi, kAnimationModeCombatIdle);
 			_animationState = 8;
 			_animationFrame = 0;
-			*animation = 642;
-			Actor_Set_Goal_Number(kActorHanoi, 241);
+			*animation = kModelAnimationHanoiCombatIdle;
+			Actor_Set_Goal_Number(kActorHanoi, kGoalHanoiNR04ShootMcCoy);
 		}
 		break;
 
 	case 10:
-		*animation = 644;
-		_animationFrame++;
+		*animation = kModelAnimationHanoiCombatFiresGun;
+		++_animationFrame;
+
 		if (_animationFrame == 4) {
-			Ambient_Sounds_Play_Sound(492, 77, 0, 0, 20);
+			Ambient_Sounds_Play_Sound(kSfxSHOTCOK1, 77, 0, 0, 20);
 		}
+
 		if (_animationFrame == 6) {
-			Ambient_Sounds_Play_Sound(493, 97, 0, 0, 20);
+			Ambient_Sounds_Play_Sound(kSfxSHOTGUN1, 97, 0, 0, 20);
 		}
+
 		if (_animationFrame == 5) {
 			Actor_Force_Stop_Walking(kActorMcCoy);
-			Actor_Change_Animation_Mode(kActorMcCoy, 48);
+			Actor_Change_Animation_Mode(kActorMcCoy, kAnimationModeDie);
 		}
-		if (_animationFrame > Slice_Animation_Query_Number_Of_Frames(*animation) - 1) {
-			Actor_Change_Animation_Mode(kActorHanoi, 4);
+
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
+			Actor_Change_Animation_Mode(kActorHanoi, kAnimationModeCombatIdle);
 			_animationFrame = 0;
 			_animationState = 8;
-			*animation = 642;
+			*animation = kModelAnimationHanoiCombatIdle;
 		}
 		break;
 
 	case 11:
-		*animation = 660;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(660)) {
-			*animation = 648;
+		*animation = kModelAnimationHanoiPunchUpAttack;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
+			*animation = kModelAnimationHanoiLooksAroundIdle;
 			_animationFrame = 0;
 			_animationState = 0;
 		}
 		break;
 
 	case 12:
-		*animation = 646;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(646)) {
-			*animation = 642;
+		*animation = kModelAnimationHanoiGotHitOrViolentHeadNod;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
+			*animation = kModelAnimationHanoiCombatIdle;
 			_animationFrame = 0;
 			_animationState = 0;
 		}
 		break;
 
 	case 13:
-		*animation = 647;
-		if (_animationFrame < Slice_Animation_Query_Number_Of_Frames(647) - 1) {
-			_animationFrame++;
+		*animation = kModelAnimationHanoiShotDead;
+		if (_animationFrame < Slice_Animation_Query_Number_Of_Frames(*animation) - 1) {
+			++_animationFrame;
 		}
 		break;
 
 	case 14:
-		*animation = 650;
-		if (!_animationFrame && _var1) {
+		*animation = kModelAnimationHanoiCalmTalk;
+		if (_animationFrame == 0 && _resumeIdleAfterFramesetCompletesFlag) {
+			// _resumeIdleAfterFramesetCompletesFlag is never set so it's always false, thus this does not evaluate true
 			_animationState = 0;
 		} else {
-			_animationFrame++;
-			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(650)) {
+			++_animationFrame;
+			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 				_animationFrame = 0;
 			}
 		}
 		break;
 
 	case 15:
-		*animation = 651;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(651)) {
+		*animation = kModelAnimationHanoiExplainTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 			_animationFrame = 0;
 			_animationState = 14;
-			*animation = 650;
+			*animation = kModelAnimationHanoiCalmTalk;
 		}
 		break;
 
 	case 16:
-		*animation = 652;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(652)) {
+		*animation = kModelAnimationHanoiDownwardsNodTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 			_animationFrame = 0;
 			_animationState = 14;
-			*animation = 650;
+			*animation = kModelAnimationHanoiCalmTalk;
 		}
 		break;
 
 	case 17:
-		*animation = 653;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(653)) {
+		*animation = kModelAnimationHanoiDenyTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 			_animationFrame = 0;
 			_animationState = 14;
-			*animation = 650;
+			*animation = kModelAnimationHanoiCalmTalk;
 		}
 		break;
 
 	case 18:
-		*animation = 654;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(654)) {
+		*animation = kModelAnimationHanoiSlightBowingTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 			_animationFrame = 0;
 			_animationState = 14;
-			*animation = 650;
+			*animation = kModelAnimationHanoiCalmTalk;
 		}
 		break;
 
 	case 19:
-		*animation = 655;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(655)) {
+		*animation = kModelAnimationHanoiLaughTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 			_animationFrame = 0;
 			_animationState = 14;
-			*animation = 650;
+			*animation = kModelAnimationHanoiCalmTalk;
 		}
 		break;
 
 	case 20:
-		*animation = 656;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(656)) {
+		*animation = kModelAnimationHanoiMockTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
 			_animationFrame = 0;
 			_animationState = 14;
-			*animation = 650;
+			*animation = kModelAnimationHanoiCalmTalk;
 		}
 		break;
 
@@ -605,10 +653,12 @@ bool AIScriptHanoi::UpdateAnimation(int *animation, int *frame) {
 bool AIScriptHanoi::ChangeAnimationMode(int mode) {
 	switch (mode) {
 	case kAnimationModeIdle:
-		if ((unsigned int)(_animationState - 2) > 1) {
-			_animationState = 0;
-		} else {
+		if (_animationState == 2
+		 || _animationState == 3
+		) {
 			_animationState = 3;
+		} else {
+			_animationState = 0;
 		}
 		_animationFrame = 0;
 		break;
@@ -624,7 +674,7 @@ bool AIScriptHanoi::ChangeAnimationMode(int mode) {
 			_animationFrame = 0;
 		} else {
 			_animationStateNext = 14;
-			_animationNext = 650;
+			_animationNext = kModelAnimationHanoiCalmTalk;
 			_animationState = 1;
 		}
 		break;
@@ -641,54 +691,65 @@ bool AIScriptHanoi::ChangeAnimationMode(int mode) {
 
 	case 12:
 		_animationStateNext = 15;
-		_animationNext = 651;
+		_animationNext = kModelAnimationHanoiExplainTalk;
 		_animationState = 1;
 		break;
 
 	case 13:
 		_animationStateNext = 16;
-		_animationNext = 652;
+		_animationNext = kModelAnimationHanoiDownwardsNodTalk;
 		_animationState = 1;
 		break;
 
 	case 14:
 		_animationStateNext = 17;
-		_animationNext = 653;
+		_animationNext = kModelAnimationHanoiDenyTalk;
 		_animationState = 1;
 		break;
 
 	case 15:
 		_animationStateNext = 18;
-		_animationNext = 654;
+		_animationNext = kModelAnimationHanoiSlightBowingTalk;
 		_animationState = 1;
 		break;
 
 	case 16:
+		// Used when Hanoi says "You're real cute" to McCoy (in NR03),
+		// when McCoy first tries to sit on the rotating couch
+#if BLADERUNNER_ORIGINAL_BUGS
+		// TODO a bug? uses kModelAnimationHanoiSlightBowingTalk (654) again like case 15
 		_animationStateNext = 18;
-		_animationNext = 654;
+		_animationNext = kModelAnimationHanoiSlightBowingTalk;
+#else
+		_animationStateNext = 19;
+		_animationNext = kModelAnimationHanoiLaughTalk;
+#endif
 		_animationState = 1;
 		break;
 
 	case 17:
 		_animationStateNext = 20;
-		_animationNext = 656;
+		_animationNext = kModelAnimationHanoiMockTalk;
 		_animationState = 1;
 		break;
 
 	case kAnimationModeHit:
+		// fall through
 	case kAnimationModeCombatHit:
 		_animationState = 12;
 		_animationFrame = 0;
 		break;
 
 	case 23:
-		if (_animationState != 3 && _animationState != 4) {
+		if (_animationState != 3
+		 && _animationState != 4
+		) {
 			Actor_Set_Invisible(kActorMcCoy, true);
 			_animationState = 2;
 			_animationFrame = 0;
 		} else {
 			_animationState = 5;
-			_animationFrame = Slice_Animation_Query_Number_Of_Frames(657) - 1;
+			_animationFrame = Slice_Animation_Query_Number_Of_Frames(kModelAnimationHanoiGrabsMcCoy) - 1;
 		}
 		break;
 

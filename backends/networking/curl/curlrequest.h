@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -50,6 +49,8 @@ protected:
 	uint32 _bytesBufferSize;
 	bool _uploading; //using PUT method
 	bool _usingPatch; //using PATCH method
+	bool _keepAlive;
+	long _keepAliveIdle, _keepAliveInterval;
 
 	virtual NetworkReadStream *makeStream();
 
@@ -85,6 +86,10 @@ public:
 	/** Remembers to use PATCH method when it would create NetworkReadStream. */
 	virtual void usePatch();
 
+	/** Remembers to use Connection: keep-alive or close. */
+	virtual void connectionKeepAlive(long idle = 120, long interval = 60);
+	virtual void connectionClose();
+
 	/**
 	 * Starts this Request with ConnMan.
 	 * @return its NetworkReadStream in NetworkReadStreamResponse.
@@ -93,6 +98,9 @@ public:
 
 	/** Returns Request's NetworkReadStream. */
 	const NetworkReadStream *getNetworkReadStream() const;
+
+	/** Waits for Request to be processed. Should be called after Request is put into ConnMan. */
+	void wait(int spinlockDelay = 5);
 };
 
 } // End of namespace Networking

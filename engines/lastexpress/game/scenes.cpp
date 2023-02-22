@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -41,7 +40,7 @@ namespace LastExpress {
 
 SceneManager::SceneManager(LastExpressEngine *engine) : _engine(engine),
 	_flagNoEntity(false), _flagDrawEntities(false), _flagDrawSequences(false), _flagCoordinates(false),
-	_coords(0, 0, 480, 640), _clockHours(NULL), _clockMinutes(NULL) {
+	_coords(0, 0, 480, 640), _clockHours(nullptr), _clockMinutes(nullptr) {
 	_sceneLoader = new SceneLoader();
 }
 
@@ -61,7 +60,7 @@ SceneManager::~SceneManager() {
 	SAFE_DELETE(_sceneLoader);
 
 	// Zero-out passed pointers
-	_engine = NULL;
+	_engine = nullptr;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -76,7 +75,7 @@ void SceneManager::loadSceneDataFile(ArchiveIndex archive) {
 	case kArchiveCd1:
 	case kArchiveCd2:
 	case kArchiveCd3:
-		if (!_sceneLoader->load(getArchive(Common::String::format("CD%iTRAIN.DAT", archive))))
+		if (!_sceneLoader->load(getArchiveMember(Common::String::format("CD%iTRAIN.DAT", archive))))
 			error("[SceneManager::loadSceneDataFile] Cannot load data file CD%iTRAIN.DAT", archive);
 		break;
 
@@ -1064,7 +1063,7 @@ void SceneManager::preProcessScene(SceneIndex *index) {
 	Scene *newScene = getScenes()->get(*index);
 	if (getSoundQueue()->isBuffered(kEntityTables4)) {
 		if (newScene->type != Scene::kTypeReadText || newScene->param1)
-			getSoundQueue()->processEntry(kEntityTables4);
+			getSoundQueue()->fade(kEntityTables4);
 	}
 
 	// Cleanup beetle sequences
@@ -1137,7 +1136,7 @@ void SceneManager::postProcessScene() {
 			}
 
 			if (progress)
-				getSound()->excuseMe((progress == 1) ? entities[0] : entities[rnd(progress)], kEntityPlayer, kFlagDefault);
+				getSound()->excuseMe((progress == 1) ? entities[0] : entities[rnd(progress)], kEntityPlayer, kVolumeFull);
 		}
 
 		if (hotspot->scene)
@@ -1162,8 +1161,8 @@ void SceneManager::postProcessScene() {
 		if (getState()->time >= kTimeCityGalanta || getProgress().field_18 == 4)
 			break;
 
-		getSoundQueue()->processEntry(kSoundType7);
-		getSound()->playSound(kEntityTrain, "LIB050", kFlagDefault);
+		getSoundQueue()->fade(kSoundTagLink);
+		getSound()->playSound(kEntityTrain, "LIB050", kVolumeFull);
 
 		switch (getProgress().chapter) {
 		default:

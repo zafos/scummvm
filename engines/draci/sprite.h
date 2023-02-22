@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -112,20 +111,20 @@ public:
 	// transposed image.
 	Sprite(const byte *sprite_data, uint16 length, int x, int y, bool columnwise);
 
-	~Sprite();
+	~Sprite() override;
 
-	void draw(Surface *surface, bool markDirty, int relX, int relY) const;
-	void drawReScaled(Surface *surface, bool markDirty, const Displacement &displacement) const;
+	void draw(Surface *surface, bool markDirty, int relX, int relY) const override;
+	void drawReScaled(Surface *surface, bool markDirty, const Displacement &displacement) const override;
 
 	void setMirrorOn() { _mirror = true; }
 	void setMirrorOff() { _mirror = false; }
 
-	Common::Rect getRect(const Displacement &displacement) const;
+	Common::Rect getRect(const Displacement &displacement) const override;
 
 	const byte *getBuffer() const { return _data; }
 	int getPixel(int x, int y, const Displacement &displacement) const;
 
-	DrawableType getType() const { return kDrawableSprite; }
+	DrawableType getType() const override { return kDrawableSprite; }
 
 private:
 	bool _ownsData;
@@ -138,7 +137,7 @@ class Text : public Drawable {
 public:
 	Text(const Common::String &str, const Font *font, byte fontColor,
 	    int x, int y, uint spacing);
-	~Text() {}
+	~Text() override {}
 
 	void setText(const Common::String &str);
 	void setColor(byte fontColor) { _color = fontColor; }
@@ -149,14 +148,14 @@ public:
 
 	uint getLength() const { return _length; }
 
-	void draw(Surface *surface, bool markDirty, int relX, int relY) const;
+	void draw(Surface *surface, bool markDirty, int relX, int relY) const override;
 
 	// drawReScaled just calls draw so that Text can be accessed through a Drawable pointer.
 	// Text scaling does not need to be handled.
-	void drawReScaled(Surface *surface, bool markDirty, const Displacement &displacement) const { draw(surface, markDirty, displacement.relX, displacement.relY); }
-	Common::Rect getRect(const Displacement &displacement) const;
+	void drawReScaled(Surface *surface, bool markDirty, const Displacement &displacement) const override { draw(surface, markDirty, displacement.relX, displacement.relY); }
+	Common::Rect getRect(const Displacement &displacement) const override;
 
-	DrawableType getType() const { return kDrawableText; }
+	DrawableType getType() const override { return kDrawableText; }
 private:
 	void splitLinesLongerThan(uint maxWidth);
 

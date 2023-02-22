@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,46 +26,34 @@
 
 class OSystem_POSIX : public OSystem_SDL {
 public:
-	// Let the subclasses be able to change _baseConfigName in the constructor
-	OSystem_POSIX(Common::String baseConfigName = "scummvm.ini");
-	virtual ~OSystem_POSIX() {}
+	bool hasFeature(Feature f) override;
 
-	virtual bool hasFeature(Feature f);
+	bool displayLogFile() override;
 
-	virtual bool displayLogFile();
+	void init() override;
+	void initBackend() override;
 
-	virtual bool openUrl(const Common::String &url);
+	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0) override;
 
-	virtual void init();
-	virtual void initBackend();
-
-	virtual void addSysArchivesToSearchSet(Common::SearchSet &s, int priority = 0);
+	// Default paths
+	Common::String getDefaultIconsPath() override;
+	Common::String getScreenshotsPath() override;
 
 protected:
-	/**
-	 * Base string for creating the default path and filename for the
-	 * configuration file. This allows the Mac OS X subclass to override
-	 * the config file path and name.
-	 */
-	Common::String _baseConfigName;
+	Common::String getDefaultConfigFileName() override;
+	Common::String getDefaultLogFileName() override;
 
-	/**
-	 * The path of the currently open log file, if any.
-	 *
-	 * @note This is currently a string and not an FSNode for simplicity;
-	 * e.g. we don't need to include fs.h here, and currently the
-	 * only use of this value is to use it to open the log file in an
-	 * editor; for that, we need it only as a string anyway.
-	 */
-	Common::String _logFilePath;
+	Common::String getXdgUserDir(const char *name);
 
-	virtual Common::String getDefaultConfigFileName();
+	AudioCDManager *createAudioCDManager() override;
 
-	virtual Common::WriteStream *createLogFile();
+#ifdef HAS_POSIX_SPAWN
+public:
+	bool openUrl(const Common::String &url) override;
 
-	virtual AudioCDManager *createAudioCDManager();
-
+protected:
 	bool launchBrowser(const Common::String& client, const Common::String &url);
+#endif
 };
 
 #endif

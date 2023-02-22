@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,52 +15,33 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "base/plugins.h"
 
 #include "engines/advancedDetector.h"
-#include "engines/engine.h"
-#include "common/savefile.h"
 
+#include "common/translation.h"
+
+#include "lure/detection.h"
 #include "lure/lure.h"
-
-namespace Lure {
-
-struct LureGameDescription {
-	ADGameDescription desc;
-
-	uint32 features;
-};
-
-uint32 LureEngine::getFeatures() const { return _gameDescription->features; }
-Common::Language LureEngine::getLanguage() const { return _gameDescription->desc.language; }
-Common::Platform LureEngine::getPlatform() const { return _gameDescription->desc.platform; }
-
-LureLanguage LureEngine::getLureLanguage() const {
-	switch (_gameDescription->desc.language) {
-	case Common::IT_ITA: return LANG_IT_ITA;
-	case Common::FR_FRA: return LANG_FR_FRA;
-	case Common::DE_DEU: return LANG_DE_DEU;
-	case Common::ES_ESP: return LANG_ES_ESP;
-	case Common::RU_RUS: return LANG_RU_RUS;
-	case Common::EN_ANY: return LANG_EN_ANY;
-	case Common::UNK_LANG: return LANG_UNKNOWN;
-	default:
-		error("Unknown game language");
-	}
-}
-
-} // End of namespace Lure
 
 static const PlainGameDescriptor lureGames[] = {
 	{"lure", "Lure of the Temptress"},
-	{0, 0}
+	{nullptr, nullptr}
 };
 
+static const DebugChannelDef debugFlagList[] = {
+	{Lure::kLureDebugScripts, "scripts", "Scripts debugging"},
+	{Lure::kLureDebugAnimations, "animations", "Animations debugging"},
+	{Lure::kLureDebugHotspots, "hotspots", "Hotspots debugging"},
+	{Lure::kLureDebugFights, "fights", "Fights debugging"},
+	{Lure::kLureDebugSounds, "sounds", "Sounds debugging"},
+	{Lure::kLureDebugStrings, "strings", "Strings debugging"},
+	DEBUG_CHANNEL_END
+};
 
 namespace Lure {
 
@@ -73,9 +54,48 @@ static const LureGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
+#ifdef USE_TTS
+			GUIO1(GAMEOPTION_TTS_NARRATOR)
+#else
 			GUIO0()
+#endif
 		},
-		GF_FLOPPY,
+		GF_FLOPPY
+	},
+
+	{ // Konami VGA version. Assembled 11:13:50 on 08/04/92
+	  // Bugreport #11441
+		{
+			"lure",
+			"Konami VGA",
+			AD_ENTRY1s("disk1.vga", "fbb0fca025579c0eda81d832d1fa5567", 615008),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+#ifdef USE_TTS
+			GUIO1(GAMEOPTION_TTS_NARRATOR)
+#else
+			GUIO0()
+#endif
+		},
+		GF_FLOPPY | GF_KONAMI
+	},
+
+	{ // Konami VGA version. Assembled 09:19:10 on 09/23/92
+		{
+			"lure",
+			"Konami VGA",
+			AD_ENTRY1s("disk1.vga", "fe11231363593982f76e0a64e988a284", 612352),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+#ifdef USE_TTS
+			GUIO1(GAMEOPTION_TTS_NARRATOR)
+#else
+			GUIO0()
+#endif
+		},
+		GF_FLOPPY | GF_KONAMI
 	},
 
 	{
@@ -86,9 +106,13 @@ static const LureGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
+#ifdef USE_TTS
+			GUIO1(GAMEOPTION_TTS_NARRATOR)
+#else
 			GUIO0()
+#endif
 		},
-		GF_FLOPPY | GF_EGA,
+		GF_FLOPPY | GF_EGA
 	},
 
 	{
@@ -101,7 +125,7 @@ static const LureGameDescription gameDescriptions[] = {
 			ADGF_NO_FLAGS,
 			GUIO0()
 		},
-		GF_FLOPPY,
+		GF_FLOPPY
 	},
 
 	{
@@ -114,7 +138,7 @@ static const LureGameDescription gameDescriptions[] = {
 			ADGF_NO_FLAGS,
 			GUIO0()
 		},
-		GF_FLOPPY | GF_EGA,
+		GF_FLOPPY | GF_EGA
 	},
 
 	{
@@ -127,7 +151,7 @@ static const LureGameDescription gameDescriptions[] = {
 			ADGF_NO_FLAGS,
 			GUIO0()
 		},
-		GF_FLOPPY,
+		GF_FLOPPY
 	},
 
 	{
@@ -140,7 +164,7 @@ static const LureGameDescription gameDescriptions[] = {
 			ADGF_NO_FLAGS,
 			GUIO0()
 		},
-		GF_FLOPPY,
+		GF_FLOPPY
 	},
 
 	{
@@ -153,7 +177,7 @@ static const LureGameDescription gameDescriptions[] = {
 			ADGF_NO_FLAGS,
 			GUIO0()
 		},
-		GF_FLOPPY,
+		GF_FLOPPY
 	},
 
 	{
@@ -166,7 +190,7 @@ static const LureGameDescription gameDescriptions[] = {
 			ADGF_NO_FLAGS,
 			GUIO0()
 		},
-		GF_FLOPPY,
+		GF_FLOPPY
 	},
 
 	// Russian OG Edition v1.0
@@ -180,7 +204,7 @@ static const LureGameDescription gameDescriptions[] = {
 			ADGF_NO_FLAGS,
 			GUIO0()
 		},
-		GF_FLOPPY,
+		GF_FLOPPY
 	},
 
 	// Russian OG Edition v1.1
@@ -194,7 +218,22 @@ static const LureGameDescription gameDescriptions[] = {
 			ADGF_NO_FLAGS,
 			GUIO0()
 		},
-		GF_FLOPPY,
+		GF_FLOPPY
+	},
+
+	// Unsupported demo
+	// Bugreport #11501
+	{
+		{
+			"lure",
+			_s("Missing game code"), // Reason for being unsupported
+			AD_ENTRY1s("disk1.vga", "7a6aa0e958450c33b70b664d9f841ad1", 621984),
+			Common::RU_RUS,
+			Common::kPlatformDOS,
+			ADGF_DEMO | ADGF_UNSUPPORTED,
+			GUIO0()
+		},
+		GF_FLOPPY
 	},
 
 
@@ -203,11 +242,10 @@ static const LureGameDescription gameDescriptions[] = {
 
 } // End of namespace Lure
 
-class LureMetaEngine : public AdvancedMetaEngine {
+class LureMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	LureMetaEngine() : AdvancedMetaEngine(Lure::gameDescriptions, sizeof(Lure::LureGameDescription), lureGames) {
+	LureMetaEngineDetection() : AdvancedMetaEngineDetection(Lure::gameDescriptions, sizeof(Lure::LureGameDescription), lureGames) {
 		_md5Bytes = 1024;
-		_singleId = "lure";
 
 		// Use kADFlagUseExtraAsHint to distinguish between EGA and VGA versions
 		// of italian Lure when their datafiles sit in the same directory.
@@ -215,82 +253,21 @@ public:
 		_guiOptions = GUIO1(GUIO_NOSPEECH);
 	}
 
-	virtual const char *getName() const {
-		return "Lure";
+	const char *getName() const override {
+		return "lure";
 	}
 
-	virtual const char *getOriginalCopyright() const {
+	const char *getEngineName() const override {
+		return "Lure of the Temptress";
+	}
+
+	const char *getOriginalCopyright() const override {
 		return "Lure of the Temptress (C) Revolution";
 	}
 
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
-	virtual SaveStateList listSaves(const char *target) const;
-	virtual int getMaximumSaveSlot() const;
-	virtual void removeSaveState(const char *target, int slot) const;
+	const DebugChannelDef *getDebugChannels() const override {
+		return debugFlagList;
+	}
 };
 
-bool LureMetaEngine::hasFeature(MetaEngineFeature f) const {
-	return
-		(f == kSupportsListSaves) ||
-		(f == kSupportsLoadingDuringStartup) ||
-		(f == kSupportsDeleteSave);
-}
-
-bool Lure::LureEngine::hasFeature(EngineFeature f) const {
-	return
-		(f == kSupportsRTL) ||
-		(f == kSupportsLoadingDuringRuntime) ||
-		(f == kSupportsSavingDuringRuntime);
-}
-
-bool LureMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	const Lure::LureGameDescription *gd = (const Lure::LureGameDescription *)desc;
-	if (gd) {
-		*engine = new Lure::LureEngine(syst, gd);
-	}
-	return gd != 0;
-}
-
-SaveStateList LureMetaEngine::listSaves(const char *target) const {
-	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
-	Common::StringArray filenames;
-	Common::String saveDesc;
-	Common::String pattern = "lure.###";
-
-	filenames = saveFileMan->listSavefiles(pattern);
-
-	SaveStateList saveList;
-	for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
-		// Obtain the last 3 digits of the filename, since they correspond to the save slot
-		int slotNum = atoi(file->c_str() + file->size() - 3);
-
-		if (slotNum >= 0 && slotNum <= 999) {
-			Common::InSaveFile *in = saveFileMan->openForLoading(*file);
-			if (in) {
-				saveDesc = Lure::getSaveName(in);
-				saveList.push_back(SaveStateDescriptor(slotNum, saveDesc));
-				delete in;
-			}
-		}
-	}
-
-	// Sort saves based on slot number.
-	Common::sort(saveList.begin(), saveList.end(), SaveStateDescriptorSlotComparator());
-	return saveList;
-}
-
-int LureMetaEngine::getMaximumSaveSlot() const { return 999; }
-
-void LureMetaEngine::removeSaveState(const char *target, int slot) const {
-	Common::String filename = target;
-	filename += Common::String::format(".%03d", slot);
-
-	g_system->getSavefileManager()->removeSavefile(filename);
-}
-
-#if PLUGIN_ENABLED_DYNAMIC(LURE)
-	REGISTER_PLUGIN_DYNAMIC(LURE, PLUGIN_TYPE_ENGINE, LureMetaEngine);
-#else
-	REGISTER_PLUGIN_STATIC(LURE, PLUGIN_TYPE_ENGINE, LureMetaEngine);
-#endif
+REGISTER_PLUGIN_STATIC(LURE_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, LureMetaEngineDetection);

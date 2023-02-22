@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -36,9 +35,10 @@ namespace BladeRunner {
 
 SliceRenderer::SliceRenderer(BladeRunnerEngine *vm) {
 	_vm = vm;
-	_pixelFormat = createRGB555();
+	_pixelFormat = screenPixelFormat();
 
-	for (int i = 0; i < 942; i++) { // yes, its going just to 942 and not 997
+	// original game is going just up to 942 and not 997
+	for (int i = 0; i < ARRAYSIZE(_animationsShadowEnabled); ++i) {
 		_animationsShadowEnabled[i] = true;
 	}
 	_animation = -1;
@@ -118,9 +118,9 @@ Matrix3x2 SliceRenderer::calculateFacingRotationMatrix() {
 	assert(_sliceFramePtr);
 
 	Vector3 viewPos = _view->_sliceViewMatrix * _position;
-	float dir = atan2f(viewPos.x, viewPos.z) + _facing;
-	float s = sinf(dir);
-	float c = cosf(dir);
+	float dir = atan2(viewPos.x, viewPos.z) + _facing;
+	float s = sin(dir);
+	float c = cos(dir);
 
 	Matrix3x2 mRotation(c, -s, 0.0f,
 	                    s,  c, 0.0f);
@@ -152,19 +152,6 @@ void SliceRenderer::calculateBoundingRect() {
 	if (bottom.z <= 0.0f || top.z <= 0.0f) {
 		return;
 	}
-
-	Matrix3x2 facingRotation = calculateFacingRotationMatrix();
-
-	Matrix3x2 mProjection(_view->_viewportPosition.z / bottom.z,  0.0f, 0.0f,
-	                                                       0.0f, 25.5f, 0.0f);
-
-	Matrix3x2 mOffset(1.0f, 0.0f, _framePos.x,
-                      0.0f, 1.0f, _framePos.y);
-
-	Matrix3x2 mScale(_frameScale.x,          0.0f, 0.0f,
-	                          0.0f, _frameScale.y, 0.0f);
-
-	_mvpMatrix = mProjection * (facingRotation * (mOffset * mScale));
 
 	Vector4 startScreenVector(
 	           _view->_viewportPosition.x + (top.x / top.z) * _view->_viewportPosition.z,
@@ -220,6 +207,19 @@ void SliceRenderer::calculateBoundingRect() {
 	 * Calculate min and max X
 	 */
 
+	Matrix3x2 facingRotation = calculateFacingRotationMatrix();
+
+	Matrix3x2 mProjection(_view->_viewportPosition.z / bottom.z,  0.0f, 0.0f,
+	                                                       0.0f, 25.5f, 0.0f);
+
+	Matrix3x2 mOffset(1.0f, 0.0f, _framePos.x,
+	                  0.0f, 1.0f, _framePos.y);
+
+	Matrix3x2 mScale(_frameScale.x,          0.0f, 0.0f,
+	                          0.0f, _frameScale.y, 0.0f);
+
+	_mvpMatrix = mProjection * (facingRotation * (mOffset * mScale));
+
 	Matrix3x2 mStart(
 		1.0f, 0.0f, startScreenVector.x,
 		0.0f, 1.0f, 25.5f / startScreenVector.z
@@ -233,11 +233,11 @@ void SliceRenderer::calculateBoundingRect() {
 	Matrix3x2 mStartMVP = mStart * _mvpMatrix;
 	Matrix3x2 mEndMVP   = mEnd   * _mvpMatrix;
 
-	float minX =  640.0f;
-	float maxX =    0.0f;
+	float minX = (float)BladeRunnerEngine::kOriginalGameWidth;
+	float maxX = 0.0f;
 
-	for (float i = 0.0f; i <= 256.0f; i += 255.0f) {
-		for (float j = 0.0f; j <= 256.0f; j += 255.0f) {
+	for (float i = 0.0f; i <= 255.0f; i += 255.0f) {
+		for (float j = 0.0f; j <= 255.0f; j += 255.0f) {
 			Vector2 v1 = mStartMVP * Vector2(i, j);
 			minX = MIN(minX, v1.x);
 			maxX = MAX(maxX, v1.x);
@@ -248,8 +248,8 @@ void SliceRenderer::calculateBoundingRect() {
 		}
 	}
 
-	_screenRectangle.left  = CLIP((int)minX,     0, 640);
-	_screenRectangle.right = CLIP((int)maxX + 1, 0, 640);
+	_screenRectangle.left  = CLIP<int32>(minX,     0, BladeRunnerEngine::kOriginalGameWidth);
+	_screenRectangle.right = CLIP<int32>(maxX + 1, 0, BladeRunnerEngine::kOriginalGameWidth);
 
 	_startScreenVector.x = startScreenVector.x;
 	_startScreenVector.y = startScreenVector.y;
@@ -279,25 +279,26 @@ void SliceRenderer::loadFrame(int animation, int frame) {
 }
 
 struct SliceLineIterator {
-	// int _sliceMatrix[2][3];
 	Matrix3x2 _sliceMatrix;
 	int _startY;
 	int _endY;
+	int _currentY;
 
 	float _currentZ;
 	float _stepZ;
 	float _currentSlice;
 	float _stepSlice;
+
 	float _currentX;
 	float _stepX;
-	int   _field_38;
-	int   _currentY;
+
+	float _field_38;
 
 	void setup(float endScreenX,   float endScreenY,   float endScreenZ,
 	           float startScreenX, float startScreenY, float startScreenZ,
 	           float endSlice,     float startSlice,
 	           Matrix3x2 m);
-	float line();
+	float line() const;
 	void advance();
 };
 
@@ -306,8 +307,9 @@ void SliceLineIterator::setup(
 		float startScreenX, float startScreenY, float startScreenZ,
 		float endSlice,     float startSlice,
 		Matrix3x2 m) {
-	_startY = (int)startScreenY;
-	_endY   = (int)endScreenY;
+	_startY   = (int)startScreenY;
+	_endY     = (int)endScreenY;
+	_currentY = _startY;
 
 	float size = endScreenY - startScreenY;
 
@@ -324,24 +326,21 @@ void SliceLineIterator::setup(
 	_currentX = startScreenX;
 	_stepX    = (endScreenX - startScreenX) / size;
 
-	_field_38 = (int)((25.5f / size) * (1.0f / endScreenZ - 1.0f / startScreenZ) * 64.0f);
-	_currentY = _startY;
+	_field_38 = (25.5f / size) * (1.0f / endScreenZ - 1.0f / startScreenZ);
 
 	float offsetX =         _currentX;
 	float offsetZ = 25.5f / _currentZ;
 
-	Matrix3x2 translate_matrix = Matrix3x2(1.0f, 0.0f, offsetX,
-	                                       0.0f, 1.0f, offsetZ);
+	Matrix3x2 mTranslate = Matrix3x2(1.0f, 0.0f, offsetX,
+	                                 0.0f, 1.0f, offsetZ);
 
-	Matrix3x2 scale_matrix = Matrix3x2(65536.0f,  0.0f, 0.0f,
-	                                       0.0f, 64.0f, 0.0f);
+	Matrix3x2 mScale = Matrix3x2(65536.0f,  0.0f, 0.0f,  // x position is using fixed-point precisson with 16 bits
+	                                 0.0f, 64.0f, 0.0f); // z position is using fixed-point precisson with 6 bits
 
-	m = scale_matrix * (translate_matrix * m);
-
-	_sliceMatrix = m;
+	_sliceMatrix = mScale * (mTranslate * m);
 }
 
-float SliceLineIterator::line() {
+float SliceLineIterator::line() const {
 	float var_0 = 0.0f;
 
 	if (_currentZ != 0.0f)
@@ -354,12 +353,13 @@ float SliceLineIterator::line() {
 }
 
 void SliceLineIterator::advance() {
-	_currentZ          += _stepZ;
-	_currentSlice      += _stepSlice;
-	_currentX          += _stepX;
-	_currentY          += 1;
-	_sliceMatrix._m[0][2] += (int)(65536.0f * _stepX);
-	_sliceMatrix._m[1][2] += _field_38;
+	_currentZ     += _stepZ;
+	_currentSlice += _stepSlice;
+	_currentX     += _stepX;
+	++_currentY;
+
+	_sliceMatrix._m[0][2] += _stepX * 65536.0f;
+	_sliceMatrix._m[1][2] += _field_38 * 64.0f;
 }
 
 static void setupLookupTable(int t[256], int inc) {
@@ -375,7 +375,8 @@ void SliceRenderer::drawInWorld(int animationId, int animationFrame, Vector3 pos
 	assert(_setEffects);
 	//assert(_view);
 
-	_vm->_sliceRenderer->setupFrameInWorld(animationId, animationFrame, position, facing);
+	setupFrameInWorld(animationId, animationFrame, position, facing, scale);
+
 	assert(_sliceFramePtr);
 
 	if (_screenRectangle.isEmpty()) {
@@ -441,10 +442,11 @@ void SliceRenderer::drawInWorld(int animationId, int animationFrame, Vector3 pos
 
 	int frameY = sliceLineIterator._startY;
 
-	uint16 *frameLinePtr  = (uint16 *)surface.getPixels() + 640 * frameY;
-	uint16 *zBufferLinePtr = zbuffer + 640 * frameY;
+	uint16 *zBufferLinePtr = zbuffer + BladeRunnerEngine::kOriginalGameWidth * frameY;
 
 	while (sliceLineIterator._currentY <= sliceLineIterator._endY) {
+		_m13 = sliceLineIterator._sliceMatrix(0, 2);
+		_m23 = sliceLineIterator._sliceMatrix(1, 2);
 		sliceLine = sliceLineIterator.line();
 
 		sliceRendererLights.calculateColorSlice(Vector3(_position.x, _position.y, _position.z + _frameBottomZ + sliceLine * _frameSliceHeight));
@@ -465,14 +467,13 @@ void SliceRenderer::drawInWorld(int animationId, int animationFrame, Vector3 pos
 		_setEffectColor.g = setEffectColor.g * 31.0f * 65536.0f;
 		_setEffectColor.b = setEffectColor.b * 31.0f * 65536.0f;
 
-		if (frameY >= 0 && frameY < 480) {
-			drawSlice((int)sliceLine, true, frameLinePtr, zBufferLinePtr, frameY);
+		if (frameY >= 0 && frameY < surface.h) {
+			drawSlice((int)sliceLine, true, frameY, surface, zBufferLinePtr);
 		}
 
 		sliceLineIterator.advance();
-		frameY += 1;
-		frameLinePtr += 640;
-		zBufferLinePtr += 640;
+		++frameY;
+		zBufferLinePtr += BladeRunnerEngine::kOriginalGameWidth;
 	}
 }
 
@@ -488,28 +489,28 @@ void SliceRenderer::drawOnScreen(int animationId, int animationFrame, int screen
 	loadFrame(animationId, animationFrame);
 
 	float frameHeight = _frameSliceHeight * _frameSliceCount;
-	float frameSize = sqrtf(_frameScale.x * 255.0f * _frameScale.x * 255.0f + _frameScale.y * 255.0f * _frameScale.y * 255.0f);
+	float frameSize = sqrt(_frameScale.x * 255.0f * _frameScale.x * 255.0f + _frameScale.y * 255.0f * _frameScale.y * 255.0f);
 	float size = scale / MAX(frameSize, frameHeight);
 
-	float s = sinf(_facing);
-	float c = cosf(_facing);
+	float s = sin(_facing);
+	float c = cos(_facing);
 
-	Matrix3x2 m_rotation(c, -s, 0.0f,
-	                     s,  c, 0.0f);
+	Matrix3x2 mRotation(c, -s, 0.0f,
+	                    s,  c, 0.0f);
 
-	Matrix3x2 m_frame(_frameScale.x, 0.0f, _framePos.x,
-	                  0.0f, _frameScale.y, _framePos.y);
+	Matrix3x2 mFrame(_frameScale.x,           0.0f, _framePos.x,
+	                           0.0f, _frameScale.y, _framePos.y);
 
-	Matrix3x2 m_scale_size_25_5(size,  0.0f, 0.0f,
-	                            0.0f, 25.5f, 0.0f);
+	Matrix3x2 mScale(size,  0.0f, 0.0f,
+	                 0.0f, 25.5f, 0.0f);
 
-	Matrix3x2 m_translate_x_32k(1.0f, 0.0f, screenX,
-	                            0.0f, 1.0f, 32768.0f);
+	Matrix3x2 mTranslate(1.0f, 0.0f, screenX,
+	                     0.0f, 1.0f, 32768.0f);
 
-	Matrix3x2 m_scale_64k_64(65536.0f,  0.0f, 0.0f,
-	                             0.0f, 64.0f, 0.0f);
+	Matrix3x2 mScaleFixed(65536.0f,  0.0f, 0.0f,  // x position is using fixed-point precisson with 16 bits
+	                          0.0f, 64.0f, 0.0f); // z position is using fixed-point precisson with 6 bits
 
-	Matrix3x2 m = m_scale_64k_64 * (m_translate_x_32k * (m_scale_size_25_5 * (m_rotation * m_frame)));
+	Matrix3x2 m = mScaleFixed * (mTranslate * (mScale * (mRotation * mFrame)));
 
 	setupLookupTable(_m11lookup, m(0, 0));
 	setupLookupTable(_m12lookup, m(0, 1));
@@ -524,21 +525,19 @@ void SliceRenderer::drawOnScreen(int animationId, int animationFrame, int screen
 	float currentSlice = 0;
 	float sliceStep = 1.0f / size / _frameSliceHeight;
 
-	uint16 *frameLinePtr = (uint16 *)surface.getPixels() + 640 * frameY;
-	uint16 lineZbuffer[640];
+	uint16 lineZbuffer[BladeRunnerEngine::kOriginalGameWidth];
 
 	while (currentSlice < _frameSliceCount) {
-		if (currentY >= 0 && currentY < 480) {
-			memset(lineZbuffer, 0xFF, 640 * 2);
-			drawSlice(currentSlice, false, frameLinePtr, lineZbuffer, currentY);
+		if (currentY >= 0 && currentY < surface.h) {
+			memset(lineZbuffer, 0xFF, BladeRunnerEngine::kOriginalGameWidth * 2);
+			drawSlice(currentSlice, false, currentY, surface, lineZbuffer);
 			currentSlice += sliceStep;
-			currentY--;
-			frameLinePtr -= 640;
+			--currentY;
 		}
 	}
 }
 
-void SliceRenderer::drawSlice(int slice, bool advanced, uint16 *frameLinePtr, uint16 *zbufLinePtr, int y) {
+void SliceRenderer::drawSlice(int slice, bool advanced, int y, Graphics::Surface &surface, uint16 *zbufferLine) {
 	if (slice < 0 || (uint32)slice >= _frameSliceCount) {
 		return;
 	}
@@ -553,6 +552,7 @@ void SliceRenderer::drawSlice(int slice, bool advanced, uint16 *frameLinePtr, ui
 
 	uint32 polyCount = READ_LE_UINT32(p);
 	p += 4;
+
 	while (polyCount--) {
 		uint32 vertexCount = READ_LE_UINT32(p);
 		p += 4;
@@ -561,34 +561,36 @@ void SliceRenderer::drawSlice(int slice, bool advanced, uint16 *frameLinePtr, ui
 			continue;
 
 		uint32 lastVertex = vertexCount - 1;
-		int lastVertexX = MAX((_m11lookup[p[3 * lastVertex]] + _m12lookup[p[3 * lastVertex + 1]] + _m13) >> 16, 0);
+		int lastVertexX = MAX((_m11lookup[p[3 * lastVertex]] + _m12lookup[p[3 * lastVertex + 1]] + _m13) / 65536, 0);
 
 		int previousVertexX = lastVertexX;
 
 		while (vertexCount--) {
-			int vertexX = CLIP((_m11lookup[p[0]] + _m12lookup[p[1]] + _m13) >> 16, 0, 640);
+			int vertexX = CLIP<int32>((_m11lookup[p[0]] + _m12lookup[p[1]] + _m13) / 65536, 0, BladeRunnerEngine::kOriginalGameWidth);
 
 			if (vertexX > previousVertexX) {
-				int vertexZ = (_m21lookup[p[0]] + _m22lookup[p[1]] + _m23) >> 6;
+				int vertexZ = (_m21lookup[p[0]] + _m22lookup[p[1]] + _m23) / 64;
 
 				if (vertexZ >= 0 && vertexZ < 65536) {
-					int color555 = palette.color555[p[2]];
+					uint32 outColor = palette.value[p[2]];
 					if (advanced) {
 						Color256 aescColor = { 0, 0, 0 };
 						_screenEffects->getColor(&aescColor, vertexX, y, vertexZ);
 
 						Color256 color = palette.color[p[2]];
-						color.r = ((int)(_setEffectColor.r + _lightsColor.r * color.r) >> 16) + aescColor.r;
-						color.g = ((int)(_setEffectColor.g + _lightsColor.g * color.g) >> 16) + aescColor.g;
-						color.b = ((int)(_setEffectColor.b + _lightsColor.b * color.b) >> 16) + aescColor.b;
-
-						int bladeToScummVmConstant = 256 / 32;
-						color555 = _pixelFormat.RGBToColor(CLIP(color.r * bladeToScummVmConstant, 0, 255), CLIP(color.g * bladeToScummVmConstant, 0, 255), CLIP(color.b * bladeToScummVmConstant, 0, 255));
+						color.r = ((int)(_setEffectColor.r + _lightsColor.r * color.r) / 65536) + aescColor.r;
+						color.g = ((int)(_setEffectColor.g + _lightsColor.g * color.g) / 65536) + aescColor.g;
+						color.b = ((int)(_setEffectColor.b + _lightsColor.b * color.b) / 65536) + aescColor.b;
+						// We need to convert from 5 bits per channel (r,g,b) to 8 bits
+						outColor = _pixelFormat.RGBToColor(Color::get8BitColorFrom5Bit(color.r), Color::get8BitColorFrom5Bit(color.g), Color::get8BitColorFrom5Bit(color.b));
 					}
+
 					for (int x = previousVertexX; x != vertexX; ++x) {
-						if (vertexZ < zbufLinePtr[x]) {
-							frameLinePtr[x] = color555;
-							zbufLinePtr[x] = (uint16)vertexZ;
+						if (vertexZ < zbufferLine[x]) {
+							zbufferLine[x] = (uint16)vertexZ;
+
+							void *dstPtr = surface.getBasePtr(CLIP(x, 0, surface.w - 1), CLIP(y, 0, surface.h - 1));
+							drawPixel(surface, dstPtr, outColor);
 						}
 					}
 				}
@@ -610,10 +612,13 @@ void SliceRenderer::drawShadowInWorld(int transparency, Graphics::Surface &surfa
 		0.0f, 1.0f, 0.0f, _position.y,
 		0.0f, 0.0f, 1.0f, _position.z);
 
+	float s = sin(_facing);
+	float c = cos(_facing);
+
 	Matrix4x3 mRotation(
-		cosf(_facing), -sinf(_facing), 0.0f, 0.0f,
-		sinf(_facing),  cosf(_facing), 0.0f, 0.0f,
-		          0.0f,          0.0f, 1.0f, 0.0f);
+		   c,   -s, 0.0f, 0.0f,
+		   s,    c, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f);
 
 	Matrix4x3 mScale(
 		_frameScale.x,          0.0f,              0.0f, 0.0f,
@@ -642,11 +647,11 @@ void SliceRenderer::drawShadowPolygon(int transparency, Graphics::Surface &surfa
 	// this simplified polygon drawing algo is in the game
 
 	int yMax = 0;
-	int yMin = 480;
+	int yMin = BladeRunnerEngine::kOriginalGameHeight;
 	uint16 zMin = 65535;
 
-	int polygonLeft[480] = {};
-	int polygonRight[480] = {};
+	int polygonLeft[BladeRunnerEngine::kOriginalGameHeight] = {};
+	int polygonRight[BladeRunnerEngine::kOriginalGameHeight] = {};
 
 	int iNext = 11;
 	for (int i = 0; i < 12; ++i) {
@@ -680,7 +685,7 @@ void SliceRenderer::drawShadowPolygon(int transparency, Graphics::Surface &surfa
 
 		if (yCurrent > yNext) {
 			while (y >= yNext) {
-				if (y >= 0 && y < 480) {
+				if (y >= 0 && y < BladeRunnerEngine::kOriginalGameHeight) {
 					polygonLeft[y] = x;
 				}
 				xCounter += xDelta;
@@ -692,7 +697,7 @@ void SliceRenderer::drawShadowPolygon(int transparency, Graphics::Surface &surfa
 			}
 		} else if (yCurrent < yNext) {
 			while (y <= yNext) {
-				if (y >= 0 && y < 480) {
+				if (y >= 0 && y < BladeRunnerEngine::kOriginalGameHeight) {
 					polygonRight[y] = x;
 				}
 				xCounter += xDelta;
@@ -706,10 +711,10 @@ void SliceRenderer::drawShadowPolygon(int transparency, Graphics::Surface &surfa
 		iNext = (iNext + 1) % 12;
 	}
 
-	yMax = CLIP(yMax, 0, 480);
-	yMin = CLIP(yMin, 0, 480);
+	yMax = CLIP<int32>(yMax, 0, BladeRunnerEngine::kOriginalGameHeight);
+	yMin = CLIP<int32>(yMin, 0, BladeRunnerEngine::kOriginalGameHeight);
 
-	int ditheringFactor[] = {
+	static const int ditheringFactor[] = {
 		0,  8,  2, 10,
 		12, 4, 14,  6,
 		3, 11,  1,  9,
@@ -717,17 +722,23 @@ void SliceRenderer::drawShadowPolygon(int transparency, Graphics::Surface &surfa
 	};
 
 	for (int y = yMin; y < yMax; ++y) {
-		int xMin = CLIP(polygonLeft[y], 0, 640);
-		int xMax = CLIP(polygonRight[y], 0, 640);
+		int xMin = CLIP<int32>(polygonLeft[y],  0, BladeRunnerEngine::kOriginalGameWidth);
+		int xMax = CLIP<int32>(polygonRight[y], 0, BladeRunnerEngine::kOriginalGameWidth);
 
 		for (int x = MIN(xMin, xMax); x < MAX(xMin, xMax); ++x) {
-			uint16 z = zbuffer[x + y * 640];
-			uint16 *pixel = (uint16*)surface.getBasePtr(x, y);
+			uint16 z = zbuffer[x + y * BladeRunnerEngine::kOriginalGameWidth];
+			void *pixel = surface.getBasePtr(CLIP(x, 0, surface.w - 1), CLIP(y, 0, surface.h - 1));
 
 			if (z >= zMin) {
 				int index = (x & 3) + ((y & 3) << 2);
 				if (transparency - ditheringFactor[index] <= 0) {
-					*pixel = ((*pixel & 0x7BDE) >> 1) + ((*pixel & 0x739C) >> 2);
+					uint8 r, g, b;
+					surface.format.colorToRGB(READ_UINT32(pixel), r, g, b);
+					r *= 0.75f;
+					g *= 0.75f;
+					b *= 0.75f;
+
+					drawPixel(surface, pixel, surface.format.RGBToColor(r, g, b));
 				}
 			}
 		}
@@ -754,7 +765,7 @@ SliceRendererLights::SliceRendererLights(Lights *lights) {
 
 	_lights = lights;
 
-	for (int i = 0; i < 20; i++) {
+	for (int i = 0; i < 20; ++i) {
 		_cacheColor[i].r = 0.0f;
 		_cacheColor[i].g = 0.0f;
 		_cacheColor[i].b = 0.0f;
@@ -769,7 +780,7 @@ void SliceRendererLights::calculateColorBase(Vector3 position1, Vector3 position
 	_finalColor.b = 0.0f;
 	_cacheRecalculation = 0;
 	if (_lights) {
-		for (uint i = 0; i < _lights->_lights.size(); i++) {
+		for (uint i = 0; i < _lights->_lights.size(); ++i) {
 			Light *light = _lights->_lights[i];
 			if (i < 20) {
 				float cacheCoeficient = light->calculate(position1, position2/*, height*/);
@@ -803,7 +814,7 @@ void SliceRendererLights::calculateColorSlice(Vector3 position) {
 	_finalColor.b = 0.0f;
 
 	if (_lights) {
-		for (uint i = 0; i < _lights->_lights.size(); i++) {
+		for (uint i = 0; i < _lights->_lights.size(); ++i) {
 			Light *light = _lights->_lights[i];
 			if (i < 20) {
 				_cacheCounter[i] -= 1.0f;
@@ -812,7 +823,7 @@ void SliceRendererLights::calculateColorSlice(Vector3 position) {
 						_cacheCounter[i] = _cacheCounter[i] + _cacheStart[i];
 					} while (_cacheCounter[i] <= 0.0f);
 					light->calculateColor(&_cacheColor[i], position);
-					_cacheRecalculation++;
+					++_cacheRecalculation;
 				}
 				_finalColor.r += _cacheColor[i].r;
 				_finalColor.g += _cacheColor[i].g;
@@ -820,7 +831,7 @@ void SliceRendererLights::calculateColorSlice(Vector3 position) {
 			} else {
 				Color color;
 				light->calculateColor(&color, position);
-				_cacheRecalculation++;
+				++_cacheRecalculation;
 				_finalColor.r += color.r;
 				_finalColor.g += color.g;
 				_finalColor.b += color.b;

@@ -6,7 +6,7 @@ I tried to use all the latest iOS features to replace the old code. For instance
 
 ## Compilation ##
 
-See http://wiki.scummvm.org/index.php/Compiling_ScummVM/iPhone
+See https://wiki.scummvm.org/index.php/Compiling_ScummVM/iPhone
 
 ## Usage ##
 
@@ -23,3 +23,5 @@ Here is a list of the in-game gestures:
 |Two fingers double-tap|Skip the cinematic / video|
 
 The iOS keyboard is visible when the device is in portrait mode, and hidden in landscape mode.
+
+External devices such as mouse, trackpad and gamepad controllers, are supported from iOS 14 and later.

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -42,17 +41,18 @@ void AIScriptGenericWalkerB::Initialize() {
 	isInside = false;
 	deltaX = 0.0f;
 	deltaZ = 0.0f;
-	Actor_Set_Goal_Number(kActorGenwalkerB, 0);
+	Actor_Set_Goal_Number(kActorGenwalkerB, kGoalGenwalkerDefault);
 }
 
 bool AIScriptGenericWalkerB::Update() {
 	switch (Actor_Query_Goal_Number(kActorGenwalkerB)) {
-		case 0:
+		case kGoalGenwalkerDefault:
 			if (prepareWalker()) {
 				return true;
 			}
 			break;
-		case 1:
+
+		case kGoalGenwalkerMoving:
 			if (deltaX != 0.0f || deltaZ != 0.0f) {
 				movingUpdate();
 			}
@@ -62,8 +62,8 @@ bool AIScriptGenericWalkerB::Update() {
 }
 
 void AIScriptGenericWalkerB::TimerExpired(int timer) {
-	if (timer == 2) {
-		AI_Countdown_Timer_Reset(kActorGenwalkerB, 2);
+	if (timer == kActorTimerAIScriptCustomTask2) {
+		AI_Countdown_Timer_Reset(kActorGenwalkerB, kActorTimerAIScriptCustomTask2);
 		Game_Flag_Reset(kFlagGenericWalkerWaiting);
 		return;// true;
 	}
@@ -71,12 +71,12 @@ void AIScriptGenericWalkerB::TimerExpired(int timer) {
 }
 
 void AIScriptGenericWalkerB::CompletedMovementTrack() {
-	if (Actor_Query_Goal_Number(kActorGenwalkerB) > 0) {
-		Actor_Set_Goal_Number(kActorGenwalkerB, 0);
+	if (Actor_Query_Goal_Number(kActorGenwalkerB) > kGoalGenwalkerDefault) {
+		Actor_Set_Goal_Number(kActorGenwalkerB, kGoalGenwalkerDefault);
 		if (!Game_Flag_Query(kFlagGenericWalkerWaiting)) {
 			Game_Flag_Set(kFlagGenericWalkerWaiting);
-			AI_Countdown_Timer_Reset(kActorGenwalkerB, 2);
-			AI_Countdown_Timer_Start(kActorGenwalkerB, 2, Random_Query(6, 10));
+			AI_Countdown_Timer_Reset(kActorGenwalkerB, kActorTimerAIScriptCustomTask2);
+			AI_Countdown_Timer_Start(kActorGenwalkerB, kActorTimerAIScriptCustomTask2, Random_Query(6, 10));
 		}
 		// return true;
 	}
@@ -93,30 +93,39 @@ void AIScriptGenericWalkerB::ClickedByPlayer() {
 	case 1:
 		Actor_Says(kActorMcCoy, 365, 3);
 		break;
+
 	case 2:
 		Actor_Says(kActorMcCoy, 755, 3);
 		break;
+
 	case 3:
 		Actor_Says(kActorMcCoy, 940, 3);
 		break;
+
 	case 4:
 		Actor_Says(kActorMcCoy, 4560, 3);
 		break;
+
 	case 5:
 		Actor_Says(kActorMcCoy, 4870, 3);
 		break;
+
 	case 6:
 		Actor_Says(kActorMcCoy, 5125, 3);
 		break;
+
 	case 7:
 		Actor_Says(kActorMcCoy, 8450, 3);
 		break;
+
 	case 8:
 		Actor_Says(kActorMcCoy, 1085, 3);
 		break;
+
 	case 9:
-		Actor_Says(kActorMcCoy, 365, 3);
+		Actor_Says(kActorMcCoy, 365, 3); // Re-used line, same as case 1
 		break;
+
 	case 10:
 		Actor_Says(kActorMcCoy, 7415, 3);
 		break;
@@ -124,17 +133,17 @@ void AIScriptGenericWalkerB::ClickedByPlayer() {
 	//return false;
 }
 
-void AIScriptGenericWalkerB::EnteredScene(int sceneId) {
+void AIScriptGenericWalkerB::EnteredSet(int setId) {
 	//return false;
 }
 
-void AIScriptGenericWalkerB::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptGenericWalkerB::OtherAgentEnteredThisSet(int otherActorId) {
 	//return false;
 }
 
-void AIScriptGenericWalkerB::OtherAgentExitedThisScene(int otherActorId) {
-	if (Actor_Query_Goal_Number(kActorGenwalkerB) && otherActorId == kActorMcCoy) {
-		Actor_Set_Goal_Number(kActorGenwalkerB, 0);
+void AIScriptGenericWalkerB::OtherAgentExitedThisSet(int otherActorId) {
+	if (Actor_Query_Goal_Number(kActorGenwalkerB) > kGoalGenwalkerDefault && otherActorId == kActorMcCoy) {
+		Actor_Set_Goal_Number(kActorGenwalkerB, kGoalGenwalkerDefault);
 	}
 	//return false;
 }
@@ -148,11 +157,11 @@ void AIScriptGenericWalkerB::ShotAtAndMissed() {
 }
 
 bool AIScriptGenericWalkerB::ShotAtAndHit() {
-	if (Actor_Query_Goal_Number(kActorGenwalkerB)) {
+	if (Actor_Query_Goal_Number(kActorGenwalkerB) > kGoalGenwalkerDefault) {
 		AI_Movement_Track_Flush(kActorGenwalkerB);
 		_animationState = kGenericWalkerBStatesDie;
 		_animationFrame = 0;
-		Sound_Play(203, 100, 0, 0, 50);
+		Sound_Play(kSfxPOTSPL5, 100, 0, 0, 50);
 		movingStart();
 		return true;
 	}
@@ -168,12 +177,12 @@ int AIScriptGenericWalkerB::GetFriendlinessModifierIfGetsClue(int otherActorId, 
 }
 
 bool AIScriptGenericWalkerB::GoalChanged(int currentGoalNumber, int newGoalNumber) {
-	if (newGoalNumber == 0) {
+	if (newGoalNumber == kGoalGenwalkerDefault) {
 		AI_Movement_Track_Flush(kActorGenwalkerB);
 		Actor_Put_In_Set(kActorGenwalkerB, kSetFreeSlotH);
 		Global_Variable_Set(kVariableGenericWalkerBModel, -1);
 		return false;
-	} else if (newGoalNumber == 1) {
+	} else if (newGoalNumber == kGoalGenwalkerMoving) {
 		return true;
 	}
 	return false;
@@ -184,45 +193,103 @@ bool AIScriptGenericWalkerB::UpdateAnimation(int *animation, int *frame) {
 	case kGenericWalkerBStatesIdle:
 		switch (Global_Variable_Query(kVariableGenericWalkerBModel)) {
 		case 0:
-			*animation = 426;
+			*animation = kModelGenWalkerHattedPersonWithUmbrellaStandsStill; // Hatted Person with umbrella still
 			break;
+
 		case 1:
-			*animation = 430;
+			*animation = kModelGenWalkerHoodedPersonWithUmbrellaStandsStill; // Hooded person with umbrella still
 			break;
+
 		case 2:
-			*animation = 437;
+#if BLADERUNNER_ORIGINAL_BUGS
+			// Hatted lady with wooden umbrella still (different from 436 model!)
+			*animation = kModelGenWalkerHattedLadyWithWoodenUmbrellaStandsStill;
+#else
+			// use model 436 and animation frame 4
+			*animation = kModelGenWalkerHattedPersonWithWoodenUmbrella;
+			_animationFrame = 4; // frame 4 is used for still
+#endif // BLADERUNNER_ORIGINAL_BUGS
 			break;
+
 		case 3:
-			*animation = 431;
+			*animation = kModelGenWalkerPunkPersonWithGlassesAndBeardStandsStill;
 			break;
+
 		case 4:
-			*animation = 427;
+			*animation = kModelGenWalkerHattedPersonNoUmbrellaStandsStill;
 			break;
+
 		case 5:
-			*animation = 433;
+			*animation = kModelGenWalkerPunkPersonWithGlassesStandsStill;
+			break;
+
+		case 6:
+			*animation = kModelGenWalkerHattedChild; // Hatted child walking
+			_animationFrame = 11; // frame 11 used for still
+			break;
+
+		case 7:
+			*animation = kModelGenWalkerChild; // Child walking
+			_animationFrame = 0; // frame 0 used for still (could also use frame 5)
+			break;
+
+		case 8:
+			*animation = kModelGenWalkerHattedPersonFastPace; // Hatted person walking fast
+			_animationFrame = 1; // frame 1 used for still
+			break;
+
+		case 9:
+			*animation = kModelGenWalkerHattedPersonLoweredFace; // Hatted person walking lowered face
+			_animationFrame = 6;  // frame 6 used for still
 			break;
 		}
-		_animationFrame = 0;
+		if (!_vm->_cutContent
+		    || (Global_Variable_Query(kVariableGenericWalkerBModel) < 6 && Global_Variable_Query(kVariableGenericWalkerBModel) != 2)
+		) {
+			_animationFrame = 0;
+		}
 		break;
+
 	case kGenericWalkerBStatesWalk:
-		switch (Global_Variable_Query(kVariableGenericWalkerBModel)){
+		switch (Global_Variable_Query(kVariableGenericWalkerBModel)) {
 		case 0:
-			*animation = 424;
+			*animation = kModelGenWalkerHattedPersonWithUmbrella;
 			break;
+
 		case 1:
-			*animation = 428;
+			*animation = kModelGenWalkerHoodedPersonWithUmbrella;
 			break;
+
 		case 2:
-			*animation = 436;
+			*animation = kModelGenWalkerHattedPersonWithWoodenUmbrella;
 			break;
+
 		case 3:
-			*animation = 429;
+			*animation = kModelGenWalkerPunkPersonWithGlassesAndBeard;
 			break;
+
 		case 4:
-			*animation = 425;
+			*animation = kModelGenWalkerHattedPersonNoUmbrellaSmallSteps;
 			break;
+
 		case 5:
-			*animation = 432;
+			*animation = kModelGenWalkerPunkPersonWithGlasses;
+			break;
+
+		case 6:
+			*animation = kModelGenWalkerHattedChild; // Hatted child walking
+			break;
+
+		case 7:
+			*animation = kModelGenWalkerChild; // Child walking
+			break;
+
+		case 8:
+			*animation = kModelGenWalkerHattedPersonFastPace; // Hatted person walking fast
+			break;
+
+		case 9:
+			*animation = kModelGenWalkerHattedPersonLoweredFace; // Hatted person walking lowered face
 			break;
 		}
 		++_animationFrame;
@@ -230,13 +297,16 @@ bool AIScriptGenericWalkerB::UpdateAnimation(int *animation, int *frame) {
 			_animationFrame = 0;
 		}
 		break;
+
 	case kGenericWalkerBStatesDie:
-		*animation = 874;
+		// This is an animation for Maggie (exploding) but is also used for generic death states (rats, generic walkers)
+		// probably for debug purposes
+		*animation = kModelAnimationMaggieExploding;
 		++_animationFrame;
-		if (++_animationFrame >= Slice_Animation_Query_Number_Of_Frames(874))
+		if (++_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMaggieExploding))
 		{
 			_animationFrame = 0;
-			Actor_Set_Goal_Number(kActorGenwalkerB, 0);
+			Actor_Set_Goal_Number(kActorGenwalkerB, kGoalGenwalkerDefault);
 			_animationState = kGenericWalkerBStatesIdle;
 			deltaX = 0.0f;
 			deltaZ = 0.0f;
@@ -251,8 +321,13 @@ bool AIScriptGenericWalkerB::ChangeAnimationMode(int mode) {
 	switch (mode) {
 	case kAnimationModeIdle:
 		_animationState = kGenericWalkerBStatesIdle;
-		_animationFrame = 0;
+		if (!_vm->_cutContent
+		    || (Global_Variable_Query(kVariableGenericWalkerBModel) < 6 && Global_Variable_Query(kVariableGenericWalkerBModel) != 2)
+		) {
+			_animationFrame = 0;
+		}
 		break;
+
 	case kAnimationModeWalk:
 		_animationState = kGenericWalkerBStatesWalk;
 		_animationFrame = 0;
@@ -319,24 +394,29 @@ void AIScriptGenericWalkerB::movingUpdate() {
 }
 
 bool AIScriptGenericWalkerB::prepareWalker() {
-	if (Game_Flag_Query(kFlagGenericWalkerWaiting) || Global_Variable_Query(35) < 0 || !preparePath()) {
+	if (Game_Flag_Query(kFlagGenericWalkerWaiting) || Global_Variable_Query(kVariableGenericWalkerConfig) < 0 || !preparePath()) {
 		return false;
 	}
 
 	int model = 0;
 	do {
 		if (isInside) {
-			model = Random_Query(3, 5);
+			model = Random_Query(3, 5); // 0, 1, 2 models have umbrellas so they should be in outdoors locations
 		} else {
-			model = Random_Query(0, 5);
+			if (_vm->_cutContent) {
+				model = Random_Query(0, 9);
+			} else {
+				model = Random_Query(0, 5);
+			}
 		}
+		// this while loop ensures choosing a different model for Walker B than the Walker A or Walker C
 	} while (model == Global_Variable_Query(kVariableGenericWalkerAModel) || model == Global_Variable_Query(kVariableGenericWalkerCModel));
 
 	Global_Variable_Set(kVariableGenericWalkerBModel, model);
 	Game_Flag_Set(kFlagGenericWalkerWaiting);
-	AI_Countdown_Timer_Reset(kActorGenwalkerB, 2);
-	AI_Countdown_Timer_Start(kActorGenwalkerB, 2, Random_Query(4, 12));
-	Actor_Set_Goal_Number(kActorGenwalkerB, 1);
+	AI_Countdown_Timer_Reset(kActorGenwalkerB, kActorTimerAIScriptCustomTask2);
+	AI_Countdown_Timer_Start(kActorGenwalkerB, kActorTimerAIScriptCustomTask2, Random_Query(4, 12));
+	Actor_Set_Goal_Number(kActorGenwalkerB, kGoalGenwalkerMoving);
 	return true;
 }
 

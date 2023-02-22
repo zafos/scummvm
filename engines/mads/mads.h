@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,6 +39,7 @@
 #include "mads/msurface.h"
 #include "mads/resources.h"
 #include "mads/sound.h"
+#include "mads/detection.h"
 
 /**
  * This is the namespace of the MADS engine.
@@ -61,19 +61,11 @@ enum MADSDebugChannels {
 	kDebugGraphics	= 1 << 2
 };
 
-enum {
-	GType_RexNebular = 0,
-	GType_Dragonsphere = 1,
-	GType_Phantom = 2
-};
-
 enum ScreenFade {
 	SCREEN_FADE_SMOOTH = 0,
 	SCREEN_FADE_MEDIUM = 1,
 	SCREEN_FADE_FAST = 2
 };
-
-struct MADSGameDescription;
 
 
 class MADSEngine : public Engine {
@@ -89,8 +81,8 @@ private:
 	void loadOptions();
 protected:
 	// Engine APIs
-	virtual Common::Error run();
-	virtual bool hasFeature(EngineFeature f) const;
+	Common::Error run() override;
+	bool hasFeature(EngineFeature f) const override;
 public:
 	Debugger *_debugger;
 	Dialogs *_dialogs;
@@ -113,7 +105,7 @@ public:
 	bool _disableFastwalk;
 public:
 	MADSEngine(OSystem *syst, const MADSGameDescription *gameDesc);
-	virtual ~MADSEngine();
+	~MADSEngine() override;
 
 	uint32 getFeatures() const;
 	Common::Language getLanguage() const;
@@ -121,41 +113,35 @@ public:
 	uint16 getVersion() const;
 	uint32 getGameID() const;
 	uint32 getGameFeatures() const;
+	bool isDemo() const;
 
 	int getRandomNumber(int maxNumber);
 	int getRandomNumber(int minNumber, int maxNumber);
-	int hypotenuse(int xv, int yv);
 
 	/**
 	* Returns true if it is currently okay to restore a game
 	*/
-	bool canLoadGameStateCurrently();
+	bool canLoadGameStateCurrently() override;
 
 	/**
 	* Returns true if it is currently okay to save the game
 	*/
-	bool canSaveGameStateCurrently();
-
-	/**
-	* Support method that generates a savegame name
-	* @param slot		Slot number
-	*/
-	Common::String generateSaveName(int slot);
+	bool canSaveGameStateCurrently() override;
 
 	/**
 	 * Handles loading a game via the GMM
 	 */
-	virtual Common::Error loadGameState(int slot);
+	Common::Error loadGameState(int slot) override;
 
 	/**
 	 * Handles saving the game via the GMM
 	 */
-	virtual Common::Error saveGameState(int slot, const Common::String &desc);
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
 
 	/**
 	 * Handles updating sound settings after they're changed in the GMM dialog
 	 */
-	virtual void syncSoundSettings();
+	void syncSoundSettings() override;
 
 	void saveOptions();
 };

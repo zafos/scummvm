@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -51,7 +50,7 @@ void OSpit::xorollcredittime(const ArgumentArray &args) {
 	// we should be using the Tay end game sequences.
 	if (_vm->_vars["returnstackid"] == kStackRspit) {
 		RivenScriptPtr script = _vm->_scriptMan->createScriptWithCommand(
-				new RivenStackChangeCommand(_vm, kStackRspit, 0x3338, true));
+				new RivenStackChangeCommand(_vm, kStackRspit, 0x3338, true, false));
 		_vm->_scriptMan->runScript(script, false);
 		return;
 	}
@@ -60,11 +59,11 @@ void OSpit::xorollcredittime(const ArgumentArray &args) {
 	uint32 gehnState = _vm->_vars["agehn"];
 
 	if (gehnState == 0)         // Gehn who?
-		runEndGame(1, 9500);
+		runEndGame(1, 9500, 1225);
 	else if (gehnState == 4)    // You freed him? Are you kidding me?
-		runEndGame(2, 12000);
+		runEndGame(2, 12000, 558);
 	else                        // You already spoke with Gehn. What were you thinking?
-		runEndGame(3, 8000);
+		runEndGame(3, 8000, 857);
 }
 
 void OSpit::xbookclick(const ArgumentArray &args) {
@@ -142,8 +141,7 @@ void OSpit::xbookclick(const ArgumentArray &args) {
 	// use the trap book, he will shoot the player. Dead on arrival.
 	// Run the credits from here.
 	if (_vm->_vars["agehn"] == 3) {
-		_vm->_scriptMan->stopAllScripts();
-		runCredits(args[0], 5000);
+		runCredits(args[0], 5000, 995);
 		return;
 	}
 

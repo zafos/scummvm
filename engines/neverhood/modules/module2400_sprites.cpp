@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -65,6 +64,8 @@ uint32 AsScene2401WaterSpit::handleMessage(int messageNum, const MessageParam &p
 		stopAnimation();
 		setVisible(false);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -108,6 +109,8 @@ uint32 AsScene2401FlowingWater::handleMessage(int messageNum, const MessageParam
 		stopAnimation();
 		setVisible(false);
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -150,6 +153,8 @@ uint32 AsScene2401WaterFlushing::handleMessage(int messageNum, const MessagePara
 	case NM_ANIMATION_STOP:
 		stopAnimation();
 		setVisible(false);
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -206,6 +211,8 @@ uint32 AsScene2401Door::handleMessage(int messageNum, const MessageParam &param,
 			playSound(0, calcHash("fxDoorOpen38"));
 			NextState(&AsScene2401Door::stDoorOpenFinished);
 		}
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -264,6 +271,8 @@ uint32 AsScene2402Door::handleMessage(int messageNum, const MessageParam &param,
 		startAnimation(0x80495831, 0, -1);
 		_newStickFrameIndex = STICK_LAST_FRAME;
 		playSound(0, calcHash("fxDoorOpen38"));
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -349,6 +358,8 @@ uint32 AsScene2402TV::hmJoke(int messageNum, const MessageParam &param, Entity *
 	case NM_ANIMATION_STOP:
 		gotoNextState();
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -430,6 +441,8 @@ uint32 KmScene2401::xHandleMessage(int messageNum, const MessageParam &param) {
 	case 0x4840:
 		startSpecialWalkLeft(param.asInteger());
 		break;
+	default:
+		break;
 	}
 	return messageResult;
 }
@@ -449,6 +462,8 @@ uint32 KmScene2401::hmSpit(int messageNum, const MessageParam &param, Entity *se
 		} else if (param.asInteger() == 0x018A0001) {
 			sendMessage(_parentScene, 0x2001, _spitDestPipeIndex);
 		}
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -470,7 +485,7 @@ void KmScene2401::stTrySpitIntoPipe() {
 		startAnimation(0x1808B150, 0, -1);
 		SetUpdateHandler(&Klaymen::update);
 		SetMessageHandler(&KmScene2401::hmSpit);
-		SetSpriteUpdate(NULL);
+		SetSpriteUpdate(nullptr);
 	}
 }
 
@@ -482,7 +497,7 @@ void KmScene2401::spitIntoPipe() {
 	startAnimation(0x1B08B553, 0, -1);
 	SetUpdateHandler(&Klaymen::update);
 	SetMessageHandler(&KmScene2401::hmSpit);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 	NextState(&KmScene2401::stContSpitIntoPipe);
 }
 
@@ -492,7 +507,7 @@ void KmScene2401::stContSpitIntoPipe() {
 	startAnimationByHash(0x1808B150, 0x16401CA6, 0);
 	SetUpdateHandler(&Klaymen::update);
 	SetMessageHandler(&KmScene2401::hmSpit);
-	SetSpriteUpdate(NULL);
+	SetSpriteUpdate(nullptr);
 }
 
 KmScene2402::KmScene2402(NeverhoodEngine *vm, Scene *parentScene, int16 x, int16 y)
@@ -559,6 +574,8 @@ uint32 KmScene2402::xHandleMessage(int messageNum, const MessageParam &param) {
 		break;
 	case 0x4840:
 		startSpecialWalkLeft(param.asInteger());
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -643,6 +660,8 @@ uint32 KmScene2403::xHandleMessage(int messageNum, const MessageParam &param) {
 		break;
 	case 0x4840:
 		startSpecialWalkLeft(param.asInteger());
+		break;
+	default:
 		break;
 	}
 	return messageResult;
@@ -733,6 +752,8 @@ uint32 KmScene2406::xHandleMessage(int messageNum, const MessageParam &param) {
 		break;
 	case 0x4840:
 		startSpecialWalkLeft(param.asInteger());
+		break;
+	default:
 		break;
 	}
 	return messageResult;

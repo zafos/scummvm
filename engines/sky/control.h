@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,15 +42,16 @@ class Text;
 class MusicBase;
 class Sound;
 class SkyCompact;
+class SkyEngine;
 struct Compact;
 struct DataFileHeader;
 struct MegaSet;
 
-#define MAX_SAVE_GAMES 999
-#define MAX_TEXT_LEN 80
-#define PAN_LINE_WIDTH 184
-#define PAN_CHAR_HEIGHT 12
-#define STATUS_WIDTH 146
+#define MAX_SAVE_GAMES  999
+#define MAX_TEXT_LEN     80
+#define PAN_LINE_WIDTH  184
+#define PAN_CHAR_HEIGHT  12
+#define STATUS_WIDTH    146
 #define MPNL_X 60  // Main Panel
 #define MPNL_Y 10
 
@@ -155,8 +155,8 @@ private:
 class TextResource : public ConResource {
 public:
 	TextResource(void *pSpData, uint32 pNSprites, uint32 pCurSprite, uint16 pX, uint16 pY, uint32 pText, uint8 pOnClick, OSystem *system, uint8 *screen);
-	virtual ~TextResource();
-	virtual void drawToScreen(bool doMask);
+	~TextResource() override;
+	void drawToScreen(bool doMask) override;
 	void flushForRedraw();
 private:
 	uint16 _oldX, _oldY;
@@ -180,23 +180,25 @@ private:
 
 class Control {
 public:
-	Control(Common::SaveFileManager *saveFileMan, Screen *screen, Disk *disk, Mouse *mouse, Text *text, MusicBase *music, Logic *logic, Sound *sound, SkyCompact *skyCompact, OSystem *system);
+	Control(SkyEngine *vm, Common::SaveFileManager *saveFileMan, Screen *screen, Disk *disk, Mouse *mouse, Text *text, MusicBase *music, Logic *logic, Sound *sound, SkyCompact *skyCompact, OSystem *system, Common::Keymap *shortcutsKeymap);
 	void doControlPanel();
 	void doLoadSavePanel();
 	void restartGame();
 	void showGameQuitMsg();
-	void doAutoSave();
 	uint16 quickXRestore(uint16 slot);
 	bool loadSaveAllowed();
+	bool isControlPanelOpen();
+
+	SkyEngine *_vm;
 
 	uint16 _selectedGame;
-	uint16 saveGameToFile(bool fromControlPanel, const char *filename = 0);
+	uint16 saveGameToFile(bool fromControlPanel, const char *filename = 0, bool isAutosave = false);
 
 	void loadDescriptions(Common::StringArray &list);
 	void saveDescriptions(const Common::StringArray &list);
 
 private:
-	int displayMessage(const char *altButton, const char *message, ...) GCC_PRINTF(3, 4);
+	int displayMessage(const char *altButton, MSVC_PRINTF const char *message, ...) GCC_PRINTF(3, 4);
 
 	void initPanel();
 	void removePanel();
@@ -211,7 +213,7 @@ private:
 	void delay(unsigned int amount);
 
 	void animClick(ConResource *pButton);
-	bool getYesNo(char *text);
+	bool getYesNo(char *text, uint bufSize);
 	void buttonControl(ConResource *pButton);
 	uint16 handleClick(ConResource *pButton);
 	uint16 doMusicSlide();
@@ -225,7 +227,7 @@ private:
 	void drawCross(uint16 x, uint16 y);
 
 	uint16 saveRestorePanel(bool allowSave);
-	void setUpGameSprites(const Common::StringArray &saveGameNames, DataFileHeader **nameSprites, uint16 firstNum, uint16 selectedGame);
+	void setUpGameSprites(const Common::StringArray &saveGameNames, DataFileHeader **nameSprites, uint16 firstNum, uint16 selectedGame, const Common::String &dirtyString);
 	void showSprites(DataFileHeader **nameSprites, bool allowSave);
 	void handleKeyPress(Common::KeyState kbd, Common::String &textBuf);
 
@@ -249,7 +251,9 @@ private:
 	OSystem *_system;
 	bool _mouseClicked;
 	Common::KeyState _keyPressed;
+	Common::CustomEventType _action;
 	int _mouseWheel;
+	Common::Keymap *_shortcutsKeymap;
 
 	struct {
 		uint8 *controlPanel;

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,17 +15,16 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "cryo/defs.h"
 #include "cryo/cryo.h"
-#include "cryo/platdefs.h"
 #include "cryo/cryolib.h"
 #include "cryo/eden.h"
-#include "cryo/sound.h"
+
+#include "common/substream.h"
 
 namespace Cryo {
 
@@ -86,8 +85,6 @@ void EdenGame::openbigfile() {
 		_bigfileHeader->_files[j]._flag = _bigfile.readByte();
 	}
 
-	_vm->_video->resetInternals();
-	_vm->_video->setFile(&_bigfile);
 }
 
 void EdenGame::closebigfile() {
@@ -191,15 +188,13 @@ void EdenGame::loadRoomFile(uint16 num, Room *buffer) {
 	}
 }
 
-// Original name: shnmfl
-void EdenGame::loadHnm(uint16 num) {
-	unsigned int resNum = num - 1 + 485;
+Common::SeekableReadStream *EdenGame::loadSubStream(uint16 resNum) {
 	assert(resNum < _bigfileHeader->_count);
 	PakHeaderItem *file = &_bigfileHeader->_files[resNum];
 	int size = file->_size;
 	int offs = file->_offs;
-	debug("* Loading movie %d (%s) at 0x%X, %d bytes", num, file->_name.c_str(), (uint)offs, size);
-	_vm->_video->_file->seek(offs, SEEK_SET);
+	debug("* Loading file %s at 0x%X, %d bytes", file->_name.c_str(), (uint)offs, size);
+	return new Common::SafeSeekableSubReadStream(&_bigfile, offs, offs + size, DisposeAfterUse::NO);
 }
 
 // Original name: ssndfl
@@ -234,13 +229,13 @@ int EdenGame::loadSound(uint16 num) {
 
 		uint32 val = 0;
 		_bigfile.read(&val, 3);
-		unsigned int chunkLen = LE32(val);
+		unsigned int chunkLen = FROM_LE_32(val);
 
 		if (chunkType == 5) {
 			_bigfile.read(_gameLipsync + 7260, chunkLen);
 			chunkType = _bigfile.readByte();
 			_bigfile.read(&val, 3);
-			chunkLen = LE32(val);
+			chunkLen = FROM_LE_32(val);
 		}
 
 		// 3. Normal sound data
@@ -259,7 +254,7 @@ void EdenGame::convertMacToPC() {
 	// Array of longs
 	int *p = (int *)_gameLipsync;
 	for (int i = 0; i < 7240 / 4; i++)
-		p[i] = BE32(p[i]);
+		p[i] = FROM_BE_32(p[i]);
 }
 
 void EdenGame::loadpermfiles() {
@@ -472,7 +467,7 @@ bool EdenGame::ReadDataSyncVOC(unsigned int num) {
 		uint32 chunkLen = 0;
 		loadpartoffile(resNum, &chunkLen, filePos, 3);
 		filePos += 3;
-		chunkLen = LE32(chunkLen);
+		chunkLen = FROM_LE_32(chunkLen);
 		loadpartoffile(resNum, _gameLipsync + 7260, filePos, chunkLen);
 		return true;
 	}

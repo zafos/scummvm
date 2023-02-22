@@ -8,13 +8,14 @@ MODULE_OBJS := \
 	cheater_geisha.o \
 	cmpfile.o \
 	console.o \
-	dataio.o \
 	databases.o \
+	dataio.o \
 	dbase.o \
 	decfile.o \
 	draw.o \
 	draw_v1.o \
 	draw_v2.o \
+	draw_v7.o \
 	draw_bargon.o \
 	draw_fascin.o \
 	draw_playtoons.o \
@@ -27,6 +28,7 @@ MODULE_OBJS := \
 	goblin_v2.o \
 	goblin_v3.o \
 	goblin_v4.o \
+	goblin_v7.o \
 	hotspots.o \
 	iniconfig.o \
 	init.o \
@@ -55,6 +57,7 @@ MODULE_OBJS := \
 	map.o \
 	map_v1.o \
 	map_v2.o \
+	metaengine.o \
 	mult.o \
 	mult_v1.o \
 	mult_v2.o \
@@ -77,7 +80,6 @@ MODULE_OBJS := \
 	demos/demoplayer.o \
 	demos/scnplayer.o \
 	demos/batplayer.o \
-	detection/detection.o \
 	pregob/pregob.o \
 	pregob/txtfile.o \
 	pregob/gctfile.o \
@@ -104,6 +106,7 @@ MODULE_OBJS := \
 	save/saveload_v4.o \
 	save/saveload_v6.o \
 	save/saveload_v7.o \
+	save/saveload_adibou1.o \
 	save/saveload_geisha.o \
 	save/saveload_fascin.o \
 	save/saveload_ajworld.o \
@@ -133,3 +136,13 @@ endif
 
 # Include common rules
 include $(srcdir)/rules.mk
+
+# Detection objects
+DETECT_OBJS += $(MODULE)/detection/detection.o
+
+# Skip building the following objects if a static
+# module is enabled, because it already has the contents.
+ifneq ($(ENABLE_GOB), STATIC_PLUGIN)
+# External dependencies for detection.
+DETECT_OBJS += $(MODULE)/dataio.o
+endif

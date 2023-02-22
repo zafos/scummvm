@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,7 +25,7 @@ namespace BladeRunner {
 
 AIScriptMutant3::AIScriptMutant3(BladeRunnerEngine *vm) : AIScriptBase(vm) {
 	_var1 = 1;
-	_flag = 0;
+	_resumeIdleAfterFramesetCompletesFlag = false;
 }
 
 void AIScriptMutant3::Initialize() {
@@ -36,7 +35,7 @@ void AIScriptMutant3::Initialize() {
 	_animationNext = 0;
 
 	_var1 = 1;
-	_flag = 0;
+	_resumeIdleAfterFramesetCompletesFlag = false;
 
 	Actor_Put_In_Set(kActorMutant3, kSetFreeSlotG);
 	Actor_Set_At_Waypoint(kActorMutant3, 39, 0);
@@ -46,22 +45,18 @@ void AIScriptMutant3::Initialize() {
 bool AIScriptMutant3::Update() {
 	if (Global_Variable_Query(kVariableChapter) == 4) {
 		switch (Actor_Query_Goal_Number(kActorMutant3)) {
-		case 599:
-			if (Actor_Query_Which_Set_In(kActorMutant3) != Player_Query_Current_Set()) {
-				Actor_Set_Goal_Number(kActorMutant3, 403);
-			}
-			break;
-
 		case 401:
 			if (Actor_Query_Which_Set_In(kActorMutant3) == Player_Query_Current_Set()
-					&& (Actor_Query_Friendliness_To_Other(kActorMutant3, kActorMcCoy) < 40
-					|| Actor_Query_Combat_Aggressiveness(kActorMutant3) >= 60)) {
+			 && (Actor_Query_Friendliness_To_Other(kActorMutant3, kActorMcCoy) < 40
+			  || Actor_Query_Combat_Aggressiveness(kActorMutant3) >= 60
+			 )
+			) {
 				Actor_Set_Goal_Number(kActorMutant3, 410);
 			}
 			break;
 
 		case 404:
-			if (!Game_Flag_Query(630)) {
+			if (!Game_Flag_Query(kFlagMutantsPaused)) {
 				Actor_Set_Goal_Number(kActorMutant3, 401);
 			}
 			break;
@@ -72,12 +67,27 @@ bool AIScriptMutant3::Update() {
 				Actor_Set_Goal_Number(kActorMutant3, 403);
 			}
 			break;
+
+		case 599:
+			if (Actor_Query_Which_Set_In(kActorMutant3) != Player_Query_Current_Set()) {
+#if BLADERUNNER_ORIGINAL_BUGS
+				Actor_Set_Goal_Number(kActorMutant3, 403);
+#else
+				// intermediate goal to set new Health (revive for reuse)
+				Actor_Set_Goal_Number(kActorMutant3, 411);
+#endif // BLADERUNNER_ORIGINAL_BUGS
+			}
+			break;
 		}
 
-		if (Game_Flag_Query(630) == 1 && Actor_Query_Goal_Number(kActorMutant3) != 599) {
+		if (Game_Flag_Query(kFlagMutantsPaused)
+		 && Actor_Query_Goal_Number(kActorMutant3) != 599
+		) {
 			Actor_Set_Goal_Number(kActorMutant3, 404);
 		}
-	} else if (Global_Variable_Query(kVariableChapter) == 5 && Actor_Query_Goal_Number(kActorMutant3) != 590) {
+	} else if (Global_Variable_Query(kVariableChapter) == 5
+	        && Actor_Query_Goal_Number(kActorMutant3) != 590
+	) {
 		if (Actor_Query_Which_Set_In(kActorMutant3) != Player_Query_Current_Set()) {
 			Actor_Set_Goal_Number(kActorMutant3, 590);
 		}
@@ -109,28 +119,33 @@ void AIScriptMutant3::ClickedByPlayer() {
 	//return false;
 }
 
-void AIScriptMutant3::EnteredScene(int sceneId) {
+void AIScriptMutant3::EnteredSet(int setId) {
 	// return false;
 }
 
-void AIScriptMutant3::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptMutant3::OtherAgentEnteredThisSet(int otherActorId) {
 	// return false;
 }
 
-void AIScriptMutant3::OtherAgentExitedThisScene(int otherActorId) {
+void AIScriptMutant3::OtherAgentExitedThisSet(int otherActorId) {
 	// return false;
 }
 
 void AIScriptMutant3::OtherAgentEnteredCombatMode(int otherActorId, int combatMode) {
-	if (Actor_Query_Which_Set_In(kActorMutant3) == Player_Query_Current_Set() && Actor_Query_Goal_Number(kActorMutant3) != 599) {
-		if (otherActorId != kActorMcCoy) {
-			if (otherActorId > 72 || (otherActorId != kActorFreeSlotA && otherActorId != kActorMutant1 && otherActorId != kActorMutant2)) {
-				Actor_Modify_Combat_Aggressiveness(kActorMutant3, -10);
+	if (Actor_Query_Which_Set_In(kActorMutant3) == Player_Query_Current_Set()
+	 && Actor_Query_Goal_Number(kActorMutant3) != 599
+	) {
+		if (otherActorId == kActorMcCoy) {
+			if (combatMode) {
+				Actor_Modify_Combat_Aggressiveness(kActorMutant3, 10);
 			} else {
-				Actor_Modify_Combat_Aggressiveness(kActorMutant3, 5);
+				Actor_Modify_Combat_Aggressiveness(kActorMutant3, -10);
 			}
-		} else if (combatMode) {
-			Actor_Modify_Combat_Aggressiveness(kActorMutant3, 10);
+		} else if (otherActorId == kActorFreeSlotA
+		        || otherActorId == kActorMutant1
+		        || otherActorId == kActorMutant2
+		) {
+			Actor_Modify_Combat_Aggressiveness(kActorMutant3, 5);
 		} else {
 			Actor_Modify_Combat_Aggressiveness(kActorMutant3, -10);
 		}
@@ -140,14 +155,14 @@ void AIScriptMutant3::OtherAgentEnteredCombatMode(int otherActorId, int combatMo
 void AIScriptMutant3::ShotAtAndMissed() {
 	if (Actor_Query_Goal_Number(kActorMutant3) != 410) {
 		Actor_Modify_Combat_Aggressiveness(kActorMutant3, 15);
-		Actor_Modify_Friendliness_To_Other(kActorMutant3, 0, -15);
+		Actor_Modify_Friendliness_To_Other(kActorMutant3, kActorMcCoy, -15);
 	}
 }
 
 bool AIScriptMutant3::ShotAtAndHit() {
 	if (Actor_Query_Goal_Number(kActorMutant3) != 410) {
 		Actor_Modify_Combat_Aggressiveness(kActorMutant3, 20);
-		Actor_Modify_Friendliness_To_Other(kActorMutant3, 0, -20);
+		Actor_Modify_Friendliness_To_Other(kActorMutant3, kActorMcCoy, -20);
 	}
 	return false;
 }
@@ -175,14 +190,14 @@ bool AIScriptMutant3::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 		AI_Movement_Track_Append(kActorMutant3, 39, 0);
 		AI_Movement_Track_Repeat(kActorMutant3);
 
-		if (Game_Flag_Query(169) == 1) {
+		if (Game_Flag_Query(kFlagCT04HomelessKilledByMcCoy)) {
 			Actor_Set_Combat_Aggressiveness(kActorMutant3, 80);
 			Actor_Set_Friendliness_To_Other(kActorMutant3, kActorMcCoy, 20);
 		}
 		break;
 
 	case 401:
-		Actor_Set_Targetable(kActorMutant3, 1);
+		Actor_Set_Targetable(kActorMutant3, true);
 		AI_Movement_Track_Flush(kActorMutant3);
 		AI_Movement_Track_Append(kActorMutant3, 39, 0);
 
@@ -303,7 +318,7 @@ bool AIScriptMutant3::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 		break;
 
 	case 403:
-		Actor_Set_Targetable(kActorMutant3, 0);
+		Actor_Set_Targetable(kActorMutant3, false);
 		Actor_Set_Goal_Number(kActorMutant3, 401);
 		break;
 
@@ -320,18 +335,54 @@ bool AIScriptMutant3::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 			break;
 
 		case kSetUG04:
+			// fall through
 		case kSetUG05:
+			// fall through
 		case kSetUG06:
 			Non_Player_Actor_Combat_Mode_On(kActorMutant3, kActorCombatStateIdle, false, kActorMcCoy, 10, kAnimationModeCombatIdle, kAnimationModeCombatWalk, kAnimationModeCombatRun, -1, -1, -1, 10, 300, false);
 			break;
 
 		case kSetUG10:
+			// fall through
 		case kSetUG12:
+			// fall through
 		case kSetUG14:
 			Non_Player_Actor_Combat_Mode_On(kActorMutant3, kActorCombatStateIdle, false, kActorMcCoy, 14, kAnimationModeCombatIdle, kAnimationModeCombatWalk, kAnimationModeCombatRun, -1, -1, -1, 10, 300, false);
 			break;
 		}
 		break;
+
+#if BLADERUNNER_ORIGINAL_BUGS
+#else
+	case 411:
+		// We need the additional intermediate goal 411 (as mutant1 has)
+		// so that we set the health here, instead of the when the goal is set to 599 (dying)
+		// Setting the health "revives" the mutant, which would result in their bound box being reduced to a point
+		// (see Actor::setHealth() call to retire(false, 0, 0, -1))
+		// and thus their corpse being unclickable after McCoy shot them.
+		// Goal 411 does this, but is set only when McCoy is no longer present in the scene/set.
+		AI_Movement_Track_Flush(kActorMutant3);
+		Actor_Set_Intelligence(kActorMutant3, 40);
+		Actor_Set_Health(kActorMutant3, 10 * Query_Difficulty_Level() + 50, 10 * Query_Difficulty_Level() + 50);
+
+		if (Game_Flag_Query(kFlagCT04HomelessKilledByMcCoy)) {
+			Actor_Set_Combat_Aggressiveness(kActorMutant3, 80);
+			Actor_Set_Friendliness_To_Other(kActorMutant3, kActorMcCoy, 20);
+		} else {
+			Actor_Set_Combat_Aggressiveness(kActorMutant3, 50);
+			Actor_Set_Friendliness_To_Other(kActorMutant3, kActorMcCoy, 40);
+		}
+
+		// code repeated also in case 599 which precedes this one
+		// redundant?
+		// results in additional reduction in friendliness and increase of aggressiveness for the other two mutants
+		Actor_Modify_Friendliness_To_Other(kActorMutant1, kActorMcCoy, 20);
+		Actor_Modify_Friendliness_To_Other(kActorMutant2, kActorMcCoy, 15);
+		Actor_Modify_Combat_Aggressiveness(kActorMutant1, 10);
+		Actor_Modify_Combat_Aggressiveness(kActorMutant2, 10);
+		Actor_Set_Goal_Number(kActorMutant3, 403);
+		return true;
+#endif // BLADERUNNER_ORIGINAL_BUGS
 
 	case 590:
 		AI_Movement_Track_Flush(kActorMutant3);
@@ -341,18 +392,20 @@ bool AIScriptMutant3::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 
 	case 599:
 		AI_Movement_Track_Flush(kActorMutant3);
-		Actor_Change_Animation_Mode(kActorMutant3, 48);
+		Actor_Change_Animation_Mode(kActorMutant3, kAnimationModeDie);
+#if BLADERUNNER_ORIGINAL_BUGS
 		Actor_Set_Intelligence(kActorMutant3, 40);
 		Actor_Set_Health(kActorMutant3, 10 * Query_Difficulty_Level() + 50, 10 * Query_Difficulty_Level() + 50);
 
-		if (Game_Flag_Query(169) == 1) {
+		if (Game_Flag_Query(kFlagCT04HomelessKilledByMcCoy)) {
 			Actor_Set_Combat_Aggressiveness(kActorMutant3, 80);
 			Actor_Set_Friendliness_To_Other(kActorMutant3, kActorMcCoy, 20);
 		} else {
 			Actor_Set_Combat_Aggressiveness(kActorMutant3, 50);
 			Actor_Set_Friendliness_To_Other(kActorMutant3, kActorMcCoy, 40);
 		}
-
+#endif // BLADERUNNER_ORIGINAL_BUGS
+		// results in additional reduction in friendliness and increase of aggressiveness for the other two mutants
 		Actor_Modify_Friendliness_To_Other(kActorMutant1, kActorMcCoy, 20);
 		Actor_Modify_Friendliness_To_Other(kActorMutant2, kActorMcCoy, 15);
 		Actor_Modify_Combat_Aggressiveness(kActorMutant1, 10);
@@ -369,55 +422,55 @@ bool AIScriptMutant3::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 bool AIScriptMutant3::UpdateAnimation(int *animation, int *frame) {
 	switch (_animationState) {
 	case 0:
-		*animation = 910;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(910)) {
+		*animation = kModelAnimationMutant3Idle;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMutant3Idle)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 1:
-		*animation = 908;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(908)) {
+		*animation = kModelAnimationMutant3Walking;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMutant3Walking)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 2:
-		*animation = 909;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(909)) {
+		*animation = kModelAnimationMutant3Running;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMutant3Running)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 3:
-		if (!_animationFrame && _flag) {
-			*animation = 910;
+		if (_animationFrame == 0 && _resumeIdleAfterFramesetCompletesFlag) {
+			*animation = kModelAnimationMutant3Idle;
 			_animationState = 0;
 		} else {
-			*animation = 912;
-			_animationFrame++;
-			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(912)) {
+			*animation = kModelAnimationMutant3YellOrHurt;
+			++_animationFrame;
+			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMutant3YellOrHurt)) {
 				_animationFrame = 0;
 			}
 		}
 		break;
 
 	case 4:
-		*animation = 912;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(912)) {
+		*animation = kModelAnimationMutant3YellOrHurt;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMutant3YellOrHurt)) {
 			_animationFrame = 0;
 			_animationState = 3;
-			*animation = 911;
+			*animation = kModelAnimationMutant3CalmTalk;
 		}
 		break;
 
 	case 5:
-		*animation = 913;
-		_animationFrame++;
+		*animation = kModelAnimationMutant3PicksUpAndThrowsRock;
+		++_animationFrame;
 		if (_animationFrame == 9) {
 			int snd;
 			if (Random_Query(1, 2) == 1) {
@@ -431,66 +484,67 @@ bool AIScriptMutant3::UpdateAnimation(int *animation, int *frame) {
 			Actor_Combat_AI_Hit_Attempt(kActorMutant3);
 		}
 		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(*animation)) {
-			Actor_Change_Animation_Mode(kActorMutant3, 0);
+			Actor_Change_Animation_Mode(kActorMutant3, kAnimationModeIdle);
 		}
 		break;
 
 	case 6:
-		*animation = 917;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(917)) {
+		*animation = kModelAnimationMutant3ShotDead;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMutant3ShotDead)) {
 			Actor_Change_Animation_Mode(kActorMutant3, 88);
 		}
 		break;
 
 	case 7:
-		*animation = 917;
-		_animationFrame = Slice_Animation_Query_Number_Of_Frames(917) - 1;
+		*animation = kModelAnimationMutant3ShotDead;
+		_animationFrame = Slice_Animation_Query_Number_Of_Frames(kModelAnimationMutant3ShotDead) - 1;
 		break;
 
 	case 8:
-		*animation = 914;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(914)) {
+		*animation = kModelAnimationMutant3CrouchedWaiting;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMutant3CrouchedWaiting)) {
 			_animationFrame = 0;
 		}
 		break;
 
 	case 9:
-		*animation = 916;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(916)) {
+		*animation = kModelAnimationMutant3CrouchedFromStanding;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMutant3CrouchedFromStanding)) {
 			_animationFrame = 0;
 			_animationState = 8;
-			*animation = 914;
+			*animation = kModelAnimationMutant3CrouchedWaiting;
 		}
 		break;
 
 	case 10:
-		*animation = 915;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(915)) {
-			*animation = 910;
+		*animation = kModelAnimationMutant3CrouchedToStanding;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMutant3CrouchedToStanding)) {
+			*animation = kModelAnimationMutant3Idle;
 			_animationFrame = 0;
 			_animationState = 0;
 		}
 		break;
 
 	case 11:
-		*animation = 917;
+		*animation = kModelAnimationMutant3ShotDead;
 		_animationFrame += _var1;
 		if (_animationFrame == 3) {
-			Sound_Play(400, 100, 0, 0, 50);
+			Sound_Play(kSfxHURT1M3, 100, 0, 0, 50);
 			_var1 = -1;
 		} else {
-			if (!_animationFrame) {
-				Actor_Change_Animation_Mode(kActorMutant3, 0);
+			if (_animationFrame == 0) {
+				Actor_Change_Animation_Mode(kActorMutant3, kAnimationModeIdle);
 			}
 		}
 		break;
 
 	default:
-		*animation = 406;
+		// Dummy placeholder, kModelAnimationZubenIdle (406) is a Zuben animation
+		*animation = kModelAnimationZubenIdle;
 		break;
 	}
 	*frame = _animationFrame;
@@ -503,14 +557,14 @@ bool AIScriptMutant3::ChangeAnimationMode(int mode) {
 	case 0:
 		switch (_animationState) {
 		case 3:
+			// fall through
 		case 4:
-			_flag = 1;
+			_resumeIdleAfterFramesetCompletesFlag = true;
 			break;
 
 		case 8:
 			_animationState = 10;
 			_animationFrame = 0;
-
 			break;
 
 		case 10:
@@ -524,27 +578,30 @@ bool AIScriptMutant3::ChangeAnimationMode(int mode) {
 		break;
 
 	case 1:
+		// fall through
 	case 7:
 		_animationState = 1;
 		_animationFrame = 0;
 		break;
 
 	case 2:
+		// fall through
 	case 8:
 		_animationState = 2;
 		_animationFrame = 0;
 		break;
 
 	case 3:
+		// fall through
 	case 12:
 		_animationState = 3;
 		_animationFrame = 0;
-		_flag = 0;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		break;
 
 	case 4:
 		if (_animationState >= 3 && _animationState <= 4) {
-			_flag = 1;
+			_resumeIdleAfterFramesetCompletesFlag = true;
 		} else {
 			_animationState = 0;
 			_animationFrame = 0;
@@ -557,6 +614,7 @@ bool AIScriptMutant3::ChangeAnimationMode(int mode) {
 		break;
 
 	case 21:
+		// fall through
 	case 22:
 		_animationState = 11;
 		_animationFrame = 0;
@@ -565,7 +623,7 @@ bool AIScriptMutant3::ChangeAnimationMode(int mode) {
 
 	case 88:
 		_animationState = 7;
-		_animationFrame = Slice_Animation_Query_Number_Of_Frames(917) - 1;
+		_animationFrame = Slice_Animation_Query_Number_Of_Frames(kModelAnimationMutant3ShotDead) - 1;
 		break;
 
  	case 43:
@@ -575,7 +633,7 @@ bool AIScriptMutant3::ChangeAnimationMode(int mode) {
 		}
 		break;
 
-	case 48:
+	case kAnimationModeDie:
 		_animationState = 6;
 		_animationFrame = 0;
 		break;

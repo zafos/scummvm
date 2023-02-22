@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -35,12 +34,16 @@
 #include "zvision/text/truetype_font.h"
 #include "zvision/sound/midi.h"
 
+#include "backends/keymapper/keymap.h"
+#include "backends/keymapper/keymapper.h"
+
 #include "common/config-manager.h"
 #include "common/str.h"
 #include "common/debug.h"
 #include "common/debug-channels.h"
 #include "common/textconsole.h"
 #include "common/timer.h"
+#include "common/translation.h"
 #include "common/error.h"
 #include "common/system.h"
 #include "common/file.h"
@@ -76,6 +79,10 @@ struct zvisionIniSettings {
 	{"mpegmovies", StateKey_MPEGMovies, -1, true, true}		// Zork: Grand Inquisitor DVD hi-res MPEG movies (0 = normal, 1 = hires, 2 = disable option)
 };
 
+const char *mainKeymapId = "zvision";
+const char *gameKeymapId = "zvision-game";
+const char *cutscenesKeymapId = "zvision-cutscenes";
+
 ZVision::ZVision(OSystem *syst, const ZVisionGameDescription *gameDesc)
 	: Engine(syst),
 	  _gameDescription(gameDesc),
@@ -90,7 +97,6 @@ ZVision::ZVision(OSystem *syst, const ZVisionGameDescription *gameDesc)
 	  _cursorManager(nullptr),
 	  _midiManager(nullptr),
 	  _rnd(nullptr),
-	  _console(nullptr),
 	  _menu(nullptr),
 	  _searchManager(nullptr),
 	  _textRenderer(nullptr),
@@ -112,7 +118,6 @@ ZVision::~ZVision() {
 	debug(1, "ZVision::~ZVision");
 
 	// Dispose of resources
-	delete _console;
 	delete _cursorManager;
 	delete _stringManager;
 	delete _saveManager;
@@ -122,9 +127,6 @@ ZVision::~ZVision() {
 	delete _midiManager;
 
 	getTimerManager()->removeTimerProc(&fpsTimerCallback);
-
-	// Remove all of our debug levels
-	DebugMan.clearAllDebugChannels();
 }
 
 void ZVision::registerDefaultSettings() {
@@ -191,7 +193,22 @@ void ZVision::initialize() {
 		}
 	}
 
+	Graphics::ModeList modes;
+	modes.push_back(Graphics::Mode(WINDOW_WIDTH, WINDOW_HEIGHT));
+#if defined(USE_MPEG2) && defined(USE_A52)
+	// For the DVD version of ZGI we can play high resolution videos
+	if (getGameId() == GID_GRANDINQUISITOR && (getFeatures() & GF_DVD))
+		modes.push_back(Graphics::Mode(HIRES_WINDOW_WIDTH, HIRES_WINDOW_HEIGHT));
+#endif
+	initGraphicsModes(modes);
+
 	initScreen();
+
+	Common::Keymapper *keymapper = _system->getEventManager()->getKeymapper();
+	_gameKeymap = keymapper->getKeymap(gameKeymapId);
+	_gameKeymap->setEnabled(true);
+	_cutscenesKeymap = keymapper->getKeymap(cutscenesKeymapId);
+	_cutscenesKeymap->setEnabled(false);
 
 	// Register random source
 	_rnd = new Common::RandomSource("zvision");
@@ -219,13 +236,13 @@ void ZVision::initialize() {
 
 	loadSettings();
 
-#ifndef USE_MPEG2
-	// libmpeg2 not loaded, disable the MPEG2 movies option
+#if !defined(USE_MPEG2) || !defined(USE_A52)
+	// libmpeg2 or liba52 not loaded, disable the MPEG2 movies option
 	_scriptManager->setStateValue(StateKey_MPEGMovies, 2);
 #endif
 
 	// Create debugger console. It requires GFX to be initialized
-	_console = new Console(this);
+	setDebugger(new Console(this));
 	_doubleFPS = ConfMan.getBool("doublefps");
 
 	// Initialize FPS timer callback
@@ -276,7 +293,8 @@ Common::Error ZVision::run() {
 
 			if (!Common::File::exists(fontName) && !_searchManager->hasFile(fontName) &&
 				!Common::File::exists(liberationFontName) && !_searchManager->hasFile(liberationFontName) &&
-				!Common::File::exists(freeFontName) && !_searchManager->hasFile(freeFontName)) {
+				!Common::File::exists(freeFontName) && !_searchManager->hasFile(freeFontName) &&
+				!Common::File::exists("fonts.dat") && !_searchManager->hasFile("fonts.dat")) {
 				foundAllFonts = false;
 				break;
 			}
@@ -287,7 +305,7 @@ Common::Error ZVision::run() {
 	}
 
 	if (!foundAllFonts) {
-		GUI::MessageDialog dialog(
+		GUI::MessageDialog dialog(_(
 				"Before playing this game, you'll need to copy the required "
 				"fonts into ScummVM's extras directory, or into the game directory. "
 				"On Windows, you'll need the following font files from the Windows "
@@ -297,7 +315,7 @@ Common::Error ZVision::run() {
 				"fonts from the font package you choose, i.e., LiberationMono, "
 				"LiberationSans and LiberationSerif, or FreeMono, FreeSans and "
 				"FreeSerif respectively."
-		);
+		));
 		dialog.runModal();
 		quitGame();
 		return Common::kUnknownError;
@@ -340,10 +358,6 @@ Common::Error ZVision::run() {
 			delay >>= 1;
 		}
 
-		if (canSaveGameStateCurrently() && shouldPerformAutoSave(_saveManager->getLastSaveTime())) {
-			_saveManager->autoSave();
-		}
-
 		_system->delayMillis(delay);
 	}
 
@@ -360,20 +374,12 @@ void ZVision::pauseEngineIntern(bool pause) {
 	}
 }
 
-Common::String ZVision::generateSaveFileName(uint slot) {
-	return Common::String::format("%s.%03u", _targetName.c_str(), slot);
-}
-
 void ZVision::setRenderDelay(uint delay) {
 	_frameRenderDelay = delay;
 }
 
 bool ZVision::canRender() {
 	return _frameRenderDelay <= 0;
-}
-
-GUI::Debugger *ZVision::getDebugger() {
-	return _console;
 }
 
 void ZVision::syncSoundSettings() {

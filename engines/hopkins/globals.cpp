@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -77,7 +76,7 @@ Globals::Globals(HopkinsEngine *vm) {
 	_speed = 1;
 	_eventMode = EVENTMODE_DEFAULT;
 	_exitId = 0;
-	_characterSpriteBuf = 0;
+	_characterSpriteBuf = nullptr;
 	_screenId = 0;
 	_prevScreenId = 0;
 	_characterMaxPosY = 0;
@@ -105,11 +104,11 @@ Globals::Globals(HopkinsEngine *vm) {
 	_oceanDirection = DIR_NONE;
 
 	// Initialize pointers
-	_levelSpriteBuf = NULL;
-	_saveData = NULL;
-	_answerBuffer = NULL;
-	_characterSpriteBuf = NULL;
-	_optionDialogSpr = NULL;
+	_levelSpriteBuf = nullptr;
+	_saveData = nullptr;
+	_answerBuffer = nullptr;
+	_characterSpriteBuf = nullptr;
+	_optionDialogSpr = nullptr;
 
 	// Reset flags
 	_censorshipFl = false;
@@ -128,7 +127,7 @@ Globals::~Globals() {
 	freeMemory((byte *)_saveData);
 	freeMemory(_answerBuffer);
 	freeMemory(_characterSpriteBuf);
-	free(NULL);
+	free(nullptr);
 }
 
 void Globals::setConfig() {
@@ -166,22 +165,24 @@ void Globals::setConfig() {
 		_zoneFilename = "ZONEES.TXT";
 		_textFilename = "TEXTEES.TXT";
 		break;
+	default:
+		break;
 	}
 }
 
 void Globals::clearAll() {
 	_vm->_fontMan->clearAll();
 	_vm->_dialog->clearAll();
-	_answerBuffer = NULL;
-	_levelSpriteBuf = NULL;
-	_saveData = NULL;
+	_answerBuffer = nullptr;
+	_levelSpriteBuf = nullptr;
+	_saveData = nullptr;
 	_vm->_objectsMan->_curObjectIndex = 0;
 
 	_vm->_linesMan->clearAll();
 	_vm->_objectsMan->clearAll();
 
 	_saveData = (Savegame *)malloc(sizeof(Savegame));
-	memset(_saveData, 0, sizeof(Savegame));
+	_saveData->reset();
 
 	_vm->_events->clearAll();
 }
@@ -202,14 +203,14 @@ void Globals::loadCharacterData() {
 byte *Globals::allocMemory(int count) {
 	byte *result = (byte *)malloc(count);
 	if (!result)
-		result = NULL;
+		result = nullptr;
 	return result;
 }
 
 byte *Globals::freeMemory(byte *p) {
 	if (p)
 		free(p);
-	return NULL;
+	return nullptr;
 }
 
 } // End of namespace Hopkins

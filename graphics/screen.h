@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -30,6 +29,15 @@
 
 namespace Graphics {
 
+/**
+ * @defgroup graphics_screen Screen
+ * @ingroup graphics
+ *
+ * @brief Screen class for managing the screen.
+ *
+ * @{
+ */
+
 #define PALETTE_COUNT 256
 #define PALETTE_SIZE (256 * 3)
 
@@ -40,27 +48,21 @@ namespace Graphics {
  * areas to the physical screen
  */
 class Screen : public ManagedSurface {
-private:
+protected:
 	/**
 	 * List of affected areas of the screen
 	 */
 	Common::List<Common::Rect> _dirtyRects;
-private:
+protected:
 	/**
-	* Merges together overlapping dirty areas of the screen
-	*/
+	 * Merges together overlapping dirty areas of the screen
+	 */
 	void mergeDirtyRects();
 
 	/**
-	* Returns the union of two dirty area rectangles
-	*/
-	bool unionRectangle(Common::Rect &destRect, const Common::Rect &src1, const Common::Rect &src2);
-protected:
-	/**
-	 * Adds a rectangle to the list of modified areas of the screen during the
-	 * current frame
+	 * Returns the union of two dirty area rectangles
 	 */
-	virtual void addDirtyRect(const Common::Rect &r);
+	bool unionRectangle(Common::Rect &destRect, const Common::Rect &src1, const Common::Rect &src2);
 public:
 	Screen();
 	Screen(int width, int height);
@@ -83,9 +85,20 @@ public:
 	virtual void clearDirtyRects() { _dirtyRects.clear(); }
 
 	/**
+	 * Adds a rectangle to the list of modified areas of the screen during the
+	 * current frame
+	 */
+	virtual void addDirtyRect(const Common::Rect &r);
+
+	/**
 	 * Updates the screen by copying any affected areas to the system
 	 */
 	virtual void update();
+
+	/**
+	 * Updates the screen at the end of an update call
+	 */
+	virtual void updateScreen();
 
 	/**
 	 * Return the currently active palette
@@ -112,7 +125,7 @@ public:
 	 */
 	void clearPalette();
 };
-
+ /** @} */
 } // End of namespace Graphics
 
 #endif

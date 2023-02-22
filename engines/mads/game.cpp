@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -45,10 +44,12 @@ Game *Game::init(MADSEngine *vm) {
 	switch (vm->getGameID()) {
 	case GType_RexNebular:
 		return new Nebular::GameNebular(vm);
+#ifdef ENABLE_MADSV2
 	case GType_Dragonsphere:
 		return new Dragonsphere::GameDragonsphere(vm);
 	case GType_Phantom:
 		return new Phantom::GamePhantom(vm);
+#endif
 	default:
 		error("Game: Unknown game");
 	}
@@ -349,7 +350,9 @@ void Game::loadQuotes() {
 	while (true) {
 		uint8 b = f.readByte();
 
-		msg += b;
+		if (b != '\0')
+			msg += b;
+
 		if (f.eos() || b == '\0') {
 			// end of string, add it to the strings list
 			_quotes.push_back(msg);
@@ -476,7 +479,7 @@ void Game::synchronize(Common::Serializer &s, bool phase1) {
 
 void Game::loadGame(int slotNumber) {
 	_saveFile = g_system->getSavefileManager()->openForLoading(
-		_vm->generateSaveName(slotNumber));
+		_vm->getSaveStateName(slotNumber));
 
 	Common::Serializer s(_saveFile, nullptr);
 
@@ -505,7 +508,7 @@ void Game::loadGame(int slotNumber) {
 
 void Game::saveGame(int slotNumber, const Common::String &saveName) {
 	Common::OutSaveFile *out = g_system->getSavefileManager()->openForSaving(
-		_vm->generateSaveName(slotNumber));
+		_vm->getSaveStateName(slotNumber));
 
 	MADSSavegameHeader header;
 	header._saveName = saveName;
@@ -617,6 +620,9 @@ void Game::syncTimers(SyncType slaveType, int slaveId, SyncType masterType, int 
 	case SYNC_PLAYER:
 		syncTime = _player._priorTimer;
 		break;
+
+	default:
+		break;
 	}
 
 
@@ -635,6 +641,10 @@ void Game::syncTimers(SyncType slaveType, int slaveId, SyncType masterType, int 
 
 	case SYNC_CLOCK:
 		error("syncTimer is trying to force _frameStartTime");
+		break;
+
+	default:
+		break;
 	}
 }
 

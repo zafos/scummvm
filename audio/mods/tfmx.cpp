@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -458,7 +457,7 @@ void Tfmx::macroRun(ChannelContext &channel) {
 			continue;
 
 		// 0x22 - 0x29 are used by Gem`X
-		// 0x30 - 0x34 are used by Carribean Disaster
+		// 0x30 - 0x34 are used by Caribbean Disaster
 
 		default:
 			debug(3, "Tfmx: Macro %02X not supported", macroPtr[0]);
@@ -604,6 +603,9 @@ bool Tfmx::patternRun(PatternContext &pattern) {
 
 			case 15: 	// NOP
 				continue;
+
+			default:
+				break;
 			}
 		}
 	}
@@ -732,6 +734,9 @@ void Tfmx::noteCommand(const uint8 note, const uint8 param1, const uint8 param2,
 			channel.envCount = channel.envSkip = (param2 >> 4) + 1;
 			channel.envEndVolume = param3;
 			break;
+
+		default:
+			break;
 	}
 }
 
@@ -854,8 +859,8 @@ void Tfmx::freeResourceDataImpl() {
 		}
 		delete[] _resourceSample.sampleData;
 	}
-	_resource = 0;
-	_resourceSample.sampleData = 0;
+	_resource = nullptr;
+	_resourceSample.sampleData = nullptr;
 	_resourceSample.sampleLen = 0;
 	_deleteResource = false;
 }
@@ -876,13 +881,13 @@ const int8 *Tfmx::loadSampleFile(uint32 &sampleLen, Common::SeekableReadStream &
 	const int32 sampleSize = sampleStream.size();
 	if (sampleSize < 4) {
 		warning("Tfmx: Cant load Samplefile");
-		return 0;
+		return nullptr;
 	}
 
 	int8 *sampleAlloc = new int8[sampleSize];
 	if (!sampleAlloc) {
 		warning("Tfmx: Could not allocate Memory: %dKB", sampleSize / 1024);
-		return 0;
+		return nullptr;
 	}
 
 	if (sampleStream.read(sampleAlloc, sampleSize) == (uint32)sampleSize) {
@@ -891,7 +896,7 @@ const int8 *Tfmx::loadSampleFile(uint32 &sampleLen, Common::SeekableReadStream &
 	} else {
 		delete[] sampleAlloc;
 		warning("Tfmx: Encountered IO-Error");
-		return 0;
+		return nullptr;
 	}
 	return sampleAlloc;
 }
@@ -908,13 +913,13 @@ const Tfmx::MdatResource *Tfmx::loadMdatFile(Common::SeekableReadStream &musicDa
 
 	if (!hasHeader) {
 		warning("Tfmx: File is not a Tfmx Module");
-		return 0;
+		return nullptr;
 	}
 
 	MdatResource *resource = new MdatResource;
 
-	resource->mdatAlloc = 0;
-	resource->mdatData = 0;
+	resource->mdatAlloc = nullptr;
+	resource->mdatData = nullptr;
 	resource->mdatLen = 0;
 
 	// 0x000A: int16 flags
@@ -955,7 +960,7 @@ const Tfmx::MdatResource *Tfmx::loadMdatFile(Common::SeekableReadStream &musicDa
 	if (musicData.err()) {
 		warning("Tfmx: Encountered IO-Error");
 		delete resource;
-		return 0;
+		return nullptr;
 	}
 
 	// TODO: if a File is packed it could have for Ex only 2 Patterns/Macros
@@ -988,7 +993,7 @@ const Tfmx::MdatResource *Tfmx::loadMdatFile(Common::SeekableReadStream &musicDa
 	if (!mdatAlloc) {
 		warning("Tfmx: Could not allocate Memory: %dKB", allocSize / 1024);
 		delete resource;
-		return 0;
+		return nullptr;
 	}
 	musicData.seek(mdatOffset);
 	if (musicData.read(mdatAlloc, allocSize) == allocSize) {
@@ -999,7 +1004,7 @@ const Tfmx::MdatResource *Tfmx::loadMdatFile(Common::SeekableReadStream &musicDa
 		delete[] mdatAlloc;
 		warning("Tfmx: Encountered IO-Error");
 		delete resource;
-		return 0;
+		return nullptr;
 	}
 
 	return resource;
@@ -1127,7 +1132,7 @@ void displayMacroStep(const void * const vptr) {
 		"Go submacro xx/xxxx  macro-number/step ",
 		"--------Return to old macro------------",
 		"Setperiod   ..xxxx   DMA period        ",
-		"Sampleloop  ..xxxx   relative adress   ",
+		"Sampleloop  ..xxxx   relative address  ",
 		"-------Set one shot sample-------------",
 		"Wait on DMA ..xxxx   count (Wavecycles)",
 		"Random play xx/xx/xx macro/speed/mode  ",

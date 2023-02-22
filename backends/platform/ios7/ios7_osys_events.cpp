@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -77,6 +76,18 @@ bool OSystem_iOS7::pollEvent(Common::Event &event) {
 			handleEvent_applicationResumed();
 			return false;
 
+		case kInputApplicationSaveState:
+			handleEvent_applicationSaveState();
+			return false;
+
+		case kInputApplicationRestoreState:
+			handleEvent_applicationRestoreState();
+			return false;
+
+		case kInputApplicationClearState:
+			handleEvent_applicationClearState();
+			return false;
+
 		case kInputMouseSecondDragged:
 			if (!handleEvent_mouseSecondDragged(event, internalEvent.value1, internalEvent.value2))
 				return false;
@@ -104,6 +115,34 @@ bool OSystem_iOS7::pollEvent(Common::Event &event) {
 		case kInputTap:
 			if (!handleEvent_tap(event, (UIViewTapDescription) internalEvent.value1, internalEvent.value2))
 				return false;
+			break;
+
+		case kInputMainMenu:
+			event.type = Common::EVENT_MAINMENU;
+			_queuedInputEvent.type = Common::EVENT_INVALID;
+			_queuedEventTime = getMillis() + kQueuedInputEventDelay;
+			break;
+
+		case kInputJoystickAxisMotion:
+			event.type = Common::EVENT_JOYAXIS_MOTION;
+			event.joystick.axis = internalEvent.value1;
+			event.joystick.position = internalEvent.value2;
+			break;
+
+		case kInputJoystickButtonDown:
+			event.type = Common::EVENT_JOYBUTTON_DOWN;
+			event.joystick.button = internalEvent.value1;
+			break;
+
+		case kInputJoystickButtonUp:
+			event.type = Common::EVENT_JOYBUTTON_UP;
+			event.joystick.button = internalEvent.value1;
+			break;
+
+		case kInputChanged:
+			event.type = Common::EVENT_INPUT_CHANGED;
+			_queuedInputEvent.type = Common::EVENT_INVALID;
+			_queuedEventTime = getMillis() + kQueuedInputEventDelay;
 			break;
 
 		default:
@@ -192,7 +231,7 @@ bool OSystem_iOS7::handleEvent_secondMouseUp(Common::Event &event, int x, int y)
 
 	if (curTime - _lastSecondaryDown < 400) {
 		//printf("Right tap!\n");
-		if (curTime - _lastSecondaryTap < 400 && !_videoContext->overlayVisible) {
+		if (curTime - _lastSecondaryTap < 400 && !_videoContext->overlayInGUI) {
 			//printf("Right escape!\n");
 			event.type = Common::EVENT_KEYDOWN;
 			_queuedInputEvent.type = Common::EVENT_KEYUP;
@@ -245,8 +284,8 @@ bool OSystem_iOS7::handleEvent_mouseDragged(Common::Event &event, int x, int y) 
 		mouseNewPosX = (int)(_videoContext->mouseX - deltaX / 0.5f);
 		mouseNewPosY = (int)(_videoContext->mouseY - deltaY / 0.5f);
 
-		int widthCap = _videoContext->overlayVisible ? _videoContext->overlayWidth : _videoContext->screenWidth;
-		int heightCap = _videoContext->overlayVisible ? _videoContext->overlayHeight : _videoContext->screenHeight;
+		int widthCap = _videoContext->overlayInGUI ? _videoContext->overlayWidth : _videoContext->screenWidth;
+		int heightCap = _videoContext->overlayInGUI ? _videoContext->overlayHeight : _videoContext->screenHeight;
 
 		if (mouseNewPosX < 0)
 			mouseNewPosX = 0;
@@ -303,7 +342,7 @@ bool OSystem_iOS7::handleEvent_mouseSecondDragged(Common::Event &event, int x, i
 		if (absX < kMaxDeviation && -vecY >= kNeededLength) {
 			// Swipe up
 			_mouseClickAndDragEnabled = !_mouseClickAndDragEnabled;
-			const char *dialogMsg;
+			Common::U32String dialogMsg;
 			if (_mouseClickAndDragEnabled) {
 				_touchpadModeEnabled = false;
 				dialogMsg = _("Mouse-click-and-drag mode enabled.");
@@ -317,7 +356,7 @@ bool OSystem_iOS7::handleEvent_mouseSecondDragged(Common::Event &event, int x, i
 		if (absY < kMaxDeviation && vecX >= kNeededLength) {
 			// Swipe right
 			_touchpadModeEnabled = !_touchpadModeEnabled;
-			const char *dialogMsg;
+			Common::U32String dialogMsg;
 			if (_touchpadModeEnabled)
 				dialogMsg = _("Touchpad mode enabled.");
 			else
@@ -344,6 +383,9 @@ void  OSystem_iOS7::handleEvent_orientationChanged(int orientation) {
 	switch (orientation) {
 	case 1:
 		newOrientation = kScreenOrientationPortrait;
+		break;
+	case 2:
+		newOrientation = kScreenOrientationFlippedPortrait;
 		break;
 	case 3:
 		newOrientation = kScreenOrientationLandscape;
@@ -383,54 +425,12 @@ void  OSystem_iOS7::handleEvent_keyPressed(Common::Event &event, int keyPressed)
 	int ascii = keyPressed;
 	//printf("key: %i\n", keyPressed);
 
-	// We remap some of the iPhone keyboard keys.
-	// The first ten here are the row of symbols below the numeric keys.
-	switch (keyPressed) {
-	case 45:
-		keyPressed = Common::KEYCODE_F1;
-		ascii = Common::ASCII_F1;
-		break;
-	case 47:
-		keyPressed = Common::KEYCODE_F2;
-		ascii = Common::ASCII_F2;
-		break;
-	case 58:
-		keyPressed = Common::KEYCODE_F3;
-		ascii = Common::ASCII_F3;
-		break;
-	case 59:
-		keyPressed = Common::KEYCODE_F4;
-		ascii = Common::ASCII_F4;
-		break;
-	case 40:
-		keyPressed = Common::KEYCODE_F5;
-		ascii = Common::ASCII_F5;
-		break;
-	case 41:
-		keyPressed = Common::KEYCODE_F6;
-		ascii = Common::ASCII_F6;
-		break;
-	case 36:
-		keyPressed = Common::KEYCODE_F7;
-		ascii = Common::ASCII_F7;
-		break;
-	case 38:
-		keyPressed = Common::KEYCODE_F8;
-		ascii = Common::ASCII_F8;
-		break;
-	case 64:
-		keyPressed = Common::KEYCODE_F9;
-		ascii = Common::ASCII_F9;
-		break;
-	case 34:
-		keyPressed = Common::KEYCODE_F10;
-		ascii = Common::ASCII_F10;
-		break;
-	case 10:
+	// Map LF character to Return key/CR character
+	if (keyPressed == 10) {
 		keyPressed = Common::KEYCODE_RETURN;
 		ascii = Common::ASCII_RETURN;
-		break;
 	}
+
 	event.type = Common::EVENT_KEYDOWN;
 	_queuedInputEvent.type = Common::EVENT_KEYUP;
 
@@ -441,63 +441,23 @@ void  OSystem_iOS7::handleEvent_keyPressed(Common::Event &event, int keyPressed)
 }
 
 bool OSystem_iOS7::handleEvent_swipe(Common::Event &event, int direction, int touches) {
-	if (touches == 1) {
+	if (touches == 3) {
 		Common::KeyCode keycode = Common::KEYCODE_INVALID;
-		switch (_screenOrientation) {
-		case kScreenOrientationPortrait:
-			switch ((UIViewSwipeDirection)direction) {
-				case kUIViewSwipeUp:
-					keycode = Common::KEYCODE_UP;
-					break;
-				case kUIViewSwipeDown:
-					keycode = Common::KEYCODE_DOWN;
-					break;
-				case kUIViewSwipeLeft:
-					keycode = Common::KEYCODE_LEFT;
-					break;
-				case kUIViewSwipeRight:
-					keycode = Common::KEYCODE_RIGHT;
-					break;
-				default:
-					return false;
-			}
-			break;
-		case kScreenOrientationLandscape:
-			switch ((UIViewSwipeDirection)direction) {
-				case kUIViewSwipeUp:
-					keycode = Common::KEYCODE_LEFT;
-					break;
-				case kUIViewSwipeDown:
-					keycode = Common::KEYCODE_RIGHT;
-					break;
-				case kUIViewSwipeLeft:
-					keycode = Common::KEYCODE_DOWN;
-					break;
-				case kUIViewSwipeRight:
-					keycode = Common::KEYCODE_UP;
-					break;
-				default:
-					return false;
-			}
-			break;
-		case kScreenOrientationFlippedLandscape:
-			switch ((UIViewSwipeDirection)direction) {
-				case kUIViewSwipeUp:
-					keycode = Common::KEYCODE_RIGHT;
-					break;
-				case kUIViewSwipeDown:
-					keycode = Common::KEYCODE_LEFT;
-					break;
-				case kUIViewSwipeLeft:
-					keycode = Common::KEYCODE_UP;
-					break;
-				case kUIViewSwipeRight:
-					keycode = Common::KEYCODE_DOWN;
-					break;
-				default:
-					return false;
-			}
-			break;
+		switch ((UIViewSwipeDirection)direction) {
+			case kUIViewSwipeUp:
+				keycode = Common::KEYCODE_UP;
+				break;
+			case kUIViewSwipeDown:
+				keycode = Common::KEYCODE_DOWN;
+				break;
+			case kUIViewSwipeLeft:
+				keycode = Common::KEYCODE_LEFT;
+				break;
+			case kUIViewSwipeRight:
+				keycode = Common::KEYCODE_RIGHT;
+				break;
+			default:
+				return false;
 		}
 
 		event.kbd.keycode = _queuedInputEvent.kbd.keycode = keycode;
@@ -513,7 +473,7 @@ bool OSystem_iOS7::handleEvent_swipe(Common::Event &event, int direction, int to
 		switch ((UIViewSwipeDirection)direction) {
 		case kUIViewSwipeUp: {
 			_mouseClickAndDragEnabled = !_mouseClickAndDragEnabled;
-			const char *dialogMsg;
+			Common::U32String dialogMsg;
 			if (_mouseClickAndDragEnabled) {
 				_touchpadModeEnabled = false;
 				dialogMsg = _("Mouse-click-and-drag mode enabled.");
@@ -535,7 +495,7 @@ bool OSystem_iOS7::handleEvent_swipe(Common::Event &event, int direction, int to
 		case kUIViewSwipeRight: {
 			// Swipe right
 			_touchpadModeEnabled = !_touchpadModeEnabled;
-			const char *dialogMsg;
+			Common::U32String dialogMsg;
 			if (_touchpadModeEnabled)
 				dialogMsg = _("Touchpad mode enabled.");
 			else

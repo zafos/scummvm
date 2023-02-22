@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -65,7 +64,18 @@ AdlEngine_v5::RegionChunkType AdlEngine_v5::getRegionChunkType(const uint16 addr
 	}
 }
 
-int AdlEngine_v5::o5_isNounNotInRoom(ScriptEnv &e) {
+void AdlEngine_v5::setupOpcodeTables() {
+	AdlEngine_v4::setupOpcodeTables();
+
+	_condOpcodes[0x0a] = opcode(&AdlEngine_v5::o_abortScript);
+
+	_actOpcodes[0x0a] = opcode(&AdlEngine_v5::o_dummy);
+	_actOpcodes[0x0b] = opcode(&AdlEngine_v5::o_setTextMode);
+	_actOpcodes[0x0e] = opcode(&AdlEngine_v5::o_dummy);
+	_actOpcodes[0x13] = opcode(&AdlEngine_v5::o_dummy);
+}
+
+int AdlEngine_v5::o_isNounNotInRoom(ScriptEnv &e) {
 	OP_DEBUG_1("\t&& NO_SUCH_ITEMS_IN_ROOM(%s)", itemRoomStr(e.arg(1)).c_str());
 
 	Common::List<Item>::const_iterator item;
@@ -83,7 +93,7 @@ int AdlEngine_v5::o5_isNounNotInRoom(ScriptEnv &e) {
 	return 1;
 }
 
-int AdlEngine_v5::o5_abortScript(ScriptEnv &e) {
+int AdlEngine_v5::o_abortScript(ScriptEnv &e) {
 	OP_DEBUG_0("\t&& ABORT_SCRIPT()");
 
 	_abortScript = true;
@@ -92,19 +102,19 @@ int AdlEngine_v5::o5_abortScript(ScriptEnv &e) {
 	return -1;
 }
 
-int AdlEngine_v5::o5_dummy(ScriptEnv &e) {
+int AdlEngine_v5::o_dummy(ScriptEnv &e) {
 	OP_DEBUG_0("\tDUMMY()");
 
 	return 0;
 }
 
-int AdlEngine_v5::o5_setTextMode(ScriptEnv &e) {
+int AdlEngine_v5::o_setTextMode(ScriptEnv &e) {
 	OP_DEBUG_1("\tSET_TEXT_MODE(%d)", e.arg(1));
 
 	switch (e.arg(1)) {
 	case 1:
 		if (_linesPrinted != 0) {
-			_display->printChar(APPLECHAR(' '));
+			_display->printChar(_display->asciiToNative(' '));
 			handleTextOverflow();
 			_display->moveCursorTo(Common::Point(0, 23));
 			_maxLines = 4;
@@ -112,7 +122,7 @@ int AdlEngine_v5::o5_setTextMode(ScriptEnv &e) {
 		return 1;
 	case 2:
 		_textMode = true;
-		_display->setMode(DISPLAY_MODE_TEXT);
+		_display->setMode(Display::kModeText);
 		_display->home();
 		_maxLines = 24;
 		_linesPrinted = 0;
@@ -126,7 +136,7 @@ int AdlEngine_v5::o5_setTextMode(ScriptEnv &e) {
 	}
 }
 
-int AdlEngine_v5::o5_setRegionRoom(ScriptEnv &e) {
+int AdlEngine_v5::o_setRegionRoom(ScriptEnv &e) {
 	OP_DEBUG_2("\tSET_REGION_ROOM(%d, %d)", e.arg(1), e.arg(2));
 
 	getCurRoom().curPicture = getCurRoom().picture;
@@ -137,7 +147,7 @@ int AdlEngine_v5::o5_setRegionRoom(ScriptEnv &e) {
 	return -1;
 }
 
-int AdlEngine_v5::o5_setRoomPic(ScriptEnv &e) {
+int AdlEngine_v5::o_setRoomPic(ScriptEnv &e) {
 	const byte isFirstTime = restoreRoomState(e.arg(1));
 
 	// CHECKME: More peculiar isFirstTime handling (see also restoreRoomState).
@@ -147,7 +157,7 @@ int AdlEngine_v5::o5_setRoomPic(ScriptEnv &e) {
 	if (isFirstTime != 0xff)
 		getRoom(e.arg(1)).isFirstTime = isFirstTime;
 
-	o4_setRoomPic(e);
+	AdlEngine_v4::o_setRoomPic(e);
 	return 2;
 }
 

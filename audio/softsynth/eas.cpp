@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -67,20 +66,21 @@ public:
 	virtual ~MidiDriver_EAS();
 
 	// MidiDriver
-	virtual int open();
-	virtual bool isOpen() const;
-	virtual void close();
-	virtual void send(uint32 b);
-	virtual void sysEx(const byte *msg, uint16 length);
-	virtual void setTimerCallback(void *timerParam,
-								Common::TimerManager::TimerProc timerProc);
-	virtual uint32 getBaseTempo();
+	int open() override;
+	bool isOpen() const override { return _dlHandle != 0; }
+
+	void close() override;
+	void send(uint32 b) override;
+	void sysEx(const byte *msg, uint16 length) override;
+	void setTimerCallback(void *timerParam,
+								Common::TimerManager::TimerProc timerProc) override;
+	uint32 getBaseTempo() override;
 
 	// AudioStream
-	virtual int readBuffer(int16 *buffer, const int numSamples);
-	virtual bool isStereo() const;
-	virtual int getRate() const;
-	virtual bool endOfData() const;
+	int readBuffer(int16 *buffer, const int numSamples) override;
+	bool isStereo() const override;
+	int getRate() const override;
+	bool endOfData() const override;
 
 private:
 	struct EASLibConfig {
@@ -314,10 +314,6 @@ int MidiDriver_EAS::open() {
 	return 0;
 }
 
-bool MidiDriver_EAS::isOpen() const {
-	return _dlHandle != 0;
-}
-
 void MidiDriver_EAS::close() {
 	MidiDriver_MPU401::close();
 
@@ -359,6 +355,9 @@ void MidiDriver_EAS::close() {
 void MidiDriver_EAS::send(uint32 b) {
 	byte buf[4];
 
+	if (!isOpen())
+		return;
+
 	WRITE_LE_UINT32(buf, b);
 
 	int32 len = 3;
@@ -372,6 +371,9 @@ void MidiDriver_EAS::send(uint32 b) {
 
 void MidiDriver_EAS::sysEx(const byte *msg, uint16 length) {
 	byte buf[266];
+
+	if (!isOpen())
+		return;
 
 	assert(length + 2 <= ARRAYSIZE(buf));
 
@@ -397,6 +399,9 @@ uint32 MidiDriver_EAS::getBaseTempo() {
 int MidiDriver_EAS::readBuffer(int16 *buffer, const int numSamples) {
 	// see note at top of this file
 	assert(numSamples == INTERMEDIATE_BUFFER_SIZE);
+
+	if (!isOpen())
+		return -1;
 
 	int32 res, c;
 

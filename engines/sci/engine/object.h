@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -73,12 +72,13 @@ public:
 		_name(NULL_REG),
 		_offset(getSciVersion() < SCI_VERSION_1_1 ? 0 : 5),
 		_isFreed(false),
-		_baseObj(),
-		_baseVars(),
-		_methodCount(0)
+		_methodCount(0),
+	    _pos(NULL_REG)
 #ifdef ENABLE_SCI32
 		,
-		_propertyOffsetsSci3()
+		_infoSelectorSci3(NULL_REG),
+		_speciesSelectorSci3(NULL_REG),
+		_superClassPosSci3(NULL_REG)
 #endif
 		{}
 
@@ -233,10 +233,7 @@ public:
 	 * @returns A pointer to the code for the method at the given index.
 	 */
 	reg_t getFunction(const uint16 index) const {
-		reg_t addr;
-		addr.setSegment(_pos.getSegment());
-		addr.setOffset(_baseMethod[index * 2 + 1]);
-		return addr;
+		return make_reg32(_pos.getSegment(), _baseMethod[index * 2 + 1]);
 	}
 
 	/**
@@ -282,7 +279,7 @@ public:
 	uint16 getMethodCount() const { return _methodCount; }
 	reg_t getPos() const { return _pos; }
 
-	void saveLoadWithSerializer(Common::Serializer &ser);
+	void saveLoadWithSerializer(Common::Serializer &ser) override;
 
 	void cloneFromObject(const Object *obj) {
 		_name = obj ? obj->_name : NULL_REG;
@@ -303,9 +300,9 @@ public:
 
 	int propertyOffsetToId(SegManager *segMan, int propertyOffset) const;
 
-	void initSpecies(SegManager *segMan, reg_t addr);
-	void initSuperClass(SegManager *segMan, reg_t addr);
-	bool initBaseObject(SegManager *segMan, reg_t addr, bool doInitSuperClass = true);
+	void initSpecies(SegManager *segMan, reg_t addr, bool applyScriptPatches);
+	void initSuperClass(SegManager *segMan, reg_t addr, bool applyScriptPatches);
+	bool initBaseObject(SegManager *segMan, reg_t addr, bool doInitSuperClass = true, bool applyScriptPatches = true);
 
 #ifdef ENABLE_SCI32
 	bool mustSetViewVisible(const int index, const bool fromPropertyOp) const;

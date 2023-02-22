@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -30,12 +29,14 @@
 #define WINTERMUTE_BASE_GAME_H
 
 #include "engines/wintermute/base/base_object.h"
+#include "engines/wintermute/base/base_game_custom_actions.h"
 #include "engines/wintermute/base/timer.h"
 #include "engines/wintermute/persistent.h"
 #include "engines/wintermute/coll_templ.h"
 #include "engines/wintermute/math/rect32.h"
 #include "engines/wintermute/debugger.h"
 #include "common/events.h"
+#include "common/random.h"
 #if EXTENDED_DEBUGGER_ENABLED
 #include "engines/wintermute/base/scriptables/debuggable/debuggable_script_engine.h"
 #endif
@@ -60,14 +61,26 @@ class BaseKeyboardState;
 class BaseGameSettings;
 class ScEngine;
 class SXMath;
+class SXDirectory;
 class UIWindow;
 class VideoPlayer;
 class VideoTheoraPlayer;
 class SaveThumbHelper;
 
+#ifdef ENABLE_WME3D
+class BaseRenderer3D;
+struct FogParameters;
+#endif
+
 class BaseGame: public BaseObject {
 public:
 	DECLARE_PERSISTENT(BaseGame, BaseObject)
+
+	virtual bool getLayerSize(int *LayerWidth, int *LayerHeight, Rect32 *viewport, bool *customViewport);
+#ifdef ENABLE_WME3D
+	virtual uint32 getAmbientLightColor();
+	virtual bool getFogParams(bool *fogEnabled, uint32 *fogColor, float *start, float *end);
+#endif
 
 	virtual bool onScriptShutdown(ScScript *script);
 
@@ -103,6 +116,7 @@ public:
 	void setShowFPS(bool enabled) { _debugShowFPS = enabled; }
 	bool getBilinearFiltering() { return _bilinearFiltering; }
 	bool getSuspendedRendering() const { return _suspendedRendering; }
+	virtual bool renderShadowGeometry();
 
 	TTextEncoding _textEncoding;
 	bool _textRTL;
@@ -111,6 +125,17 @@ public:
 
 	void DEBUG_DumpClassRegistry();
 	bool setWaitCursor(const char *filename);
+
+#ifdef ENABLE_WME3D
+	bool _supportsRealTimeShadows;
+	TShadowType _maxShadowType;
+
+	bool setMaxShadowType(TShadowType maxShadowType);
+	virtual TShadowType getMaxShadowType(BaseObject *object = nullptr);
+
+	int32 _editorResolutionWidth;
+	int32 _editorResolutionHeight;
+#endif
 
 	uint32 getSaveThumbWidth() const { return _thumbnailWidth; }
 	uint32 getSaveThumbHeight() const { return _thumbnailHeight; }
@@ -151,6 +176,11 @@ public:
 	void LOG(bool res, const char *fmt, ...);
 
 	BaseRenderer *_renderer;
+#ifdef ENABLE_WME3D
+	BaseRenderer3D *_renderer3D;
+	bool _playing3DGame;
+#endif
+
 	BaseSoundMgr *_soundMgr;
 #if EXTENDED_DEBUGGER_ENABLED
 	DebuggableScEngine *_scEngine;
@@ -158,10 +188,11 @@ public:
 	ScEngine *_scEngine;
 #endif
 	BaseScriptable *_mathClass;
+	BaseScriptable *_directoryClass;
 	BaseSurfaceStorage *_surfaceStorage;
 	BaseFontStorage *_fontStorage;
 	BaseGame(const Common::String &targetName);
-	virtual ~BaseGame();
+	~BaseGame() override;
 
 	bool _debugDebugMode;
 
@@ -176,10 +207,10 @@ public:
 
 	virtual bool externalCall(ScScript *script, ScStack *stack, ScStack *thisStack, char *name);
 	// scripting interface
-	virtual ScValue *scGetProperty(const Common::String &name) override;
-	virtual bool scSetProperty(const char *name, ScValue *value) override;
-	virtual bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
-	virtual const char *scToString() override;
+	ScValue *scGetProperty(const Common::String &name) override;
+	bool scSetProperty(const char *name, ScValue *value) override;
+	bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
+	const char *scToString() override;
 	// compatibility bits
 	bool _compatKillMethodThreads;
 
@@ -193,12 +224,14 @@ public:
 
 	bool getIsLoading() const { return _loading; }
 
-	virtual bool handleMouseWheel(int32 delta);
+	bool handleMouseWheel(int32 delta) override;
 	bool _quitting;
 	virtual bool getVersion(byte *verMajor, byte *verMinor, byte *extMajor, byte *extMinor) const;
 
-	virtual bool handleKeypress(Common::Event *event, bool printable = false);
+	bool handleKeypress(Common::Event *event, bool printable = false) override;
 	virtual void handleKeyRelease(Common::Event *event);
+	virtual bool handleCustomActionStart(BaseGameCustomAction action);
+	virtual bool handleCustomActionEnd(BaseGameCustomAction action);
 
 	bool unfreeze();
 	bool freeze(bool includingMusic = true);
@@ -217,7 +250,7 @@ public:
 	bool loadGame(uint32 slot);
 	bool loadGame(const char *filename);
 	bool saveGame(int32 slot, const char *desc, bool quickSave = false);
-	virtual bool showCursor();
+	bool showCursor() override;
 
 	BaseObject *_activeObject;
 
@@ -256,6 +289,8 @@ public:
 	bool setActiveObject(BaseObject *Obj);
 	BaseSprite *_lastCursor;
 	bool drawCursor(BaseSprite *Cursor);
+	bool storeSaveThumbnail();
+	void deleteSaveThumbnail();
 
 	SaveThumbHelper *_cachedThumbnail;
 	void addMem(int32 bytes);
@@ -280,6 +315,9 @@ protected:
 private:
 	bool _debugShowFPS;
 	bool _bilinearFiltering;
+#ifdef ENABLE_WME3D
+	bool _force2dRenderer;
+#endif
 	void *_debugLogFile;
 	void DEBUG_DebugDisable();
 	void DEBUG_DebugEnable(const char *filename = nullptr);
@@ -293,8 +331,8 @@ private:
 
 	int32 _soundBufferSizeSec;
 
-	virtual bool invalidateDeviceObjects();
-	virtual bool restoreDeviceObjects();
+	bool invalidateDeviceObjects() override;
+	bool restoreDeviceObjects() override;
 
 	// TODO: This can probably be removed completely:
 	bool _saveDirChecked;
@@ -367,6 +405,15 @@ protected:
 
 public:
 	void autoSaveOnExit();
+
+#ifdef ENABLE_HEROCRAFT
+private:
+	// HeroCraft games specific random source with ability a in-script function to set the seed
+	Common::RandomSource *_rndHc;
+
+	// HeroCraft games specific checksum function, used in Papa's Daughters 2 selfcheck
+	uint8 getFilePartChecksumHc(const char *filename, uint32 begin, uint32 end);
+#endif
 
 };
 

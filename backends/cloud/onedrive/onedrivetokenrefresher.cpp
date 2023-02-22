@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,19 +15,18 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#include <curl/curl.h>
 #include "backends/cloud/onedrive/onedrivetokenrefresher.h"
 #include "backends/cloud/onedrive/onedrivestorage.h"
 #include "backends/networking/curl/networkreadstream.h"
 #include "common/debug.h"
-#include "common/json.h"
-#include <curl/curl.h>
+#include "common/formats/json.h"
 
 namespace Cloud {
 namespace OneDrive {
@@ -41,7 +40,7 @@ void OneDriveTokenRefresher::tokenRefreshed(Storage::BoolResponse response) {
 	if (!response.value) {
 		//failed to refresh token, notify user with NULL in original callback
 		warning("OneDriveTokenRefresher: failed to refresh token");
-		finishError(Networking::ErrorResponse(this, false, true, "", -1));
+		finishError(Networking::ErrorResponse(this, false, true, "OneDriveTokenRefresher::tokenRefreshed: failed to refresh token", -1));
 		return;
 	}
 
@@ -94,18 +93,19 @@ void OneDriveTokenRefresher::finishJson(Common::JSONValue *json) {
 					irrecoverable = false;
 			}
 
-			if (code == "unauthenticated")
+			if (code == "unauthenticated" || code == "InvalidAuthenticationToken")
 				irrecoverable = false;
 
 			if (irrecoverable) {
-				finishError(Networking::ErrorResponse(this, false, true, json->stringify(true), httpResponseCode));
+				Common::String errorContents = "<irrecoverable> " + json->stringify(true);
+				finishError(Networking::ErrorResponse(this, false, true, errorContents, httpResponseCode));
 				delete json;
 				return;
 			}
 
 			pause();
 			delete json;
-			_parentStorage->getAccessToken(new Common::Callback<OneDriveTokenRefresher, Storage::BoolResponse>(this, &OneDriveTokenRefresher::tokenRefreshed));
+			_parentStorage->refreshAccessToken(new Common::Callback<OneDriveTokenRefresher, Storage::BoolResponse>(this, &OneDriveTokenRefresher::tokenRefreshed));
 			return;
 		}
 	}
@@ -114,10 +114,33 @@ void OneDriveTokenRefresher::finishJson(Common::JSONValue *json) {
 	CurlJsonRequest::finishJson(json);
 }
 
+void OneDriveTokenRefresher::finishError(Networking::ErrorResponse error, Networking::RequestState state) {
+	if (error.failed) {
+		Common::JSONValue *value = Common::JSON::parse(error.response.c_str());
+
+		//somehow OneDrive returns JSON with '.' in unexpected places, try fixing it
+		if (!value) {
+			Common::String fixedResponse = error.response;
+			for (uint32 i = 0; i < fixedResponse.size(); ++i) {
+				if (fixedResponse[i] == '.')
+					fixedResponse.replace(i, 1, " ");
+			}
+			value = Common::JSON::parse(fixedResponse.c_str());
+		}
+
+		if (value) {
+			finishJson(value);
+			return;
+		}
+	}
+
+	Request::finishError(error); //call closest base class's method
+}
+
 void OneDriveTokenRefresher::setHeaders(Common::Array<Common::String> &headers) {
 	_headers = headers;
 	curl_slist_free_all(_headersList);
-	_headersList = 0;
+	_headersList = nullptr;
 	for (uint32 i = 0; i < headers.size(); ++i)
 		CurlJsonRequest::addHeader(headers[i]);
 }

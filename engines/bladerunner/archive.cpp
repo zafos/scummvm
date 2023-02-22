@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,13 +33,17 @@ MIXArchive::MIXArchive() {
 
 MIXArchive::~MIXArchive() {
 	if (_fd.isOpen()) {
-		debug("~MIXArchive: fd not closed: %s", _fd.getName());
+		warning("~MIXArchive: File not closed: %s", _fd.getName());
 	}
+}
+
+bool MIXArchive::exists(const Common::String &filename) {
+	return Common::File::exists(filename);
 }
 
 bool MIXArchive::open(const Common::String &filename) {
 	if (!_fd.open(filename)) {
-		debug("MIXArchive::open(): Could not open %s", filename.c_str());
+		error("MIXArchive::open(): Can not open %s", filename.c_str());
 		return false;
 	}
 
@@ -49,15 +52,12 @@ bool MIXArchive::open(const Common::String &filename) {
 	_entryCount = _fd.readUint16LE();
 	_size       = _fd.readUint32LE();
 
+
 	_entries.resize(_entryCount);
 	for (uint16 i = 0; i != _entryCount; ++i) {
 		_entries[i].hash   = _fd.readUint32LE();
 		_entries[i].offset = _fd.readUint32LE();
 		_entries[i].length = _fd.readUint32LE();
-
-#if BLADERUNNER_DEBUG_CONSOLE
-		debug("%08x %-12d %-12d", _entries[i].id, _entries[i].offset, _entries[i].length);
-#endif
 
 		// Verify that the entries are sorted by id. Note that id is signed.
 		if (i > 0) {

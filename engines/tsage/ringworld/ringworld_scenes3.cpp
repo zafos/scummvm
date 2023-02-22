@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -52,6 +51,8 @@ void Scene2000::Action1::signal() {
 		g_globals->_stripNum = 0;
 		g_globals->_sceneManager.changeScene(1250);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -72,6 +73,8 @@ void Scene2000::Action2::signal() {
 		setDelay(g_globals->_randomSource.getRandomNumber(179) + 60);
 		_actionIndex = g_globals->_randomSource.getRandomNumber(1);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -87,6 +90,8 @@ void Scene2000::Action3::signal() {
 		scene->_object6.animate(ANIM_MODE_6, NULL);
 		setDelay(g_globals->_randomSource.getRandomNumber(179) + 60);
 		_actionIndex = 0;
+		break;
+	default:
 		break;
 	}
 }
@@ -104,6 +109,8 @@ void Scene2000::Action4::signal() {
 		setDelay(g_globals->_randomSource.getRandomNumber(179) + 60);
 		_actionIndex = 0;
 		break;
+	default:
+		break;
 	}
 }
 
@@ -119,6 +126,8 @@ void Scene2000::Action5::signal() {
 		scene->_object3.animate(ANIM_MODE_6, NULL);
 		setDelay(g_globals->_randomSource.getRandomNumber(125) + 300);
 		_actionIndex = 0;
+		break;
+	default:
 		break;
 	}
 }
@@ -154,6 +163,8 @@ void Scene2000::Action6::signal() {
 		scene->_object6.remove();
 		g_globals->_sceneManager.changeScene(1001);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -172,6 +183,8 @@ void Scene2000::Action7::signal() {
 		break;
 	case 3:
 		g_globals->_sceneManager.changeScene(2222);
+		break;
+	default:
 		break;
 	}
 }
@@ -193,6 +206,8 @@ void Scene2000::Action8::signal() {
 		g_globals->_stripNum = 2005;
 		g_globals->_sceneManager.changeScene(1000);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -212,6 +227,8 @@ void Scene2000::Action9::signal() {
 	case 3:
 		g_globals->_stripNum = 2008;
 		g_globals->_sceneManager.changeScene(9999);
+		break;
+	default:
 		break;
 	}
 }
@@ -233,6 +250,8 @@ void Scene2000::Action10::signal() {
 		g_globals->_stripNum = 0;
 		g_globals->_sceneManager.changeScene(9999);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -252,6 +271,8 @@ void Scene2000::Action11::signal() {
 	case 3:
 		g_globals->_stripNum = 0;
 		g_globals->_sceneManager.changeScene(1400);
+		break;
+	default:
 		break;
 	}
 }
@@ -274,6 +295,8 @@ void Scene2000::Action12::signal() {
 	case 3:
 		g_globals->_sceneManager.changeScene(2300);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -291,6 +314,8 @@ void Scene2000::Action13::signal() {
 		SceneItem::display(0, 0);
 		g_globals->_stripNum = 2751;
 		g_globals->_sceneManager.changeScene(1500);
+		break;
+	default:
 		break;
 	}
 }
@@ -345,6 +370,8 @@ void Scene2000::Action14::signal() {
 	case 9:
 		g_globals->_stripNum = 1250;
 		g_globals->_sceneManager.changeScene(1000);
+		break;
+	default:
 		break;
 	}
 }
@@ -476,6 +503,8 @@ void Scene2000::stripCallback(int v) {
 		_object9.setFrame(1);
 		_object9.animate(ANIM_MODE_5, NULL);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -585,6 +614,8 @@ void Scene2100::Action1::signal() {
 		g_globals->_player.enableControl();
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -606,6 +637,8 @@ void Scene2100::Action2::signal() {
 		scene->_object3.animate(ANIM_MODE_6, this);
 		_actionIndex = 0;
 		break;
+	default:
+		break;
 	}
 }
 
@@ -623,6 +656,8 @@ void Scene2100::Action3::signal() {
 	case 3:
 		scene->_object2.animate(ANIM_MODE_6, this);
 		_actionIndex = 0;
+		break;
+	default:
 		break;
 	}
 }
@@ -653,6 +688,8 @@ void Scene2100::Action4::signal() {
 	case 3:
 		g_globals->_sceneManager.changeScene(2120);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -679,6 +716,8 @@ void Scene2100::Action5::signal() {
 		break;
 	case 4:
 		g_globals->_sceneManager.changeScene(3700);
+		break;
+	default:
 		break;
 	}
 }
@@ -713,6 +752,8 @@ void Scene2100::Action6::signal() {
 	case 2:
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -731,6 +772,8 @@ void Scene2100::Action7::signal() {
 		break;
 	case 3:
 		g_globals->_sceneManager.changeScene(8100);
+		break;
+	default:
 		break;
 	}
 }
@@ -763,6 +806,8 @@ void Scene2100::Action8::signal() {
 			g_globals->_player.enableControl();
 			remove();
 		}
+		break;
+	default:
 		break;
 	}
 }
@@ -803,6 +848,8 @@ void Scene2100::Action9::signal() {
 			setAction(&scene->_action10);
 		else
 			setAction(&scene->_action11);
+		break;
+	default:
 		break;
 	}
 }
@@ -890,6 +937,8 @@ void Scene2100::Action10::signal() {
 		g_globals->_stripNum = 2101;
 		g_globals->_sceneManager.changeScene(2320);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -957,6 +1006,8 @@ void Scene2100::Action11::signal() {
 		g_globals->_stripNum = 2102;
 		g_globals->_player.enableControl();
 		g_globals->_player._canWalk = false;
+		break;
+	default:
 		break;
 	}
 }
@@ -1043,6 +1094,8 @@ void Scene2100::Action12::signal() {
 		}
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1077,6 +1130,8 @@ void Scene2100::Action13::signal() {
 		break;
 	case 4:
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -1163,6 +1218,8 @@ void Scene2100::Action14::signal() {
 		g_globals->_sceneManager.changeScene(7000);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1228,6 +1285,8 @@ void Scene2100::Action15::signal() {
 	case 7:
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1277,6 +1336,8 @@ void Scene2100::Action16::signal() {
 		g_globals->_sceneManager.changeScene(7000);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1319,6 +1380,8 @@ void Scene2100::Action17::signal() {
 		RING_INVENTORY._stasisNegator._sceneNumber = 1;
 		g_globals->_sceneManager.changeScene(9100);
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -1927,6 +1990,8 @@ void Scene2100::stripCallback(int v) {
 	case 2:
 		_object4.animate(ANIM_MODE_NONE, NULL);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1958,6 +2023,8 @@ void Scene2100::signal() {
 	case 2111:
 	case 2112:
 		g_globals->_player.enableControl();
+		break;
+	default:
 		break;
 	}
 }
@@ -2043,6 +2110,8 @@ void Scene2120::Action1::signal() {
 			SET_X, 130, SET_FONT, 1, SET_EXT_BGCOLOR, 7, SET_BG_COLOR, -1, SET_WIDTH, 200,
 			SET_KEEP_ONSCREEN, -1, SET_TEXT_MODE, 0, LIST_END);
 		_actionIndex = 4;
+		break;
+	default:
 		break;
 	}
 }
@@ -2132,6 +2201,8 @@ void Scene2120::Action1::dispatch() {
 					_actionIndex = 3;
 					setDelay(30);
 				}
+				break;
+			default:
 				break;
 			}
 
@@ -2317,6 +2388,8 @@ void Scene2150::Action1::signal() {
 		g_globals->_player.enableControl();
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -2377,6 +2450,8 @@ void Scene2150::Action2::signal() {
 		g_globals->_player.enableControl();
 
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -2628,6 +2703,8 @@ void Scene2150::signal() {
 	case 2156:
 		g_globals->_sceneManager.changeScene(2280);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -2675,6 +2752,8 @@ void Scene2200::Action1::signal() {
 		g_globals->_sceneManager.changeScene(2150);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -2704,6 +2783,8 @@ void Scene2200::Action2::signal() {
 		scene->_hotspot4.animate(ANIM_MODE_NONE, NULL);
 		g_globals->_player._uiEnabled = true;
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -2796,6 +2877,8 @@ void Scene2200::Action3::signal() {
 		g_globals->_sceneManager.changeScene(2000);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -2827,6 +2910,8 @@ void Scene2200::Action4::signal() {
 	case 3:
 		g_globals->_player._uiEnabled = true;
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -3016,6 +3101,8 @@ void Scene2200::stripCallback(int v) {
 		_hotspot4.setStrip(4);
 		_hotspot4.animate(ANIM_MODE_NONE, NULL);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -3059,6 +3146,8 @@ void Scene2222::Action1::signal() {
 	case 3:
 		g_globals->_sceneManager.changeScene(1000);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -3078,6 +3167,8 @@ void Scene2222::Action2::signal() {
 	case 3:
 		g_globals->_sceneManager._fadeMode = FADEMODE_GRADUAL;
 		g_globals->_sceneManager.changeScene(2100);
+		break;
+	default:
 		break;
 	}
 }
@@ -3194,6 +3285,8 @@ void Scene2230::Action1::signal() {
 	case 5:
 		g_globals->_sceneManager.changeScene(2150);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -3237,6 +3330,8 @@ void Scene2230::Action2::signal() {
 		g_globals->_events.setCursor(CURSOR_USE);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -3274,16 +3369,23 @@ void Scene2230::Action3::signal() {
 
 		g_globals->_events.setCursor(CURSOR_USE);
 		remove();
+		break;
+	default:
+		break;
 	}
 }
 
 void Scene2230::Action4::signal() {
 	switch (_actionIndex++) {
 	case 0:
-		Common::Point pt(190 + g_globals->_randomSource.getRandomNumber(9), 68);
-		NpcMover *mover = new NpcMover();
-		g_globals->_player.addMover(mover, &pt, this);
-		_actionIndex = 0;
+		{
+			Common::Point pt(190 + g_globals->_randomSource.getRandomNumber(9), 68);
+			NpcMover *mover = new NpcMover();
+			g_globals->_player.addMover(mover, &pt, this);
+			_actionIndex = 0;
+		}
+		break;
+	default:
 		break;
 	}
 }
@@ -3322,6 +3424,8 @@ void Scene2230::Action5::signal() {
 		scene->_sceneMode = 2;
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -3342,6 +3446,8 @@ void Scene2230::Action6::signal() {
 		g_globals->_player._canWalk = true;
 		g_globals->_player.animate(ANIM_MODE_1, NULL);
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -3398,6 +3504,8 @@ void Scene2230::Action7::signal() {
 		scene->_hotspot2.remove();
 		g_globals->_player.enableControl();
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -3469,6 +3577,8 @@ void Scene2230::Action8::signal() {
 		g_globals->_player.enableControl();
 
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -3799,6 +3909,8 @@ void Scene2280::Action1::signal() {
 	case 5:
 		g_globals->_sceneManager.changeScene(7000);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -3846,6 +3958,8 @@ void Scene2280::Action2::signal() {
 
 		g_globals->_player.enableControl();
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -3915,6 +4029,8 @@ void Scene2280::Action3::signal() {
 		g_globals->_player.enableControl();
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -3938,6 +4054,8 @@ void Scene2280::Action4::signal() {
 			g_globals->_player.addMover(mover, &pt, this);
 			break;
 		}
+		default:
+			break;
 		}
 		break;
 	}
@@ -3983,6 +4101,8 @@ void Scene2280::Action4::signal() {
 			RING_INVENTORY._scanner._sceneNumber = 2280;
 			g_globals->_sceneItems.push_front(&scene->_hotspot18);
 			break;
+		default:
+			break;
 		}
 
 		g_globals->_player.animate(ANIM_MODE_6, this);
@@ -3994,6 +4114,8 @@ void Scene2280::Action4::signal() {
 		g_globals->_player._strip = 2;
 
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -4519,6 +4641,8 @@ void Scene2300::Action1::signal() {
 		g_globals->_sceneManager.changeScene(2000);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -4586,6 +4710,8 @@ void Scene2300::Action2::signal() {
 	case 10:
 		g_globals->_sceneManager.changeScene(2310);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -4639,6 +4765,8 @@ void Scene2300::Action3::signal() {
 	case 6:
 		g_globals->_sceneManager.changeScene(2310);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -4675,6 +4803,8 @@ void Scene2300::Action4::signal() {
 	case 3:
 		scene->_soundHandler1.play(13);
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -4936,6 +5066,8 @@ void Scene2310::signal() {
 		g_globals->_sceneManager.changeScene(2200);
 		break;
 	}
+	default:
+		break;
 	}
 }
 
@@ -5057,6 +5189,8 @@ void Scene2320::Action1::signal() {
 		setDelay(120);
 		_actionIndex = 3;
 		break;
+	default:
+		break;
 	}
 }
 
@@ -5076,6 +5210,8 @@ void Scene2320::Action2::signal() {
 	case 1:
 		scene->_hotspot13.hide();
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -5171,6 +5307,8 @@ void Scene2320::Action3::signal() {
 	case 7:
 		g_globals->_player.enableControl();
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -5330,6 +5468,8 @@ void Scene2320::Action4::signal() {
 		scene->_hotspot13.fixPriority(1);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -5391,6 +5531,8 @@ void Scene2320::Action5::signal() {
 		break;
 	case 8:
 		g_globals->_sceneManager.changeScene(4000);
+		break;
+	default:
 		break;
 	}
 }
@@ -5454,6 +5596,8 @@ void Scene2320::Action6::signal() {
 		g_globals->_player.enableControl();
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -5512,6 +5656,8 @@ void Scene2320::Action7::signal() {
 		g_globals->_player.enableControl();
 		RING_INVENTORY._stasisBox._sceneNumber = 2320;
 		break;
+	default:
+		break;
 	}
 }
 
@@ -5544,6 +5690,8 @@ void Scene2320::Action8::signal() {
 		scene->_sceneMode = 2326;
 		scene->_speakerGameText.setTextPos(Common::Point(g_globals->_sceneManager._scene->_sceneBounds.left + 30, 10));
 		scene->setAction(&scene->_sequenceManager1, scene, 2326, &g_globals->_player, &scene->_hotspot11, NULL);
+		break;
+	default:
 		break;
 	}
 }
@@ -6070,6 +6218,8 @@ void Scene2320::signal() {
 	case 5000:
 		g_globals->_player.enableControl();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -6102,6 +6252,8 @@ void Scene2400::Action1::signal() {
 		break;
 	case 6:
 		g_globals->_sceneManager.changeScene(4000);
+		break;
+	default:
 		break;
 	}
 }

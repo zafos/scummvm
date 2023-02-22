@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -56,14 +55,14 @@ struct MystScriptEntry {
 	uint16 u1;
 };
 
-typedef Common::SharedPtr<Common::Array<MystScriptEntry> > MystScript;
+typedef Common::Array<MystScriptEntry> MystScript;
 
 class MystScriptParser {
 public:
-	explicit MystScriptParser(MohawkEngine_Myst *vm);
+	MystScriptParser(MohawkEngine_Myst *vm, MystStack stackId);
 	virtual ~MystScriptParser();
 
-	void runScript(MystScript script, MystArea *invokingResource = nullptr);
+	void runScript(const MystScript &script, MystArea *invokingResource = nullptr);
 	void runOpcode(uint16 op, uint16 var = 0, const ArgumentsArray &args = ArgumentsArray());
 	const Common::String getOpcodeDesc(uint16 op);
 	MystScript readScript(Common::SeekableReadStream *stream, MystScriptType type);
@@ -83,6 +82,7 @@ public:
 	virtual void toggleVar(uint16 var);
 	virtual bool setVarValue(uint16 var, uint16 value);
 
+	MystStack getStackId() const { return _stackId; }
 	virtual uint16 getMap() { return 0; }
 	void showMap();
 
@@ -166,7 +166,7 @@ protected:
 	int16 _tempVar; // Generic temp var used by the scripts
 	uint32 _startTime; // Generic start time used by the scripts
 
-	static const uint8 _stackMap[];
+	static const MystStack _stackMap[];
 	static const uint16 _startCard[];
 
 	void setupCommonOpcodes();
@@ -187,6 +187,8 @@ private:
 
 	MystArea *_invokingResource;
 	int32 _scriptNestingLevel;
+
+	const MystStack _stackId;
 
 	Common::String describeCommand(const MystOpcode &command, uint16 var, const ArgumentsArray &args);
 };

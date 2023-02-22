@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,22 +42,23 @@ struct RegionInitDataOffset {
 
 class AdlEngine_v4 : public AdlEngine_v3 {
 public:
-	virtual ~AdlEngine_v4();
+	~AdlEngine_v4() override;
 
 protected:
 	AdlEngine_v4(OSystem *syst, const AdlGameDescription *gd);
 
 	// AdlEngine
-	virtual void gameLoop();
-	virtual void loadState(Common::ReadStream &stream);
-	virtual void saveState(Common::WriteStream &stream);
-	virtual Common::String loadMessage(uint idx) const;
-	virtual Common::String getItemDescription(const Item &item) const;
-	virtual void switchRegion(byte region);
-	virtual void switchRoom(byte roomNr);
+	void setupOpcodeTables() override;
+	void gameLoop() override;
+	void loadState(Common::ReadStream &stream) override;
+	void saveState(Common::WriteStream &stream) override;
+	Common::String loadMessage(uint idx) const override;
+	Common::String getItemDescription(const Item &item) const override;
+	void switchRegion(byte region) override;
+	void switchRoom(byte roomNr) override;
 
 	// AdlEngine_v2
-	virtual void adjustDataBlockPtr(byte &track, byte &sector, byte &offset, byte &size) const;
+	void adjustDataBlockPtr(byte &track, byte &sector, byte &offset, byte &size) const override;
 
 	enum RegionChunkType {
 		kRegionChunkUnknown,
@@ -84,17 +84,17 @@ protected:
 	void backupVars();
 	void restoreVars();
 
-	int o4_isItemInRoom(ScriptEnv &e);
-	int o4_isVarGT(ScriptEnv &e);
-	int o4_moveItem(ScriptEnv &e);
-	int o4_setRegionToPrev(ScriptEnv &e);
-	int o4_moveAllItems(ScriptEnv &e);
-	int o4_setRegion(ScriptEnv &e);
-	int o4_save(ScriptEnv &e);
-	int o4_restore(ScriptEnv &e);
-	int o4_restart(ScriptEnv &e);
-	int o4_setRegionRoom(ScriptEnv &e);
-	int o4_setRoomPic(ScriptEnv &e);
+	int o_isItemInRoom(ScriptEnv &e) override;
+	virtual int o_isVarGT(ScriptEnv &e);
+	int o_moveItem(ScriptEnv &e) override;
+	virtual int o_setRegionToPrev(ScriptEnv &e);
+	int o_moveAllItems(ScriptEnv &e) override;
+	virtual int o_setRegion(ScriptEnv &e);
+	int o_save(ScriptEnv &e) override;
+	int o_restore(ScriptEnv &e) override;
+	int o_restart(ScriptEnv &e) override;
+	virtual int o_setRegionRoom(ScriptEnv &e);
+	int o_setRoomPic(ScriptEnv &e) override;
 
 	Common::Array<RegionLocation> _regionLocations;
 	Common::Array<RegionInitDataOffset> _regionInitDataOffsets;

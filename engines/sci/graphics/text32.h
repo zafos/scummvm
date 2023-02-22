@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -119,7 +118,7 @@ private:
 
 	void drawFrame(const Common::Rect &rect, const int16 size, const uint8 color, const bool doScaling);
 
-	void drawChar(const char charIndex);
+	void drawChar(const uint16 charIndex);
 	void drawText(const uint index, uint length);
 
 	/**
@@ -136,6 +135,12 @@ private:
 	 * scaling.
 	 */
 	int16 getTextWidth(const uint index, uint length) const;
+
+	/**
+	* Gets the pixel dimensions of a substring of the currently loaded text,
+	* without scaling.
+	*/
+	void getTextDimensions(const uint index, uint length, int16 &width, int16& height) const;
 
 	inline Common::Rect scaleRect(const Common::Rect &rect) {
 		Common::Rect scaledRect(rect);
@@ -190,6 +195,11 @@ public:
 	 */
 	reg_t createFontBitmap(const CelInfo32 &celInfo, const Common::Rect &rect, const Common::String &text, const int16 foreColor, const int16 backColor, const GuiResourceId fontId, const int16 skipColor, const int16 borderColor, const bool dimmed, const bool gc);
 
+	/**
+	 * Creates a titled font bitmap with a flat color background.
+	 */
+	reg_t createTitledFontBitmap(int16 width, int16 height, const Common::Rect &textRect, const Common::String &text, const uint8 foreColor, const uint8 backColor, const uint8 skipColor, const GuiResourceId fontId, const TextAlign alignment, const int16 borderColor, const Common::String &title, const uint8 titleForeColor, const uint8 titleBackColor, const GuiResourceId titleFontId, const bool doScaling, const bool gc);
+
 	inline int scaleUpWidth(int value) const {
 		const int scriptWidth = g_sci->_gfxFrameout->getScriptWidth();
 		return (value * scriptWidth + _xResolution - 1) / _xResolution;
@@ -235,7 +245,7 @@ public:
 	/**
 	 * Gets the width of a character.
 	 */
-	uint16 getCharWidth(const char charIndex, const bool doScaling) const;
+	uint16 getCharWidth(const uint16 charIndex, const bool doScaling) const;
 
 	/**
 	 * Retrieves the width and height of a block of text.
@@ -271,6 +281,9 @@ public:
 	 * line. Originally FontMgr::DrawOneLine and FontMgr::UpOneLine.
 	 */
 	void scrollLine(const Common::String &textLine, int numLines, uint8 color, TextAlign align, GuiResourceId fontId, ScrollDirection dir);
+
+	bool SwitchToFont1001OnKorean(const char *text);
+
 };
 
 } // End of namespace Sci

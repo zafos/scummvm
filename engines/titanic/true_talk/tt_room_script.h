@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -68,27 +67,27 @@ public:
 	/**
 	 * Returns true if a response can be made
 	 */
-	virtual bool canRespond(TTnpcScript *npcScript, TTsentence *sentence, int val) const {
+	bool canRespond(TTnpcScript *npcScript, TTsentence *sentence, int val) const override {
 		return true;
 	}
 
 	/**
 	 * Returns true if further sentence processing is allowed
 	 */
-	virtual bool canProcess(TTnpcScript *npcScript, TTsentence *sentence) const {
+	bool canProcess(TTnpcScript *npcScript, TTsentence *sentence) const override {
 		return true;
 	}
 
-	virtual bool  proc8() const;
+	bool  proc8() const override;
 
-	virtual void proc9(int v);
+	void proc9(int v) override;
 
 	/**
 	 * Called when the script changes
 	 */
-	virtual ScriptChangedResult scriptChanged(TTscriptBase *npcScript, int id);
+	ScriptChangedResult scriptChanged(TTscriptBase *npcScript, int id) override;
 
-	virtual bool proc11() const;
+	bool proc11() const override;
 
 	/**
 	 * Called with the new script and id

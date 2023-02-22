@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995-1997 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,13 +18,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "pegasus/gamestate.h"
 #include "pegasus/pegasus.h"
+#include "pegasus/items/biochips/arthurchip.h"
 #include "pegasus/items/inventory/airmask.h"
 #include "pegasus/neighborhood/norad/constants.h"
 #include "pegasus/neighborhood/norad/alpha/fillingstation.h"
@@ -127,7 +127,7 @@ enum {
 };
 
 NoradAlphaFillingStation::NoradAlphaFillingStation(Neighborhood *owner) : GameInteraction(kNoradFillingStationInteractionID, owner),
-		_rightSideMovie(kN01RightSideID), _rightSideNotification(kNoradFillingStationNotificationID, ((PegasusEngine *)g_engine)) {
+		_rightSideMovie(kN01RightSideID), _rightSideNotification(kNoradFillingStationNotificationID, g_vm) {
 	_state = kNoState;
 }
 
@@ -194,6 +194,8 @@ void NoradAlphaFillingStation::splashFinished() {
 
 void NoradAlphaFillingStation::intakeWarningFinished() {
 	setStaticState(kFSMainMenu, kMainMenu);
+	if (g_arthurChip)
+		g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA29", kArthurNoradSawIntakeWarning);
 }
 
 void NoradAlphaFillingStation::showIntakeInProgress(uint16 numSeconds) {
@@ -256,6 +258,8 @@ void NoradAlphaFillingStation::dispenseGas() {
 				setSegmentState(kFSNIncompatibleStart, kFSNIncompatibleStop,
 						kFSIntakeWarningFinishedFlag, kNoState);
 				break;
+			default:
+				break;
 			}
 		else {
 			if (_dispenseItemID == kArgonCanister) {
@@ -287,6 +291,8 @@ void NoradAlphaFillingStation::dispenseGas() {
 			break;
 		case kNitrogenCanister:
 			setStaticState(kFSNAttach, kWaitingForDispense);
+			break;
+		default:
 			break;
 		}
 	}
@@ -349,6 +355,8 @@ void NoradAlphaFillingStation::receiveNotification(Notification *, const Notific
 	case kFSNHiliteFinishedFlag:
 		NHighlightFinished();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -409,6 +417,8 @@ void NoradAlphaFillingStation::clickInHotspot(const Input &input, const Hotspot 
 	case kNorad01NSpotID:
 		clickInN();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -426,6 +436,8 @@ void NoradAlphaFillingStation::activateHotspots() {
 		g_allHotspots.activateOneHotspot(kNorad01HeSpotID);
 		g_allHotspots.activateOneHotspot(kNorad01OSpotID);
 		g_allHotspots.activateOneHotspot(kNorad01NSpotID);
+		break;
+	default:
 		break;
 	}
 }

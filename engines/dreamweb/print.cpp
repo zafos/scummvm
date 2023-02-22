@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -60,7 +59,7 @@ uint8 DreamWebEngine::getNextWord(const GraphicsFile &charSet, const uint8 *stri
 	}
 }
 
-void DreamWebEngine::printChar(const GraphicsFile &charSet, uint16* x, uint16 y, uint8 c, uint8 nextChar, uint8 *width, uint8 *height) {
+void DreamWebEngine::printChar(const GraphicsFile &charSet, uint16* x, uint16 y, uint8 c, uint8 nextChar, uint8 *width, uint8 *height, bool kerning) {
 	// WORKAROUND: Some texts contain leftover tab characters, which will cause
 	// OOB memory access when showing a character, as all the printable ones are
 	// from 32 onwards. We compensate for that here by ignoring all the invalid
@@ -69,15 +68,15 @@ void DreamWebEngine::printChar(const GraphicsFile &charSet, uint16* x, uint16 y,
 		return;
 
 	uint8 dummyWidth, dummyHeight;
-	if (width == NULL)
+	if (width == nullptr)
 		width = &dummyWidth;
-	if (height == NULL)
+	if (height == nullptr)
 		height = &dummyHeight;
 	if (_foreignRelease)
 		y -= 3;
 	uint16 tmp = c - 32 + _charShift;
 	showFrame(charSet, *x, y, tmp & 0x1ff, (tmp >> 8) & 0xfe, width, height);
-	if (_kerning == 0)
+	if (!kerning)
 		*width = kernChars(c, nextChar, *width);
 	(*x) += *width;
 }
@@ -103,7 +102,7 @@ uint8 DreamWebEngine::printSlow(const uint8 *string, uint16 x, uint16 y, uint8 m
 			}
 			if (charCount != 1) {
 				c1 = modifyChar(c1);
-				_charShift = 91;
+				_charShift = getLanguage() == Common::RU_RUS ? 182 : 91;
 				uint16 offset2 = offset;
 				printBoth(_charset1, &offset2, y, c1, c2);
 				_charShift = 0;
@@ -130,7 +129,7 @@ uint8 DreamWebEngine::printDirect(const uint8* string, uint16 x, uint16 y, uint8
 	return printDirect(&string, x, &y, maxWidth, centered);
 }
 
-uint8 DreamWebEngine::printDirect(const uint8** string, uint16 x, uint16 *y, uint8 maxWidth, bool centered) {
+uint8 DreamWebEngine::printDirect(const uint8** string, uint16 x, uint16 *y, uint8 maxWidth, bool centered, bool kerning) {
 	_lastXPos = x;
 	const GraphicsFile &charSet = *_currentCharset;
 	while (true) {
@@ -194,6 +193,16 @@ uint8 DreamWebEngine::getNumber(const GraphicsFile &charSet, const uint8 *string
 }
 
 uint8 DreamWebEngine::kernChars(uint8 firstChar, uint8 secondChar, uint8 width) {
+	if (getLanguage() == Common::RU_RUS) {
+		if ((firstChar == 'a') || (firstChar == 'u') || (firstChar == 0xa0)
+				|| (firstChar == 0xa8) || (firstChar == 0xa9) || (firstChar == 0xe9)) {
+			if ((secondChar == 0xe2) || (secondChar == 'n') || (secondChar == 't') || (secondChar == 'r') || (secondChar == 'i') || (secondChar == 'l'))
+				return width-1;
+
+		}
+		return width;
+	}
+
 	if ((firstChar == 'a') || (firstChar == 'u')) {
 		if ((secondChar == 'n') || (secondChar == 't') || (secondChar == 'r') || (secondChar == 'i') || (secondChar == 'l'))
 			return width-1;
@@ -211,7 +220,6 @@ uint16 DreamWebEngine::waitFrames() {
 }
 
 const char *DreamWebEngine::monPrint(const char *string) {
-	_kerning = 1;
 	uint16 x = _monAdX;
 	const char *iterator = string;
 	bool done = false;
@@ -233,7 +241,7 @@ const char *DreamWebEngine::monPrint(const char *string) {
 				break;
 			}
 			c = modifyChar(c);
-			printChar(_monitorCharset, &x, _monAdY, c, 0, NULL, NULL);
+			printChar(_monitorCharset, &x, _monAdY, c, 0, nullptr, nullptr, true);
 			_cursLocX = x;
 			_cursLocY = _monAdY;
 			_mainTimer = 1;
@@ -248,7 +256,6 @@ const char *DreamWebEngine::monPrint(const char *string) {
 		_cursLocX = _monAdX;
 	}
 
-	_kerning = 0;
 	return iterator;
 }
 

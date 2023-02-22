@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -29,6 +28,7 @@
 #include "engines/wintermute/base/base_parser.h"
 #include "engines/wintermute/base/base_engine.h"
 #include "engines/wintermute/base/base_frame.h"
+#include "engines/wintermute/base/base_game.h"
 #include "engines/wintermute/base/base_object.h"
 #include "engines/wintermute/base/base_dynamic_buffer.h"
 #include "engines/wintermute/base/sound/base_sound_manager.h"
@@ -80,6 +80,11 @@ bool BaseFrame::draw(int x, int y, BaseObject *registerOwner, float zoomX, float
 	bool res;
 
 	for (uint32 i = 0; i < _subframes.size(); i++) {
+		// filter out subframes unsupported by current renderer
+		if (!allFrames) {
+			if ((_subframes[i]->_2DOnly && _gameRef->_useD3D) || (_subframes[i]->_3DOnly && !_gameRef->_useD3D))
+				continue;
+		}
 		res = _subframes[i]->draw(x, y, registerOwner, zoomX, zoomY, precise, alpha, rotate, blendMode);
 		if (DID_FAIL(res)) {
 			return res;
@@ -174,7 +179,7 @@ bool BaseFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 	int r = 255, g = 255, b = 255;
 	int ar = 255, ag = 255, ab = 255, alpha = 255;
 	int hotspotX = 0, hotspotY = 0;
-	bool custoTrans = false;
+	bool customTrans = false;
 	bool editorSelected = false;
 	bool is2DOnly = false;
 	bool is3DOnly = false;
@@ -196,7 +201,7 @@ bool BaseFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 
 		case TOKEN_TRANSPARENT:
 			parser.scanStr(params, "%d,%d,%d", &r, &g, &b);
-			custoTrans = true;
+			customTrans = true;
 			break;
 
 		case TOKEN_RECT:
@@ -275,8 +280,9 @@ bool BaseFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 		break;
 
 		case TOKEN_APPLY_EVENT: {
-			char *event = new char[strlen(params) + 1];
-			strcpy(event, params);
+			size_t eventSize = strlen(params) + 1;
+			char *event = new char[eventSize];
+			Common::strcpy_s(event, eventSize, params);
 			_applyEvent.add(event);
 		}
 		break;
@@ -291,6 +297,9 @@ bool BaseFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 
 		case TOKEN_EDITOR_PROPERTY:
 			parseEditorProperty(params, false);
+			break;
+
+		default:
 			break;
 		}
 	}
@@ -307,7 +316,7 @@ bool BaseFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 
 	BaseSubFrame *sub = new BaseSubFrame(_gameRef);
 	if (surface_file != nullptr) {
-		if (custoTrans) {
+		if (customTrans) {
 			sub->setSurface(surface_file, false, r, g, b, lifeTime, keepLoaded);
 		} else {
 			sub->setSurface(surface_file, true, 0, 0, 0, lifeTime, keepLoaded);
@@ -320,7 +329,7 @@ bool BaseFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 		}
 
 		sub->_alpha = BYTETORGBA(ar, ag, ab, alpha);
-		if (custoTrans) {
+		if (customTrans) {
 			sub->_transparent = BYTETORGBA(r, g, b, 0xFF);
 		}
 	}

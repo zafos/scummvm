@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -157,7 +156,7 @@ private:
 	void printObjectDesc(const Common::String &str, bool firstTime);
 public:
 	ImageFile *_controlPanel;
-        ImageFile *_controls;
+		ImageFile *_controls;
 	int _oldUse;
 
 	byte _hotkeyLook;
@@ -179,7 +178,7 @@ public:
 
 public:
 	ScalpelUserInterface(SherlockEngine *vm);
-	virtual ~ScalpelUserInterface();
+	~ScalpelUserInterface() override;
 
 	/**
 	 * Handles counting down whilst checking for input, then clears the info line.
@@ -203,43 +202,43 @@ public:
 	/**
 	 * Resets the user interface
 	 */
-	virtual void reset();
+	void reset() override;
 
 	/**
 	 * Main input handler for the user interface
 	 */
-	virtual void handleInput();
+	void handleInput() override;
 
 	/**
 	 * Draw the user interface onto the screen's back buffers
 	 */
-	virtual void drawInterface(int bufferNum = 3);
+	void drawInterface(int bufferNum = 3) override;
 
 	/**
 	 * Displays a passed window by gradually scrolling it vertically on-screen
 	 */
-	virtual void summonWindow(const Surface &bgSurface, bool slideUp = true);
+	void summonWindow(const Surface &bgSurface, bool slideUp = true) override;
 
 	/**
 	 * Slide the window stored in the back buffer onto the screen
 	 */
-	virtual void summonWindow(bool slideUp = true, int height = CONTROLS_Y);
+	void summonWindow(bool slideUp = true, int height = CONTROLS_Y) override;
 
 	/**
 	 * Close a currently open window
 	 * @param flag	0 = slide old window down, 1 = slide prior UI back up
 	 */
-	virtual void banishWindow(bool slideUp = true);
+	void banishWindow(bool slideUp = true) override;
 
 	/**
 	 * Clears the info line of the screen
 	 */
-	virtual void clearInfo();
+	void clearInfo() override;
 
 	/**
 	 * Clear any active text window
 	 */
-	virtual void clearWindow();
+	void clearWindow() override;
 
 	/**
 	 * Print the previously selected object's decription

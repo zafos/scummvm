@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -39,34 +38,34 @@ public:
 	/**
 	 * Setup the element
 	 */
-	virtual void setup(PetElementMode mode, const CString &name,
-		CPetControl *petControl);
+	void setup(PetElementMode mode, const CString &name,
+		CPetControl *petControl) override;
 
 	/**
 	 * Reset the element
 	 */
-	virtual void reset(const CString &name, CPetControl *petControl,
-		PetElementMode mode = MODE_UNSELECTED);
+	void reset(const CString &name, CPetControl *petControl,
+		PetElementMode mode = MODE_UNSELECTED) override;
 
 	/**
 	 * Draw the item
 	 */
-	virtual void draw(CScreenManager *screenManager);
+	void draw(CScreenManager *screenManager) override;
 
 	/**
 	 * Draw the item
 	 */
-	virtual void draw(CScreenManager *screenManager, const Common::Point &destPos);
+	void draw(CScreenManager *screenManager, const Common::Point &destPos) override;
 
 	/**
 	 * Get the bounds for the element
 	 */
-	virtual Rect getBounds() const;
+	Rect getBounds() const override;
 
 	/**
 	 * Get the game object associated with this item
 	 */
-	virtual CGameObject *getObject() const;
+	CGameObject *getObject() const override;
 
 	/**
 	 * Gets the explicit bounds set for the graphic element,

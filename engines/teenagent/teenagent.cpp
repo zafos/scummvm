@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -54,23 +53,10 @@ namespace TeenAgent {
 
 TeenAgentEngine::TeenAgentEngine(OSystem *system, const ADGameDescription *gd)
 	: Engine(system), _action(kActionNone), _gameDescription(gd), _rnd("teenagent") {
-	DebugMan.addDebugChannel(kDebugActor, "Actor", "Enable Actor Debug");
-	DebugMan.addDebugChannel(kDebugAnimation, "Animation", "Enable Animation Debug");
-	DebugMan.addDebugChannel(kDebugCallbacks, "Callbacks", "Enable Callbacks Debug");
-	DebugMan.addDebugChannel(kDebugDialog, "Dialog", "Enable Dialog Debug");
-	DebugMan.addDebugChannel(kDebugFont, "Font", "Enable Font Debug");
-	DebugMan.addDebugChannel(kDebugInventory, "Inventory", "Enable Inventory Debug");
-	DebugMan.addDebugChannel(kDebugMusic, "Music", "Enable Music Debug");
-	DebugMan.addDebugChannel(kDebugObject, "Object", "Enable Object Debug");
-	DebugMan.addDebugChannel(kDebugPack, "Pack", "Enable Pack Debug");
-	DebugMan.addDebugChannel(kDebugScene, "Scene", "Enable Scene Debug");
-	DebugMan.addDebugChannel(kDebugSurface, "Surface", "Enable Surface Debug");
-
 	music = new MusicPlayer(this);
 	dialog = new Dialog(this);
 	res = new Resources();
 
-	console = 0;
 	scene = 0;
 	inventory = 0;
 	_sceneBusy = false;
@@ -95,9 +81,6 @@ TeenAgentEngine::~TeenAgentEngine() {
 	res = 0;
 
 	CursorMan.popCursor();
-
-	delete console;
-	DebugMan.clearAllDebugChannels();
 }
 
 bool TeenAgentEngine::trySelectedObject() {
@@ -167,6 +150,7 @@ void TeenAgentEngine::processObject() {
 	break;
 
 	case kActionNone:
+	default:
 		break;
 	}
 }
@@ -226,7 +210,8 @@ void TeenAgentEngine::init() {
 
 Common::Error TeenAgentEngine::loadGameState(int slot) {
 	debug(0, "loading from slot %d", slot);
-	Common::ScopedPtr<Common::InSaveFile> in(_saveFileMan->openForLoading(Common::String::format("teenagent.%02d", slot)));
+	Common::ScopedPtr<Common::InSaveFile> in(_saveFileMan->openForLoading(
+		getSaveStateName(slot)));
 	if (!in)
 		in.reset(_saveFileMan->openForLoading(Common::String::format("teenagent.%d", slot)));
 
@@ -264,9 +249,14 @@ Common::Error TeenAgentEngine::loadGameState(int slot) {
 	return Common::kNoError;
 }
 
-Common::Error TeenAgentEngine::saveGameState(int slot, const Common::String &desc) {
+Common::String TeenAgentEngine::getSaveStateName(int slot) const {
+	return Common::String::format("teenagent.%02d", slot);
+}
+
+Common::Error TeenAgentEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	debug(0, "saving to slot %d", slot);
-	Common::ScopedPtr<Common::OutSaveFile> out(_saveFileMan->openForSaving(Common::String::format("teenagent.%02d", slot)));
+	Common::ScopedPtr<Common::OutSaveFile> out(_saveFileMan->openForSaving(
+		getSaveStateName(slot)));
 	if (!out)
 		return Common::kWritingFailed;
 
@@ -292,7 +282,7 @@ int TeenAgentEngine::skipEvents() const {
 	while (_event->pollEvent(event)) {
 		switch (event.type) {
 		case Common::EVENT_QUIT:
-		case Common::EVENT_RTL:
+		case Common::EVENT_RETURN_TO_LAUNCHER:
 			return -1;
 		case Common::EVENT_MAINMENU:
 		case Common::EVENT_LBUTTONDOWN:
@@ -535,13 +525,16 @@ bool TeenAgentEngine::showMetropolis() {
 }
 
 Common::Error TeenAgentEngine::run() {
+	const Common::FSNode gameDataDir(ConfMan.get("path"));
+	SearchMan.addSubDirectoryMatching(gameDataDir, "music");
+
 	if (!res->loadArchives(_gameDescription))
 		return Common::kUnknownError;
 
 	Common::EventManager *_event = _system->getEventManager();
 
 	initGraphics(kScreenWidth, kScreenHeight);
-	console = new Console(this);
+	setDebugger(new Console(this));
 
 	scene = new Scene(this);
 	inventory = new Inventory(this);
@@ -587,7 +580,7 @@ Common::Error TeenAgentEngine::run() {
 		Object *currentObject = scene->findObject(mouse);
 
 		while (_event->pollEvent(event)) {
-			if (event.type == Common::EVENT_RTL)
+			if (event.type == Common::EVENT_RETURN_TO_LAUNCHER)
 				return Common::kNoError;
 
 			if ((!_sceneBusy && inventory->processEvent(event)) || scene->processEvent(event))
@@ -596,10 +589,7 @@ Common::Error TeenAgentEngine::run() {
 			debug(5, "event");
 			switch (event.type) {
 			case Common::EVENT_KEYDOWN:
-				if ((event.kbd.hasFlags(Common::KBD_CTRL) && event.kbd.keycode == Common::KEYCODE_d) ||
-				        event.kbd.ascii == '~' || event.kbd.ascii == '#') {
-					console->attach();
-				} else if (event.kbd.hasFlags(0) && event.kbd.keycode == Common::KEYCODE_F5) {
+				if (event.kbd.hasFlags(0) && event.kbd.keycode == Common::KEYCODE_F5) {
 					openMainMenuDialog();
 				} if (event.kbd.hasFlags(Common::KBD_CTRL) && event.kbd.keycode == Common::KEYCODE_f) {
 					_markDelay = _markDelay == 80 ? 40 : 80;
@@ -699,8 +689,6 @@ Common::Error TeenAgentEngine::run() {
 		_system->unlockScreen();
 
 		_system->updateScreen();
-
-		console->onFrame();
 
 		uint32 nextTick = MIN(gameTimer, markTimer);
 		if (nextTick > 0) {
@@ -1029,15 +1017,15 @@ void TeenAgentEngine::wait(uint16 frames) {
 	scene->push(event);
 }
 
-void TeenAgentEngine::playSoundNow(byte id) {
-	uint size = res->sam_sam.getSize(id);
+void TeenAgentEngine::playSoundNow(Pack *pack, byte id) {
+	uint size = pack->getSize(id);
 	if (size == 0) {
 		warning("skipping invalid sound %u", id);
 		return;
 	}
 
 	byte *data = (byte *)malloc(size);
-	res->sam_sam.read(id, data, size);
+	pack->read(id, data, size);
 	debug(3, "playing %u samples...", size);
 
 	Audio::AudioStream *stream = Audio::makeRawStream(data, size, 11025, 0);
@@ -1065,7 +1053,7 @@ void TeenAgentEngine::setMusic(byte id) {
 
 bool TeenAgentEngine::hasFeature(EngineFeature f) const {
 	switch (f) {
-	case kSupportsRTL:
+	case kSupportsReturnToLauncher:
 	case kSupportsSubtitleOptions:
 	case kSupportsLoadingDuringRuntime:
 	case kSupportsSavingDuringRuntime:

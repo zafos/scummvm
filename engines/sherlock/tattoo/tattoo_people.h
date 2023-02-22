@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -111,7 +110,7 @@ protected:
 	/**
 	 * Get the source position for a character potentially affected by scaling
 	 */
-	virtual Common::Point getSourcePoint() const;
+	Common::Point getSourcePoint() const override;
 public:
 	Common::Stack<SavedNPCPath> _pathStack;
 	int _npcIndex;
@@ -128,7 +127,7 @@ public:
 	bool _lookHolmes;
 public:
 	TattooPerson();
-	virtual ~TattooPerson();
+	~TattooPerson() override;
 
 	/**
 	 * Clear the NPC related data
@@ -190,23 +189,23 @@ public:
 	/**
 	 * This adjusts the sprites position, as well as its animation sequence:
 	 */
-	virtual void adjustSprite();
+	void adjustSprite() override;
 
 	/**
 	 * Bring a moving character to a standing position
 	 */
-	virtual void gotoStand();
+	void gotoStand() override;
 
 	/**
 	 * Set the variables for moving a character from one poisition to another
 	 * in a straight line
 	 */
-	virtual void setWalking();
+	void setWalking() override;
 
 	/**
 	 * Walk to the co-ordinates passed, and then face the given direction
 	 */
-	virtual void walkToCoords(const Point32 &destPos, int destDir);
+	void walkToCoords(const Point32 &destPos, int destDir) override;
 
 	/**
 	 * Adjusts the frame and sequence variables of a sprite that corresponds to the current speaker
@@ -215,18 +214,18 @@ public:
 	 * @param seq	Which sequence to use (if there's more than 1)
 	 * @remarks		1: First talk seq, 2: second talk seq, etc.
 	 */
-	virtual void setObjTalkSequence(int seq);
+	void setObjTalkSequence(int seq) override;
 
 	/**
 	 * Center the visible screen so that the person is in the center of the screen
 	 */
-	virtual void centerScreenOnPerson();
+	void centerScreenOnPerson() override;
 };
 
 class TattooPeople : public People {
 public:
 	TattooPeople(SherlockEngine *vm);
-	virtual ~TattooPeople() {}
+	~TattooPeople() override {}
 
 	TattooPerson &operator[](PeopleId id) { return *(TattooPerson *)_data[id]; }
 	TattooPerson &operator[](int idx) { return *(TattooPerson *)_data[idx]; }
@@ -239,27 +238,27 @@ public:
 	/**
 	 * Finds the scene background object corresponding to a specified speaker
 	 */
-	virtual int findSpeaker(int speaker);
+	int findSpeaker(int speaker) override;
 
 	/**
 	 * Synchronize the data for a savegame
 	 */
-	virtual void synchronize(Serializer &s);
+	void synchronize(Serializer &s) override;
 
 	/**
 	 * Change the sequence of the scene background object associated with the specified speaker.
 	 */
-	virtual void setTalkSequence(int speaker, int sequenceNum = 1);
+	void setTalkSequence(int speaker, int sequenceNum = 1) override;
 
 	/**
 	 * Load the walking images for Sherlock
 	 */
-	virtual bool loadWalk();
+	bool loadWalk() override;
 
 	/**
 	 * Restrict passed point to zone using Sherlock's positioning rules
 	 */
-	virtual const Common::Point restrictToZone(int zoneId, const Common::Point &destPos);
+	const Common::Point restrictToZone(int zoneId, const Common::Point &destPos) override;
 
 	/**
 	 * If the specified speaker is a background object, it will set it so that it uses
@@ -270,7 +269,7 @@ public:
 	 * @param speaker		Who is speaking
 	 * @param sequenceNum	Which listen sequence to use
 	 */
-	virtual void setListenSequence(int speaker, int sequenceNum = 1);
+	void setListenSequence(int speaker, int sequenceNum = 1) override;
 };
 
 } // End of namespace Tattoo

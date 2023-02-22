@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -38,16 +37,16 @@ namespace LastExpress {
 
 Vesna::Vesna(LastExpressEngine *engine) : Entity(engine, kEntityVesna) {
 	ADD_CALLBACK_FUNCTION(Vesna, reset);
-	ADD_CALLBACK_FUNCTION(Vesna, playSound);
-	ADD_CALLBACK_FUNCTION(Vesna, enterExitCompartment);
-	ADD_CALLBACK_FUNCTION(Vesna, draw);
-	ADD_CALLBACK_FUNCTION(Vesna, updateEntity);
-	ADD_CALLBACK_FUNCTION(Vesna, updateFromTime);
-	ADD_CALLBACK_FUNCTION(Vesna, updateEntity2);
+	ADD_CALLBACK_FUNCTION_S(Vesna, playSound);
+	ADD_CALLBACK_FUNCTION_SI(Vesna, enterExitCompartment);
+	ADD_CALLBACK_FUNCTION_S(Vesna, draw);
+	ADD_CALLBACK_FUNCTION_II(Vesna, updateEntity);
+	ADD_CALLBACK_FUNCTION_I(Vesna, updateFromTime);
+	ADD_CALLBACK_FUNCTION_II(Vesna, updateEntity2);
 	ADD_CALLBACK_FUNCTION(Vesna, callbackActionRestaurantOrSalon);
 	ADD_CALLBACK_FUNCTION(Vesna, callbackActionOnDirection);
-	ADD_CALLBACK_FUNCTION(Vesna, savegame);
-	ADD_CALLBACK_FUNCTION(Vesna, homeAlone);
+	ADD_CALLBACK_FUNCTION_II(Vesna, savegame);
+	ADD_CALLBACK_FUNCTION_TYPE(Vesna, homeAlone, EntityParametersIIIS);
 	ADD_CALLBACK_FUNCTION(Vesna, chapter1);
 	ADD_CALLBACK_FUNCTION(Vesna, withMilos);
 	ADD_CALLBACK_FUNCTION(Vesna, homeTogether);
@@ -56,7 +55,7 @@ Vesna::Vesna(LastExpressEngine *engine) : Entity(engine, kEntityVesna) {
 	ADD_CALLBACK_FUNCTION(Vesna, chapter2Handler);
 	ADD_CALLBACK_FUNCTION(Vesna, checkTrain);
 	ADD_CALLBACK_FUNCTION(Vesna, chapter3);
-	ADD_CALLBACK_FUNCTION(Vesna, inCompartment);
+	ADD_CALLBACK_FUNCTION_TYPE(Vesna, inCompartment, EntityParametersIIIS);
 	ADD_CALLBACK_FUNCTION(Vesna, takeAWalk);
 	ADD_CALLBACK_FUNCTION(Vesna, killAnna);
 	ADD_CALLBACK_FUNCTION(Vesna, killedAnna);
@@ -93,7 +92,7 @@ IMPLEMENT_FUNCTION_END
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION_II(5, Vesna, updateEntity, CarIndex, EntityPosition)
 	if (savepoint.action == kActionExcuseMeCath) {
-		getSound()->playSound(kEntityPlayer, rnd(2) ? "CAT10150" : "CAT1015A");
+		getSound()->playSound(kEntityPlayer, rnd(2) ? "CAT1015" : "CAT1015A");
 
 		return;
 	}
@@ -116,8 +115,8 @@ IMPLEMENT_FUNCTION_II(7, Vesna, updateEntity2, CarIndex, EntityPosition)
 		params->param3 = 0;
 
 		if (getEntities()->isDistanceBetweenEntities(kEntityVesna, kEntityMilos, 500)
-		 || (((getData()->direction == kDirectionUp && (getData()->car > getEntityData(kEntityMilos)->car)) || (getData()->car == getEntityData(kEntityMilos)->car && getData()->entityPosition > getEntityData(kEntityMilos)->entityPosition)))
-		 || (((getData()->direction == kDirectionDown && (getData()->car < getEntityData(kEntityMilos)->car)) || (getData()->car == getEntityData(kEntityMilos)->car && getData()->entityPosition < getEntityData(kEntityMilos)->entityPosition)))) {
+		 || (getData()->direction == kDirectionUp && (getData()->car > getEntityData(kEntityMilos)->car || (getData()->car == getEntityData(kEntityMilos)->car && getData()->entityPosition > getEntityData(kEntityMilos)->entityPosition)))
+		 || (getData()->direction == kDirectionDown && (getData()->car < getEntityData(kEntityMilos)->car || (getData()->car == getEntityData(kEntityMilos)->car && getData()->entityPosition < getEntityData(kEntityMilos)->entityPosition)))) {
 			getData()->field_49B = 0;
 			params->param3 = 1;
 		}
@@ -186,16 +185,16 @@ IMPLEMENT_FUNCTION(11, Vesna, homeAlone)
 		parameters->param1++;
 		switch (parameters->param1) {
 		default:
-			strcpy((char *)&parameters->seq, "VES1015C");
+			Common::strcpy_s(parameters->seq, "VES1015C");
 			parameters->param1 = 0;
 			break;
 
 		case 1:
-			strcpy((char *)&parameters->seq, "VES1015A");
+			Common::strcpy_s(parameters->seq, "VES1015A");
 			break;
 
 		case 2:
-			strcpy((char *)&parameters->seq, "VES1015B");
+			Common::strcpy_s(parameters->seq, "VES1015B");
 			break;
 		}
 
@@ -226,7 +225,7 @@ IMPLEMENT_FUNCTION(11, Vesna, homeAlone)
 		case 1:
 		case 2:
 			setCallback(3);
-			setup_playSound((char *)&parameters->seq);
+			setup_playSound(parameters->seq);
 			break;
 
 		case 3:
@@ -277,6 +276,7 @@ IMPLEMENT_FUNCTION(13, Vesna, withMilos)
 	case kActionNone:
 		getData()->entityPosition = getEntityData(kEntityMilos)->entityPosition;
 		getData()->location = getEntityData(kEntityMilos)->location;
+		getData()->car = getEntityData(kEntityMilos)->car;
 		break;
 
 	case kActionCallback:
@@ -373,7 +373,7 @@ IMPLEMENT_FUNCTION(18, Vesna, checkTrain)
 
 	case kActionDefault:
 		setCallback(1);
-		setup_enterExitCompartment("610Bg", kObjectCompartmentG);
+		setup_enterExitCompartment("610BG", kObjectCompartmentG);
 		break;
 
 	case kActionCallback:
@@ -449,7 +449,7 @@ IMPLEMENT_FUNCTION(18, Vesna, checkTrain)
 
 		case 10:
 			setCallback(11);
-			setup_enterExitCompartment("610Ag", kObjectCompartmentG);
+			setup_enterExitCompartment("610AG", kObjectCompartmentG);
 			break;
 
 		case 11:
@@ -538,19 +538,16 @@ IMPLEMENT_FUNCTION(20, Vesna, inCompartment)
 
 		switch (parameters->param3) {
 		default:
+			Common::strcpy_s(parameters->seq, "VES1015C");
+			parameters->param3 = 0;
 			break;
 
 		case 1:
-			strcpy((char *)&parameters->seq, "VES1015A");
+			Common::strcpy_s(parameters->seq, "VES1015A");
 			break;
 
 		case 2:
-			strcpy((char *)&parameters->seq, "VES1015B");
-			break;
-
-		case 3:
-			strcpy((char *)&parameters->seq, "VES1015C");
-			parameters->param3 = 0;
+			Common::strcpy_s(parameters->seq, "VES1015B");
 			break;
 		}
 
@@ -586,7 +583,7 @@ IMPLEMENT_FUNCTION(20, Vesna, inCompartment)
 		case 1:
 		case 2:
 			setCallback(3);
-			setup_playSound((char *)&parameters->seq);
+			setup_playSound(parameters->seq);
 			break;
 
 		case 3:
@@ -1051,8 +1048,6 @@ IMPLEMENT_FUNCTION(29, Vesna, guarding)
 
 	case kActionOpenDoor:
 		setCallback(1);
-
-		getData()->currentCall++;
 		setup_savegame(kSavegameTypeEvent, kEventCathVesnaRestaurantKilled);
 		break;
 
@@ -1083,7 +1078,7 @@ IMPLEMENT_FUNCTION(30, Vesna, climbing)
 	case kActionNone:
 		if (!params->param1) {
 			if (Entity::updateParameter(params->param3, getState()->timeTicks, 120)) {
-				getSound()->playSound(kEntityVesna, "Ves50001", kFlagDefault);
+				getSound()->playSound(kEntityVesna, "Ves5001", kVolumeFull);
 				params->param1 = 1;
 			}
 		}
@@ -1117,9 +1112,10 @@ IMPLEMENT_FUNCTION(30, Vesna, climbing)
 			params->param2 = getFight()->setup(kFightVesna);
 
 			if (params->param2) {
-				getLogic()->gameOver(kSavegameTypeIndex, 0, kSceneNone, params->param2 != Fight::kFightEndExit);
+				getLogic()->gameOver(kSavegameTypeIndex, 0, kSceneNone, params->param2 == Fight::kFightEndLost);
 			} else {
 				getSound()->playSound(kEntityPlayer, "TUNNEL");
+				// TODO: fade to black screen
 
 				getState()->time = (TimeValue)(getState()->time + 1800);
 
@@ -1147,7 +1143,7 @@ IMPLEMENT_FUNCTION(30, Vesna, climbing)
 			setCallback(2);
 			setup_savegame(kSavegameTypeEvent, kEventCathVesnaTrainTopKilled);
 		} else {
-			getSound()->playSound(kEntityVesna, "Ves5001", kFlagDefault);
+			getSound()->playSound(kEntityVesna, "Ves5001", kVolumeFull);
 			params->param1 = 1;
 		}
 		break;

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -170,6 +169,7 @@ bool TheoraDecoder::loadStream(Common::SeekableReadStream *stream) {
 	if (_hasVideo) {
 		_videoTrack = new TheoraVideoTrack(getDefaultHighColorFormat(), theoraInfo, theoraSetup);
 		addTrack(_videoTrack);
+		setRate(_videoTrack->getFrameRate());
 	}
 
 	th_info_clear(&theoraInfo);
@@ -356,9 +356,11 @@ Audio::AudioStream *TheoraDecoder::VorbisAudioTrack::getAudioStream() const {
 
 #define AUDIOFD_FRAGSIZE 10240
 
+#ifndef USE_TREMOR
 static double rint(double v) {
 	return floor(v + 0.5);
 }
+#endif
 
 bool TheoraDecoder::VorbisAudioTrack::decodeSamples() {
 #ifdef USE_TREMOR
@@ -383,7 +385,11 @@ bool TheoraDecoder::VorbisAudioTrack::decodeSamples() {
 
 		for (i = 0; i < ret && i < maxsamples; i++) {
 			for (int j = 0; j < channels; j++) {
+#ifdef USE_TREMOR
+				int val = CLIP((int)pcm[j][i] >> 9, -32768, 32767);
+#else
 				int val = CLIP((int)rint(pcm[j][i] * 32767.f), -32768, 32767);
+#endif
 				_audioBuffer[count++] = val;
 			}
 		}

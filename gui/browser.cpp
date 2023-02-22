@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,18 +15,21 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "gui/browser.h"
 #include "gui/gui-manager.h"
+#include "gui/widgets/edittext.h"
 #include "gui/widgets/list.h"
 
 #include "common/config-manager.h"
 #include "common/system.h"
 #include "common/algorithm.h"
+#if defined(USE_SYSDIALOGS)
+#include "common/dialogs.h"
+#endif
 
 #include "common/translation.h"
 
@@ -35,7 +38,8 @@ namespace GUI {
 enum {
 	kChooseCmd = 'Chos',
 	kGoUpCmd = 'GoUp',
-	kHiddenCmd = 'Hidd'
+	kHiddenCmd = 'Hidd',
+	kPathEditedCmd = 'Path'
 };
 
 /* We want to use this as a general directory selector at some point... possible uses
@@ -44,19 +48,20 @@ enum {
  * - others???
  */
 
-BrowserDialog::BrowserDialog(const char *title, bool dirBrowser)
+BrowserDialog::BrowserDialog(const Common::U32String &title, bool dirBrowser)
 	: Dialog("Browser") {
 
+	_title = title;
 	_isDirBrowser = dirBrowser;
-	_fileList = NULL;
-	_currentPath = NULL;
+	_fileList = nullptr;
+	_currentPath = nullptr;
 	_showHidden = false;
 
 	// Headline - TODO: should be customizable during creation time
 	new StaticTextWidget(this, "Browser.Headline", title);
 
 	// Current path - TODO: handle long paths ?
-	_currentPath = new StaticTextWidget(this, "Browser.Path", "DUMMY");
+	_currentPath = new EditTextWidget(this, "Browser.Path", Common::U32String(), Common::U32String(), 0, kPathEditedCmd);
 
 	// Add file list
 	_fileList = new ListWidget(this, "Browser.List");
@@ -73,8 +78,25 @@ BrowserDialog::BrowserDialog(const char *title, bool dirBrowser)
 		new ButtonWidget(this, "Browser.Up", _("Go up"), _("Go to previous directory level"), kGoUpCmd);
 	else
 		new ButtonWidget(this, "Browser.Up", _c("Go up", "lowres"), _("Go to previous directory level"), kGoUpCmd);
-	new ButtonWidget(this, "Browser.Cancel", _("Cancel"), 0, kCloseCmd);
-	new ButtonWidget(this, "Browser.Choose", _("Choose"), 0, kChooseCmd);
+	new ButtonWidget(this, "Browser.Cancel", _("Cancel"), Common::U32String(), kCloseCmd);
+	new ButtonWidget(this, "Browser.Choose", _("Choose"), Common::U32String(), kChooseCmd);
+}
+
+int BrowserDialog::runModal() {
+#if defined(USE_SYSDIALOGS)
+	// Try to use the backend browser
+	Common::DialogManager *dialogManager = g_system->getDialogManager();
+	if (dialogManager) {
+		if (ConfMan.getBool("gui_browser_native", Common::ConfigManager::kApplicationDomain)) {
+			Common::DialogManager::DialogResult result = dialogManager->showFileBrowser(_title, _choice, _isDirBrowser);
+			if (result != Common::DialogManager::kDialogError) {
+				return result;
+			}
+		}
+	}
+#endif
+	// If all else fails, use the GUI browser
+	return Dialog::runModal();
 }
 
 void BrowserDialog::open() {
@@ -83,6 +105,7 @@ void BrowserDialog::open() {
 
 	if (ConfMan.hasKey("browser_lastpath"))
 		_node = Common::FSNode(ConfMan.get("browser_lastpath"));
+
 	if (!_node.isDirectory())
 		_node = Common::FSNode(".");
 
@@ -94,6 +117,12 @@ void BrowserDialog::open() {
 
 void BrowserDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data) {
 	switch (cmd) {
+	//Search for typed-in directory
+	case kPathEditedCmd:
+		_node = Common::FSNode(Common::convertFromU32String(_currentPath->getEditString()));
+		updateListing();
+		break;
+	//Search by text input
 	case kChooseCmd:
 		if (_isDirBrowser) {
 			// If nothing is selected in the list widget, choose the current dir.
@@ -157,10 +186,13 @@ void BrowserDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data
 
 void BrowserDialog::updateListing() {
 	// Update the path display
-	_currentPath->setLabel(_node.getPath());
+	_currentPath->setEditString(_node.getPath());
 
 	// We memorize the last visited path.
-	ConfMan.set("browser_lastpath", _node.getPath());
+	// Don't memorize a path that is not a directory
+	if (_node.isDirectory()) {
+		ConfMan.set("browser_lastpath", _node.getPath());
+	}
 
 	// Read in the data from the file system
 	if (!_node.getChildren(_nodeContent, Common::FSNode::kListAll, _showHidden))
@@ -169,26 +201,23 @@ void BrowserDialog::updateListing() {
 		Common::sort(_nodeContent.begin(), _nodeContent.end());
 
 	// Populate the ListWidget
-	ListWidget::StringArray list;
-	ListWidget::ColorList colors;
+	Common::U32StringArray list;
+	Common::U32String color = ListWidget::getThemeColor(ThemeEngine::kFontColorNormal);
 	for (Common::FSList::iterator i = _nodeContent.begin(); i != _nodeContent.end(); ++i) {
-		if (i->isDirectory())
-			list.push_back(i->getDisplayName() + "/");
-		else
-			list.push_back(i->getDisplayName());
-
 		if (_isDirBrowser) {
 			if (i->isDirectory())
-				colors.push_back(ThemeEngine::kFontColorNormal);
+				color = ListWidget::getThemeColor(ThemeEngine::kFontColorNormal);
 			else
-				colors.push_back(ThemeEngine::kFontColorAlternate);
+				color = ListWidget::getThemeColor(ThemeEngine::kFontColorAlternate);
 		}
+
+		if (i->isDirectory())
+			list.push_back(color + ListWidget::escapeString(Common::U32String(i->getName()) + "/"));
+		else
+			list.push_back(color + ListWidget::escapeString(Common::U32String(i->getName())));
 	}
 
-	if (_isDirBrowser)
-		_fileList->setList(list, &colors);
-	else
-		_fileList->setList(list);
+	_fileList->setList(list);
 	_fileList->scrollTo(0);
 
 	// Finally, redraw

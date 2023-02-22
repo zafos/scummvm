@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -43,7 +42,7 @@ namespace Tucker {
 
 TuckerEngine::TuckerEngine(OSystem *system, Common::Language language, uint32 flags)
 	: Engine(system), _gameLang(language), _gameFlags(flags), _rnd("tucker") {
-	_console = new TuckerConsole(this);
+	setDebugger(new TuckerConsole(this));
 
 	resetVariables();
 
@@ -75,12 +74,11 @@ TuckerEngine::TuckerEngine(OSystem *system, Common::Language language, uint32 fl
 }
 
 TuckerEngine::~TuckerEngine() {
-	delete _console;
 }
 
 bool TuckerEngine::hasFeature(EngineFeature f) const {
 	switch (f) {
-	case kSupportsRTL:
+	case kSupportsReturnToLauncher:
 	case kSupportsLoadingDuringRuntime:
 	case kSupportsSavingDuringRuntime:
 		return true;
@@ -351,8 +349,6 @@ void TuckerEngine::resetVariables() {
 	_updateLocationFlag = false;
 	_updateLocation70StringLen = 0;
 	memset(_updateLocation70String, 0, sizeof(_updateLocation70String));
-
-	_lastSaveTime = _system->getMillis();
 }
 
 void TuckerEngine::mainLoop() {
@@ -376,10 +372,10 @@ void TuckerEngine::mainLoop() {
 		_infoBarBuf[getPositionForLine(kVerbPrepositionWith, _infoBarBuf)] = 'c';
 	}
 
-	_data5Buf = loadFile("data5.c", 0);
-	_bgTextBuf = loadFile("bgtext.c", 0);
-	_charNameBuf = loadFile("charname.c", 0);
-	_csDataBuf = loadFile("csdata.c", 0);
+	_data5Buf    = loadFile("data5.c", nullptr);
+	_bgTextBuf   = loadFile("bgtext.c", nullptr);
+	_charNameBuf = loadFile("charname.c", nullptr);
+	_csDataBuf   = loadFile("csdata.c", nullptr);
 	_csDataSize = _fileLoadSize;
 
 	_currentSaveLoadGameState = 1;
@@ -618,14 +614,10 @@ void TuckerEngine::mainLoop() {
 			handleCreditsSequence();
 			_quitGame = true;
 		}
-
-		if (shouldPerformAutoSave(_lastSaveTime)) {
-			writeAutosave();
-		}
 	} while (!_quitGame && _flagsTable[100] == 0);
 
 	// auto save on quit
-	writeAutosave();
+	saveAutosaveIfEnabled();
 
 	if (_flagsTable[100] == 1) {
 		handleCongratulationsSequence();
@@ -655,6 +647,8 @@ void TuckerEngine::parseEvents() {
 			case '.':
 				_inputKeys[kInputKeySkipSpeech] = true;
 				break;
+			default:
+				break;
 			}
 			switch (ev.kbd.keycode) {
 			case Common::KEYCODE_f:
@@ -677,12 +671,6 @@ void TuckerEngine::parseEvents() {
 			case Common::KEYCODE_ESCAPE:
 				_inputKeys[kInputKeyEscape] = true;
 				_inputKeys[kInputKeySkipSpeech] = true;
-				break;
-			case Common::KEYCODE_d:
-				if (ev.kbd.hasFlags(Common::KBD_CTRL)) {
-					this->getDebugger()->attach();
-					this->getDebugger()->onFrame();
-				}
 				break;
 			default:
 				break;
@@ -908,6 +896,8 @@ void TuckerEngine::updateCharPosition() {
 					}
 					_speechSoundNum = 281 + _flagsTable[200];
 					break;
+				default:
+					break;
 				}
 			}
 			_speechSoundNum += 1865;
@@ -932,6 +922,8 @@ void TuckerEngine::updateCharPosition() {
 				updateCharPositionHelper();
 				return;
 			}
+			break;
+		default:
 			break;
 		}
 	}
@@ -1144,7 +1136,7 @@ void TuckerEngine::updateCursor() {
 			moveUpInventoryObjects();
 	}
 	if (_leftMouseButtonPressed && _mouseClick == 0) {
-		_fadedPanel = 0;
+		_fadedPanel = false;
 		_mouseClick = 1;
 		clearItemsGfx();
 		drawInfoString();
@@ -1323,7 +1315,7 @@ void TuckerEngine::updateData3() {
 				a->_drawFlag = false;
 			}
 			if (_location == kLocationStoreRoom && i == 0) {
-				// workaround bug #2872385: update fish animation sequence for correct
+				// workaround bug #4642: update fish animation sequence for correct
 				// position in aquarium.
 				if (a->_animInitCounter == 505 && a->_animCurrentCounter == 513) {
 					a->_animCurrentCounter = 525;
@@ -1627,6 +1619,8 @@ void TuckerEngine::updateSoundsTypes3_4() {
 				startSound(_locationSoundsTable[i]._offset, 0, _locationSoundsTable[i]._volume);
 				return;
 			}
+			break;
+		default:
 			break;
 		}
 	}
@@ -2087,6 +2081,8 @@ const uint8 *TuckerEngine::getStringBuf(int type) const {
 	case 3:
 		p = _objTxtBuf;
 		break;
+	default:
+		break;
 	}
 	return p;
 }
@@ -2356,6 +2352,8 @@ void TuckerEngine::updateCharacterAnimation() {
 				break;
 			case 4:
 				num = 2;
+				break;
+			default:
 				break;
 			}
 		}
@@ -2985,7 +2983,7 @@ void TuckerEngine::drawStringInteger(int num, int x, int y, int digits) {
 	const int xStart = x;
 	char numStr[4];
 	assert(num < 1000);
-	sprintf(numStr, "%03d", num);
+	Common::sprintf_s(numStr, "%03d", num);
 	int i = (digits > 2) ? 0 : 1;
 	for (; i < 3; ++i) {
 		Graphics::drawStringChar(_locationBackgroundGfxBuf, _scrollOffset + x, y, 640, numStr[i], 102, _charsetGfxBuf);
@@ -3213,7 +3211,7 @@ static const struct {
 	{ "wfx", kCode_wfx },
 	{ "xhr", kCode_xhr },
 	{ "xhm", kCode_xhm },
-	{ 0, 0 }
+	{ nullptr, 0 }
 };
 
 int TuckerEngine::readTableInstructionCode(int *index) {
@@ -3486,7 +3484,7 @@ int TuckerEngine::executeTableInstruction() {
 		//   Fixed: 61dw buw,148,125,wsm,buw,148,132,wsm,mof,pan,01,wat,050[...]
 		//                                               ^^^^^^^^^^
 		// To work around the issue in the problematic versions we inject these two
-		// instructions after the first occurence of the 'wsm' instruction (which
+		// instructions after the first occurrence of the 'wsm' instruction (which
 		// proves good enough).
 		if (_location == kLocationStoreRoom && _nextAction == 61) {
 			setCursorState(kCursorStateDisabledHidden);
@@ -3513,6 +3511,8 @@ int TuckerEngine::executeTableInstruction() {
 		// opcodes mapped here are treated as NOOPs
 		readTableInstructionParam(3);
 		return 0;
+	default:
+		break;
 	}
 	return 2;
 }
@@ -3632,6 +3632,8 @@ void TuckerEngine::setSelectedObjectKey() {
 		case 3:
 			_selectedObject._xPos = _xPosCurrent;
 			_selectedObject._yPos = _yPosCurrent;
+			break;
+		default:
 			break;
 		}
 	}
@@ -3767,6 +3769,8 @@ void TuckerEngine::handleMouseClickOnInventoryObject() {
 				_actionVerbLocked = false;
 			}
 		}
+		break;
+	default:
 		break;
 	}
 }

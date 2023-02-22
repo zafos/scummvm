@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -210,7 +209,7 @@ protected:
 	uint32 hmSleeping(int messageNum, const MessageParam &param, Entity *sender);
 	uint32 hmPullHammerLever(int messageNum, const MessageParam &param, Entity *sender);
 
-	uint32 xHandleMessage(int messageNum, const MessageParam &param);
+	uint32 xHandleMessage(int messageNum, const MessageParam &param) override;
 };
 
 class KmScene1002 : public Klaymen {
@@ -244,8 +243,8 @@ protected:
 	uint32 hmPressDoorButton(int messageNum, const MessageParam &param, Entity *sender);
 	uint32 hmHitByBoxingGlove(int messageNum, const MessageParam &param, Entity *sender);
 
-	void xUpdate();
-	uint32 xHandleMessage(int messageNum, const MessageParam &param);
+	void xUpdate() override;
+	uint32 xHandleMessage(int messageNum, const MessageParam &param) override;
 };
 
 class KmScene1004 : public Klaymen {
@@ -254,7 +253,7 @@ public:
 protected:
 	void stReadNote();
 	uint32 hmReadNote(int messageNum, const MessageParam &param, Entity *sender);
-	uint32 xHandleMessage(int messageNum, const MessageParam &param);
+	uint32 xHandleMessage(int messageNum, const MessageParam &param) override;
 };
 
 } // End of namespace Neverhood

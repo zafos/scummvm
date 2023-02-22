@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -54,7 +53,7 @@ static uint32 GetCRC(byte *data, int len) {
 
 class V2A_Sound {
 public:
-	V2A_Sound() : _id(0), _mod(NULL) { }
+	V2A_Sound() : _id(0), _mod(nullptr) { }
 	virtual ~V2A_Sound() {}
 	virtual void start(Player_MOD *mod, int id, const byte *data) = 0;
 	virtual bool update() = 0;
@@ -68,26 +67,26 @@ protected:
 class V2A_Sound_Unsupported : public V2A_Sound {
 public:
 	V2A_Sound_Unsupported() { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		warning("player_v2a - sound %i not supported", id);
 	}
-	virtual bool update() { return false; }
-	virtual void stop() { }
+	bool update() override { return false; }
+	void stop() override { }
 };
 
 // template, automatically stops all channels when a sound is silenced
 template<int numChan>
 class V2A_Sound_Base : public V2A_Sound {
 public:
-	V2A_Sound_Base() : _offset(0), _size(0), _data(0) { }
-	V2A_Sound_Base(uint16 offset, uint16 size) : _offset(offset), _size(size), _data(0) { }
-	virtual void stop() {
+	V2A_Sound_Base() : _offset(0), _size(0), _data(nullptr) { }
+	V2A_Sound_Base(uint16 offset, uint16 size) : _offset(offset), _size(size), _data(nullptr) { }
+	void stop() override {
 		assert(_id);
 		for (int i = 0; i < numChan; i++)
 			_mod->stopChannel(_id | (i << 8));
 		_id = 0;
 		free(_data);
-		_data = 0;
+		_data = nullptr;
 	}
 protected:
 	const uint16 _offset;
@@ -101,7 +100,7 @@ class V2A_Sound_Music : public V2A_Sound {
 public:
 	V2A_Sound_Music(uint16 instoff, uint16 voloff, uint16 chan1off, uint16 chan2off, uint16 chan3off, uint16 chan4off, uint16 sampoff, bool looped) :
 		_instoff(instoff), _voloff(voloff), _chan1off(chan1off), _chan2off(chan2off), _chan3off(chan3off), _chan4off(chan4off), _sampoff(sampoff), _looped(looped) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 
@@ -122,7 +121,7 @@ public:
 		}
 		update();
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		int i, j = 0;
 		for (i = 0; i < 4; i++) {
@@ -194,7 +193,7 @@ public:
 			return false;
 		return true;
 	}
-	virtual void stop() {
+	void stop() override {
 		assert(_id);
 		for (int i = 0; i < 4; i++) {
 			if (_chan[i].dur)
@@ -230,7 +229,7 @@ class V2A_Sound_Single : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Single(uint16 offset, uint16 size, uint16 freq, uint8 vol) :
 		V2A_Sound_Base<1>(offset, size), _freq(freq), _vol(vol) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data = (char *)malloc(_size);
@@ -239,7 +238,7 @@ public:
 		_mod->startChannel(_id, tmp_data, _size, BASE_FREQUENCY / _freq, vol, 0, 0);
 		_ticks = 1 + (60 * _size * _freq) / BASE_FREQUENCY;
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		_ticks--;
 		if (!_ticks) {
@@ -261,7 +260,7 @@ public:
 		V2A_Sound_Base<1>(offset, size), _loopoffset(loopoffset), _loopsize(loopsize), _freq(freq), _vol(vol) { }
 	V2A_Sound_SingleLooped(uint16 offset, uint16 size, uint16 freq, uint8 vol) :
 		V2A_Sound_Base<1>(offset, size), _loopoffset(0), _loopsize(size), _freq(freq), _vol(vol) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data = (char *)malloc(_size);
@@ -269,7 +268,7 @@ public:
 		int vol = (_vol << 2) | (_vol >> 4);
 		_mod->startChannel(_id, tmp_data, _size, BASE_FREQUENCY / _freq, vol, _loopoffset, _loopoffset + _loopsize);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		return true;
 	}
@@ -285,7 +284,7 @@ class V2A_Sound_MultiLooped : public V2A_Sound_Base<2> {
 public:
 	V2A_Sound_MultiLooped(uint16 offset, uint16 size, uint16 freq1, uint8 vol1, uint16 freq2, uint8 vol2) :
 		V2A_Sound_Base<2>(offset, size), _freq1(freq1), _vol1(vol1), _freq2(freq2), _vol2(vol2) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data1 = (char *)malloc(_size);
@@ -297,7 +296,7 @@ public:
 		_mod->startChannel(_id | 0x000, tmp_data1, _size, BASE_FREQUENCY / _freq1, vol1, 0, _size, -127);
 		_mod->startChannel(_id | 0x100, tmp_data2, _size, BASE_FREQUENCY / _freq2, vol2, 0, _size, 127);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		return true;
 	}
@@ -313,11 +312,11 @@ class V2A_Sound_MultiLoopedDuration : public V2A_Sound_MultiLooped {
 public:
 	V2A_Sound_MultiLoopedDuration(uint16 offset, uint16 size, uint16 freq1, uint8 vol1, uint16 freq2, uint8 vol2, uint16 numframes) :
 		V2A_Sound_MultiLooped(offset, size, freq1, vol1, freq2, vol2), _duration(numframes) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		V2A_Sound_MultiLooped::start(mod, id, data);
 		_ticks = 0;
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		_ticks++;
 		if (_ticks >= _duration)
@@ -335,7 +334,7 @@ class V2A_Sound_SingleLoopedPitchbend : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_SingleLoopedPitchbend(uint16 offset, uint16 size, uint16 freq1, uint16 freq2, uint8 vol, uint8 step) :
 		V2A_Sound_Base<1>(offset, size), _freq1(freq1), _freq2(freq2), _vol(vol), _step(step) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data = (char *)malloc(_size);
@@ -344,7 +343,7 @@ public:
 		_curfreq = _freq1;
 		_mod->startChannel(_id, tmp_data, _size, BASE_FREQUENCY / _curfreq, vol, 0, _size);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		if (_freq1 < _freq2) {
 			_curfreq += _step;
@@ -376,7 +375,7 @@ class V2A_Sound_Special_Maniac69 : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_Maniac69(uint16 offset, uint16 size, uint16 freq, uint8 vol) :
 		V2A_Sound_Base<1>(offset, size), _freq(freq), _vol(vol) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data = (char *)malloc(_size);
@@ -385,7 +384,7 @@ public:
 		_curfreq = _freq;
 		_mod->startChannel(_id, tmp_data, _size, BASE_FREQUENCY / _curfreq, _curvol >> 1, 0, _size);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		_curfreq += 2;
 		_mod->setChannelFreq(_id, BASE_FREQUENCY / _curfreq);
@@ -409,7 +408,7 @@ class V2A_Sound_Special_ManiacDing : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_ManiacDing(uint16 offset, uint16 size, uint16 freq, uint8 fadeinrate, uint8 fadeoutrate) :
 		V2A_Sound_Base<1>(offset, size), _freq(freq), _fade1(fadeinrate), _fade2(fadeoutrate) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data = (char *)malloc(_size);
@@ -418,7 +417,7 @@ public:
 		_dir = 0;
 		_mod->startChannel(_id, tmp_data, _size, BASE_FREQUENCY / _freq, _curvol, 0, _size);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		if (_dir == 0) {
 			_curvol += _fade1;
@@ -449,7 +448,7 @@ class V2A_Sound_Special_ZakStereoDing : public V2A_Sound_Base<2> {
 public:
 	V2A_Sound_Special_ZakStereoDing(uint16 offset, uint16 size, uint16 freq1, uint16 freq2, uint8 fadeinrate, uint8 fadeoutrate) :
 		V2A_Sound_Base<2>(offset, size), _freq1(freq1), _freq2(freq2), _fade1(fadeinrate), _fade2(fadeoutrate) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data1 = (char *)malloc(_size);
@@ -461,7 +460,7 @@ public:
 		_mod->startChannel(_id | 0x000, tmp_data1, _size, BASE_FREQUENCY / _freq1, 1, 0, _size, -127);
 		_mod->startChannel(_id | 0x100, tmp_data2, _size, BASE_FREQUENCY / _freq2, 1, 0, _size, 127);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		if (_dir == 0) {
 			_curvol += _fade1;
@@ -494,7 +493,7 @@ class V2A_Sound_Special_ManiacTentacle : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_ManiacTentacle(uint16 offset, uint16 size, uint16 freq1, uint16 freq2, uint16 step) :
 		V2A_Sound_Base<1>(offset, size), _freq1(freq1), _freq2(freq2), _step(step) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data = (char *)malloc(_size);
@@ -503,7 +502,7 @@ public:
 		_curvol = 0x3F;
 		_mod->startChannel(_id, tmp_data, _size, BASE_FREQUENCY / _curfreq, (_curvol << 2) | (_curvol >> 4), 0, _size);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		if (_curfreq > _freq2)
 			_curvol = 0x3F + _freq2 - _curfreq;
@@ -529,7 +528,7 @@ class V2A_Sound_Special_Maniac59 : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_Maniac59(uint16 offset, uint16 size, uint16 freq1, uint16 freq2, uint16 step, uint8 vol) :
 		V2A_Sound_Base<1>(offset, size), _freq1(freq1), _freq2(freq2), _step(step), _vol(vol) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data = (char *)malloc(_size);
@@ -539,7 +538,7 @@ public:
 		_dir = 2;
 		_mod->startChannel(_id, tmp_data, _size, BASE_FREQUENCY / _curfreq, vol, 0, _size);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		if (_dir == 2) {
 			_curfreq += _step;
@@ -574,7 +573,7 @@ class V2A_Sound_Special_Maniac61 : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_Maniac61(uint16 offset, uint16 size, uint16 freq1, uint16 freq2) :
 		V2A_Sound_Base<1>(offset, size), _freq1(freq1), _freq2(freq2) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data = (char *)malloc(_size);
@@ -583,7 +582,7 @@ public:
 		_curvol = 0x3F;
 		_mod->startChannel(_id, tmp_data, _size, BASE_FREQUENCY / _curfreq, (_curvol << 2) | (_curvol >> 4), 0, _size);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		_curfreq++;
 		if (!(_curfreq & 3))
@@ -608,7 +607,7 @@ class V2A_Sound_Special_ManiacPhone : public V2A_Sound_Base<2> {
 public:
 	V2A_Sound_Special_ManiacPhone(uint16 offset, uint16 size, uint16 freq1, uint8 vol1, uint16 freq2, uint8 vol2, uint16 numframes, uint8 playwidth, uint8 loopwidth) :
 		V2A_Sound_Base<2>(offset, size), _freq1(freq1), _vol1(vol1), _freq2(freq2), _vol2(vol2), _duration(numframes), _playwidth(playwidth), _loopwidth(loopwidth) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -617,7 +616,7 @@ public:
 		_ticks = 0;
 		_loop = 0;
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		if (_loop == _playwidth) {
 			_mod->stopChannel(_id | 0x000);
@@ -663,7 +662,7 @@ class V2A_Sound_Special_Maniac46 : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_Maniac46(uint16 offset, uint16 size, uint16 freq, uint8 vol, uint8 loopwidth, uint8 numloops) :
 		V2A_Sound_Base<1>(offset, size), _freq(freq), _vol(vol), _loopwidth(loopwidth), _numloops(numloops) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -672,7 +671,7 @@ public:
 		_loop = 0;
 		_loopctr = 0;
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		_loop++;
 		if (_loop == _loopwidth) {
@@ -707,7 +706,7 @@ class V2A_Sound_Special_ManiacTypewriter : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_ManiacTypewriter(uint16 offset, uint16 size, uint16 freq, uint8 vol, uint8 numdurs, const uint8 *durations, bool looped) :
 		V2A_Sound_Base<1>(offset, size), _freq(freq), _vol(vol), _numdurs(numdurs), _durations(durations), _looped(looped) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -716,7 +715,7 @@ public:
 		_curdur = 0;
 		_ticks = _durations[_curdur++];
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		_ticks--;
 		if (!_ticks) {
@@ -755,7 +754,7 @@ class V2A_Sound_Special_Maniac44 : public V2A_Sound_Base<2> {
 public:
 	V2A_Sound_Special_Maniac44(uint16 offset1, uint16 size1, uint16 offset2, uint16 size2, uint16 freq1, uint16 freq2, uint8 vol) :
 		_offset1(offset1), _size1(size1), _offset2(offset2), _size2(size2), _freq1(freq1), _freq2(freq2), _vol(vol) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -767,7 +766,7 @@ public:
 
 		soundon(_data + _offset1, _size1);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		_mod->setChannelFreq(_id | 0x000, BASE_FREQUENCY / _curfreq);
 		_mod->setChannelFreq(_id | 0x100, BASE_FREQUENCY / (_curfreq + 3));
@@ -820,7 +819,7 @@ class V2A_Sound_Special_Maniac32 : public V2A_Sound_Base<4> {
 public:
 	V2A_Sound_Special_Maniac32(uint16 offset1, uint16 size1, uint16 offset2, uint16 size2, uint8 vol) :
 		_offset1(offset1), _size1(size1), _offset2(offset2), _size2(size2), _vol(vol) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 
@@ -846,7 +845,7 @@ public:
 		_mod->startChannel(_id | 0x200, tmp_data3, _size1, BASE_FREQUENCY / _freq3, _vol, 0, _size1, 127);
 		_mod->startChannel(_id | 0x300, tmp_data4, _size2, BASE_FREQUENCY / _freq4, _vol, 0, _size2, -127);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		updatefreq(_freq1, _step1, 0x00AA, 0x00FA);
 		updatefreq(_freq2, _step2, 0x019A, 0x03B6);
@@ -893,7 +892,7 @@ class V2A_Sound_Special_Zak70 : public V2A_Sound_Base<4> {
 public:
 	V2A_Sound_Special_Zak70(uint16 offset, uint16 size, uint16 freq1, uint16 freq2, uint16 freq3, uint16 freq4, uint8 vol) :
 		V2A_Sound_Base<4>(offset, size), _freq1(freq1), _freq2(freq2), _freq3(freq3), _freq4(freq4), _vol(vol) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 
@@ -910,7 +909,7 @@ public:
 		_mod->startChannel(_id | 0x200, tmp_data3, _size, BASE_FREQUENCY / _freq3, _vol, 0, _size, 127);
 		_mod->startChannel(_id | 0x300, tmp_data4, _size, BASE_FREQUENCY / _freq4, _vol, 0, _size, -127);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		return true;
 	}
@@ -928,11 +927,11 @@ class V2A_Sound_Special_Zak101 : public V2A_Sound_Special_Zak70 {
 public:
 	V2A_Sound_Special_Zak101(uint16 offset, uint16 size, uint16 freq1, uint16 freq2, uint16 freq3, uint16 freq4, uint8 vol, uint16 dur) :
 		V2A_Sound_Special_Zak70(offset, size, freq1, freq2, freq3, freq4, vol), _dur(dur) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		V2A_Sound_Special_Zak70::start(mod, id, data);
 		_ticks = _dur;
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		if (!--_ticks)
 			return false;
@@ -956,7 +955,7 @@ class V2A_Sound_Special_Zak37 : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_Zak37(uint16 offset, uint16 size, uint16 freq, uint8 vol) :
 		V2A_Sound_Base<1>(offset, size), _freq(freq), _vol(vol) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data = (char *)malloc(_size);
@@ -964,7 +963,7 @@ public:
 		_curvol = _vol << 2;
 		_mod->startChannel(_id, tmp_data, _size, BASE_FREQUENCY / _freq, _curvol, 0, _size);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		if (!--_curvol)
 			return false;
@@ -984,7 +983,7 @@ class V2A_Sound_Special_ZakAirplane : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_ZakAirplane(uint16 offset, uint16 size, uint16 freq1, uint16 freq2) :
 		V2A_Sound_Base<1>(offset, size), _freq1(freq1), _freq2(freq2) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data = (char *)malloc(_size);
@@ -994,7 +993,7 @@ public:
 		_mod->startChannel(_id, tmp_data, _size, BASE_FREQUENCY / _curfreq, (_curvol << 2) | (_curvol >> 4), 0, _size);
 		_ticks = 0;
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		_ticks++;
 		if (_ticks < 4)
@@ -1029,7 +1028,7 @@ class V2A_Sound_Special_Zak71 : public V2A_Sound_Base<4> {
 public:
 	V2A_Sound_Special_Zak71(uint16 offset, uint16 size) :
 		_offset(offset), _size(size) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 
@@ -1052,7 +1051,7 @@ public:
 		_mod->startChannel(_id | 0x200, tmp_data3, _size, BASE_FREQUENCY / _freq3, MIN((_vol >> 1) + 3, 0x32), 0, _size, 127);
 		_mod->startChannel(_id | 0x300, tmp_data4, _size, BASE_FREQUENCY / _freq4, MIN((_vol >> 1) + 3, 0x32), 0, _size, -127);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		_freq1 += 0x14;
 		_freq2 += 0x1E;
@@ -1088,7 +1087,7 @@ class V2A_Sound_Special_Zak99 : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_Zak99(uint16 offset, uint16 size, uint16 freq1, uint16 freq2, uint8 vol) :
 		V2A_Sound_Base<1>(offset, size), _freq1(freq1), _freq2(freq2), _vol(vol) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		char *tmp_data = (char *)malloc(_size);
@@ -1099,7 +1098,7 @@ public:
 		_bendctr = 100;
 		_holdctr = 30;
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		if (_curfreq >= _freq2) {
 			_mod->setChannelFreq(_id, BASE_FREQUENCY / _curfreq);
@@ -1132,7 +1131,7 @@ class V2A_Sound_Special_Zak54 : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_Zak54(uint16 offset1, uint16 size1, uint16 offset2, uint16 size2, uint16 freq) :
 		_offset1(offset1), _size1(size1), _offset2(offset2), _size2(size2), _freq(freq) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -1143,7 +1142,7 @@ public:
 		_mod->startChannel(_id, tmp_data, _size1, BASE_FREQUENCY / _freq, _vol, 0, _size1);
 		_loop = _size1 * _freq * 60 / BASE_FREQUENCY;
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		if (!_loop) {
 			_vol--;
@@ -1177,7 +1176,7 @@ class V2A_Sound_Special_Zak110 : public V2A_Sound_Base<2> {
 public:
 	V2A_Sound_Special_Zak110(uint16 offset1, uint16 size1, uint16 offset2, uint16 size2, uint16 freq1, uint16 freq2) :
 		_offset1(offset1), _size1(size1), _offset2(offset2), _size2(size2), _freq1(freq1), _freq2(freq2) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -1187,7 +1186,7 @@ public:
 		_vol = 0x1500;
 		_beepcount = 0;
 	}
-	virtual bool update() {
+	bool update() override {
 		char *tmp_data;
 		assert(_id);
 
@@ -1254,7 +1253,7 @@ class V2A_Sound_Special_Zak32 : public V2A_Sound_Base<2> {
 public:
 	V2A_Sound_Special_Zak32(uint16 offset1, uint16 offset2, uint16 size1, uint16 size2) :
 		_offset1(offset1), _offset2(offset2), _size1(size1), _size2(size2) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -1271,7 +1270,7 @@ public:
 		_mod->startChannel(_id | 0x000, tmp_data1, _size1, BASE_FREQUENCY / _freq, 0x7F, 0, _size1, -127);
 		_mod->startChannel(_id | 0x100, tmp_data2, _size1, BASE_FREQUENCY / (_freq + 3), 0x7F, 0, _size1, 127);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 
 		if (_loopnum < 7) {
@@ -1329,7 +1328,7 @@ class V2A_Sound_Special_Zak52 : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_Zak52(uint16 offset, uint16 size) :
 		_offset(offset), _size(size) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -1341,7 +1340,7 @@ public:
 		memcpy(tmp_data, _data + _offset, _size);
 		_mod->startChannel(_id | 0x000, tmp_data, _size, BASE_FREQUENCY / _curfreq, 0xFF, 0, _size, -127);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		int vol = (_curfreq - 0xC8) >> 3;
 		if (vol > 0x3F)
@@ -1368,7 +1367,7 @@ class V2A_Sound_Special_Zak61 : public V2A_Sound_Base<2> {
 public:
 	V2A_Sound_Special_Zak61(uint16 offset, uint16 size) :
 		_offset(offset), _size(size) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -1385,7 +1384,7 @@ public:
 		// start 2nd channel silent
 		_mod->startChannel(_id | 0x100, tmp_data2, _size, BASE_FREQUENCY / _curfreq, 0, 0, _size, 127);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		int freq = (_loop << 4) + _curfreq;
 		int vol = freq - 0x76;
@@ -1400,6 +1399,8 @@ public:
 		case 1:
 			_mod->setChannelFreq(_id | 0x100, BASE_FREQUENCY / freq);
 			_mod->setChannelVol(_id | 0x100, vol);
+			break;
+		default:
 			break;
 		}
 		_loop = (_loop + 1) & 3;
@@ -1424,7 +1425,7 @@ class V2A_Sound_Special_Zak62 : public V2A_Sound_Base<2> {
 public:
 	V2A_Sound_Special_Zak62(uint16 offset, uint16 size) :
 		_offset(offset), _size(size) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -1441,7 +1442,7 @@ public:
 		// start 2nd channel silent
 		_mod->startChannel(_id | 0x100, tmp_data2, _size, BASE_FREQUENCY / _curfreq, 0, 0, _size, 127);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		int freq = (_loop << 4) + _curfreq;
 		int vol = 0x0200 - freq;
@@ -1456,6 +1457,8 @@ public:
 		case 1:
 			_mod->setChannelFreq(_id | 0x100, BASE_FREQUENCY / freq);
 			_mod->setChannelVol(_id | 0x100, vol);
+			break;
+		default:
 			break;
 		}
 		_loop = (_loop + 1) & 3;
@@ -1480,7 +1483,7 @@ class V2A_Sound_Special_Zak82 : public V2A_Sound_Base<4> {
 public:
 	V2A_Sound_Special_Zak82(uint16 offset, uint16 size) :
 		_offset(offset), _size(size) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -1502,7 +1505,7 @@ public:
 		memcpy(tmp_data, _data + offset, size);
 		_mod->startChannel(_id | 0x000, tmp_data, size, BASE_FREQUENCY / 0x0479, 0xFF, 0, size);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		char *tmp_data1, *tmp_data2;
 		int size, offset = _offset;
@@ -1581,7 +1584,7 @@ class V2A_Sound_Special_Zak86 : public V2A_Sound_Base<1> {
 public:
 	V2A_Sound_Special_Zak86(uint16 offset, uint16 size) :
 		_offset(offset), _size(size) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -1598,7 +1601,7 @@ public:
 		memcpy(tmp_data, _data + offset, size);
 		_mod->startChannel(_id | 0x000, tmp_data, size, BASE_FREQUENCY / 0x0096, 0, 0, size, 0);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		int size, offset;
 		char *tmp_data;
@@ -1638,6 +1641,8 @@ public:
 				_volmod = 16;
 			}
 			break;
+		default:
+			break;
 		}
 		return true;
 	}
@@ -1656,7 +1661,7 @@ class V2A_Sound_Special_Zak98 : public V2A_Sound_Base<4> {
 public:
 	V2A_Sound_Special_Zak98(uint16 offset, uint16 size) :
 		_offset(offset), _size(size) { }
-	virtual void start(Player_MOD *mod, int id, const byte *data) {
+	void start(Player_MOD *mod, int id, const byte *data) override {
 		_mod = mod;
 		_id = id;
 		_data = (char *)malloc(READ_LE_UINT16(data));
@@ -1687,7 +1692,7 @@ public:
 		_mod->startChannel(_id | 0x200, tmp_data3, _size, BASE_FREQUENCY / _freq[2], _vol[2], 0, _size, 127);
 		_mod->startChannel(_id | 0x300, tmp_data4, _size, BASE_FREQUENCY / _freq[3], _vol[3], 0, _size, -127);
 	}
-	virtual bool update() {
+	bool update() override {
 		assert(_id);
 		const uint16 _minvol[2] = {0x2E, 0x32};
 		int i;
@@ -1838,7 +1843,7 @@ static V2A_Sound *findSound(unsigned long crc) {
 	CRCToSound(0x59976529, V2A_Sound_Music(0x088E, 0x092E, 0x048E, 0x05EE, 0x074E, 0x07EE, 0x112E, true)); // Zak 49
 	CRCToSound(0xED1EED02, V2A_Sound_Music(0x08D0, 0x0950, 0x0440, 0x07E0, 0x08B0, 0x08C0, 0x1350, false)); // Zak 112
 	CRCToSound(0x5A16C037, V2A_Sound_Music(0x634A, 0x64CA, 0x049A, 0x18FA, 0x398A, 0x511A, 0x6CCA, false)); // Zak 95
-	return NULL;
+	return nullptr;
 }
 
 Player_V2A::Player_V2A(ScummEngine *scumm, Audio::Mixer *mixer) {
@@ -1849,7 +1854,7 @@ Player_V2A::Player_V2A(ScummEngine *scumm, Audio::Mixer *mixer) {
 
 	for (i = 0; i < V2A_MAXSLOTS; i++) {
 		_slot[i].id = 0;
-		_slot[i].sound = NULL;
+		_slot[i].sound = nullptr;
 	}
 
 	_mod = new Player_MOD(mixer);
@@ -1884,7 +1889,7 @@ void Player_V2A::stopAllSounds() {
 			continue;
 		_slot[i].sound->stop();
 		delete _slot[i].sound;
-		_slot[i].sound = NULL;
+		_slot[i].sound = nullptr;
 		_slot[i].id = 0;
 	}
 }
@@ -1898,7 +1903,7 @@ void Player_V2A::stopSound(int nr) {
 		return;
 	_slot[i].sound->stop();
 	delete _slot[i].sound;
-	_slot[i].sound = NULL;
+	_slot[i].sound = nullptr;
 	_slot[i].id = 0;
 }
 
@@ -1908,7 +1913,7 @@ void Player_V2A::startSound(int nr) {
 	assert(data);
 	uint32 crc = GetCRC(data + 0x0A, READ_BE_UINT16(data + 0x08));
 	V2A_Sound *snd = findSound(crc);
-	if (snd == NULL) {
+	if (snd == nullptr) {
 		warning("player_v2a - sound %i not recognized yet (crc %08X)", nr, crc);
 		return;
 	}
@@ -1933,7 +1938,7 @@ void Player_V2A::updateSound() {
 		if ((_slot[i].id) && (!_slot[i].sound->update())) {
 			_slot[i].sound->stop();
 			delete _slot[i].sound;
-			_slot[i].sound = NULL;
+			_slot[i].sound = nullptr;
 			_slot[i].id = 0;
 		}
 	}

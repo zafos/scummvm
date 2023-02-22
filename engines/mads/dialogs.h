@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -127,14 +126,14 @@ protected:
 	Common::String _lines[TEXT_DIALOG_MAX_LINES];
 	int _lineXp[TEXT_DIALOG_MAX_LINES];
 	SpriteAsset *_edgeSeries;
-	MSurface *_icon;
+	MSurface *_portrait;
 	int _piecesPerCenter;
 	int _fontSpacing;
 
 	/**
 	 * Calculate the bounds for the dialog
 	 */
-	virtual void calculateBounds();
+	void calculateBounds() override;
 public:
 	/**
 	 * Constructor
@@ -151,21 +150,21 @@ public:
 	 * @param vm			Engine reference
 	 * @param fontName		Font to use for display
 	 * @param pos			Position for window top-left
-	 * @param icon			Speaker portrait to show in dialog
+	 * @param portrait		Speaker portrait to show in dialog
 	 * @param maxTextChars	Horizontal width of text portion of window in characters
 	 */
 	TextDialog(MADSEngine *vm, const Common::String &fontName, const Common::Point &pos,
-		MSurface *icon, int maxTextChars);
+		MSurface *portrait, int maxTextChars);
 
 	/**
 	 * Destructor
 	 */
-	virtual ~TextDialog();
+	~TextDialog() override;
 
 	/**
 	 * Draw the dialog
 	 */
-	virtual void draw();
+	void draw() override;
 
 	/**
 	 * Draw the dialog along with any input box
@@ -224,7 +223,7 @@ class MessageDialog : public TextDialog {
 public:
 	MessageDialog(MADSEngine *vm, int lines, ...);
 
-	virtual ~MessageDialog() {}
+	~MessageDialog() override {}
 };
 
 enum DialogId {
@@ -286,7 +285,7 @@ public:
 	 */
 	FullScreenDialog(MADSEngine *vm);
 
-	virtual ~FullScreenDialog();
+	~FullScreenDialog() override;
 };
 
 } // End of namespace MADS

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,7 +25,7 @@
 // Note: the following data can be found in the original game's executable
 const int kNumRooms = 424;
 const room_t gameRooms[kNumRooms] = {
-	// Mo        
+	// Mo
 	{ 1, {255,  0,  0,  0}, 0, 66, 0xFFFF,29, 93,  1,  4},
 	{ 7, {  4,  0,  6,  0}, 4, 72, 0xFFFF, 8,143,  2,  2},
 	{ 3, { 24,  0,  5,  0}, 6, 99,      1, 6,  6,  3,  0},

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 /*
  * The code in this file is based on information found at
- * http://www.borg.com/~jglatt/tech/aiff.htm
+ * https://www.co-bw.com/Audio_AIFF.htm
  *
  * Also partially based on libav's aiffdec.c
  */
@@ -72,14 +71,14 @@ static const uint32 kVersionAIFC = MKTAG('A', 'I', 'F', 'C');
 // Codecs
 static const uint32 kCodecPCM = MKTAG('N', 'O', 'N', 'E'); // very original
 
-RewindableAudioStream *makeAIFFStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse) {
+AIFFHeader *AIFFHeader::readAIFFHeader(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse) {
 	if (stream->readUint32BE() != MKTAG('F', 'O', 'R', 'M')) {
 		warning("makeAIFFStream: No 'FORM' header");
 
 		if (disposeAfterUse == DisposeAfterUse::YES)
 			delete stream;
 
-		return 0;
+		return nullptr;
 	}
 
 	stream->readUint32BE(); // file size
@@ -92,7 +91,7 @@ RewindableAudioStream *makeAIFFStream(Common::SeekableReadStream *stream, Dispos
 		if (disposeAfterUse == DisposeAfterUse::YES)
 			delete stream;
 
-		return 0;
+		return nullptr;
 	}
 
 	// From here on, we only care about the COMM and SSND chunks, which are
@@ -101,10 +100,8 @@ RewindableAudioStream *makeAIFFStream(Common::SeekableReadStream *stream, Dispos
 	bool foundCOMM = false;
 	bool foundSSND = false;
 
-	uint16 channels = 0, bitsPerSample = 0;
-	uint32 rate = 0;
-	uint32 codec = kCodecPCM; // AIFF default
-	Common::SeekableReadStream *dataStream = 0;
+	AIFFHeader *aiffHeader = new AIFFHeader;
+	aiffHeader->_codec = kCodecPCM; // AIFF Default;
 
 	while (!(foundCOMM && foundSSND) && !stream->err() && !stream->eos()) {
 		uint32 tag = stream->readUint32BE();
@@ -117,21 +114,20 @@ RewindableAudioStream *makeAIFFStream(Common::SeekableReadStream *stream, Dispos
 		switch (tag) {
 		case MKTAG('C', 'O', 'M', 'M'):
 			foundCOMM = true;
-			channels = stream->readUint16BE();
-			/* frameCount = */ stream->readUint32BE();
-			bitsPerSample = stream->readUint16BE();
-			rate = readExtended(*stream);
+			aiffHeader->_channels = stream->readUint16BE();
+			aiffHeader->_frameCount = stream->readUint32BE();
+			aiffHeader->_bitsPerSample = stream->readUint16BE();
+			aiffHeader->_rate = readExtended(*stream);
 
 			if (version == kVersionAIFC)
-				codec = stream->readUint32BE();
+				aiffHeader->_codec = stream->readUint32BE();
 			break;
 		case MKTAG('S', 'S', 'N', 'D'):
 			foundSSND = true;
 			/* uint32 offset = */ stream->readUint32BE();
 			/* uint32 blockAlign = */ stream->readUint32BE();
-			if (dataStream)
-				delete dataStream;
-			dataStream = new Common::SeekableSubReadStream(stream, stream->pos(), stream->pos() + length - 8, disposeAfterUse);
+			delete aiffHeader->_dataStream;
+			aiffHeader->_dataStream = new Common::SeekableSubReadStream(stream, stream->pos(), stream->pos() + length - 8, disposeAfterUse);
 			break;
 		case MKTAG('F', 'V', 'E', 'R'):
 			switch (stream->readUint32BE()) {
@@ -149,63 +145,72 @@ RewindableAudioStream *makeAIFFStream(Common::SeekableReadStream *stream, Dispos
 		case MKTAG('w', 'a', 'v', 'e'):
 			warning("Found unhandled AIFF-C extra data chunk");
 
-			if (!dataStream && disposeAfterUse == DisposeAfterUse::YES)
+			if (!aiffHeader->_dataStream && disposeAfterUse == DisposeAfterUse::YES)
 				delete stream;
 
-			delete dataStream;
-			return 0;
+			delete aiffHeader->_dataStream;
+			return nullptr;
 		default:
 			debug(1, "Skipping AIFF '%s' chunk", tag2str(tag));
 			break;
 		}
 
-		stream->seek(pos + length + (length & 1)); // ensure we're also word-aligned
+		uint32 seekPos = pos + length;
+		if (seekPos < (uint32)stream->size()) {
+			seekPos += (length & 1); // ensure we're word-aligned
+		}
+		stream->seek(seekPos);
 	}
 
 	if (!foundCOMM) {
-		warning("makeAIFFStream: Cound not find 'COMM' chunk");
+		warning("makeAIFFStream: Could not find 'COMM' chunk");
 
-		if (!dataStream && disposeAfterUse == DisposeAfterUse::YES)
+		if (!aiffHeader->_dataStream && disposeAfterUse == DisposeAfterUse::YES)
 			delete stream;
 
-		delete dataStream;
-		return 0;
+		delete aiffHeader;
+		return nullptr;
 	}
 
 	if (!foundSSND) {
-		warning("makeAIFFStream: Cound not find 'SSND' chunk");
+		warning("makeAIFFStream: Could not find 'SSND' chunk");
 
 		if (disposeAfterUse == DisposeAfterUse::YES)
 			delete stream;
 
-		return 0;
+		delete aiffHeader;
+		return nullptr;
 	}
 
+	return aiffHeader;
+}
+
+RewindableAudioStream *AIFFHeader::makeAIFFStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse) {
 	// We only implement a subset of the AIFF standard.
 
-	if (channels < 1 || channels > 2) {
-		warning("makeAIFFStream: Only 1 or 2 channels are supported, not %d", channels);
-		delete dataStream;
-		return 0;
+	if (_channels < 1 || _channels > 2) {
+		warning("makeAIFFStream: Only 1 or 2 channels are supported, not %d", _channels);
+		delete _dataStream;
+		return nullptr;
 	}
 
-	// Seek to the start of dataStream, required for at least FileStream
-	dataStream->seek(0);
+	// Seek to the start of _dataStream, required for at least FileStream
+	_dataStream->seek(0);
 
-	switch (codec) {
+	switch (_codec) {
 	case kCodecPCM:
 	case MKTAG('t', 'w', 'o', 's'):
 	case MKTAG('s', 'o', 'w', 't'): {
 		// PCM samples are always signed.
 		byte rawFlags = 0;
-		if (bitsPerSample == 16)
+		if (_bitsPerSample == 16)
 			rawFlags |= Audio::FLAG_16BITS;
-		if (channels == 2)
+		if (_channels == 2)
 			rawFlags |= Audio::FLAG_STEREO;
-		if (codec == MKTAG('s', 'o', 'w', 't'))
+		if (_codec == MKTAG('s', 'o', 'w', 't'))
 			rawFlags |= Audio::FLAG_LITTLE_ENDIAN;
 
-		return makeRawStream(dataStream, rate, rawFlags);
+		return makeRawStream(_dataStream, _rate, rawFlags, disposeAfterUse);
 	}
 	case MKTAG('i', 'm', 'a', '4'):
 		// TODO: Use QT IMA ADPCM
@@ -218,16 +223,27 @@ RewindableAudioStream *makeAIFFStream(Common::SeekableReadStream *stream, Dispos
 		break;
 	case MKTAG('A', 'D', 'P', '4'):
 		// ADP4 on 3DO
-		return make3DO_ADP4AudioStream(dataStream, rate, channels == 2);
+		return make3DO_ADP4AudioStream(_dataStream, _rate, _channels == 2, NULL, disposeAfterUse);
 	case MKTAG('S', 'D', 'X', '2'):
 		// SDX2 on 3DO
-		return make3DO_SDX2AudioStream(dataStream, rate, channels == 2);
+		return make3DO_SDX2AudioStream(_dataStream, _rate, _channels == 2, NULL, disposeAfterUse);
 	default:
-		warning("Unhandled AIFF-C compression tag '%s'", tag2str(codec));
+		warning("Unhandled AIFF-C compression tag '%s'", tag2str(_codec));
 	}
 
-	delete dataStream;
-	return 0;
+	delete _dataStream;
+	return nullptr;
+}
+
+RewindableAudioStream *makeAIFFStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse) {
+	AIFFHeader *aiffHeader = AIFFHeader::readAIFFHeader(stream, disposeAfterUse);
+	if (aiffHeader == nullptr) {
+		return nullptr;
+	}
+
+	auto res = aiffHeader->makeAIFFStream(stream, disposeAfterUse);
+	delete aiffHeader;
+	return res;
 }
 
 } // End of namespace Audio

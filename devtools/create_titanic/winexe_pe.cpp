@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
 #include "file.h"
-#include "str.h"
+#include "common/str.h"
 #include "winexe_pe.h"
 #include "common/array.h"
 #include "common/endian.h"
@@ -31,7 +30,7 @@
 namespace Common {
 
 PEResources::PEResources() {
-	_exe = 0;
+	_exe = nullptr;
 }
 
 PEResources::~PEResources() {
@@ -41,21 +40,7 @@ PEResources::~PEResources() {
 void PEResources::clear() {
 	_sections.clear();
 	_resources.clear();
-	delete _exe; _exe = 0;
-}
-
-bool PEResources::loadFromEXE(const String &fileName) {
-	if (fileName.empty())
-		return false;
-
-	File *file = new File();
-
-	if (!file->open(fileName.c_str())) {
-		delete file;
-		return false;
-	}
-
-	return loadFromEXE(file);
+	delete _exe; _exe = nullptr;
 }
 
 bool PEResources::loadFromEXE(File *stream) {
@@ -151,7 +136,7 @@ void PEResources::parseResourceLevel(Section &section, uint32 offset, int level)
 		if (level == 0)
 			_curType = id;
 		else if (level == 1)
-			_curName = id;
+			_curID = id;
 		else if (level == 2)
 			_curLang = id;
 
@@ -165,7 +150,7 @@ void PEResources::parseResourceLevel(Section &section, uint32 offset, int level)
 			resource.offset = _exe->readUint32LE() + section.offset - section.virtualAddress;
 			resource.size = _exe->readUint32LE();
 
-			_resources[_curType][_curName][_curLang] = resource;
+			_resources[_curType][_curID][_curLang] = resource;
 		}
 
 		_exe->seek(lastOffset);
@@ -184,32 +169,32 @@ const Array<WinResourceID> PEResources::getTypeList() const {
 	return array;
 }
 
-const Array<WinResourceID> PEResources::getNameList(const WinResourceID &type) const {
+const Array<WinResourceID> PEResources::getIDList(const WinResourceID &type) const {
 	Array<WinResourceID> array;
 
 	if (!_exe || !_resources.contains(type))
 		return array;
 
-	const NameMap &nameMap = _resources[type];
+	const IDMap &idMap = _resources[type];
 
-	for (NameMap::const_iterator it = nameMap.begin(); it != nameMap.end(); it++)
+	for (IDMap::const_iterator it = idMap.begin(); it != idMap.end(); it++)
 		array.push_back(it->_key);
 
 	return array;
 }
 
-const Array<WinResourceID> PEResources::getLangList(const WinResourceID &type, const WinResourceID &name) const {
+const Array<WinResourceID> PEResources::getLangList(const WinResourceID &type, const WinResourceID &id) const {
 	Array<WinResourceID> array;
 
 	if (!_exe || !_resources.contains(type))
 		return array;
 
-	const NameMap &nameMap = _resources[type];
+	const IDMap &idMap = _resources[type];
 
-	if (!nameMap.contains(name))
+	if (!idMap.contains(id))
 		return array;
 
-	const LangMap &langMap = nameMap[name];
+	const LangMap &langMap = idMap[id];
 
 	for (LangMap::const_iterator it = langMap.begin(); it != langMap.end(); it++)
 		array.push_back(it->_key);
@@ -217,13 +202,13 @@ const Array<WinResourceID> PEResources::getLangList(const WinResourceID &type, c
 	return array;
 }
 
-File *PEResources::getResource(const WinResourceID &type, const WinResourceID &name) {
-	Array<WinResourceID> langList = getLangList(type, name);
+File *PEResources::getResource(const WinResourceID &type, const WinResourceID &id) {
+	Array<WinResourceID> langList = getLangList(type, id);
 
 	if (langList.empty())
-		return 0;
+		return nullptr;
 
-	const Resource &resource = _resources[type][name][langList[0]];
+	const Resource &resource = _resources[type][id][langList[0]];
 	byte *data = (byte *)malloc(resource.size);
 	_exe->seek(resource.offset);
 	_exe->read(data, resource.size);
@@ -233,19 +218,19 @@ File *PEResources::getResource(const WinResourceID &type, const WinResourceID &n
 	return file;
 }
 
-File *PEResources::getResource(const WinResourceID &type, const WinResourceID &name, const WinResourceID &lang) {
+File *PEResources::getResource(const WinResourceID &type, const WinResourceID &id, const WinResourceID &lang) {
 	if (!_exe || !_resources.contains(type))
-		return 0;
+		return nullptr;
 
-	const NameMap &nameMap = _resources[type];
+	const IDMap &idMap = _resources[type];
 
-	if (!nameMap.contains(name))
-		return 0;
+	if (!idMap.contains(id))
+		return nullptr;
 
-	const LangMap &langMap = nameMap[name];
+	const LangMap &langMap = idMap[id];
 
 	if (!langMap.contains(lang))
-		return 0;
+		return nullptr;
 
 	const Resource &resource = langMap[lang];
 	byte *data = (byte *)malloc(resource.size);

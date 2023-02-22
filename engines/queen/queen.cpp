@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -50,7 +49,10 @@
 namespace Queen {
 
 QueenEngine::QueenEngine(OSystem *syst)
-	: Engine(syst), _debugger(0), randomizer("queen") {
+	: Engine(syst), _bam(nullptr), _bankMan(nullptr), _command(nullptr), _debugger(nullptr),
+	_display(nullptr), _graphics(nullptr), _grid(nullptr), _input(nullptr), _logic(nullptr),
+	_sound(nullptr), _resource(nullptr), _walk(nullptr), _gameStarted(false),
+	randomizer("queen") {
 }
 
 QueenEngine::~QueenEngine() {
@@ -58,7 +60,6 @@ QueenEngine::~QueenEngine() {
 	delete _resource;
 	delete _bankMan;
 	delete _command;
-	delete _debugger;
 	delete _display;
 	delete _graphics;
 	delete _grid;
@@ -66,6 +67,7 @@ QueenEngine::~QueenEngine() {
 	delete _logic;
 	delete _sound;
 	delete _walk;
+	//_debugger is deleted by Engine
 }
 
 void QueenEngine::registerDefaultSettings() {
@@ -124,8 +126,6 @@ void QueenEngine::writeOptionSettings() {
 }
 
 void QueenEngine::update(bool checkPlayerInput) {
-	_debugger->onFrame();
-
 	_graphics->update(_logic->currentRoom());
 	_logic->update();
 
@@ -143,10 +143,7 @@ void QueenEngine::update(bool checkPlayerInput) {
 	_display->update(joe->active, joe->x, joe->y);
 
 	_input->checkKeys();
-	if (_input->debugger()) {
-		_input->debuggerReset();
-		_debugger->attach();
-	}
+
 	if (canLoadOrSave()) {
 		if (_input->quickSave()) {
 			_input->quickSaveReset();
@@ -155,10 +152,6 @@ void QueenEngine::update(bool checkPlayerInput) {
 		if (_input->quickLoad()) {
 			_input->quickLoadReset();
 			loadGameState(SLOT_QUICKSAVE);
-		}
-		if (shouldPerformAutoSave(_lastSaveTime)) {
-			saveGameState(SLOT_AUTOSAVE, "Autosave");
-			_lastSaveTime = _system->getMillis();
 		}
 	}
 	if (!_input->cutawayRunning()) {
@@ -173,7 +166,7 @@ void QueenEngine::update(bool checkPlayerInput) {
 }
 
 bool QueenEngine::canLoadOrSave() const {
-	return !_input->cutawayRunning() && !(_resource->isDemo() || _resource->isInterview());
+	return !_input->cutawayRunning() && !(_resource->isDemo() || _resource->isInterview()) && _gameStarted;
 }
 
 bool QueenEngine::canLoadGameStateCurrently() {
@@ -184,7 +177,7 @@ bool QueenEngine::canSaveGameStateCurrently() {
 	return canLoadOrSave();
 }
 
-Common::Error QueenEngine::saveGameState(int slot, const Common::String &desc) {
+Common::Error QueenEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	debug(3, "Saving game to slot %d", slot);
 	char name[20];
 	Common::Error err = Common::kNoError;
@@ -276,15 +269,20 @@ Common::InSaveFile *QueenEngine::readGameStateHeader(int slot, GameStateHeader *
 	return file;
 }
 
-void QueenEngine::makeGameStateName(int slot, char *buf) const {
+Common::String QueenEngine::getSaveStateName(int slot) const {
 	if (slot == SLOT_LISTPREFIX) {
-		strcpy(buf, "queen.s??");
+		return "queen.s??";
 	} else if (slot == SLOT_AUTOSAVE) {
-		strcpy(buf, "queen.asd");
-	} else {
-		assert(slot >= 0);
-		sprintf(buf, "queen.s%02d", slot);
+		slot = getAutosaveSlot();
 	}
+
+	assert(slot >= 0);
+	return Common::String::format("queen.s%02d", slot);
+}
+
+void QueenEngine::makeGameStateName(int slot, char *buf) const {
+	Common::String name = getSaveStateName(slot);
+	Common::strcpy_s(buf, 20, name.c_str());
 }
 
 int QueenEngine::getGameStateSlot(const char *filename) const {
@@ -305,19 +303,15 @@ void QueenEngine::findGameStateDescriptions(char descriptions[100][32]) {
 		if (i >= 0 && i < SAVESTATE_MAX_NUM) {
 			GameStateHeader header;
 			Common::InSaveFile *f = readGameStateHeader(i, &header);
-			strcpy(descriptions[i], header.description);
+			Common::strcpy_s(descriptions[i], header.description);
 			delete f;
 		}
 	}
 }
 
-GUI::Debugger *QueenEngine::getDebugger() {
-	return _debugger;
-}
-
 bool Queen::QueenEngine::hasFeature(EngineFeature f) const {
 	return
-		(f == kSupportsRTL) ||
+		(f == kSupportsReturnToLauncher) ||
 		(f == kSupportsLoadingDuringRuntime) ||
 		(f == kSupportsSavingDuringRuntime) ||
 		(f == kSupportsSubtitleOptions);
@@ -332,6 +326,7 @@ Common::Error QueenEngine::run() {
 	_bankMan = new BankManager(_resource);
 	_command = new Command(this);
 	_debugger = new Debugger(this);
+	setDebugger(_debugger);
 	_display = new Display(this, _system);
 	_graphics = new Graphics(this);
 	_grid = new Grid(this);
@@ -356,10 +351,11 @@ Common::Error QueenEngine::run() {
 	syncSoundSettings();
 
 	_logic->start();
+	_gameStarted = true;
 	if (ConfMan.hasKey("save_slot") && canLoadOrSave()) {
 		loadGameState(ConfMan.getInt("save_slot"));
 	}
-	_lastSaveTime = _lastUpdateTime = _system->getMillis();
+	_lastUpdateTime = _system->getMillis();
 
 	while (!shouldQuit()) {
 		if (_logic->newRoom() > 0) {

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -164,18 +163,20 @@ static Common::Point closestPtOnLine(const Common::Point &lineStart, const Commo
 }
 
 byte ScummEngine::getMaskFromBox(int box) {
-	// WORKAROUND for bug #740244 and #755863. This appears to have been a
+	// WORKAROUND for bug #791 and #897. This appears to have been a
 	// long standing bug in the original engine?
-	if (_game.version <= 3 && box == 255)
+	if (_game.version <= 3 && box == kOldInvalidBox)
 		return 1;
 
 	Box *ptr = getBoxBaseAddr(box);
 	if (!ptr)
 		return 0;
 
-	// WORKAROUND for bug #847827: This is a bug in the data files, as it also
-	// occurs with the original engine. We work around it here anyway.
-	if (_game.id == GID_INDY4 && _currentRoom == 225 && _roomResource == 94 && box == 8)
+	// WORKAROUND for bug #1315: the wall sprite is drawn over Indy when he
+	// stands at a specific place near Nur-Ab-Sal's abode. This is a bug in
+	// the data files, as it also occurs with the original engine. We work
+	// around it here anyway.
+	if (_game.id == GID_INDY4 && _currentRoom == 225 && _roomResource == 94 && box == 8 && _enableEnhancements)
 		return 0;
 
 	if (_game.version == 8)
@@ -328,7 +329,7 @@ int ScummEngine::getBoxScale(int box) {
  * and in fact the lack of it caused various bugs in the past.
  *
  * Hence, we decided to switch all games to use the more powerful scale slots.
- * To accomodate old savegames, we attempt here to convert rtScaleTable
+ * To accommodate old savegames, we attempt here to convert rtScaleTable
  * resources to scale slots.
  */
 void ScummEngine::convertScaleTableToScaleSlot(int slot) {
@@ -339,7 +340,7 @@ void ScummEngine::convertScaleTableToScaleSlot(int slot) {
 	float m, oldM;
 
 	// Do nothing if the given scale table doesn't exist
-	if (resptr == 0)
+	if (resptr == nullptr)
 		return;
 
 	if (resptr[0] == resptr[199]) {
@@ -452,17 +453,17 @@ byte ScummEngine::getNumBoxes() {
 
 Box *ScummEngine::getBoxBaseAddr(int box) {
 	byte *ptr = getResourceAddress(rtMatrix, 2);
-	if (!ptr || box == 255)
-		return NULL;
+	if (!ptr || box == kOldInvalidBox)
+		return nullptr;
 
 	// WORKAROUND: The NES version of Maniac Mansion attempts to set flags for boxes 2-4
 	// when there are only three boxes (0-2) when walking out to the garage.
 	if ((_game.id == GID_MANIAC) && (_game.platform == Common::kPlatformNES) && (box >= ptr[0]))
-		return NULL;
+		return nullptr;
 
 	// WORKAROUND: In "pass to adventure", the loom demo, when bobbin enters
 	// the tent to the elders, box = 2, but ptr[0] = 2 -> errors out.
-	// Also happens in Indy3EGA (see bug #770351) and ZakEGA (see bug #771803).
+	// Also happens in Indy3EGA (see bug #1007) and ZakEGA (see bug #1037).
 	//
 	// This *might* mean that we have a bug in our box implementation
 	// OTOH, the original engine, unlike ScummVM, performed no bound
@@ -516,7 +517,7 @@ bool ScummEngine::checkXYInBoxBounds(int boxnum, int x, int y) {
 	// Since this method is called by many other methods that take params
 	// from e.g. script opcodes, but do not validate the boxnum, we
 	// make a check here to filter out invalid boxes.
-	// See also bug #1599113.
+	// See also bug #2914.
 	if (boxnum < 0 || boxnum == Actor::kInvalidBox)
 		return false;
 
@@ -542,13 +543,24 @@ bool ScummEngine::checkXYInBoxBounds(int boxnum, int x, int y) {
 	// Corner case: If the box is a simple line segment, we consider the
 	// point to be contained "in" (or rather, lying on) the line if it
 	// is very close to its projection to the line segment.
-	if ((box.ul == box.ur && box.lr == box.ll) ||
-		(box.ul == box.ll && box.ur == box.lr)) {
+	// Update: It can cause bugs like #1194/#13366 if used for games where
+	// this code isn't actually present in the original interpreter. I have
+	// checked disasm for LOOM FM-TOWNS and DOS EGA, ZAK FM-TOWNS, INDY3
+	// FM-TOWNS and DOS VGA and also LOOM DOS VGA (v4). MI2 does have the
+	// these lines, so that's probably the origin of our code. So it seems
+	// safe to assume that it does not belong in any game before SCUMM5.
+	// I have also checked ZAK DOS to verify that the early games don't
+	// even have/use the whole function checkXYInBoxBounds(), so we're
+	// doing that correctly.
+	if (_game.version > 4) {
+		if ((box.ul == box.ur && box.lr == box.ll) ||
+			(box.ul == box.ll && box.ur == box.lr)) {
 
-		Common::Point tmp;
-		tmp = closestPtOnLine(box.ul, box.lr, p);
-		if (p.sqrDist(tmp) <= 4)
-			return true;
+			Common::Point tmp;
+			tmp = closestPtOnLine(box.ul, box.lr, p);
+			if (p.sqrDist(tmp) <= 4)
+				return true;
+		}
 	}
 
 	// Finally, fall back to the classic algorithm to compute containment
@@ -587,7 +599,7 @@ BoxCoords ScummEngine::getBoxCoordinates(int boxnum) {
 		box->lr.x = (short)FROM_LE_32(bp->v8.lrx);
 		box->lr.y = (short)FROM_LE_32(bp->v8.lry);
 
-		// WORKAROUND (see patch #684732): Some walkboxes in CMI appear
+		// WORKAROUND (see patch #8173): Some walkboxes in CMI appear
 		// to have been flipped, in the sense that for instance the
 		// lower boundary is above the upper one. We work around this
 		// by simply flipping them back.
@@ -757,7 +769,7 @@ int ScummEngine::getNextBox(byte from, byte to) {
 	// WORKAROUND #1: It seems that in some cases, the box matrix is corrupt
 	// (more precisely, is too short) in the datafiles already. In
 	// particular this seems to be the case in room 46 of Indy3 EGA (see
-	// also bug #770690). This didn't cause problems in the original
+	// also bug #1017). This didn't cause problems in the original
 	// engine, because there, the memory layout is different. After the
 	// walkbox would follow the rest of the room file, thus the program
 	// always behaved the same (and by chance, correct). Not so for us,
@@ -769,7 +781,7 @@ int ScummEngine::getNextBox(byte from, byte to) {
 
 	// WORKAROUND #2: In addition to the above, we have to add this special
 	// case to fix the scene in Indy3 where Indy meets Hitler in Berlin.
-	// See bug #770690 and also bug #774783.
+	// See bug #1017 and also bug #1052.
 	if ((_game.id == GID_INDY3) && _roomResource == 46 && from == 1 && to == 0)
 		return 0;
 
@@ -1251,19 +1263,11 @@ void Actor_v3::findPathTowardsOld(byte box1, byte box2, byte finalBox, Common::P
 	p2.x = 32000;
 	p3.x = 32000;
 
-	// next box (box2) = final box?
 	if (box2 == finalBox) {
-		// In Indy3, the masks (= z-level) have to match, too -- needed for the
-		// 'maze' in the zeppelin (see bug #1032964).
-		if (_vm->_game.id != GID_INDY3 || _vm->getMaskFromBox(box1) == _vm->getMaskFromBox(box2)) {
-			// Is the actor (x,y) between both gates?
-			if (compareSlope(_pos, _walkdata.dest, gateA[0]) !=
-					compareSlope(_pos, _walkdata.dest, gateB[0]) &&
-					compareSlope(_pos, _walkdata.dest, gateA[1]) !=
-					compareSlope(_pos, _walkdata.dest, gateB[1])) {
+		// Is the actor (x,y) between both gates?
+		if (compareSlope(_pos, _walkdata.dest, gateA[0]) !=	compareSlope(_pos, _walkdata.dest, gateB[0]) &&
+			compareSlope(_pos, _walkdata.dest, gateA[1]) !=	compareSlope(_pos, _walkdata.dest, gateB[1]))
 				return;
-			}
-		}
 	}
 
 	p3 = closestPtOnLine(gateA[1], gateB[1], _pos);

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -93,7 +92,7 @@ TuckerEngine::SavegameError TuckerEngine::saveOrLoadGameStateData(S &s) {
 }
 
 Common::Error TuckerEngine::loadGameState(int slot) {
-	Common::String fileName = generateGameStateFileName(_targetName.c_str(), slot);
+	Common::String fileName = getSaveStateName(slot);
 	Common::InSaveFile *file = _saveFileMan->openForLoading(fileName);
 
 	if (!file) {
@@ -234,12 +233,8 @@ TuckerEngine::SavegameError TuckerEngine::writeSavegameHeader(Common::OutSaveFil
 	return (file->err() ? kSavegameIoError : kSavegameNoError);
 }
 
-Common::Error TuckerEngine::saveGameState(int slot, const Common::String &description) {
-	return writeSavegame(slot, description, false);
-}
-
-Common::Error TuckerEngine::writeSavegame(int slot, const Common::String &description, bool autosave) {
-	Common::String fileName = generateGameStateFileName(_targetName.c_str(), slot);
+Common::Error TuckerEngine::saveGameState(int slot, const Common::String &description, bool isAutosave) {
+	Common::String fileName = getSaveStateName(slot);
 	Common::OutSaveFile *file = _saveFileMan->openForSaving(fileName);
 	SavegameHeader header;
 	SavegameError savegameError = kSavegameNoError;
@@ -249,7 +244,7 @@ Common::Error TuckerEngine::writeSavegame(int slot, const Common::String &descri
 
 	if (!savegameError) {
 		// savegame flags
-		if (autosave)
+		if (isAutosave)
 			header.flags |= kSavegameFlagAutosave;
 
 		// description
@@ -274,7 +269,7 @@ Common::Error TuckerEngine::writeSavegame(int slot, const Common::String &descri
 	return Common::kNoError;
 }
 
-bool TuckerEngine::isAutosaveAllowed() {
+bool TuckerEngine::canSaveAutosaveCurrently() {
 	return isAutosaveAllowed(_targetName.c_str());
 }
 
@@ -282,24 +277,6 @@ bool TuckerEngine::isAutosaveAllowed(const char *target) {
 	SavegameHeader savegameHeader;
 	SavegameError savegameError = readSavegameHeader(target, kAutoSaveSlot, savegameHeader);
 	return (savegameError == kSavegameNotFoundError || (savegameHeader.flags & kSavegameFlagAutosave));
-}
-
-void TuckerEngine::writeAutosave() {
-	if (canSaveGameStateCurrently()) {
-		// unconditionally reset last autosave timestamp so we don't start
-		// hammering the disk in case we can't/don't actually write the file
-		_lastSaveTime = _system->getMillis();
-
-		if (!isAutosaveAllowed()) {
-			warning("Refusing to overwrite non-autosave savegame in slot %i, skipping autosave", kAutoSaveSlot);
-			return;
-		}
-
-		if (writeSavegame(kAutoSaveSlot, "Autosave", true).getCode() != Common::kNoError) {
-			warning("Can't create autosave in slot %i, game not saved", kAutoSaveSlot);
-			return;
-		}
-	}
 }
 
 bool TuckerEngine::canLoadOrSave() const {

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -59,13 +58,16 @@ bool CursorManager::showMouse(bool visible) {
 	return g_system->showMouse(visible);
 }
 
-void CursorManager::pushCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
-	Cursor *cur = new Cursor(buf, w, h, hotspotX, hotspotY, keycolor, dontScale, format);
+void CursorManager::pushCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask) {
+	if (!g_system->hasFeature(OSystem::kFeatureCursorMask))
+		mask = nullptr;
+
+	Cursor *cur = new Cursor(buf, w, h, hotspotX, hotspotY, keycolor, dontScale, format, mask);
 
 	cur->_visible = isVisible();
 	_cursorStack.push(cur);
 
-	g_system->setMouseCursor(cur->_data, w, h, hotspotX, hotspotY, keycolor, dontScale, format);
+	g_system->setMouseCursor(cur->_data, w, h, hotspotX, hotspotY, keycolor, dontScale, format, mask);
 }
 
 void CursorManager::popCursor() {
@@ -77,7 +79,7 @@ void CursorManager::popCursor() {
 
 	if (!_cursorStack.empty()) {
 		cur = _cursorStack.top();
-		g_system->setMouseCursor(cur->_data, cur->_width, cur->_height, cur->_hotspotX, cur->_hotspotY, cur->_keycolor, cur->_dontScale, &cur->_format);
+		g_system->setMouseCursor(cur->_data, cur->_width, cur->_height, cur->_hotspotX, cur->_hotspotY, cur->_keycolor, cur->_dontScale, &cur->_format, cur->_mask);
 	} else {
 		g_system->setMouseCursor(nullptr, 0, 0, 0, 0, 0);
 	}
@@ -103,10 +105,12 @@ void CursorManager::popAllCursors() {
 	g_system->showMouse(isVisible());
 }
 
-void CursorManager::replaceCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
+void CursorManager::replaceCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask) {
+	if (!g_system->hasFeature(OSystem::kFeatureCursorMask))
+		mask = nullptr;
 
 	if (_cursorStack.empty()) {
-		pushCursor(buf, w, h, hotspotX, hotspotY, keycolor, dontScale, format);
+		pushCursor(buf, w, h, hotspotX, hotspotY, keycolor, dontScale, format, mask);
 		return;
 	}
 
@@ -131,6 +135,14 @@ void CursorManager::replaceCursor(const void *buf, uint w, uint h, int hotspotX,
 	if (buf && cur->_data)
 		memcpy(cur->_data, buf, size);
 
+	delete[] cur->_mask;
+	cur->_mask = nullptr;
+
+	if (mask) {
+		cur->_mask = new byte[w * h];
+		memcpy(cur->_mask, mask, w * h);
+	}
+
 	cur->_width = w;
 	cur->_height = h;
 	cur->_hotspotX = hotspotX;
@@ -144,7 +156,15 @@ void CursorManager::replaceCursor(const void *buf, uint w, uint h, int hotspotX,
 		cur->_format = Graphics::PixelFormat::createFormatCLUT8();
 #endif
 
-	g_system->setMouseCursor(cur->_data, w, h, hotspotX, hotspotY, keycolor, dontScale, format);
+	g_system->setMouseCursor(cur->_data, w, h, hotspotX, hotspotY, keycolor, dontScale, format, mask);
+}
+
+void CursorManager::replaceCursor(const Graphics::Cursor *cursor) {
+	replaceCursor(cursor->getSurface(), cursor->getWidth(), cursor->getHeight(), cursor->getHotspotX(),
+				  cursor->getHotspotY(), cursor->getKeyColor(), false, nullptr, cursor->getMask());
+
+	if (cursor->getPalette())
+		replaceCursorPalette(cursor->getPalette(), cursor->getPaletteStartIndex(), cursor->getPaletteCount());
 }
 
 bool CursorManager::supportsCursorPalettes() {
@@ -234,14 +254,15 @@ void CursorManager::lock(bool locked) {
 	_locked = locked;
 }
 
-CursorManager::Cursor::Cursor(const void *data, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
+CursorManager::Cursor::Cursor(const void *data, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask) {
 #ifdef USE_RGB_COLOR
 	if (!format)
 		_format = Graphics::PixelFormat::createFormatCLUT8();
 	 else
 		_format = *format;
 	_size = w * h * _format.bytesPerPixel;
-	_keycolor = keycolor & ((1 << (_format.bytesPerPixel << 3)) - 1);
+	const uint32 keycolor_mask = (((uint32) -1) >> (sizeof(uint32) * 8 - _format.bytesPerPixel * 8));
+	_keycolor = keycolor & keycolor_mask;
 #else
 	_format = Graphics::PixelFormat::createFormatCLUT8();
 	_size = w * h;
@@ -250,6 +271,12 @@ CursorManager::Cursor::Cursor(const void *data, uint w, uint h, int hotspotX, in
 	_data = new byte[_size];
 	if (data && _data)
 		memcpy(_data, data, _size);
+	if (mask) {
+		_mask = new byte[w * h];
+		if (_mask)
+			memcpy(_mask, mask, w * h);
+	} else
+		_mask = nullptr;
 	_width = w;
 	_height = h;
 	_hotspotX = hotspotX;
@@ -260,6 +287,7 @@ CursorManager::Cursor::Cursor(const void *data, uint w, uint h, int hotspotX, in
 
 CursorManager::Cursor::~Cursor() {
 	delete[] _data;
+	delete[] _mask;
 }
 
 CursorManager::Palette::Palette(const byte *colors, uint start, uint num) {

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,7 +26,8 @@ namespace Director {
 
 enum TheEntityType {
 	kTheNOEntity = 0,
-	kTheActorList = 1,
+	kTheObject = 1,
+	kTheActorList = 2,
 	kTheBeepOn,
 	kTheButtonStyle,
 	kTheCast,
@@ -36,6 +36,7 @@ enum TheEntityType {
 	kTheChars,
 	kTheCheckBoxAccess,
 	kTheCheckBoxType,
+	kTheChunk,
 	kTheClickLoc,
 	kTheClickOn,
 	kTheColorDepth,
@@ -52,6 +53,7 @@ enum TheEntityType {
 	kTheFrameLabel,
 	kTheFramePalette,
 	kTheFrameScript,
+	kTheFrameTempo,
 	kTheFreeBlock,
 	kTheFreeBytes,
 	kTheFullColorPermit,
@@ -63,7 +65,6 @@ enum TheEntityType {
 	kTheKeyDownScript,
 	kTheKeyUpScript,
 	kTheLabelList,
-	kTheLast,
 	kTheLastClick,
 	kTheLastEvent,
 	kTheLastFrame,
@@ -99,6 +100,7 @@ enum TheEntityType {
 	kThePathName,
 	kThePauseState,
 	kThePerFrameHook,
+	kThePi,
 	kThePreloadEventAbort,
 	kThePreLoadRAM,
 	kTheQuickTimePresent,
@@ -107,12 +109,14 @@ enum TheEntityType {
 	kTheRightMouseDown,
 	kTheRightMouseUp,
 	kTheRomanLingo,
+	kTheScummvmVersion,			// set the Director version via lingo in tests
 	kTheSearchCurrentFolder,
 	kTheSearchPath,
 	kTheSelection,
 	kTheSelEnd,
 	kTheSelStart,
 	kTheShiftDown,
+	kTheSoundEntity,
 	kTheSoundEnabled,
 	kTheSoundLevel,
 	kTheSprite,
@@ -127,7 +131,7 @@ enum TheEntityType {
 	kTheSwitchColorDepth,
 	kTheTicks,
 	kTheTime,
-	kTheTimeoutKeydown,
+	kTheTimeoutKeyDown,
 	kTheTimeoutLapsed,
 	kTheTimeoutLength,
 	kTheTimeoutMouse,
@@ -140,7 +144,8 @@ enum TheEntityType {
 	kTheUpdateMovieEnabled,
 	kTheWindow,
 	kTheWindowList,
-	kTheWords
+	kTheWords,
+	kTheMaxTheEntityType		// This must be always last
 };
 
 enum TheFieldType {
@@ -170,9 +175,11 @@ enum TheFieldType {
 	kTheHilite,
 	kTheImmediate,
 	kTheInk,
+	kTheLast,
 	kTheLeft,
 	kTheLineSize,
 	kTheLoaded,
+	kTheLoc,
 	kTheLocH,
 	kTheLocV,
 	kTheLong,
@@ -209,7 +216,7 @@ enum TheFieldType {
 	kTheText,
 	kTheTextAlign,
 	kTheTextFont,
-	kTheTextheight,
+	kTheTextHeight,
 	kTheTextSize,
 	kTheTextStyle,
 	kTheTitle,
@@ -218,22 +225,27 @@ enum TheFieldType {
 	kTheTrails,
 	kTheType,
 	kTheVideo,
+	kTheVisibility,
 	kTheVisible,
 	kTheVolume,
 	kTheWidth,
-	kTheWindowType
+	kTheWindowType,
+	kTheMaxTheFieldType		// This must be always last
 };
 
 struct TheEntity {
 	TheEntityType entity;
 	const char *name;
 	bool hasId;
+	int version;
+	bool isFunction;
 };
 
 struct TheEntityField {
 	TheEntityType entity;
 	const char *name;
 	TheFieldType field;
+	int version;
 };
 
 } // End of namespace Director

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -82,6 +81,43 @@ struct SpriteInfo {
 	int32 classFlags;
 	int32 imgFlags;
 	int32 conditionBits;
+
+	void reset() {
+		id = 0;
+		zorder = 0;
+		flags = 0;
+		image = 0;
+		imageState = 0;
+		group = 0;
+		palette = 0;
+		priority = 0;
+		bbox.top = bbox.left = bbox.bottom = bbox.right = 0;
+		dx = 0;
+		dy = 0;
+		pos.x = pos.y = 0;
+		tx = 0;
+		ty = 0;
+		userValue = 0;
+		curImageState = 0;
+		curImage = 0;
+		imglistNum = 0;
+		shadow = 0;
+		imageStateCount = 0;
+		angle = 0;
+		scale = 0;
+		animProgress = 0;
+		curAngle = 0;
+		curScale = 0;
+		curImgFlags = 0;
+		animIndex = 0;
+		animSpeed = 0;
+		sourceImage = 0;
+		maskImage = 0;
+		zbufferImage = 0;
+		classFlags = 0;
+		imgFlags = 0;
+		conditionBits = 0;
+	}
 };
 
 struct SpriteGroup {
@@ -96,6 +132,20 @@ struct SpriteGroup {
 	int32 scale_x_ratio_div;
 	int32 scale_y_ratio_mul;
 	int32 scale_y_ratio_div;
+
+	void reset() {
+		bbox.top = bbox.left = bbox.bottom = bbox.right = 0;
+		priority = 0;
+		flags = 0;
+		tx = 0;
+		ty = 0;
+		image = 0;
+		scaling = 0;
+		scale_x_ratio_mul = 0;
+		scale_x_ratio_div = 0;
+		scale_y_ratio_mul = 0;
+		scale_y_ratio_div = 0;
+	}
 };
 
 class ScummEngine_v90he;
@@ -103,7 +153,7 @@ class ScummEngine_v90he;
 class Sprite : public Common::Serializable {
 public:
 	Sprite(ScummEngine_v90he *vm);
-	virtual ~Sprite();
+	~Sprite() override;
 
 	SpriteInfo *_spriteTable;
 	SpriteGroup *_spriteGroups;
@@ -114,7 +164,7 @@ public:
 	int32 _varNumSprites;
 	int32 _varMaxSprites;
 
-	void saveLoadWithSerializer(Common::Serializer &s);
+	void saveLoadWithSerializer(Common::Serializer &s) override;
 	void resetBackground();
 	void setRedrawFlags(bool checkZOrder);
 	void sortActiveSprites();

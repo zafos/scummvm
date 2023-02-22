@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -97,12 +96,12 @@ public:
 public:
 	DECLARE_PERSISTENT(BaseFontTT, BaseFont)
 	BaseFontTT(BaseGame *inGame);
-	virtual ~BaseFontTT(void);
+	~BaseFontTT(void) override;
 
-	virtual int getTextWidth(const byte *text, int maxLength = -1) override;
-	virtual int getTextHeight(const byte *text, int width) override;
-	virtual void drawText(const byte *text, int x, int y, int width, TTextAlign align = TAL_LEFT, int max_height = -1, int maxLength = -1) override;
-	virtual int getLetterHeight() override;
+	int getTextWidth(const byte *text, int maxLength = -1) override;
+	int getTextHeight(const byte *text, int width) override;
+	void drawText(const byte *text, int x, int y, int width, TTextAlign align = TAL_LEFT, int max_height = -1, int maxLength = -1) override;
+	int getLetterHeight() override;
 
 	bool loadBuffer(char *buffer);
 	bool loadFile(const Common::String &filename);
@@ -111,8 +110,8 @@ public:
 		return _lineHeight;
 	}
 
-	void afterLoad();
-	void initLoop();
+	void afterLoad() override;
+	void initLoop() override;
 
 private:
 	bool parseLayer(BaseTTFontLayer *layer, char *buffer);
@@ -141,6 +140,7 @@ private:
 	bool _isStriked;
 	int32 _fontHeight;
 	char *_fontFile;
+	TTextCharset _charset;
 
 	BaseArray<BaseTTFontLayer *> _layers;
 	void clearCache();

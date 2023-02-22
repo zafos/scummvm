@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -70,11 +69,11 @@ static int check_permission(snd_seq_port_info_t *pinfo) {
 class MidiDriver_ALSA : public MidiDriver_MPU401 {
 public:
 	MidiDriver_ALSA(int client, int port);
-	int open();
-	bool isOpen() const { return _isOpen; }
-	void close();
-	void send(uint32 b);
-	void sysEx(const byte *msg, uint16 length);
+	int open() override;
+	bool isOpen() const override { return _isOpen; }
+	void close() override;
+	void send(uint32 b) override;
+	void sysEx(const byte *msg, uint16 length) override;
 
 private:
 	void send_event(int do_flush);
@@ -108,7 +107,8 @@ int MidiDriver_ALSA::open() {
 	}
 	snd_seq_set_client_group(seq_handle, "input");
 
-	// According to http://www.alsa-project.org/~tiwai/alsa-subs.html
+	// According to
+	// https://web.archive.org/web/20120505164948/http://www.alsa-project.org/~tiwai/alsa-subs.html
 	// you can set read or write capabilities to allow other clients to
 	// read or write the port. I don't think we need that, unless maybe
 	// to be able to record the sound, but I can't get that to work even
@@ -185,6 +185,8 @@ void MidiDriver_ALSA::send(uint32 b) {
 		warning("MidiDriver_ALSA: Got event while not open");
 		return;
 	}
+
+	midiDriverCommonSend(b);
 
 	unsigned int midiCmd[4];
 	ev.type = SND_SEQ_EVENT_OSS;
@@ -267,6 +269,8 @@ void MidiDriver_ALSA::sysEx(const byte *msg, uint16 length) {
 	unsigned char buf[266];
 
 	assert(length + 2 <= ARRAYSIZE(buf));
+
+	midiDriverCommonSysEx(msg, length);
 
 	// Add SysEx frame
 	buf[0] = 0xF0;

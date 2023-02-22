@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,34 +15,31 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
-#include "osystem.h"
+#include "backends/platform/3ds/osystem.h"
 #include "audio/mixer.h"
 
-namespace _3DS {
+namespace N3DS {
 
 static bool hasAudio = false;
 
 static void audioThreadFunc(void *arg) {
 	Audio::MixerImpl *mixer = (Audio::MixerImpl *)arg;
-	OSystem_3DS *osys = (OSystem_3DS *)g_system;
+	OSystem_3DS *osys = dynamic_cast<OSystem_3DS *>(g_system);
 
-	int i;
 	const int channel = 0;
 	int bufferIndex = 0;
-	const int bufferCount = 3;
-	const int bufferSize = 80000; // Can't be too small, based on delayMillis duration
+	const int bufferCount = 2;
 	const int sampleRate = mixer->getOutputRate();
-	int sampleLen = 0;
-	uint32 lastTime = osys->getMillis(true);
-	uint32 time = lastTime;
+	const int bufferSamples = 1024;
+	const int bufferSize = bufferSamples * 4;
+
 	ndspWaveBuf buffers[bufferCount];
 
-	for (i = 0; i < bufferCount; ++i) {
+	for (int i = 0; i < bufferCount; ++i) {
 		memset(&buffers[i], 0, sizeof(ndspWaveBuf));
 		buffers[i].data_vaddr = linearAlloc(bufferSize);
 		buffers[i].looping = false;
@@ -55,31 +52,31 @@ static void audioThreadFunc(void *arg) {
 	ndspChnSetFormat(channel, NDSP_FORMAT_STEREO_PCM16);
 
 	while (!osys->exiting) {
-		osys->delayMillis(100); // Note: Increasing the delay requires a bigger buffer
+		svcSleepThread(5000 * 1000); // Wake up the thread every 5 ms
 
-		time = osys->getMillis(true);
-		sampleLen = (time - lastTime) * 22 * 4; // sampleRate / 1000 * channelCount * sizeof(int16);
-		lastTime = time;
+		if (osys->sleeping) {
+			continue;
+		}
 
-		if (!osys->sleeping && sampleLen > 0) {
-			bufferIndex++;
-			bufferIndex %= bufferCount;
-			ndspWaveBuf *buf = &buffers[bufferIndex];
-
-			buf->nsamples = mixer->mixCallback(buf->data_adpcm, sampleLen);
+		ndspWaveBuf *buf = &buffers[bufferIndex];
+		if (buf->status == NDSP_WBUF_FREE || buf->status == NDSP_WBUF_DONE) {
+			buf->nsamples = mixer->mixCallback(buf->data_adpcm, bufferSize);
 			if (buf->nsamples > 0) {
 				DSP_FlushDataCache(buf->data_vaddr, bufferSize);
 				ndspChnWaveBufAdd(channel, buf);
 			}
+
+			bufferIndex++;
+			bufferIndex %= bufferCount;
 		}
 	}
 
-	for (i = 0; i < bufferCount; ++i)
-		linearFree(buffers[i].data_pcm8);
+	for (int i = 0; i < bufferCount; ++i)
+		linearFree(buffers[i].data_pcm16);
 }
 
 void OSystem_3DS::initAudio() {
-	_mixer = new Audio::MixerImpl(this, 22050);
+	_mixer = new Audio::MixerImpl(22050);
 
 	hasAudio = R_SUCCEEDED(ndspInit());
 	_mixer->setReady(false);
@@ -107,4 +104,4 @@ Audio::Mixer *OSystem_3DS::getMixer() {
 	return _mixer;
 }
 
-} // namespace _3DS
+} // namespace N3DS

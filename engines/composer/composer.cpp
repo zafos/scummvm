@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 #include "common/scummsys.h"
@@ -42,7 +41,7 @@ namespace Composer {
 
 ComposerEngine::ComposerEngine(OSystem *syst, const ComposerGameDescription *gameDesc) : Engine(syst), _gameDescription(gameDesc) {
 	_rnd = new Common::RandomSource("composer");
-	_audioStream = NULL;
+	_audioStream = nullptr;
 	_currSoundPriority = 0;
 	_currentTime = 0;
 	_lastTime = 0;
@@ -51,13 +50,10 @@ ComposerEngine::ComposerEngine(OSystem *syst, const ComposerGameDescription *gam
 	_mouseVisible = true;
 	_mouseEnabled = false;
 	_mouseSpriteId = 0;
-	_lastButton = NULL;
-	_console = NULL;
+	_lastButton = nullptr;
 }
 
 ComposerEngine::~ComposerEngine() {
-	DebugMan.clearAllDebugChannels();
-
 	stopPipes();
 	for (Common::List<OldScript *>::iterator i = _oldScripts.begin(); i != _oldScripts.end(); i++)
 		delete *i;
@@ -69,7 +65,6 @@ ComposerEngine::~ComposerEngine() {
 		i->_surface.free();
 
 	delete _rnd;
-	delete _console;
 }
 
 Common::Error ComposerEngine::run() {
@@ -85,14 +80,28 @@ Common::Error ComposerEngine::run() {
 		_queuedScripts[i]._scriptId = 0;
 	}
 
-	if (!_bookIni.loadFromFile("book.ini")) {
+	if (!loadDetectedConfigFile(_bookIni)) {
+		// Config files for Darby the Dragon are located in subdirectory
 		_directoriesToStrip = 0;
 		if (!_bookIni.loadFromFile("programs/book.ini")) {
-			// mac version?
-			if (!_bookIni.loadFromFile("Darby the Dragon.ini"))
-				if (!_bookIni.loadFromFile("Gregory.ini"))
-					error("failed to find book.ini");
+			error("failed to find book.ini");
 		}
+	}
+
+	Common::String gameId(getGameId());
+	if (getPlatform() == Common::kPlatformMacintosh && (gameId == "darby" || gameId == "gregory")) {
+		_directoriesToStrip = 0;
+	}
+
+	if (getPlatform() == Common::kPlatformMacintosh) {
+		const Common::FSNode gameDataDir(ConfMan.get("path"));
+		if (gameId == "sleepingcub")
+			SearchMan.addSubDirectoryMatching(gameDataDir, "sleepcub");
+		if (gameId == "princess")
+			SearchMan.addSubDirectoryMatching(gameDataDir, "princess");
+		if (gameId == "liam")
+			SearchMan.addSubDirectoryMatching(gameDataDir, "liam");
+
 	}
 
 	uint width = 640;
@@ -105,23 +114,28 @@ Common::Error ComposerEngine::run() {
 	_screen.create(width, height, Graphics::PixelFormat::createFormatCLUT8());
 
 	Graphics::Cursor *cursor = Graphics::makeDefaultWinCursor();
-	CursorMan.replaceCursor(cursor->getSurface(), cursor->getWidth(), cursor->getHeight(), cursor->getHotspotX(),
-		cursor->getHotspotY(), cursor->getKeyColor());
-	CursorMan.replaceCursorPalette(cursor->getPalette(), cursor->getPaletteStartIndex(), cursor->getPaletteCount());
+	CursorMan.replaceCursor(cursor);
 	delete cursor;
 
-	_console = new Console(this);
+	setDebugger(new Console(this));
 
 	loadLibrary(0);
 
-	uint fps = atoi(getStringFromConfig("Common", "FPS").c_str());
+	uint fps;
+	if (_bookIni.hasKey("FPS", "Common"))
+		fps = atoi(getStringFromConfig("Common", "FPS").c_str());
+	else {
+		// On Macintosh version there is no FPS key
+		if (getPlatform() != Common::kPlatformMacintosh)
+			warning("there is no FPS key in book.ini. Defaulting to 8...");
+		fps = 8;
+	}
 	uint frameTime = 125; // Default to 125ms (1000/8)
 	if (fps != 0)
 		frameTime = 1000 / fps;
 	else
 		warning("FPS in book.ini is zero. Defaulting to 8...");
 	uint32 lastDrawTime = 0;
-	_lastSaveTime = _system->getMillis();
 
 	bool loadFromLauncher = ConfMan.hasKey("save_slot");
 
@@ -177,8 +191,7 @@ Common::Error ComposerEngine::run() {
 			loadGameState(ConfMan.getInt("save_slot"));
 			loadFromLauncher = false;
 		}
-		if (shouldPerformAutoSave(_lastSaveTime))
-			saveGameState(0, "Autosave");
+
 		while (_eventMan->pollEvent(event)) {
 			switch (event.type) {
 			case Common::EVENT_LBUTTONDOWN:
@@ -197,14 +210,6 @@ Common::Error ComposerEngine::run() {
 
 			case Common::EVENT_KEYDOWN:
 				switch (event.kbd.keycode) {
-				case Common::KEYCODE_d:
-					if (event.kbd.hasFlags(Common::KBD_CTRL)) {
-						// Start the debugger
-						getDebugger()->attach();
-						getDebugger()->onFrame();
-					}
-					break;
-
 				case Common::KEYCODE_q:
 					if (event.kbd.hasFlags(Common::KBD_CTRL))
 						quitGame();
@@ -393,10 +398,18 @@ void ComposerEngine::loadLibrary(uint id) {
 	Common::String filename;
 	Common::String oldGroup = _bookGroup;
 	if (getGameType() == GType_ComposerV1) {
-		if (!id || _bookGroup.empty())
-			filename = getStringFromConfig("Common", "StartPage");
-		else
-			filename = getStringFromConfig(_bookGroup, Common::String::format("%d", id));
+		if (getPlatform() == Common::kPlatformMacintosh) {
+			if (!id || _bookGroup.empty())
+				filename = getStringFromConfig("splash.rsc", "100");
+			else
+				filename = getStringFromConfig(_bookGroup + ".rsc", Common::String::format("%d", id));
+		}
+		else {
+			if (!id || _bookGroup.empty())
+				filename = getStringFromConfig("Common", "StartPage");
+			else
+				filename = getStringFromConfig(_bookGroup, Common::String::format("%d", id));
+		}
 		filename = mangleFilename(filename);
 
 		// bookGroup is the basename of the path.
@@ -517,10 +530,10 @@ void ComposerEngine::unloadLibrary(uint id) {
 		_sprites.clear();
 		i->_buttons.clear();
 
-		_lastButton = NULL;
+		_lastButton = nullptr;
 
 		_mixer->stopAll();
-		_audioStream = NULL;
+		_audioStream = nullptr;
 
 		for (uint j = 0; j < _queuedScripts.size(); j++) {
 			_queuedScripts[j]._count = 0;
@@ -535,7 +548,8 @@ void ComposerEngine::unloadLibrary(uint id) {
 		return;
 	}
 
-	error("tried to unload library %d, which isn't loaded", id);
+	warning("tried to unload library %d, which isn't loaded", id);
+	return;
 }
 
 bool ComposerEngine::hasResource(uint32 tag, uint16 id) {
@@ -675,7 +689,7 @@ const Button *ComposerEngine::getButtonFor(const Sprite *sprite, const Common::P
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 void ComposerEngine::setButtonActive(uint16 id, bool active) {

@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995-1997 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,13 +18,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "pegasus/gamestate.h"
 #include "pegasus/pegasus.h"
+#include "pegasus/items/biochips/arthurchip.h"
 #include "pegasus/neighborhood/norad/constants.h"
 #include "pegasus/neighborhood/norad/norad.h"
 #include "pegasus/neighborhood/norad/subcontrolroom.h"
@@ -423,11 +423,11 @@ static const ResIDType kClawMonitorGreenBallBaseID = 600;
 
 // Constructor
 SubControlRoom::SubControlRoom(Neighborhood *handler) : GameInteraction(kNoradSubControlRoomInteractionID, handler),
-		_subControlMovie(kSubControlMonitorID), _subControlNotification(kSubControlNotificationID, (PegasusEngine *)g_engine),
+		_subControlMovie(kSubControlMonitorID), _subControlNotification(kSubControlNotificationID, g_vm),
 		_clawMonitorMovie(kClawMonitorID), _pinchButton(kSubControlPinchID), _downButton(kSubControlDownID),
 		_rightButton(kSubControlRightID), _leftButton(kSubControlLeftID), _upButton(kSubControlUpID),
 		_ccwButton(kSubControlCCWID), _cwButton(kSubControlCWID), _greenBall(kClawMonitorGreenBallID),
-		_greenBallNotification(kNoradGreenBallNotificationID, (PegasusEngine *)g_engine) {
+		_greenBallNotification(kNoradGreenBallNotificationID, g_vm) {
 	_neighborhoodNotification = handler->getNeighborhoodNotification();
 	_playingAgainstRobot = false;
 	_robotState = kNoRobot;
@@ -450,7 +450,7 @@ void SubControlRoom::openInteraction() {
 	_clawPosition = _clawStartPosition;
 	_clawNextPosition = _clawPosition;
 	_subControlMovie.initFromMovieFile("Images/Norad Alpha/N22 Left Monitor Movie");
-	_subControlMovie.setVolume(((PegasusEngine *)g_engine)->getSoundFXLevel());
+	_subControlMovie.setVolume(g_vm->getSoundFXLevel());
 	_subControlMovie.moveElementTo(kNoradSubControlLeft, kNoradSubControlTop);
 	_subControlScale = _subControlMovie.getScale();
 	_subControlMovie.setDisplayOrder(kSubControlOrder);
@@ -487,15 +487,15 @@ void SubControlRoom::openInteraction() {
 
 	for (int i = 0; i < kNumClawButtons; i++) {
 		SpriteFrame *frame = new SpriteFrame();
-		frame->initFromPICTResource(((PegasusEngine *)g_engine)->_resFork, kSubControlButtonBaseID + i * 3, true);
+		frame->initFromPICTResource(g_vm->_resFork, kSubControlButtonBaseID + i * 3, true);
 		_buttons[i]->addFrame(frame, 0, 0);
 
 		frame = new SpriteFrame();
-		frame->initFromPICTResource(((PegasusEngine *)g_engine)->_resFork, kSubControlButtonBaseID + i * 3 + 1, true);
+		frame->initFromPICTResource(g_vm->_resFork, kSubControlButtonBaseID + i * 3 + 1, true);
 		_buttons[i]->addFrame(frame, 0, 0);
 
 		frame = new SpriteFrame();
-		frame->initFromPICTResource(((PegasusEngine *)g_engine)->_resFork, kSubControlButtonBaseID + i * 3 + 2, true);
+		frame->initFromPICTResource(g_vm->_resFork, kSubControlButtonBaseID + i * 3 + 2, true);
 		_buttons[i]->addFrame(frame, 0, 0);
 
 		_buttons[i]->setCurrentFrameIndex(0);
@@ -514,7 +514,7 @@ void SubControlRoom::openInteraction() {
 
 	for (int i = 0; i < kNumClawGreenBalls; i++) {
 		SpriteFrame *frame = new SpriteFrame();
-		frame->initFromPICTResource(((PegasusEngine *)g_engine)->_resFork, kClawMonitorGreenBallBaseID + i);
+		frame->initFromPICTResource(g_vm->_resFork, kClawMonitorGreenBallBaseID + i);
 		_greenBall.addFrame(frame, 0, 0);
 	}
 
@@ -565,6 +565,8 @@ void SubControlRoom::receiveNotification(Notification *notification, const Notif
 		switch (flags) {
 		case kAlphaSplashFinished:
 			setControlMonitorToTime(kMainMenuTime * _subControlScale, kAlphaMainMenu, true);
+			if (g_arthurChip)
+				g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA29", kArthurNoradSawClawMonitor);
 			break;
 		case kPrepHighlightFinished:
 			if (GameState.getNoradSubPrepState() == kSubDamaged)
@@ -604,6 +606,8 @@ void SubControlRoom::receiveNotification(Notification *notification, const Notif
 			break;
 		case kDeltaPrepFinished:
 			setControlMonitorToTime(kMainMenuTime * _subControlScale, kDeltaMainMenu, true);
+			break;
+		default:
 			break;
 		}
 	} else if (notification == &_greenBallNotification) {
@@ -658,6 +662,8 @@ void SubControlRoom::receiveNotification(Notification *notification, const Notif
 				hideEverything();
 				_robotState = kPlayerWon;
 				owner->startExtraSequence(kN60PlayerFollowsRobotToDoor, kExtraCompletedFlag, kFilterAllInput);
+				if (g_arthurChip)
+					g_arthurChip->playArthurMovieForEvent("Images/AI/Globals/XGLOBA67", kArthurNoradBeatRobotWithClaw);
 				break;
 			case kPlayerWon:
 				((NoradDelta *)owner)->playerBeatRobotWithClaw();
@@ -665,7 +671,9 @@ void SubControlRoom::receiveNotification(Notification *notification, const Notif
 				break;
 			case kRobotWon:
 				g_system->delayMillis(2 * 1000); // 120 ticks
-				((PegasusEngine *)g_engine)->die(kDeathRobotSubControlRoom);
+				g_vm->die(kDeathRobotSubControlRoom);
+				break;
+			default:
 				break;
 			}
 		} else {
@@ -689,6 +697,8 @@ void SubControlRoom::receiveNotification(Notification *notification, const Notif
 						break;
 					case kClawAtD:
 						dispatchClawAction(kMoveRightActionIndex);
+						break;
+					default:
 						break;
 					}
 				}
@@ -825,6 +835,8 @@ void SubControlRoom::clickInHotspot(const Input &input, const Hotspot *spot) {
 				case kClawAtD:
 					dispatchClawAction(kMoveRightActionIndex);
 					break;
+				default:
+					break;
 				}
 			}
 		}
@@ -884,6 +896,8 @@ void SubControlRoom::performActionImmediately(const int action, const uint32 ext
 		// Start move.
 		_greenBallTimer.start();
 		break;
+	default:
+		break;
 	}
 
 	if (_playingAgainstRobot) {
@@ -896,6 +910,8 @@ void SubControlRoom::performActionImmediately(const int action, const uint32 ext
 			break;
 		case kCarriedToDoor:
 			owner->startExtraSequence(kN60ArmCarriesRobotToPositionA, kExtraCompletedFlag, kFilterAllInput);
+			break;
+		default:
 			break;
 		}
 	} else {
@@ -966,6 +982,8 @@ void SubControlRoom::updateClawMonitor() {
 		break;
 	case kClawAtD:
 		setClawMonitorToTime(kClawAtDTime);
+		break;
+	default:
 		break;
 	}
 }
@@ -1144,6 +1162,8 @@ void SubControlRoom::moveGreenBallToC() {
 		break;
 	case kClawAtD:
 		_greenBall.setCurrentFrameIndex(kGreenBallAtCArmAtD);
+		break;
+	default:
 		break;
 	}
 

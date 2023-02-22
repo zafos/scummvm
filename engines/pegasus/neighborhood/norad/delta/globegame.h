@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995-1997 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -45,14 +44,14 @@ enum GlobeTrackDirection {
 class GlobeTracker : public Tracker {
 public:
 	GlobeTracker(Movie *, Picture *, Picture *, Picture *, Picture *);
-	virtual ~GlobeTracker() {}
+	~GlobeTracker() override {}
 
 	void setTrackParameters(const Hotspot *, GlobeTrackDirection);
-	void continueTracking(const Input &);
-	void startTracking(const Input &);
-	void stopTracking(const Input &);
-	void activateHotspots();
-	bool stopTrackingInput(const Input &);
+	void continueTracking(const Input &) override;
+	void startTracking(const Input &) override;
+	void stopTracking(const Input &) override;
+	void activateHotspots() override;
+	bool stopTrackingInput(const Input &) override;
 
 protected:
 	void trackGlobeMovie();
@@ -71,18 +70,18 @@ protected:
 class GlobeCountdown : public IdlerAnimation {
 public:
 	GlobeCountdown(const DisplayElementID);
-	virtual ~GlobeCountdown() {}
+	~GlobeCountdown() override {}
 
 	void setCountdownTime(const int);
 	void startCountdown();
 	void stopCountdown();
 
 	void setDisplayOrder(const DisplayOrder);
-	void show();
-	void hide();
-	void moveElementTo(const CoordType, const CoordType);
+	void show() override;
+	void hide() override;
+	void moveElementTo(const CoordType, const CoordType) override;
 
-	void draw(const Common::Rect &);
+	void draw(const Common::Rect &) override;
 
 protected:
 	Surface _digits;
@@ -96,16 +95,16 @@ static const int16 kNumLongSlices = 72;
 class GlobeGame : public GameInteraction, public NotificationReceiver {
 public:
 	GlobeGame(Neighborhood *);
-	virtual ~GlobeGame() {}
+	~GlobeGame() override {}
 
-	void setSoundFXLevel(const uint16);
+	void setSoundFXLevel(const uint16) override;
 
-	void handleInput(const Input &, const Hotspot *);
-	void clickInHotspot(const Input &, const Hotspot *);
-	void activateHotspots();
+	void handleInput(const Input &, const Hotspot *) override;
+	void clickInHotspot(const Input &, const Hotspot *) override;
+	void activateHotspots() override;
 
-	bool canSolve();
-	void doSolve();
+	bool canSolve() override;
+	void doSolve() override;
 
 	struct Point3D {
 		float x, y, z;
@@ -123,11 +122,11 @@ protected:
 	static const int16 _timeLimit[kNumTargetSilos];
 	static const TimeValue _siloName[kNumTargetSilos][2];
 
-	void openInteraction();
-	void initInteraction();
-	void closeInteraction();
+	void openInteraction() override;
+	void initInteraction() override;
+	void closeInteraction() override;
 
-	void receiveNotification(Notification *, const NotificationFlags);
+	void receiveNotification(Notification *, const NotificationFlags) override;
 
 	void spinGlobe(const Input &, const Hotspot *, GlobeTrackDirection);
 	void clickGlobe(const Input &);
@@ -139,11 +138,13 @@ protected:
 	void screenPointTo3DPoint(int16, int16, Point3D &);
 	bool lineHitsGlobe(const Line3D &, Point3D &);
 
+	Movie _robotMovie;
 	Movie _monitorMovie;
 	Movie _globeMovie;
 	Movie _upperNamesMovie;
 	Movie _lowerNamesMovie;
 	Notification _globeNotification;
+	NotificationCallBack _robotCallBack;
 	NotificationCallBack _monitorCallBack;
 	GlobeTracker _globeTracker;
 	Picture _globeCircleLeft;

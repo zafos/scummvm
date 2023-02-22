@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -310,6 +309,9 @@ bool AdItem::loadBuffer(char *buffer, bool complete) {
 		case TOKEN_EDITOR_PROPERTY:
 			parseEditorProperty(params, false);
 			break;
+
+		default:
+			break;
 		}
 	}
 	if (cmd == PARSERR_TOKENNOTFOUND) {
@@ -441,7 +443,7 @@ bool AdItem::display(int x, int y) {
 				font->drawText((byte *)_amountString, amountX, amountY, width, _amountAlign);
 			} else {
 				char str[256];
-				sprintf(str, "%d", _amount);
+				Common::sprintf_s(str, "%d", _amount);
 				font->drawText((byte *)str, amountX, amountY, width, _amountAlign);
 			}
 		}
@@ -532,6 +534,23 @@ bool AdItem::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 		return STATUS_OK;
 	}
 
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] RemoveNormalCursor
+	// Used while changing cursor type at some included script
+	// Return value is never used
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "RemoveNormalCursor") == 0) {
+		stack->correctParams(0);
+
+		delete _cursorNormal;
+		_cursorNormal = nullptr;
+
+		stack->pushNULL();
+		return STATUS_OK;
+	}
+#endif
+
 	//////////////////////////////////////////////////////////////////////////
 	// GetNormalCursor
 	//////////////////////////////////////////////////////////////////////////
@@ -580,6 +599,23 @@ bool AdItem::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 		}
 		return STATUS_OK;
 	}
+
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] RemoveHoverCursor
+	// Used while changing cursor type at some included script
+	// Return value is never used
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "RemoveHoverCursor") == 0) {
+		stack->correctParams(0);
+
+		delete _cursorHover;
+		_cursorHover = nullptr;
+
+		stack->pushNULL();
+		return STATUS_OK;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// GetHoverCursor

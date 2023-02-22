@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -106,6 +105,8 @@ void Scene10::Action1::signal() {
 		g_globals->_scenePalette.clearListeners();
 		g_globals->_sceneManager.changeScene(15);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -121,6 +122,8 @@ void Scene10::Action2::signal() {
 		scene->_veeshkaRightArm.setFrame(1);
 		scene->_veeshkaRightArm.animate(ANIM_MODE_5, this);
 		_actionIndex = 0;
+		break;
+	default:
 		break;
 	}
 }
@@ -241,6 +244,8 @@ void Scene15::Action1::signal() {
 	case 3:
 		SceneItem::display(0, 0);
 		g_globals->_sceneManager.changeScene(20);
+		break;
+	default:
 		break;
 	}
 }
@@ -1077,6 +1082,8 @@ void Scene40::Action1::signal() {
 		g_globals->_game->endGame(40, 20);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1160,6 +1167,8 @@ void Scene40::Action2::signal() {
 		g_globals->_player.enableControl();
 		scene->_assassin.setAction(&scene->_action8);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1196,6 +1205,8 @@ void Scene40::Action3::signal() {
 		g_globals->_player.enableControl();
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1211,6 +1222,8 @@ void Scene40::Action4::signal() {
 		g_globals->_stripNum = 88;
 		g_globals->_player.enableControl();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1225,6 +1238,9 @@ void Scene40::Action5::signal() {
 	case 1:
 		scene->_seekerTail.animate(ANIM_MODE_8, 1, this);
 		_actionIndex = 0;
+		break;
+	default:
+		break;
 	}
 }
 
@@ -1262,6 +1278,8 @@ void Scene40::Action6::signal() {
 	case 2:
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1290,6 +1308,8 @@ void Scene40::Action7::signal() {
 		scene->_leftEntrance.remove();
 		_actionIndex = 0;
 		setDelay(60);
+		break;
+	default:
 		break;
 	}
 }
@@ -1341,6 +1361,8 @@ void Scene40::Action8::signal() {
 	case 4:
 		g_globals->_game->endGame(40, 45);
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -1636,6 +1658,8 @@ void Scene50::Action1::signal() {
 		g_globals->_stripNum = -1;
 		g_globals->_sceneManager.changeScene(60);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1657,6 +1681,8 @@ void Scene50::Action2::signal() {
 		g_globals->_sceneManager.changeScene(40);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -1672,6 +1698,8 @@ void Scene50::Action3::signal() {
 	case 1:
 		g_globals->_sceneManager.changeScene(60);
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -1871,6 +1899,8 @@ void Scene50::signal() {
 	case 54:
 		g_globals->_player.enableControl();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -2038,6 +2068,8 @@ void Scene60::Action2::signal() {
 		break;
 	case 3:
 		g_globals->_sceneManager.changeScene(50);
+		break;
+	default:
 		break;
 	}
 }
@@ -2276,7 +2308,7 @@ void Scene60::Item1::doAction(int action) {
 				scene->_action1.setActionIndex(9);
 				scene->_action1.setDelay(1);
 			}
-			if (g_globals->getFlag(121) && !g_globals->_stripNum) {
+			if (g_globals->getFlag(121) && g_globals->_stripNum) {
 				g_globals->clearFlag(121);
 				scene->setAction(&scene->_action1);
 				scene->_action1.setActionIndex(9);
@@ -2445,7 +2477,11 @@ void Scene60::signal() {
 			g_globals->_player._uiEnabled = true;
 			g_globals->_events.setCursor(CURSOR_USE);
 
-			_gfxButton.setText(EXIT_MSG);
+			if (g_vm->getLanguage() == Common::ES_ESP) {
+				_gfxButton.setText(ESP_EXIT_MSG);
+			} else {
+				_gfxButton.setText(EXIT_MSG);
+			}
 			_gfxButton._bounds.center(160, 193);
 			_gfxButton.draw();
 			_gfxButton._bounds.expandPanes();
@@ -2552,6 +2588,8 @@ void Scene90::Action1::signal() {
 		SceneItem::display(0, 0);
 		g_globals->_scenePalette.clearListeners();
 		g_globals->_sceneManager.changeScene(95);
+		break;
+	default:
 		break;
 	}
 }
@@ -2826,6 +2864,8 @@ void Scene95::Action1::signal() {
 	case 9:
 		g_globals->_sceneManager.changeScene(2300);
 		break;
+	default:
+		break;
 	}
 }
 
@@ -2874,14 +2914,24 @@ void Scene6100::Action1::signal() {
 
 	switch (_actionIndex++) {
 	case 0:
-		scene->showMessage(SCENE6100_CAREFUL, 13, this);
+		if (g_vm->getLanguage() == Common::ES_ESP) {
+			scene->showMessage(ESP_SCENE6100_CAREFUL, 13, this);
+		} else {
+			scene->showMessage(SCENE6100_CAREFUL, 13, this);
+		}
 		break;
 	case 1:
-		scene->showMessage(SCENE6100_TOUGHER, 35, this);
+		if (g_vm->getLanguage() == Common::ES_ESP) {
+			scene->showMessage(ESP_SCENE6100_TOUGHER, 35, this);
+		} else {
+			scene->showMessage(SCENE6100_TOUGHER, 35, this);
+		}
 		break;
 	case 2:
 		scene->showMessage(NULL, 0, NULL);
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -2891,14 +2941,24 @@ void Scene6100::Action2::signal() {
 
 	switch (_actionIndex++) {
 	case 0:
-		scene->showMessage(SCENE6100_ONE_MORE_HIT, 13, this);
+		if (g_vm->getLanguage() == Common::ES_ESP) {
+			scene->showMessage(ESP_SCENE6100_ONE_MORE_HIT, 13, this);
+		} else {
+			scene->showMessage(SCENE6100_ONE_MORE_HIT, 13, this);
+		}
 		break;
 	case 1:
-		scene->showMessage(SCENE6100_DOING_BEST, 35, this);
+		if (g_vm->getLanguage() == Common::ES_ESP) {
+			scene->showMessage(ESP_SCENE6100_DOING_BEST, 35, this);
+		} else {
+			scene->showMessage(SCENE6100_DOING_BEST, 35, this);
+		}
 		break;
 	case 2:
 		scene->showMessage(NULL, 0, NULL);
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -2929,7 +2989,11 @@ void Scene6100::Action3::signal() {
 		scene->_stripManager.start(8120, this);
 		break;
 	case 2:
-		scene->showMessage(SCENE6100_REPAIR, 7, this);
+		if (g_vm->getLanguage() == Common::ES_ESP) {
+			scene->showMessage(ESP_SCENE6100_REPAIR, 7, this);
+		} else {
+			scene->showMessage(SCENE6100_REPAIR, 7, this);
+		}
 		break;
 	case 3:
 		scene->showMessage(NULL, 0, NULL);
@@ -2942,6 +3006,8 @@ void Scene6100::Action3::signal() {
 			(scene->_stripManager._currObj44Id == 135) ? 6100 : 2320);
 		remove();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -2950,14 +3016,24 @@ void Scene6100::Action4::signal() {
 
 	switch (_actionIndex++) {
 	case 0:
-		scene->showMessage(SCENE6100_ROCKY_AREA, 13, this);
+		if (g_vm->getLanguage() == Common::ES_ESP) {
+			scene->showMessage(ESP_SCENE6100_ROCKY_AREA, 13, this);
+		} else {
+			scene->showMessage(SCENE6100_ROCKY_AREA, 13, this);
+		}
 		break;
 	case 1:
-		scene->showMessage(SCENE6100_REPLY, 35, this);
+		if (g_vm->getLanguage() == Common::ES_ESP) {
+			scene->showMessage(ESP_SCENE6100_REPLY, 35, this);
+		} else {
+			scene->showMessage(SCENE6100_REPLY, 35, this);
+		}
 		break;
 	case 2:
 		scene->showMessage(NULL, 0, NULL);
 		remove();
+		break;
+	default:
 		break;
 	}
 }
@@ -3055,6 +3131,8 @@ void Scene6100::Action5::dispatch() {
 					scene->_probe.setAction(NULL);
 				scene->setAction(&scene->_action3);
 				break;
+			default:
+				break;
 			}
 
 			g_globals->_scenePalette.clearListeners();
@@ -3076,7 +3154,11 @@ void Scene6100::GetBoxAction::signal() {
 		break;
 	}
 	case 1: {
-		scene->showMessage(SCENE6100_TAKE_CONTROLS, 35, this);
+		if (g_vm->getLanguage() == Common::ES_ESP) {
+			scene->showMessage(ESP_SCENE6100_TAKE_CONTROLS, 35, this);
+		} else {
+			scene->showMessage(SCENE6100_TAKE_CONTROLS, 35, this);
+		}
 		g_globals->_scenePalette.clearListeners();
 
 		Common::Point pt(scene->_rocks._position.x, scene->_rocks._position.y - 10);
@@ -3086,18 +3168,33 @@ void Scene6100::GetBoxAction::signal() {
 	}
 	case 2:
 		scene->_probe._percent = 4;
-		scene->showMessage(SCENE6100_SURPRISE, 13, this);
+		if (g_vm->getLanguage() == Common::ES_ESP) {
+			scene->showMessage(ESP_SCENE6100_SURPRISE, 13, this);
+		} else {
+			scene->showMessage(SCENE6100_SURPRISE, 13, this);
+		}
 		break;
 	case 3:
-		scene->showMessage(SCENE6100_SWEAT, 35, this);
+		if (g_vm->getLanguage() == Common::ES_ESP) {
+			scene->showMessage(ESP_SCENE6100_SWEAT, 35, this);
+		} else {
+			scene->showMessage(SCENE6100_SWEAT, 35, this);
+		}
 		break;
 	case 4:
-		scene->showMessage(SCENE6100_VERY_WELL, 13, this);
+		if (g_vm->getLanguage() == Common::ES_ESP) {
+			scene->showMessage(ESP_SCENE6100_VERY_WELL, 13, this);
+		} else {
+			scene->showMessage(SCENE6100_VERY_WELL, 13, this);
+		}
 		break;
 	case 5:
 		scene->showMessage(NULL, 0, NULL);
 		g_globals->_sceneManager.changeScene(2320);
 		remove();
+		break;
+	default:
+		break;
 	}
 }
 
@@ -3130,6 +3227,8 @@ void Scene6100::Action7::signal() {
 	case 2:
 		g_globals->_sceneManager.changeScene(2100);
 		remove();
+		break;
+	default:
 		break;
 	}
 }

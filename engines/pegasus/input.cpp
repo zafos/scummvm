@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995-1997 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,37 +39,13 @@ namespace Pegasus {
 
 InputDeviceManager::InputDeviceManager() {
 	// Set all keys to "not down"
-	_keyMap[Common::KEYCODE_UP] = false;
-	_keyMap[Common::KEYCODE_KP8] = false;
-	_keyMap[Common::KEYCODE_LEFT] = false;
-	_keyMap[Common::KEYCODE_KP4] = false;
-	_keyMap[Common::KEYCODE_DOWN] = false;
-	_keyMap[Common::KEYCODE_KP5] = false;
-	_keyMap[Common::KEYCODE_RIGHT] = false;
-	_keyMap[Common::KEYCODE_KP6] = false;
-	_keyMap[Common::KEYCODE_RETURN] = false;
-	_keyMap[Common::KEYCODE_SPACE] = false;
-	_keyMap[Common::KEYCODE_t] = false;
-	_keyMap[Common::KEYCODE_KP_EQUALS] = false;
-	_keyMap[Common::KEYCODE_i] = false;
-	_keyMap[Common::KEYCODE_KP_DIVIDE] = false;
-	_keyMap[Common::KEYCODE_q] = false;
-	_keyMap[Common::KEYCODE_ESCAPE] = false;
-	_keyMap[Common::KEYCODE_p] = false;
-	_keyMap[Common::KEYCODE_TILDE] = false;
-	_keyMap[Common::KEYCODE_BACKQUOTE] = false;
-	_keyMap[Common::KEYCODE_KP7] = false;
-	_keyMap[Common::KEYCODE_BACKSPACE] = false;
-	_keyMap[Common::KEYCODE_KP_MULTIPLY] = false;
-	_keyMap[Common::KEYCODE_KP9] = false;
-	_keyMap[Common::KEYCODE_LALT] = false;
-	_keyMap[Common::KEYCODE_RALT] = false;
-	_keyMap[Common::KEYCODE_e] = false;
-	_keyMap[Common::KEYCODE_KP_ENTER] = false;
+	for (uint i = 0; i < ARRAYSIZE(_keysDown); i++) {
+		_keysDown[i] = false;
+	}
 
 	g_system->getEventManager()->getEventDispatcher()->registerObserver(this, 2, false);
 	_lastRawBits = kAllUpBits;
-	_consoleRequested = false;
+	_AKeyWasDown = false;
 }
 
 InputDeviceManager::~InputDeviceManager() {
@@ -78,58 +53,56 @@ InputDeviceManager::~InputDeviceManager() {
 }
 
 void InputDeviceManager::getInput(Input &input, const InputBits filter) {
-	// Poll for events, but ignore them!
-	// We'll pick them up in notifyEvent()
+	// Poll for events, but ignore most of them!
+	// We'll pick the rest up in notifyEvent()
 	// We do that so that any pollEvent() call can update the variables
 	// (ie. if one uses enter to access the restore menu, we never receive
 	// the key up event, which leads to bad things)
 	// This is to closely emulate what the GetKeys() function did on Mac OS
-	pumpEvents();
-
-	// Now create the bitfield
 	InputBits currentBits = 0;
 
-	if (_keyMap[Common::KEYCODE_UP] || _keyMap[Common::KEYCODE_KP8])
+	Common::Event event;
+	while (g_system->getEventManager()->pollEvent(event))
+		;
+
+	// Now fill in the rest of the bitfield
+	if (_keysDown[kPegasusActionUp])
 		currentBits |= (kRawButtonDown << kUpButtonShift);
 
-	if (_keyMap[Common::KEYCODE_DOWN] || _keyMap[Common::KEYCODE_KP5])
+	if (_keysDown[kPegasusActionDown])
 		currentBits |= (kRawButtonDown << kDownButtonShift);
 
-	if (_keyMap[Common::KEYCODE_LEFT] || _keyMap[Common::KEYCODE_KP4])
+	if (_keysDown[kPegasusActionLeft])
 		currentBits |= (kRawButtonDown << kLeftButtonShift);
 
-	if (_keyMap[Common::KEYCODE_RIGHT] || _keyMap[Common::KEYCODE_KP6])
+	if (_keysDown[kPegasusActionRight])
 		currentBits |= (kRawButtonDown << kRightButtonShift);
 
-	if (_keyMap[Common::KEYCODE_SPACE] || _keyMap[Common::KEYCODE_RETURN] || _keyMap[Common::KEYCODE_KP_ENTER])
+	if (_keysDown[kPegasusActionInteract])
 		currentBits |= (kRawButtonDown << kTwoButtonShift);
 
-	if (_keyMap[Common::KEYCODE_t] || _keyMap[Common::KEYCODE_KP_EQUALS])
+	if (_keysDown[kPegasusActionToggleCenterDisplay])
 		currentBits |= (kRawButtonDown << kThreeButtonShift);
 
-	if (_keyMap[Common::KEYCODE_i] || _keyMap[Common::KEYCODE_KP_DIVIDE])
+	if (_keysDown[kPegasusActionShowInfoScreen])
 		currentBits |= (kRawButtonDown << kFourButtonShift);
 
-	if (_keyMap[Common::KEYCODE_q])
-		currentBits |= (kRawButtonDown << kMod1ButtonShift);
-
-	if (_keyMap[Common::KEYCODE_ESCAPE] || _keyMap[Common::KEYCODE_p])
+	if (_keysDown[kPegasusActionShowPauseMenu])
 		currentBits |= (kRawButtonDown << kMod3ButtonShift);
 
-	// The original also used clear (aka "num lock" on Mac keyboards) here, but it doesn't
-	// work right on most systems. Either SDL or the OS treats num lock specially and the
-	// events don't come as expected. In many cases, the key down event is sent many times
-	// causing the drawer to open and close constantly until pressed again. It only causes
-	// more grief than anything else.
-
-	// The original doesn't use KP7 for inventory, but we're using it as an alternative for
-	// num lock. KP9 is used for the biochip drawer to balance things out.
-
-	if (_keyMap[Common::KEYCODE_TILDE] || _keyMap[Common::KEYCODE_BACKQUOTE] || _keyMap[Common::KEYCODE_KP7])
+	if (_keysDown[kPegasusActionShowInventory])
 		currentBits |= (kRawButtonDown << kLeftFireButtonShift);
 
-	if (_keyMap[Common::KEYCODE_BACKSPACE] || _keyMap[Common::KEYCODE_KP_MULTIPLY] || _keyMap[Common::KEYCODE_KP9])
+	if (_keysDown[kPegasusActionShowBiochip])
 		currentBits |= (kRawButtonDown << kRightFireButtonShift);
+
+	if (g_vm->isDVD()) {
+		if (_keysDown[kPegasusActionToggleChattyAI] && !_AKeyWasDown) {
+			g_vm->requestToggle();
+			_AKeyWasDown = true;
+		} else if (!_keysDown[kPegasusActionToggleChattyAI])
+			_AKeyWasDown = false;
+	}
 
 	// Update mouse button state
 	// Note that we don't use EVENT_LBUTTONUP/EVENT_LBUTTONDOWN because
@@ -148,19 +121,12 @@ void InputDeviceManager::getInput(Input &input, const InputBits filter) {
 	// Update the last bits
 	_lastRawBits = currentBits;
 
-	// Set the console to be requested or not
-	input.setConsoleRequested(_consoleRequested);
-	_consoleRequested = false;
-
 	// WORKAROUND: The original had this in currentBits, but then
 	// pressing alt would count as an event (and mess up someone
 	// trying to do alt+enter or something). Since it's only used
 	// as an easter egg, I'm just going to handle it as a separate
 	// bool value.
-	// WORKAROUND x2: I'm also accepting 'e' here since an
-	// alt+click is often intercepted by the OS. 'e' is used as the
-	// easter egg key in Buried in Time and Legacy of Time.
-	input.setAltDown(_keyMap[Common::KEYCODE_LALT] || _keyMap[Common::KEYCODE_RALT] || _keyMap[Common::KEYCODE_e]);
+	input.setAltDown(_keysDown[kPegasusActionEnableEasterEgg]);
 }
 
 // Wait until the input device stops returning input allowed by filter...
@@ -186,34 +152,25 @@ bool InputDeviceManager::notifyEvent(const Common::Event &event) {
 	// are based on pippin events.
 
 	switch (event.type) {
-	case Common::EVENT_KEYDOWN:
-		switch (event.kbd.keycode) {
-		case Common::KEYCODE_d:
-			if (event.kbd.flags & Common::KBD_CTRL) // Console!
-				_consoleRequested = true;
+	case Common::EVENT_CUSTOM_ENGINE_ACTION_START:
+		switch ((PegasusAction)event.customType) {
+		case kPegasusActionSaveGameState:
+			g_vm->requestSave();
 			break;
-		case Common::KEYCODE_s:
-			// We support meta where available and control elsewhere
-			if (event.kbd.flags & (Common::KBD_CTRL|Common::KBD_META))
-				((PegasusEngine *)g_engine)->requestSave();
-			break;
-		case Common::KEYCODE_o: // o for open (original)
-		case Common::KEYCODE_l: // l for load (ScummVM terminology)
-			// We support meta where available and control elsewhere
-			if (event.kbd.flags & (Common::KBD_CTRL|Common::KBD_META))
-				((PegasusEngine *)g_engine)->requestLoad();
+		case kPegasusActionLoadGameState:
+			g_vm->requestLoad();
 			break;
 		default:
-			// Otherwise, set the key to down if we have it
-			if (_keyMap.contains(event.kbd.keycode))
-				_keyMap[event.kbd.keycode] = true;
+			// Otherwise, set the action to down if we have it
+			if (event.customType != kPegasusActionNone && event.customType < kPegasusActionCount)
+				_keysDown[event.customType] = true;
 			break;
 		}
 		break;
-	case Common::EVENT_KEYUP:
+	case Common::EVENT_CUSTOM_ENGINE_ACTION_END:
 		// Set the key to up if we have it
-		if (_keyMap.contains(event.kbd.keycode))
-			_keyMap[event.kbd.keycode] = false;
+		if (event.customType != kPegasusActionNone && event.customType < kPegasusActionCount)
+			_keysDown[event.customType] = false;
 		break;
 	default:
 		break;
@@ -223,18 +180,16 @@ bool InputDeviceManager::notifyEvent(const Common::Event &event) {
 }
 
 void InputDeviceManager::pumpEvents() {
-	PegasusEngine *vm = ((PegasusEngine *)g_engine);
-
-	bool saveAllowed = vm->swapSaveAllowed(false);
-	bool openAllowed = vm->swapLoadAllowed(false);
+	bool saveAllowed = g_vm->swapSaveAllowed(false);
+	bool openAllowed = g_vm->swapLoadAllowed(false);
 
 	// Just poll for events. notifyEvent() will pick up on them.
 	Common::Event event;
 	while (g_system->getEventManager()->pollEvent(event))
 		;
 
-	vm->swapSaveAllowed(saveAllowed);
-	vm->swapLoadAllowed(openAllowed);
+	g_vm->swapSaveAllowed(saveAllowed);
+	g_vm->swapLoadAllowed(openAllowed);
 }
 
 int operator==(const Input &arg1, const Input &arg2) {
@@ -245,12 +200,12 @@ int operator!=(const Input &arg1, const Input &arg2) {
 	return !operator==(arg1, arg2);
 }
 
-InputHandler *InputHandler::_inputHandler = 0;
+InputHandler *InputHandler::_inputHandler = nullptr;
 bool InputHandler::_invalHotspots = false;
 InputBits InputHandler::_lastFilter = kFilterNoInput;
 
 InputHandler *InputHandler::setInputHandler(InputHandler *currentHandler) {
-	InputHandler *result = 0;
+	InputHandler *result = nullptr;
 
 	if (_inputHandler != currentHandler && (!_inputHandler || _inputHandler->releaseInputFocus())) {
 		result = _inputHandler;
@@ -265,7 +220,7 @@ InputHandler *InputHandler::setInputHandler(InputHandler *currentHandler) {
 void InputHandler::pollForInput() {
 	if (_inputHandler) {
 		Input input;
-		Hotspot *cursorSpot = 0;
+		Hotspot *cursorSpot = nullptr;
 
 		InputHandler::getInput(input, cursorSpot);
 		if (_inputHandler->isClickInput(input, cursorSpot))
@@ -276,7 +231,7 @@ void InputHandler::pollForInput() {
 }
 
 void InputHandler::getInput(Input &input, Hotspot *&cursorSpot) {
-	Cursor *cursor = ((PegasusEngine *)g_engine)->_cursor;
+	Cursor *cursor = g_vm->_cursor;
 
 	if (_inputHandler)
 		_lastFilter = _inputHandler->getInputFilter();
@@ -374,7 +329,7 @@ bool InputHandler::wantsCursor() {
 	return false;
 }
 
-Tracker *Tracker::_currentTracker = 0;
+Tracker *Tracker::_currentTracker = nullptr;
 
 void Tracker::handleInput(const Input &input, const Hotspot *) {
 	if (stopTrackingInput(input))
@@ -392,7 +347,7 @@ void Tracker::startTracking(const Input &) {
 
 void Tracker::stopTracking(const Input &) {
 	if (isTracking()) {
-		_currentTracker = NULL;
+		_currentTracker = nullptr;
 		InputHandler::setInputHandler(_savedHandler);
 	}
 }

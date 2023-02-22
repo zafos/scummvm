@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,14 +25,17 @@
 #include "backends/graphics/windowed.h"
 #include "backends/platform/sdl/sdl-window.h"
 
+#include "common/events.h"
 #include "common/rect.h"
 
 class SdlEventSource;
 
+#define USE_OSD	1
+
 /**
  * Base class for a SDL based graphics manager.
  */
-class SdlGraphicsManager : virtual public WindowedGraphicsManager {
+class SdlGraphicsManager : virtual public WindowedGraphicsManager, public Common::EventObserver {
 public:
 	SdlGraphicsManager(SdlEventSource *source, SdlWindow *window);
 	virtual ~SdlGraphicsManager() {}
@@ -89,7 +91,14 @@ public:
 	 */
 	virtual bool notifyMousePosition(Common::Point &mouse);
 
-	virtual bool showMouse(const bool visible) override;
+	virtual bool showMouse(bool visible) override;
+	bool lockMouse(bool lock) override;
+
+	virtual bool saveScreenshot(const Common::String &filename) const { return false; }
+	void saveScreenshot() override;
+
+	// Override from Common::EventObserver
+	bool notifyEvent(const Common::Event &event) override;
 
 	/**
 	 * A (subset) of the graphic manager's state. This is used when switching
@@ -100,6 +109,7 @@ public:
 		bool aspectRatio;
 		bool fullscreen;
 		bool cursorPalette;
+		bool vsync;
 
 #ifdef USE_RGB_COLOR
 		Graphics::PixelFormat pixelFormat;
@@ -121,13 +131,28 @@ public:
 	 */
 	SdlWindow *getWindow() const { return _window; }
 
-	virtual void initSizeHint(const Graphics::ModeList &modes) override;
+	void initSizeHint(const Graphics::ModeList &modes) override;
+
+	Common::Keymap *getKeymap();
 
 protected:
-	virtual int getGraphicsModeScale(int mode) const = 0;
+	enum CustomEventAction {
+		kActionToggleFullscreen = 100,
+		kActionToggleMouseCapture,
+		kActionSaveScreenshot,
+		kActionToggleAspectRatioCorrection,
+		kActionToggleFilteredScaling,
+		kActionCycleStretchMode,
+		kActionIncreaseScaleFactor,
+		kActionDecreaseScaleFactor,
+		kActionNextScaleFilter,
+		kActionPreviousScaleFilter
+	};
+
+	/** Obtain the user configured fullscreen resolution, or default to the desktop resolution */
+	Common::Rect getPreferredFullscreenResolution();
 
 	bool defaultGraphicsModeConfig() const;
-	int getGraphicsModeIdByName(const Common::String &name) const;
 
 	/**
 	 * Gets the dimensions of the window directly from SDL instead of from the
@@ -136,7 +161,7 @@ protected:
 	void getWindowSizeFromSdl(int *width, int *height) const {
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 		assert(_window);
-		SDL_GetWindowSize(_window->getSDLWindow(), width, height);
+		SDL_GL_GetDrawableSize(_window->getSDLWindow(), width, height);
 #else
 		assert(_hwScreen);
 
@@ -150,9 +175,13 @@ protected:
 #endif
 	}
 
-	virtual void setSystemMousePosition(const int x, const int y) override;
+	virtual void showSystemMouseCursor(bool visible);
 
-	virtual void handleResizeImpl(const int width, const int height) override;
+	void setSystemMousePosition(const int x, const int y) override;
+
+	void notifyActiveAreaChanged() override;
+
+	void handleResizeImpl(const int width, const int height) override;
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 public:
@@ -173,6 +202,9 @@ protected:
 	SDL_Surface *_hwScreen;
 	SdlEventSource *_eventSource;
 	SdlWindow *_window;
+
+private:
+	void toggleFullScreen();
 };
 
 #endif

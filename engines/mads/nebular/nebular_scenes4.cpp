@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,12 +15,12 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "common/scummsys.h"
+#include "common/math.h"
 #include "mads/mads.h"
 #include "mads/scene.h"
 #include "mads/nebular/nebular_scenes.h"
@@ -149,7 +149,7 @@ void Scene401::step() {
 	}
 
 	if (_scene->_frameStartTime >= _timer) {
-		int dist = 64 - ((_vm->hypotenuse(_game._player._playerPos.x - 219, _game._player._playerPos.y - 115) * 64) / 120);
+		int dist = 64 - ((Common::hypotenuse(_game._player._playerPos.x - 219, _game._player._playerPos.y - 115) * 64) / 120);
 
 		if (dist > 64)
 			dist = 64;
@@ -1059,6 +1059,9 @@ void Scene402::step() {
 
 		}
 		break;
+
+	default:
+		break;
 	}
 
 	switch (_game._trigger) {
@@ -1158,6 +1161,9 @@ void Scene402::step() {
 
 		}
 		break;
+
+	default:
+		break;
 	}
 
 	switch (_game._trigger) {
@@ -1226,6 +1232,9 @@ void Scene402::step() {
 		_bartenderReady = true;
 		}
 		break;
+
+	default:
+		break;
 	}
 
 	if (!_waitingGinnyMove && !_ginnyLooking) {
@@ -1275,6 +1284,9 @@ void Scene402::step() {
 		_globals._sequenceIndexes[5] = _scene->_sequences.startCycle(_globals._spriteIndexes[5], false, 1);
 		_scene->_sequences.setDepth(_globals._sequenceIndexes[5], 1);
 		_waitingGinnyMove = false;
+		break;
+
+	default:
 		break;
 	}
 
@@ -1430,6 +1442,9 @@ void Scene402::step() {
 
 	case 31:
 		_blowingSmoke = false;
+		break;
+
+	default:
 		break;
 	}
 
@@ -2127,7 +2142,7 @@ void Scene402::actions() {
 
 			default:
 				break;
-		}
+			}
 		}
 		break;
 
@@ -2165,6 +2180,9 @@ void Scene402::actions() {
 			default:
 				break;
 			}
+			break;
+
+		default:
 			break;
 		}
 	} else if (_action.isAction(VERB_TALKTO, NOUN_WOMAN_IN_CHAIR) && !_firstTalkToGirlInChair) {
@@ -3826,6 +3844,9 @@ void Scene411::actions() {
 			_game._player._stepEnabled = true;
 			_game._objects[OBJ_CHARGE_CASES].setQuality(3, 1);
 			_vm->_dialogs->showItem(OBJ_CHARGE_CASES, 41142);
+			break;
+
+		default:
 			break;
 		}
 		_action._inProgress = false;

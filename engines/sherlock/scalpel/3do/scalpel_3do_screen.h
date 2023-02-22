@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,7 +39,7 @@ protected:
 		int overrideColor);
 public:
 	Scalpel3DOScreen(SherlockEngine *vm);
-	virtual ~Scalpel3DOScreen() {}
+	~Scalpel3DOScreen() override {}
 
 	/**
 	 * Draws a sub-section of a surface at a given position within this surface
@@ -57,37 +56,37 @@ public:
 	/**
 	 * Draws a surface on this surface
 	 */
-	virtual void SHblitFrom(const Graphics::Surface &src);
+	void SHblitFrom(const Graphics::Surface &src) override;
 
 	/**
 	 * Draws a surface at a given position within this surface
 	 */
-	virtual void SHblitFrom(const Graphics::Surface &src, const Common::Point &destPos);
+	void SHblitFrom(const Graphics::Surface &src, const Common::Point &destPos) override;
 
 	/**
 	 * Draws a sub-section of a surface at a given position within this surface
 	 */
-	virtual void SHblitFrom(const Graphics::Surface &src, const Common::Point &destPos, const Common::Rect &srcBounds);
+	void SHblitFrom(const Graphics::Surface &src, const Common::Point &destPos, const Common::Rect &srcBounds) override;
 
 	/**
 	 * Draws an image frame at a given position within this surface with transparency
 	 */
-	virtual void SHtransBlitFrom(const ImageFrame &src, const Common::Point &pt,
-		bool flipped = false, int overrideColor = 0, int scaleVal = SCALE_THRESHOLD);
+	void SHtransBlitFrom(const ImageFrame &src, const Common::Point &pt,
+		bool flipped = false, int overrideColor = 0, int scaleVal = SCALE_THRESHOLD) override;
 
 	/**
 	 * Draws an image frame at a given position within this surface with transparency
 	 */
-	virtual void SHtransBlitFrom(const Graphics::Surface &src, const Common::Point &pt,
-		bool flipped = false, int overrideColor = 0, int scaleVal = SCALE_THRESHOLD);
+	void SHtransBlitFrom(const Graphics::Surface &src, const Common::Point &pt,
+		bool flipped = false, int overrideColor = 0, int scaleVal = SCALE_THRESHOLD) override;
 
 	/**
 	 * Fill a given area of the surface with a given color
 	 */
-	virtual void SHfillRect(const Common::Rect &r, uint color);
+	void SHfillRect(const Common::Rect &r, uint color) override;
 
-	virtual uint16 width() const;
-	virtual uint16 height() const;
+	uint16 width() const override;
+	uint16 height() const override;
 };
 
 } // End of namespace Scalpel

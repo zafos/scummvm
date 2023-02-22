@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -91,8 +90,7 @@ FlicDecoder::FlicVideoTrack::FlicVideoTrack(Common::SeekableReadStream *stream, 
 
 	_surface = new Graphics::Surface();
 	_surface->create(width, height, Graphics::PixelFormat::createFormatCLUT8());
-	_palette = new byte[3 * 256];
-	memset(_palette, 0, 3 * 256);
+	_palette = new byte[3 * 256]();
 	_dirtyPalette = false;
 
 	_curFrame = -1;
@@ -121,6 +119,9 @@ void FlicDecoder::FlicVideoTrack::readHeader() {
 	_offsetFrame1 = _fileStream->readUint32LE();
 	_offsetFrame2 = _fileStream->readUint32LE();
 
+	if (_offsetFrame1 == 0)
+		_offsetFrame1 = 0x80; //length of FLIC header
+
 	// Seek to the first frame
 	_fileStream->seek(_offsetFrame1);
 }
@@ -130,14 +131,13 @@ bool FlicDecoder::FlicVideoTrack::endOfTrack() const {
 }
 
 bool FlicDecoder::FlicVideoTrack::rewind() {
-	_curFrame = -1;
-	_nextFrameStartTime = 0;
-
-	if (endOfTrack() && _fileStream->pos() < _fileStream->size())
+	if (endOfTrack() && _fileStream->pos() < _fileStream->size() && _frameCount != 1)
 		_atRingFrame = true;
 	else
 		_fileStream->seek(_offsetFrame1);
 
+	_curFrame = -1;
+	_nextFrameStartTime = 0;
 	_frameDelay = _startFrameDelay;
 	return true;
 }
@@ -154,12 +154,15 @@ Graphics::PixelFormat FlicDecoder::FlicVideoTrack::getPixelFormat() const {
 	return _surface->format;
 }
 
-#define FLI_SETPAL 4
-#define FLI_SS2    7
-#define FLI_BRUN   15
-#define FLI_COPY   16
-#define PSTAMP     18
-#define FRAME_TYPE 0xF1FA
+#define FLI_SETPAL            4
+#define FLI_SS2               7
+#define FLI_BLACK             13
+#define FLI_BRUN              15
+#define FLI_COPY              16
+#define PSTAMP                18
+#define FRAME_TYPE            0xF1FA
+#define FLC_FILE_HEADER       0xAF12
+#define FLC_FILE_HEADER_SIZE  0x80
 
 const Graphics::Surface *FlicDecoder::FlicVideoTrack::decodeNextFrame() {
 	// Read chunk
@@ -169,6 +172,10 @@ const Graphics::Surface *FlicDecoder::FlicVideoTrack::decodeNextFrame() {
 	switch (frameType) {
 	case FRAME_TYPE:
 		handleFrame();
+		break;
+	case FLC_FILE_HEADER:
+		// Skip 0x80 bytes of file header subtracting 6 bytes of header
+		_fileStream->skip(FLC_FILE_HEADER_SIZE - 6);
 		break;
 	default:
 		error("FlicDecoder::decodeFrame(): unknown main chunk type (type = 0x%02X)", frameType);
@@ -225,6 +232,11 @@ void FlicDecoder::FlicVideoTrack::handleFrame() {
 			break;
 		case FLI_SS2:
 			decodeDeltaFLC(data);
+			break;
+		case FLI_BLACK:
+			_surface->fillRect(Common::Rect(0, 0, getWidth(), getHeight()), 0);
+			_dirtyRects.clear();
+			_dirtyRects.push_back(Common::Rect(0, 0, getWidth(), getHeight()));
 			break;
 		case FLI_BRUN:
 			decodeByteRun(data);
@@ -308,6 +320,7 @@ void FlicDecoder::FlicVideoTrack::decodeDeltaFLC(uint8 *data) {
 				packetCount = opcode;
 				break;
 			case OP_UNDEFINED:
+			default:
 				break;
 			case OP_LASTPIXEL:
 				*((byte *)_surface->getBasePtr(getWidth() - 1, currentLine)) = (opcode & 0xFF);
@@ -336,8 +349,6 @@ void FlicDecoder::FlicVideoTrack::decodeDeltaFLC(uint8 *data) {
 					WRITE_UINT16((byte *)_surface->getBasePtr(column + i * 2, currentLine), dataWord);
 				}
 				_dirtyRects.push_back(Common::Rect(column, currentLine, column + rleCount * 2, currentLine + 1));
-			} else { // End of cutscene ?
-				return;
 			}
 			column += rleCount * 2;
 		}

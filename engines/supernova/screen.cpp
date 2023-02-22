@@ -1,24 +1,23 @@
 /* ScummVM - Graphic Adventure Engine
-*
-* ScummVM is the legal property of its developers, whose names
-* are too numerous to list here. Please refer to the COPYRIGHT
-* file distributed with this source distribution.
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-*
-*/
+ *
+ * ScummVM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 #include "common/str.h"
 #include "common/system.h"
@@ -26,10 +25,12 @@
 #include "graphics/cursorman.h"
 #include "graphics/palette.h"
 #include "graphics/surface.h"
+#include "common/config-manager.h"
+#include "common/text-to-speech.h"
 
 #include "supernova/imageid.h"
 #include "supernova/resman.h"
-#include "supernova/state.h"
+#include "supernova/game-manager.h"
 #include "supernova/screen.h"
 #include "supernova/supernova.h"
 
@@ -105,14 +106,29 @@ Marquee::Marquee(Screen *screen, MarqueeId id, const char *text)
 	: _text(text)
 	, _textBegin(text)
 	, _delay(0)
-	, _color(kColorLightBlue)
 	, _loop(false)
+	, _oldColor(nullptr)
 	, _screen(screen) {
-	if (id == kMarqueeIntro) {
-		_y = 191;
-		_loop = true;
-	} else if (id == kMarqueeOutro) {
-		_y = 1;
+	if (_screen->_vm->_MSPart == 1) {
+		_color = kColorLightBlue;
+		if (id == kMarqueeIntro) {
+			_y = 191;
+			_loop = true;
+		} else if (id == kMarqueeOutro) {
+			_y = 1;
+		}
+	} else if (_screen->_vm->_MSPart == 2) {
+		byte purple[3] = {0x9b, 0x00, 0xfb};
+		_oldColor = new byte[3];
+		_screen->_vm->_system->getPaletteManager()->grabPalette(_oldColor, kColorPurple, 1);
+		_screen->_vm->_system->getPaletteManager()->setPalette(purple, kColorPurple, 1);
+		_color = kColorPurple;
+		if (id == kMarqueeIntro) {
+			_y = 191;
+			_loop = true;
+		} else if (id == kMarqueeOutro) {
+			_y = 191;
+		}
 	}
 
 	_textWidth = Screen::textWidth(_text);
@@ -122,14 +138,29 @@ Marquee::Marquee(Screen *screen, MarqueeId id, const char *text)
 	_screen->_textColor = _color;
 }
 
+Marquee::~Marquee() {
+	if (_screen->_vm->_MSPart == 2) {
+		_screen->_vm->_system->getPaletteManager()->setPalette(_oldColor, kColorPurple, 1);
+		delete[] _oldColor;
+	}
+}
+
 void Marquee::clearText() {
 	_screen->renderBox(_x, _y - 1, _textWidth + 1, 9, kColorBlack);
 }
 
-void Marquee::renderCharacter() {
+void Marquee::reset() {
+	_text = _textBegin;
+	clearText();
+	_textWidth = Screen::textWidth(_text);
+	_x = kScreenWidth / 2 - _textWidth / 2;
+	_screen->_textCursorX = _x;
+}
+
+bool Marquee::renderCharacter() {
 	if (_delay != 0) {
 		_delay--;
-		return;
+		return true;
 	}
 
 	switch (*_text) {
@@ -141,16 +172,22 @@ void Marquee::renderCharacter() {
 			_textWidth = Screen::textWidth(_text);
 			_x = kScreenWidth / 2 - _textWidth / 2;
 			_screen->_textCursorX = _x;
-		}
+		} else
+			return false;
 		break;
-	case '\0':
+	case '\1':
 		clearText();
 		_text++;
 		_textWidth = Screen::textWidth(_text);
 		_x = kScreenWidth / 2 - _textWidth / 2;
 		_screen->_textCursorX = _x;
-		_color = kColorLightBlue;
-		_screen->_textColor = _color;
+		if (_screen->_vm->_MSPart == 1) {
+			_color = kColorLightBlue;
+			_screen->_textColor = _color;
+		} else if (_screen->_vm->_MSPart == 2) {
+			_color = kColorPurple;
+			_screen->_textColor = _color;
+		}
 		break;
 	case '^':
 		_color = kColorLightYellow;
@@ -166,11 +203,11 @@ void Marquee::renderCharacter() {
 		_delay = 1;
 		break;
 	}
+	return true;
 }
 
-Screen::Screen(SupernovaEngine *vm, GameManager *gm, ResourceManager *resMan)
+Screen::Screen(SupernovaEngine *vm, ResourceManager *resMan)
 	: _vm(vm)
-	, _gm(gm)
 	, _resMan(resMan)
 	, _currentImage(nullptr)
 	, _viewportBrightness(255)
@@ -182,10 +219,15 @@ Screen::Screen(SupernovaEngine *vm, GameManager *gm, ResourceManager *resMan)
 	, _textCursorY(0)
 	, _messageShown(false) {
 
-	CursorMan.replaceCursor(_resMan->getImage(ResourceManager::kCursorNormal),
-							16, 16, 0, 0, kColorCursorTransparent);
-	CursorMan.replaceCursorPalette(initVGAPalette, 0, 16);
-	CursorMan.showMouse(true);
+	changeCursor(ResourceManager::kCursorNormal);
+}
+
+int Screen::getScreenWidth() const {
+	return _screenWidth;
+}
+
+int Screen::getScreenHeight() const {
+	return _screenHeight;
 }
 
 int Screen::getGuiBrightness() const {
@@ -204,8 +246,12 @@ void Screen::setGuiBrightness(int brightness) {
 	_guiBrightness = brightness;
 }
 
-const MSNImage *Screen::getCurrentImage() const {
+MSNImage *Screen::getCurrentImage() {
 	return _currentImage;
+}
+
+const Screen::ImageInfo *Screen::getImageInfo(ImageId id) const {
+	return &imageInfo[(int)id];
 }
 
 bool Screen::isMessageShown() const {
@@ -229,7 +275,7 @@ void Screen::setTextCursorColor(byte color) {
 	_textColor = color;
 }
 
-void Screen::renderMessage(StringId stringId, MessagePosition position,
+void Screen::renderMessage(int stringId, MessagePosition position,
 						   Common::String var1, Common::String var2) {
 	Common::String text = _vm->getGameString(stringId);
 
@@ -239,6 +285,7 @@ void Screen::renderMessage(StringId stringId, MessagePosition position,
 		else
 			text = Common::String::format(text.c_str(), var1.c_str());
 	}
+
 
 	renderMessage(text, position);
 }
@@ -259,7 +306,7 @@ void Screen::renderText(const char *text) {
 	renderText(text, _textCursorX, _textCursorY, _textColor);
 }
 
-void Screen::renderText(StringId stringId) {
+void Screen::renderText(int stringId) {
 	renderText(_vm->getGameString(stringId));
 }
 
@@ -323,26 +370,26 @@ void Screen::renderText(const Common::String &text, int x, int y, byte color) {
 		renderText(text.c_str(), x, y, color);
 }
 
-void Screen::renderText(StringId stringId, int x, int y, byte color) {
+void Screen::renderText(int stringId, int x, int y, byte color) {
 	renderText(_vm->getGameString(stringId), x, y, color);
 }
 
-void Screen::renderImageSection(const MSNImage *image, int section) {
+void Screen::renderImageSection(const MSNImage *image, int section, bool invert) {
 	// Note: inverting means we are removing the section. So we should get the rect for that
 	// section but draw the background (section 0) instead.
-	bool invert = false;
-	if (section > 128) {
-		section -= 128;
-		invert = true;
-	}
 	if (section > image->_numSections - 1)
 		return;
 
 	Common::Rect sectionRect(image->_section[section].x1,
-	                         image->_section[section].y1,
-	                         image->_section[section].x2 + 1,
-	                         image->_section[section].y2 + 1);
-	if (image->_filenumber == 1 || image->_filenumber == 2) {
+							 image->_section[section].y1,
+							 image->_section[section].x2 + 1,
+							 image->_section[section].y2 + 1);
+	bool bigImage = false;
+	if (_vm->_MSPart == 1)
+		bigImage = image->_filenumber == 1 || image->_filenumber == 2;
+	else if (_vm->_MSPart == 2)
+		bigImage = image->_filenumber == 38;
+	if (bigImage) {
 		sectionRect.setWidth(640);
 		sectionRect.setHeight(480);
 		if (_screenWidth != 640) {
@@ -377,39 +424,27 @@ void Screen::renderImage(ImageId id, bool removeImage) {
 	ImageInfo info = imageInfo[id];
 	const MSNImage *image = _resMan->getImage(info.filenumber);
 
-	if (_currentImage != image) {
-		_currentImage = image;
-		_vm->_system->getPaletteManager()->setPalette(image->getPalette(), 16, 239);
-	}
+	if (_currentImage != image)
+		setCurrentImage(info.filenumber);
 
 	do {
-		if (removeImage)
-			renderImageSection(image, info.section + 128);
-		else
-			renderImageSection(image, info.section);
-
+		renderImageSection(image, info.section, removeImage);
 		info.section = image->_section[info.section].next;
 	} while (info.section != 0);
 }
 
 void Screen::renderImage(int section) {
-	if (!_currentImage)
-		return;
-
-	bool sectionVisible = true;
-
-	if (section > 128) {
-		sectionVisible = false;
-		section -= 128;
+	bool removeImage = false;
+	if (section > kSectionInvert) {
+		removeImage = true;
+		section -= kSectionInvert;
 	}
 
-	_gm->_currentRoom->setSectionVisible(section, sectionVisible);
+	if (!_currentImage || section >= kMaxSection)
+		return;
 
 	do {
-		if (sectionVisible)
-			renderImageSection(_currentImage, section);
-		else
-			renderImageSection(_currentImage, section + 128);
+		renderImageSection(_currentImage, section, removeImage);
 		section = _currentImage->_section[section].next;
 	} while (section != 0);
 }
@@ -435,7 +470,7 @@ void Screen::restoreScreen() {
 }
 
 void Screen::renderRoom(Room &room) {
-	if (room.getId() == INTRO)
+	if (room.getId() == INTRO1 || room.getId() == INTRO2)
 		return;
 
 	if (setCurrentImage(room.getFileNumber())) {
@@ -443,7 +478,7 @@ void Screen::renderRoom(Room &room) {
 			int section = i;
 			if (room.isSectionVisible(section)) {
 				do {
-					renderImageSection(_currentImage, section);
+					renderImageSection(_currentImage, section, false);
 					section = _currentImage->_section[section].next;
 				} while (section != 0);
 			}
@@ -460,9 +495,11 @@ int Screen::textWidth(const uint16 key) {
 
 int Screen::textWidth(const char *text) {
 	int charWidth = 0;
-	while (*text != '\0') {
+	while (*text != '\0' && *text != '\1') {
 		byte c = *text++;
-		if (c < 32) {
+		if (c < 32 || c == 155) {
+			// 155 is used for looping in Marquee text and is not used otherwise
+			// (it is beyond the end of the font).
 			continue;
 		} else if (c == 225) {
 			c = 35;
@@ -484,7 +521,7 @@ int Screen::textWidth(const Common::String &text) {
 	return Screen::textWidth(text.c_str());
 }
 
-void Screen::renderMessage(const char *text, MessagePosition position) {
+void Screen::renderMessage(const char *text, MessagePosition position, int positionX, int positionY) {
 	Common::String t(text);
 	char *row[20];
 	Common::String::iterator p = t.begin();
@@ -511,8 +548,20 @@ void Screen::renderMessage(const char *text, MessagePosition position) {
 			rowWidthMax = rowWidth;
 	}
 
+	Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+	if (ttsMan != nullptr && ConfMan.getBool("tts_enabled")) {
+		Common::String ttsText;
+		for (uint i = 0; i < numRows; ++i) {
+			if (!ttsText.empty())
+				ttsText += ' ';
+			ttsText += row[i];
+		}
+		ttsMan->say(ttsText,  Common::TextToSpeechManager::QUEUE_NO_REPEAT, Common::kDos850);
+	}
+
 	switch (position) {
 	case kMessageNormal:
+	default:
 		x = 160 - rowWidthMax / 2;
 		textColor = kColorWhite99;
 		break;
@@ -542,6 +591,11 @@ void Screen::renderMessage(const char *text, MessagePosition position) {
 		y = 142;
 	}
 
+	if (positionX != -1 && positionY != -1) {
+		x = positionX;
+		y = positionY;
+	}
+
 	int message_columns = x - 3;
 	int message_rows = y - 3;
 	int message_width = rowWidthMax + 6;
@@ -554,7 +608,6 @@ void Screen::renderMessage(const char *text, MessagePosition position) {
 	}
 
 	_messageShown = true;
-	_gm->_messageDuration = (Common::strnlen(text, 512) + 20) * _vm->_textSpeed / 10;
 }
 
 void Screen::removeMessage() {
@@ -598,8 +651,8 @@ void Screen::paletteBrightness() {
 	_vm->_system->getPaletteManager()->setPalette(palette, 0, 255);
 }
 
-void Screen::paletteFadeOut() {
-	while (_guiBrightness > 10) {
+void Screen::paletteFadeOut(int minBrightness) {
+	while (_guiBrightness > minBrightness + 10) {
 		_guiBrightness -= 10;
 		if (_viewportBrightness > _guiBrightness)
 			_viewportBrightness = _guiBrightness;
@@ -607,15 +660,15 @@ void Screen::paletteFadeOut() {
 		_vm->_system->updateScreen();
 		_vm->_system->delayMillis(_vm->_delay);
 	}
-	_guiBrightness = 0;
-	_viewportBrightness = 0;
+	_guiBrightness = minBrightness;
+	_viewportBrightness = minBrightness;
 	paletteBrightness();
 	_vm->_system->updateScreen();
 }
 
-void Screen::paletteFadeIn() {
+void Screen::paletteFadeIn(int maxViewportBrightness) {
 	while (_guiBrightness < 245) {
-		if (_viewportBrightness < _gm->_roomBrightness)
+		if (_viewportBrightness < maxViewportBrightness)
 			_viewportBrightness += 10;
 		_guiBrightness += 10;
 		paletteBrightness();
@@ -623,7 +676,7 @@ void Screen::paletteFadeIn() {
 		_vm->_system->delayMillis(_vm->_delay);
 	}
 	_guiBrightness = 255;
-	_viewportBrightness = _gm->_roomBrightness;
+	_viewportBrightness = maxViewportBrightness;
 	paletteBrightness();
 	_vm->_system->updateScreen();
 }
@@ -632,5 +685,13 @@ void Screen::setColor63(byte value) {
 	byte color[3] = {value, value, value};
 	_vm->_system->getPaletteManager()->setPalette(color, 63, 1);
 }
+
+void Screen::changeCursor(ResourceManager::CursorId id) {
+	CursorMan.replaceCursor(_resMan->getCursor(id),
+							16, 16, 0, 0, kColorCursorTransparent);
+	CursorMan.replaceCursorPalette(initVGAPalette, 0, 16);
+	CursorMan.showMouse(true);
+}
+
 
 }

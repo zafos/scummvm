@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -40,9 +39,6 @@
 
 #define JOY_XAXIS 0
 #define JOY_YAXIS 1
-
-/* Quick default button states for modifiers. */
-int BUTTON_STATE_L                  =   false;
 
 #if defined(CAANOO)
 
@@ -148,6 +144,40 @@ enum {
 	BUTTON_HELP2        = 54
 };
 
+#else
+
+/* Main Joystick Button Mappings */
+enum {
+	/* Joystick Buttons */
+	BUTTON_A            = 0,
+	BUTTON_B            = 1,
+	BUTTON_X            = 2,
+	BUTTON_Y            = 3,
+	BUTTON_L            = 4,
+	BUTTON_R            = 5,
+	BUTTON_SELECT       = 6,
+	BUTTON_MENU         = 7,
+	BUTTON_CLICK        = 8    // Stick Click
+};
+
+enum {
+	/* Unused Joystick Buttons */
+	BUTTON_VOLUP        = 51,
+	BUTTON_VOLDOWN      = 52,
+	BUTTON_UP           = 53,
+	BUTTON_UPLEFT       = 54,
+	BUTTON_LEFT         = 55,
+	BUTTON_DOWNLEFT     = 56,
+	BUTTON_DOWN         = 57,
+	BUTTON_DOWNRIGHT    = 58,
+	BUTTON_RIGHT        = 59,
+	BUTTON_UPRIGHT      = 60,
+	BUTTON_HOME         = 61,    // Home
+	BUTTON_HOLD         = 62,    // Hold (on Power)
+	BUTTON_HELP         = 63,    // Help I
+	BUTTON_HELP2        = 64     // Help II
+};
+
 #endif
 
 enum {
@@ -158,73 +188,68 @@ enum {
 };
 
 GPHEventSource::GPHEventSource()
-	: _buttonStateL(false) {
+	: _buttonStateL(false),
+	  _tapmodeLevel(TAPMODE_LEFT) {
+}
+
+void GPHEventSource::ToggleTapMode() {
+	if (_tapmodeLevel == TAPMODE_LEFT) {
+		_tapmodeLevel = TAPMODE_RIGHT;
+	} else if (_tapmodeLevel == TAPMODE_RIGHT) {
+		_tapmodeLevel = TAPMODE_HOVER;
+	} else if (_tapmodeLevel == TAPMODE_HOVER) {
+		_tapmodeLevel = TAPMODE_LEFT;
+	} else {
+		_tapmodeLevel = TAPMODE_LEFT;
+	}
 }
 
 /* Custom handleMouseButtonDown/handleMouseButtonUp to deal with 'Tap Mode' for the touchscreen */
 
 bool GPHEventSource::handleMouseButtonDown(SDL_Event &ev, Common::Event &event) {
-	if (ev.button.button == SDL_BUTTON_LEFT) {
-		if (BUTTON_STATE_L == true) /* BUTTON_STATE_L = Left Trigger Held, force Right Click */
-			event.type = Common::EVENT_RBUTTONDOWN;
-		else if (GPH::tapmodeLevel == TAPMODE_LEFT) /* TAPMODE_LEFT = Left Click Tap Mode */
-			event.type = Common::EVENT_LBUTTONDOWN;
-		else if (GPH::tapmodeLevel == TAPMODE_RIGHT) /* TAPMODE_RIGHT = Right Click Tap Mode */
-			event.type = Common::EVENT_RBUTTONDOWN;
-		else if (GPH::tapmodeLevel == TAPMODE_HOVER) /* TAPMODE_HOVER = Hover (No Click) Tap Mode */
-			event.type = Common::EVENT_MOUSEMOVE;
-		else
-			event.type = Common::EVENT_LBUTTONDOWN; /* For normal mice etc. */
-	} else if (ev.button.button == SDL_BUTTON_RIGHT)
-		event.type = Common::EVENT_RBUTTONDOWN;
-#if defined(SDL_BUTTON_WHEELUP) && defined(SDL_BUTTON_WHEELDOWN)
-	else if (ev.button.button == SDL_BUTTON_WHEELUP)
-		event.type = Common::EVENT_WHEELUP;
-	else if (ev.button.button == SDL_BUTTON_WHEELDOWN)
-		event.type = Common::EVENT_WHEELDOWN;
-#endif
-#if defined(SDL_BUTTON_MIDDLE)
-	else if (ev.button.button == SDL_BUTTON_MIDDLE)
-		event.type = Common::EVENT_MBUTTONDOWN;
-#endif
-	else
-		return false;
+	if (ev.button.button != SDL_BUTTON_LEFT)
+		return SdlEventSource::handleMouseButtonDown(ev, event);
 
-	processMouseEvent(event, ev.button.x, ev.button.y);
+	if (_buttonStateL == true) /* _buttonStateL = Left Trigger Held, force Right Click */
+		event.type = Common::EVENT_RBUTTONDOWN;
+	else if (_tapmodeLevel == TAPMODE_LEFT) /* TAPMODE_LEFT = Left Click Tap Mode */
+		event.type = Common::EVENT_LBUTTONDOWN;
+	else if (_tapmodeLevel == TAPMODE_RIGHT) /* TAPMODE_RIGHT = Right Click Tap Mode */
+		event.type = Common::EVENT_RBUTTONDOWN;
+	else if (_tapmodeLevel == TAPMODE_HOVER) /* TAPMODE_HOVER = Hover (No Click) Tap Mode */
+		event.type = Common::EVENT_MOUSEMOVE;
+	else
+		event.type = Common::EVENT_LBUTTONDOWN; /* For normal mice etc. */
+
+
 	// update KbdMouse
 	_km.x = ev.button.x * MULTIPLIER;
 	_km.y = ev.button.y * MULTIPLIER;
 
-	return true;
+	return processMouseEvent(event, ev.button.x, ev.button.y);
 }
 
 bool GPHEventSource::handleMouseButtonUp(SDL_Event &ev, Common::Event &event) {
-	if (ev.button.button == SDL_BUTTON_LEFT) {
-		if (BUTTON_STATE_L == true) /* BUTTON_STATE_L = Left Trigger Held, force Right Click */
-			event.type = Common::EVENT_RBUTTONUP;
-		else if (GPH::tapmodeLevel == TAPMODE_LEFT) /* TAPMODE_LEFT = Left Click Tap Mode */
-			event.type = Common::EVENT_LBUTTONUP;
-		else if (GPH::tapmodeLevel == TAPMODE_RIGHT) /* TAPMODE_RIGHT = Right Click Tap Mode */
-			event.type = Common::EVENT_RBUTTONUP;
-		else if (GPH::tapmodeLevel == TAPMODE_HOVER) /* TAPMODE_HOVER = Hover (No Click) Tap Mode */
-			event.type = Common::EVENT_MOUSEMOVE;
-		else
-			event.type = Common::EVENT_LBUTTONUP; /* For normal mice etc. */
-	} else if (ev.button.button == SDL_BUTTON_RIGHT)
-		event.type = Common::EVENT_RBUTTONUP;
-#if defined(SDL_BUTTON_MIDDLE)
-	else if (ev.button.button == SDL_BUTTON_MIDDLE)
-		event.type = Common::EVENT_MBUTTONUP;
-#endif
-	else
-		return false;
+	if (ev.button.button != SDL_BUTTON_LEFT)
+		return SdlEventSource::handleMouseButtonUp(ev, event);
 
-	processMouseEvent(event, ev.button.x, ev.button.y);
+	if (_buttonStateL == true) /* _buttonStateL = Left Trigger Held, force Right Click */
+		event.type = Common::EVENT_RBUTTONUP;
+	else if (_tapmodeLevel == TAPMODE_LEFT) /* TAPMODE_LEFT = Left Click Tap Mode */
+		event.type = Common::EVENT_LBUTTONUP;
+	else if (_tapmodeLevel == TAPMODE_RIGHT) /* TAPMODE_RIGHT = Right Click Tap Mode */
+		event.type = Common::EVENT_RBUTTONUP;
+	else if (_tapmodeLevel == TAPMODE_HOVER) /* TAPMODE_HOVER = Hover (No Click) Tap Mode */
+		event.type = Common::EVENT_MOUSEMOVE;
+	else
+		event.type = Common::EVENT_LBUTTONUP; /* For normal mice etc. */
+
+
 	// update KbdMouse
 	_km.x = ev.button.x * MULTIPLIER;
 	_km.y = ev.button.y * MULTIPLIER;
 
-	return true;
+	return processMouseEvent(event, ev.button.x, ev.button.y);
 }
 
 /* Custom handleJoyButtonDown/handleJoyButtonUp to deal with the joystick buttons on GPH devices */
@@ -348,17 +373,12 @@ bool GPHEventSource::handleJoyButtonDown(SDL_Event &ev, Common::Event &event) {
 		processMouseEvent(event, _km.x / MULTIPLIER, _km.y / MULTIPLIER);
 		break;
 	case BUTTON_L:
-		BUTTON_STATE_L = true;
+		_buttonStateL = true;
 		break;
 	case BUTTON_R:
 		event.type = Common::EVENT_KEYDOWN;
-		if (BUTTON_STATE_L == true) {
-#ifdef ENABLE_VKEYBD
+		if (_buttonStateL == true) {
 			event.type = Common::EVENT_VIRTUAL_KEYBOARD;
-#else
-			event.kbd.keycode = Common::KEYCODE_0;
-			event.kbd.ascii = mapKey(SDLK_0, ev.key.keysym.mod, 0);
-#endif
 		} else {
 			event.kbd.keycode = Common::KEYCODE_RETURN;
 			event.kbd.ascii = mapKey(SDLK_RETURN, ev.key.keysym.mod, 0);
@@ -367,7 +387,7 @@ bool GPHEventSource::handleJoyButtonDown(SDL_Event &ev, Common::Event &event) {
 	case BUTTON_SELECT:
 	case BUTTON_HOME:
 		event.type = Common::EVENT_KEYDOWN;
-		if (BUTTON_STATE_L == true) {
+		if (_buttonStateL == true) {
 			event.type = Common::EVENT_QUIT;
 		} else {
 			event.kbd.keycode = Common::KEYCODE_ESCAPE;
@@ -376,7 +396,7 @@ bool GPHEventSource::handleJoyButtonDown(SDL_Event &ev, Common::Event &event) {
 		break;
 	case BUTTON_A:
 		event.type = Common::EVENT_KEYDOWN;
-		if (BUTTON_STATE_L == true) {
+		if (_buttonStateL == true) {
 			event.type = Common::EVENT_PREDICTIVE_DIALOG;
 		} else {
 			event.kbd.keycode = Common::KEYCODE_PERIOD;
@@ -385,13 +405,13 @@ bool GPHEventSource::handleJoyButtonDown(SDL_Event &ev, Common::Event &event) {
 		break;
 	case BUTTON_Y:
 		event.type = Common::EVENT_KEYDOWN;
-		if (BUTTON_STATE_L == true) {
-			GPH::ToggleTapMode();
-			if (GPH::tapmodeLevel == TAPMODE_LEFT) {
+		if (_buttonStateL == true) {
+			ToggleTapMode();
+			if (_tapmodeLevel == TAPMODE_LEFT) {
 				g_system->displayMessageOnOSD(_("Touchscreen 'Tap Mode' - Left Click"));
-			} else if (GPH::tapmodeLevel == TAPMODE_RIGHT) {
+			} else if (_tapmodeLevel == TAPMODE_RIGHT) {
 				g_system->displayMessageOnOSD(_("Touchscreen 'Tap Mode' - Right Click"));
-			} else if (GPH::tapmodeLevel == TAPMODE_HOVER) {
+			} else if (_tapmodeLevel == TAPMODE_HOVER) {
 				g_system->displayMessageOnOSD(_("Touchscreen 'Tap Mode' - Hover (No Click)"));
 			}
 		} else {
@@ -402,7 +422,7 @@ bool GPHEventSource::handleJoyButtonDown(SDL_Event &ev, Common::Event &event) {
 	case BUTTON_MENU:
 	case BUTTON_HELP:
 		event.type = Common::EVENT_KEYDOWN;
-		if (BUTTON_STATE_L == true) {
+		if (_buttonStateL == true) {
 			event.type = Common::EVENT_MAINMENU;
 		} else {
 			event.kbd.keycode = Common::KEYCODE_F5;
@@ -429,12 +449,12 @@ bool GPHEventSource::handleJoyButtonDown(SDL_Event &ev, Common::Event &event) {
 		event.type = Common::EVENT_QUIT;
 		break;
 	case BUTTON_HELP2:
-		GPH::ToggleTapMode();
-		if (GPH::tapmodeLevel == TAPMODE_LEFT) {
+		ToggleTapMode();
+		if (_tapmodeLevel == TAPMODE_LEFT) {
 			g_system->displayMessageOnOSD(_("Touchscreen 'Tap Mode' - Left Click"));
-		} else if (GPH::tapmodeLevel == TAPMODE_RIGHT) {
+		} else if (_tapmodeLevel == TAPMODE_RIGHT) {
 			g_system->displayMessageOnOSD(_("Touchscreen 'Tap Mode' - Right Click"));
-		} else if (GPH::tapmodeLevel == TAPMODE_HOVER) {
+		} else if (_tapmodeLevel == TAPMODE_HOVER) {
 			g_system->displayMessageOnOSD(_("Touchscreen 'Tap Mode' - Hover (No Click)"));
 		}
 		break;
@@ -472,7 +492,7 @@ bool GPHEventSource::handleJoyButtonUp(SDL_Event &ev, Common::Event &event) {
 		processMouseEvent(event, _km.x / MULTIPLIER, _km.y / MULTIPLIER);
 		break;
 	case BUTTON_L:
-		BUTTON_STATE_L = false;
+		_buttonStateL = false;
 		break;
 	case BUTTON_SELECT:
 	case BUTTON_HOME:
@@ -493,7 +513,7 @@ bool GPHEventSource::handleJoyButtonUp(SDL_Event &ev, Common::Event &event) {
 	case BUTTON_MENU:
 	case BUTTON_HELP:
 		event.type = Common::EVENT_KEYUP;
-		if (BUTTON_STATE_L == true) {
+		if (_buttonStateL == true) {
 			event.type = Common::EVENT_MAINMENU;
 		} else {
 			event.kbd.keycode = Common::KEYCODE_F5;
@@ -502,14 +522,9 @@ bool GPHEventSource::handleJoyButtonUp(SDL_Event &ev, Common::Event &event) {
 		break;
 	case BUTTON_R:
 		event.type = Common::EVENT_KEYUP;
-		if (BUTTON_STATE_L == true) {
-#ifdef ENABLE_VKEYBD
+		if (_buttonStateL == true) {
 			event.kbd.keycode = Common::KEYCODE_F7;
 			event.kbd.ascii = mapKey(SDLK_F7, ev.key.keysym.mod, 0);
-#else
-			event.kbd.keycode = Common::KEYCODE_0;
-			event.kbd.ascii = mapKey(SDLK_0, ev.key.keysym.mod, 0);
-#endif
 		} else {
 			event.kbd.keycode = Common::KEYCODE_RETURN;
 			event.kbd.ascii = mapKey(SDLK_RETURN, ev.key.keysym.mod, 0);

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,27 +15,17 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
-#include "common/rect.h"
-#include "graphics/surface.h"
-#include "graphics/transparent_surface.h"
-
-#include "sludge/allfiles.h"
-#include "sludge/backdrop.h"
 #include "sludge/event.h"
 #include "sludge/fileset.h"
 #include "sludge/graphics.h"
 #include "sludge/imgloader.h"
-#include "sludge/moreio.h"
 #include "sludge/newfatal.h"
 #include "sludge/people.h"
 #include "sludge/sludge.h"
-#include "sludge/sludger.h"
-#include "sludge/sprites.h"
 #include "sludge/zbuffer.h"
 
 namespace Sludge {
@@ -98,6 +88,8 @@ bool GraphicsManager::loadSpriteBank(int fileNum, SpriteBank &loadhere, bool isF
 	setResourceForFatal(fileNum);
 	if (!g_sludge->_resMan->openFileFromNum(fileNum))
 		return fatal("Can't open sprite bank / font");
+
+	g_sludge->_resMan->dumpFile(fileNum, "bank%04d.duc");
 
 	loadhere.isFont = isFont;
 
@@ -280,7 +272,6 @@ void GraphicsManager::pasteSpriteToBackDrop(int x1, int y1, Sprite &single, cons
 		_zBuffer->originalNum = num;
 	}
 
-	//TODO: shader: useLightTexture
 	x1 -= single.xhot;
 	y1 -= single.yhot;
 	Graphics::TransparentSurface tmp(single.surface, false);
@@ -298,10 +289,9 @@ void GraphicsManager::burnSpriteToBackDrop(int x1, int y1, Sprite &single, const
 		_zBuffer->originalNum = num;
 	}
 
-	//TODO: shader: useLightTexture
 	x1 -= single.xhot;
 	y1 -= single.yhot - 1;
-	Graphics::TransparentSurface tmp(single.surface, false);
+	Graphics::TransparentSurface tmp(single.burnSurface, false);
 	tmp.blit(_backdropSurface, x1, y1, Graphics::FLIP_NONE, nullptr,
 			TS_RGB(_currentBurnR, _currentBurnG, _currentBurnB));
 }
@@ -339,7 +329,7 @@ void GraphicsManager::blendColor(Graphics::Surface *blitted, uint32 color, Graph
 	Graphics::TransparentSurface tmp;
 	tmp.create(blitted->w, blitted->h, blitted->format);
 	tmp.fillRect(Common::Rect(0, 0, tmp.w, tmp.h), color);
-	tmp.blit(*blitted, 0, 0, Graphics::FLIP_NONE, nullptr, TS_ARGB(255, 255, 255, 255), blitted->w, blitted->h, mode);
+	tmp.blit(*blitted, 0, 0, Graphics::FLIP_NONE, nullptr, TS_ARGB((uint)255, (uint)255, (uint)255, (uint)255), (int)blitted->w, (int)blitted->h, mode);
 	tmp.free();
 }
 
@@ -375,8 +365,10 @@ Graphics::Surface *GraphicsManager::applyLightmapToSprite(Graphics::Surface *&bl
 			tmp.blit(*blitted, 0, 0,
 					(mirror ? Graphics::FLIP_H : Graphics::FLIP_NONE),
 					(mirror ? &rect_h : &rect_none),
-					TS_ARGB(255, 255, 255, 255),
-					blitted->w, blitted->h, Graphics::BLEND_MULTIPLY);
+					TS_ARGB((uint)255, (uint)255, (uint)255, (uint)255),
+					(int)blitted->w, (int)blitted->h, Graphics::BLEND_MULTIPLY);
+		} else {
+			curLight[0] = curLight[1] = curLight[2] = 255;
 		}
 	} else {
 		curLight[0] = curLight[1] = curLight[2] = 255;
@@ -384,19 +376,19 @@ Graphics::Surface *GraphicsManager::applyLightmapToSprite(Graphics::Surface *&bl
 
 	// calculate light map color
 	float fr, fg, fb;
-	fr = fg = fb = 0.f;
+	fr = fg = fb = 0.0F;
 	if (thisPerson->colourmix) {
-		fr = curLight[0]*thisPerson->r * thisPerson->colourmix / 65025 / 255.f;
-		fg = curLight[1]*thisPerson->g * thisPerson->colourmix / 65025 / 255.f;
-		fb = curLight[2]*thisPerson->b * thisPerson->colourmix / 65025 / 255.f;
+		fr = curLight[0]*thisPerson->r * thisPerson->colourmix / 65025 / 255.0F;
+		fg = curLight[1]*thisPerson->g * thisPerson->colourmix / 65025 / 255.0F;
+		fb = curLight[2]*thisPerson->b * thisPerson->colourmix / 65025 / 255.0F;
 	}
 
-	uint32 primaryColor = TS_ARGB((uint8)(255 - thisPerson->transparency),
+	uint32 primaryColor = TS_ARGB(255,
 			(uint8)(fr + curLight[0] * (255 - thisPerson->colourmix) / 255.f),
 			(uint8)(fg + curLight[1] * (255 - thisPerson->colourmix) / 255.f),
 			(uint8)(fb + curLight[2] * (255 - thisPerson->colourmix) / 255.f));
 
-	uint32 secondaryColor = TS_ARGB(0, (uint8)(fr * 255), (uint8)(fg * 255), (uint8)(fb * 255));
+	uint32 secondaryColor = TS_ARGB(0xff, (uint8)(fr * 255), (uint8)(fg * 255), (uint8)(fb * 255));
 
 	// apply primary color
 	if (primaryColor != (uint32)TS_ARGB(255, 255, 255, 255)) {
@@ -459,7 +451,7 @@ bool GraphicsManager::scaleSprite(Sprite &single, const SpritePalette &fontPal, 
 	// Use Transparent surface to scale and blit
 	if (!_zBuffer->numPanels) {
 		Graphics::TransparentSurface tmp(*blitted, false);
-		tmp.blit(_renderSurface, x1, y1, (mirror ? Graphics::FLIP_H : Graphics::FLIP_NONE), nullptr, TS_ARGB(255, 255, 255, 255), diffX, diffY);
+		tmp.blit(_renderSurface, x1, y1, (mirror ? Graphics::FLIP_H : Graphics::FLIP_NONE), nullptr, TS_ARGB(255 - thisPerson->transparency, 255, 255, 255), diffX, diffY);
 		if (ptr) {
 			ptr->free();
 			delete ptr;
@@ -467,12 +459,12 @@ bool GraphicsManager::scaleSprite(Sprite &single, const SpritePalette &fontPal, 
 		}
 	} else {
 		int d = useZB ? y + _cameraY : (y + _cameraY > _sceneHeight * 0.6 ? _sceneHeight + 1 : 0);
-		addSpriteDepth(blitted, d, x1, y1, (mirror ? Graphics::FLIP_H : Graphics::FLIP_NONE), diffX, diffY, ptr);
+		addSpriteDepth(blitted, d, x1, y1, (mirror ? Graphics::FLIP_H : Graphics::FLIP_NONE), diffX, diffY, ptr, 255 - thisPerson->transparency);
 	}
 
 	// Are we pointing at the sprite?
-	if (_vm->_evtMan->mouseX() >= x1 && _vm->_evtMan->mouseX() <= x2
-			&& _vm->_evtMan->mouseY() >= y1 && _vm->_evtMan->mouseY() <= y2) {
+	if (_vm->_evtMan->mouseX() >= x1 && _vm->_evtMan->mouseX() < x2
+			&& _vm->_evtMan->mouseY() >= y1 && _vm->_evtMan->mouseY() < y2) {
 		if (thisPerson->extra & EXTRA_RECTANGULAR)
 			return true;
 
@@ -500,7 +492,7 @@ void GraphicsManager::resetSpriteLayers(ZBufferData *pz, int x, int y, bool upsi
 	}
 }
 
-void GraphicsManager::addSpriteDepth(Graphics::Surface *ptr, int depth, int x, int y, Graphics::FLIP_FLAGS flip, int width, int height, bool freeAfterUse) {
+void GraphicsManager::addSpriteDepth(Graphics::Surface *ptr, int depth, int x, int y, Graphics::FLIP_FLAGS flip, int width, int height, bool freeAfterUse, byte trans) {
 	int i;
 	for (i = 1; i < _zBuffer->numPanels; ++i) {
 		if (_zBuffer->panel[i] >= depth) {
@@ -508,9 +500,9 @@ void GraphicsManager::addSpriteDepth(Graphics::Surface *ptr, int depth, int x, i
 		}
 	}
 	--i;
-	debugC(3, kSludgeDebugZBuffer, "Add sprite of Y-value : %i in layer %i", depth, i);
+	debugC(3, kSludgeDebugZBuffer, "Add sprite of Y-value : %i in layer %i trans: %02x", depth, i, trans);
 
-	SpriteDisplay *node = new SpriteDisplay(x, y, flip, ptr, width, height, freeAfterUse);
+	SpriteDisplay *node = new SpriteDisplay(x, y, flip, ptr, width, height, freeAfterUse, trans);
 	_spriteLayers->layer[i].push_back(node);
 }
 
@@ -520,7 +512,7 @@ void GraphicsManager::displaySpriteLayers() {
 		SpriteLayer::iterator it;
 		for (it = _spriteLayers->layer[i].begin(); it != _spriteLayers->layer[i].end(); ++it) {
 			Graphics::TransparentSurface tmp(*(*it)->surface, false);
-			tmp.blit(_renderSurface, (*it)->x, (*it)->y, (*it)->flip, nullptr, TS_ARGB(255, 255, 255, 255), (*it)->width, (*it)->height);
+			tmp.blit(_renderSurface, (*it)->x, (*it)->y, (*it)->flip, nullptr, TS_ARGB((*it)->transparency, 255, 255, 255), (*it)->width, (*it)->height);
 		}
 	}
 	killSpriteLayers();
@@ -575,7 +567,7 @@ void GraphicsManager::fixScaleSprite(int x, int y, Sprite &single, const SpriteP
 	// draw sprite
 	if (!_zBuffer->numPanels) {
 		Graphics::TransparentSurface tmp(single.surface, false);
-		tmp.blit(_renderSurface, x1, y1, (mirror ? Graphics::FLIP_H : Graphics::FLIP_NONE), nullptr, TS_ARGB(255, 255, 255, 255), diffX, diffY);
+		tmp.blit(_renderSurface, x1, y1, (mirror ? Graphics::FLIP_H : Graphics::FLIP_NONE), nullptr, TS_ARGB((uint)255, (uint)255, (uint)255, (uint)255), diffX, diffY);
 		if (ptr) {
 			ptr->free();
 			delete ptr;
@@ -583,7 +575,7 @@ void GraphicsManager::fixScaleSprite(int x, int y, Sprite &single, const SpriteP
 		}
 	} else {
 		int d = useZB ? y + _cameraY : (y + _cameraY > _sceneHeight * 0.6 ? _sceneHeight + 1 : 0);
-		addSpriteDepth(&single.surface, d, x1, y1, (mirror ? Graphics::FLIP_H : Graphics::FLIP_NONE), diffX, diffY, ptr);
+		addSpriteDepth(&single.surface, d, x1, y1, (mirror ? Graphics::FLIP_H : Graphics::FLIP_NONE), diffX, diffY, ptr, 255 - thisPerson->transparency);
 	}
 
 	// draw all

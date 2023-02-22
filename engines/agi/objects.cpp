@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,20 +25,12 @@
 
 namespace Agi {
 
-int AgiEngine::allocObjects(int n) {
-	if ((_objects = (AgiObject *)calloc(n, sizeof(struct AgiObject))) == NULL)
-		return errNotEnoughMemory;
-
-	return errOK;
-}
-
 int AgiEngine::decodeObjects(uint8 *mem, uint32 flen) {
 	unsigned int i, so, padsize, spos;
 
 	padsize = _game.gameFlags & ID_AMIGA ? 4 : 3;
 
 	_game.numObjects = 0;
-	_objects = NULL;
 
 	// check if first pointer exceeds file size
 	// if so, its encrypted, else it is not
@@ -60,8 +51,7 @@ int AgiEngine::decodeObjects(uint8 *mem, uint32 flen) {
 	_game.numObjects = READ_LE_UINT16(mem) / padsize;
 	debugC(5, kDebugLevelResources, "num_objects = %d (padsize = %d)", _game.numObjects, padsize);
 
-	if (allocObjects(_game.numObjects) != errOK)
-		return errNotEnoughMemory;
+	_objects.resize(_game.numObjects);
 
 	// build the object list
 	spos = getVersion() >= 0x2000 ? padsize : 0;
@@ -72,15 +62,15 @@ int AgiEngine::decodeObjects(uint8 *mem, uint32 flen) {
 		offset = READ_LE_UINT16(mem + so) + spos;
 
 		if ((uint) offset < flen) {
-			_objects[i].name = (char *)strdup((const char *)mem + offset);
+			_objects[i].name = (const char *)mem + offset;
 		} else {
 			warning("object %i name beyond object filesize (%04x > %04x)", i, offset, flen);
-			_objects[i].name = strdup("");
+			_objects[i].name.clear();
 		}
 
 		// Don't show the invalid "?" object in ego's inventory in the fanmade
-		// game Beyond the Titanic 2 (bug #3116541).
-		if (!strcmp(_objects[i].name, "?") && _objects[i].location == EGO_OWNED)
+		// game Beyond the Titanic 2 (bug #5523).
+		if (_objects[i].name == "?" && _objects[i].location == EGO_OWNED)
 			_objects[i].location = 0;
 	}
 	debug(0, "Reading objects: %d objects read.", _game.numObjects);
@@ -118,7 +108,7 @@ int AgiEngine::loadObjects(Common::File &fp) {
 int AgiEngine::readObjects(Common::File &fp, int flen) {
 	uint8 *mem;
 
-	if ((mem = (uint8 *)calloc(1, flen + 32)) == NULL) {
+	if ((mem = (uint8 *)calloc(1, flen + 32)) == nullptr) {
 		fp.close();
 		return errNotEnoughMemory;
 	}
@@ -129,19 +119,6 @@ int AgiEngine::readObjects(Common::File &fp, int flen) {
 	decodeObjects(mem, flen);
 	free(mem);
 	return errOK;
-}
-
-void AgiEngine::unloadObjects() {
-	unsigned int i;
-
-	if (_objects != NULL) {
-		for (i = 0; i < _game.numObjects; i++) {
-			free(_objects[i].name);
-			_objects[i].name = NULL;
-		}
-		free(_objects);
-		_objects = NULL;
-	}
 }
 
 void AgiEngine::objectSetLocation(uint16 objectNr, int i) {
@@ -165,7 +142,7 @@ const char *AgiEngine::objectName(uint16 objectNr) {
 		warning("AgiEngine::objectName: Can't access object %d.\n", objectNr);
 		return "";
 	}
-	return _objects[objectNr].name;
+	return _objects[objectNr].name.c_str();
 }
 
 } // End of namespace Agi

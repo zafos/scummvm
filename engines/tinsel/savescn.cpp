@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Save and restore scene and game.
  */
@@ -35,7 +34,7 @@
 #include "tinsel/pid.h"
 #include "tinsel/play.h"
 #include "tinsel/polygons.h"
-#include "tinsel/rince.h"
+#include "tinsel/movers.h"
 #include "tinsel/savescn.h"
 #include "tinsel/scene.h"
 #include "tinsel/sched.h"
@@ -50,10 +49,6 @@
 namespace Tinsel {
 
 //----------------- EXTERN FUNCTIONS --------------------
-
-// in BG.C
-extern SCNHANDLE GetBgroundHandle();
-extern void SetDoFadeIn(bool tf);
 
 // In DOS_DW.C
 void RestoreMasterProcess(INT_CONTEXT *pic);
@@ -81,7 +76,7 @@ extern SRSTATE g_SRstate;
 
 //----------------- LOCAL GLOBAL DATA --------------------
 
-// FIXME: Avoid non-const global vars
+// These vars are reset upon engine destruction
 
 bool g_ASceneIsSaved = false;
 
@@ -89,17 +84,30 @@ static int g_savedSceneCount = 0;
 
 static bool g_bNotDoneYet = false;
 
-//static SAVED_DATA ssData[MAX_NEST];
-static SAVED_DATA *g_ssData = NULL;
+static SAVED_DATA *g_ssData = nullptr;
 static SAVED_DATA g_sgData;
-
-static SAVED_DATA *g_rsd = 0;
+static SAVED_DATA *g_rsd = nullptr;
 
 static int g_RestoreSceneCount = 0;
 
 static bool g_bNoFade = false;
 
-//----------------- FORWARD REFERENCES --------------------
+void ResetVarsSaveScn() {
+	g_ASceneIsSaved = false;
+
+	g_savedSceneCount = 0;
+
+	g_bNotDoneYet = false;
+
+	free(g_ssData);
+	g_ssData = nullptr;
+
+	memset(&g_sgData, 0, sizeof(g_sgData));
+	g_rsd = nullptr;
+
+	g_RestoreSceneCount = 0;
+	g_bNoFade = false;
+}
 
 /**
  * Save current scene.
@@ -107,30 +115,30 @@ static bool g_bNoFade = false;
  */
 void DoSaveScene(SAVED_DATA *sd) {
 	sd->SavedSceneHandle = GetSceneHandle();
-	sd->SavedBgroundHandle = GetBgroundHandle();
+	sd->SavedBgroundHandle = _vm->_bg->GetBgroundHandle();
 	SaveMovers(sd->SavedMoverInfo);
-	sd->NumSavedActors = SaveActors(sd->SavedActorInfo);
-	PlayfieldGetPos(FIELD_WORLD, &sd->SavedLoffset, &sd->SavedToffset);
+	sd->NumSavedActors = _vm->_actor->SaveActors(sd->SavedActorInfo);
+	_vm->_bg->PlayfieldGetPos(FIELD_WORLD, &sd->SavedLoffset, &sd->SavedToffset);
 	SaveInterpretContexts(sd->SavedICInfo);
 	sd->SavedControl = ControlIsOn();
 	sd->SavedNoBlocking = GetNoBlocking();
-	GetNoScrollData(&sd->SavedNoScrollData);
+	_vm->_scroll->GetNoScrollData(&sd->SavedNoScrollData);
 
-	if (TinselV2) {
+	if (TinselVersion >= 2) {
 		// Tinsel 2 specific data save
-		SaveActorZ(sd->savedActorZ);
-		SaveZpositions(sd->zPositions);
+		_vm->_actor->SaveActorZ(sd->savedActorZ);
+		_vm->_actor->SaveZpositions(sd->zPositions);
 		SavePolygonStuff(sd->SavedPolygonStuff);
 		_vm->_pcmMusic->getTunePlaying(sd->SavedTune, sizeof(sd->SavedTune));
 		sd->bTinselDim = _vm->_pcmMusic->getMusicTinselDimmed();
-		sd->SavedScrollFocus = GetScrollFocus();
+		sd->SavedScrollFocus = _vm->_scroll->GetScrollFocus();
 		SaveSysVars(sd->SavedSystemVars);
 		SaveSoundReels(sd->SavedSoundReels);
 
 	} else {
 		// Tinsel 1 specific data save
 		SaveDeadPolys(sd->SavedDeadPolys);
-		CurrentMidiFacts(&sd->SavedMidi, &sd->SavedLoop);
+		_vm->_music->CurrentMidiFacts(&sd->SavedMidi, &sd->SavedLoop);
 	}
 
 	g_ASceneIsSaved = true;
@@ -164,7 +172,7 @@ void InitializeSaveScenes() {
 
 void FreeSaveScenes() {
 	free(g_ssData);
-	g_ssData = NULL;
+	g_ssData = nullptr;
 }
 
 /**
@@ -173,13 +181,13 @@ void FreeSaveScenes() {
  * Also 'stand' all the moving actors at their saved positions.
  */
 void sortActors(SAVED_DATA *sd) {
-	assert(!TinselV2);
+	assert(TinselVersion <= 1);
 	for (int i = 0; i < sd->NumSavedActors; i++) {
-		ActorsLife(sd->SavedActorInfo[i].actorID, sd->SavedActorInfo[i].bAlive);
+		_vm->_actor->ActorsLife(sd->SavedActorInfo[i].actorID, sd->SavedActorInfo[i].bAlive);
 
 		// Should be playing the same reel.
 		if (sd->SavedActorInfo[i].presFilm != 0) {
-			if (!actorAlive(sd->SavedActorInfo[i].actorID))
+			if (!_vm->_actor->actorAlive(sd->SavedActorInfo[i].actorID))
 				continue;
 
 			RestoreActorReels(sd->SavedActorInfo[i].presFilm, sd->SavedActorInfo[i].presRnum, sd->SavedActorInfo[i].zFactor,
@@ -244,9 +252,11 @@ static void SortMAProcess(CORO_PARAM, const void *) {
 
 void ResumeInterprets() {
 	// Master script only affected on restore game, not restore scene
-	if (!TinselV2 && (g_rsd == &g_sgData)) {
-		CoroScheduler.killMatchingProcess(PID_MASTER_SCR, -1);
-		FreeMasterInterpretContext();
+	if (TinselVersion <= 1) {
+		if (g_rsd == &g_sgData) {
+			CoroScheduler.killMatchingProcess(PID_MASTER_SCR, -1);
+			FreeMasterInterpretContext();
+		}
 	}
 
 	for (int i = 0; i < NUM_INTERPRET; i++) {
@@ -278,7 +288,7 @@ void ResumeInterprets() {
 			break;
 
 		case GS_ACTOR:
-			if (TinselV2)
+			if (TinselVersion >= 2)
 				RestoreProcess(&g_rsd->SavedICInfo[i]);
 			else
 				RestoreActorProcess(g_rsd->SavedICInfo[i].idActor, &g_rsd->SavedICInfo[i], g_rsd == &g_sgData);
@@ -310,7 +320,7 @@ static int DoRestoreSceneFrame(SAVED_DATA *sd, int n) {
 		_vm->_sound->stopAllSamples();
 		ClearScreen();
 
-		if (TinselV2) {
+		if (TinselVersion >= 2) {
 
 			// Master script only affected on restore game, not restore scene
 			if (sd == &g_sgData) {
@@ -338,29 +348,29 @@ static int DoRestoreSceneFrame(SAVED_DATA *sd, int n) {
 		// Start up the scene
 		StartNewScene(sd->SavedSceneHandle, NO_ENTRY_NUM);
 
-		SetDoFadeIn(!g_bNoFade);
+		_vm->_bg->SetDoFadeIn(!g_bNoFade);
 		g_bNoFade = false;
-		StartupBackground(Common::nullContext, sd->SavedBgroundHandle);
+		_vm->_bg->StartupBackground(Common::nullContext, sd->SavedBgroundHandle);
 
-		if (TinselV2) {
+		if (TinselVersion >= 2) {
 			Offset(EX_USEXY, sd->SavedLoffset, sd->SavedToffset);
 		} else {
-			KillScroll();
-			PlayfieldSetPos(FIELD_WORLD, sd->SavedLoffset, sd->SavedToffset);
+			_vm->_scroll->KillScroll();
+			_vm->_bg->PlayfieldSetPos(FIELD_WORLD, sd->SavedLoffset, sd->SavedToffset);
 			SetNoBlocking(sd->SavedNoBlocking);
 		}
 
-		RestoreNoScrollData(&sd->SavedNoScrollData);
+		_vm->_scroll->RestoreNoScrollData(&sd->SavedNoScrollData);
 
-		if (TinselV2) {
+		if (TinselVersion >= 2) {
 			// create process to sort out the moving actors
 			CoroScheduler.createProcess(PID_MOVER, SortMAProcess, NULL, 0);
 			g_bNotDoneYet = true;
 
-			RestoreActorZ(sd->savedActorZ);
-			RestoreZpositions(sd->zPositions);
+			_vm->_actor->RestoreActorZ(sd->savedActorZ);
+			_vm->_actor->RestoreZpositions(sd->zPositions);
 			RestoreSysVars(sd->SavedSystemVars);
-			RestoreActors(sd->NumSavedActors, sd->SavedActorInfo);
+			_vm->_actor->RestoreActors(sd->NumSavedActors, sd->SavedActorInfo);
 			RestoreSoundReels(sd->SavedSoundReels);
 			return 1;
 		}
@@ -372,18 +382,18 @@ static int DoRestoreSceneFrame(SAVED_DATA *sd, int n) {
 		break;
 
 	case 1:
-		if (TinselV2) {
+		if (TinselVersion >= 2) {
 			if (g_bNotDoneYet)
 				return n;
 
 			if (sd == &g_sgData)
-				HoldItem(g_thingHeld, true);
+				_vm->_dialogs->holdItem(g_thingHeld, true);
 			if (sd->bTinselDim)
 				_vm->_pcmMusic->dim(true);
 			_vm->_pcmMusic->restoreThatTune(sd->SavedTune);
-			ScrollFocus(sd->SavedScrollFocus);
+			_vm->_scroll->ScrollFocus(sd->SavedScrollFocus);
 		} else {
-			RestoreMidiFacts(sd->SavedMidi, sd->SavedLoop);
+			_vm->_music->RestoreMidiFacts(sd->SavedMidi, sd->SavedLoop);
 		}
 
 		if (sd->SavedControl)
@@ -403,7 +413,7 @@ static int DoRestoreSceneFrame(SAVED_DATA *sd, int n) {
  * @param num			num
  */
 void RestoreGame(int num) {
-	KillInventory();
+	_vm->_dialogs->killInventory();
 
 	RequestRestoreGame(num, &g_sgData, &g_savedSceneCount, g_ssData);
 

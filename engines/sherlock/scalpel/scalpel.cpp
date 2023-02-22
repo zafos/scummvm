@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,7 +33,7 @@
 #include "sherlock/sherlock.h"
 #include "sherlock/music.h"
 #include "sherlock/animation.h"
-#include "sherlock/scalpel/3do/movie_decoder.h"
+#include "video/3do_decoder.h"
 
 namespace Sherlock {
 
@@ -762,7 +761,7 @@ bool ScalpelEngine::showCityCutscene3DO() {
 		if (finished) {
 			ImageFile3DO titleImage_Copyright("title1c.cel", kImageFile3DOType_Cel);
 
-			screen.SHtransBlitFrom(titleImage_Copyright[0]._frame, Common::Point(20, 190));
+			screen.SHtransBlitFrom(titleImage_Copyright[0]._frame, Common::Point(40, 380));
 			finished = _events->delay(3500, true);
 		}
 	}
@@ -942,7 +941,7 @@ bool ScalpelEngine::showOfficeCutscene3DO() {
 
 		for (int nr = 1; finished && nr <= 4; nr++) {
 			char filename[15];
-			sprintf(filename, "credits%d.cel", nr);
+			Common::sprintf_s(filename, "credits%d.cel", nr);
 			ImageFile3DO *creditsImage = new ImageFile3DO(filename, kImageFile3DOType_Cel);
 			ImageFrame *creditsFrame = &(*creditsImage)[0];
 			for (int i = 0; finished && i < 200 + creditsFrame->_height; i++) {
@@ -1035,8 +1034,8 @@ void ScalpelEngine::startScene() {
 			// Blackwood's capture
 			_res->addToCache("final2.vda", "epilogue.lib");
 			_res->addToCache("final2.vdx", "epilogue.lib");
-			_animation->play("final1", false, 1, 3, true, 4);
-			_animation->play("final2", false, 1, 0, false, 4);
+			_animation->play("final1", false, 1, 3, true, 2);
+			_animation->play("final2", false, 1, 0, false, 2);
 			break;
 
 		case RESCUE_ANNA:
@@ -1052,8 +1051,8 @@ void ScalpelEngine::startScene() {
 			_res->addToCache("finale4.vda", "EPILOG2.lib");
 			_res->addToCache("finale4.vdx", "EPILOG2.lib");
 
-			_animation->play("finalr1", false, 1, 3, true, 4);
-			_animation->play("finalr2", false, 1, 0, false, 4);
+			_animation->play("finalr1", false, 1, 3, true, 2);
+			_animation->play("finalr2", false, 1, 0, false, 2);
 
 			if (!_res->isInCache("finale2.vda")) {
 				// Finale file isn't cached
@@ -1065,12 +1064,12 @@ void ScalpelEngine::startScene() {
 				_res->addToCache("finale4.vdx", "EPILOG2.lib");
 			}
 
-			_animation->play("finale1", false, 1, 0, false, 4);
-			_animation->play("finale2", false, 1, 0, false, 4);
-			_animation->play("finale3", false, 1, 0, false, 4);
+			_animation->play("finale1", false, 1, 0, false, 2);
+			_animation->play("finale2", false, 1, 0, false, 2);
+			_animation->play("finale3", false, 1, 0, false, 2);
 
 			_useEpilogue2 = true;
-			_animation->play("finale4", false, 1, 0, false, 4);
+			_animation->play("finale4", false, 1, 0, false, 2);
 			_useEpilogue2 = false;
 			break;
 
@@ -1081,9 +1080,9 @@ void ScalpelEngine::startScene() {
 			_res->addToCache("SUBWAY3.vda", "epilogue.lib");
 			_res->addToCache("SUBWAY3.vdx", "epilogue.lib");
 
-			_animation->play("SUBWAY1", false, 1, 3, true, 4);
-			_animation->play("SUBWAY2", false, 1, 0, false, 4);
-			_animation->play("SUBWAY3", false, 1, 0, false, 4);
+			_animation->play("SUBWAY1", false, 1, 3, true, 2);
+			_animation->play("SUBWAY2", false, 1, 0, false, 2);
+			_animation->play("SUBWAY3", false, 1, 0, false, 2);
 
 			// Set fading to direct fade temporary so the transition goes quickly.
 			_scene->_tempFadeStyle = _screen->_fadeStyle ? 257 : 256;
@@ -1092,7 +1091,7 @@ void ScalpelEngine::startScene() {
 
 		case BRUMWELL_SUICIDE:
 			// Brumwell suicide
-			_animation->play("suicid", false, 1, 3, true, 4);
+			_animation->play("suicid", false, 1, 3, true, 2);
 			break;
 		default:
 			break;
@@ -1272,10 +1271,9 @@ void ScalpelEngine::showScummVMRestoreDialog() {
 
 bool ScalpelEngine::play3doMovie(const Common::String &filename, const Common::Point &pos, bool isPortrait) {
 	Scalpel3DOScreen &screen = *(Scalpel3DOScreen *)_screen;
-	Scalpel3DOMovieDecoder *videoDecoder = new Scalpel3DOMovieDecoder();
+	Video::ThreeDOMovieDecoder *videoDecoder = new Video::ThreeDOMovieDecoder();
 	Graphics::ManagedSurface tempSurface;
 
-	Common::Point framePos(pos.x, pos.y);
 	ImageFile3DO *frameImageFile = nullptr;
 	ImageFrame *frameImage = nullptr;
 	bool frameShown = false;
@@ -1285,17 +1283,30 @@ bool ScalpelEngine::play3doMovie(const Common::String &filename, const Common::P
 		return false;
 	}
 
+	Common::Point moviePos(pos.x, pos.y);
+	int frameWidth = 8;
+
 	bool halfSize = isPortrait && !_isScreenDoubled;
+
 	if (isPortrait) {
-		// only for portrait videos, not for EA intro logo and such
-		if ((framePos.x >= 8) && (framePos.y >= 8)) { // safety check
-			framePos.x -= 8;
-			framePos.y -= 8; // frame is 8 pixels on left + top, and 7 pixels on right + bottom
+		if (!halfSize) {
+			moviePos.x *= 2;
+			moviePos.y *= 2;
+			frameWidth *= 2;
 		}
+
+		// Safety check. Only for portrait videos, not for EA intro logo and such
+		if (moviePos.x < frameWidth)
+			moviePos.x = frameWidth;
+		if (moviePos.y < frameWidth)
+			moviePos.y = frameWidth;
 
 		frameImageFile = new ImageFile3DO("vidframe.cel", kImageFile3DOType_Cel);
 		frameImage = &(*frameImageFile)[0];
 	}
+
+	 // frame is 8 pixels on left + top, and 7 pixels on right + bottom
+	Common::Point framePos(moviePos.x - frameWidth, moviePos.y - frameWidth);
 
 	bool skipVideo = false;
 	//byte bytesPerPixel = videoDecoder->getPixelFormat().bytesPerPixel;
@@ -1308,7 +1319,7 @@ bool ScalpelEngine::play3doMovie(const Common::String &filename, const Common::P
 
 	// If we're to show the movie at half-size, we'll need a temporary intermediate surface
 	if (halfSize)
-		tempSurface.create(width / 2, height / 2);
+		tempSurface.create(width / 2, height / 2, videoDecoder->getPixelFormat());
 
 	while (!shouldQuit() && !videoDecoder->endOfVideo() && !skipVideo) {
 		if (videoDecoder->needsUpdate()) {
@@ -1382,9 +1393,9 @@ bool ScalpelEngine::play3doMovie(const Common::String &filename, const Common::P
 				}
 
 				if (isPortrait && !halfSize) {
-					screen.rawBlitFrom(*frame, Common::Point(pos.x * 2, pos.y * 2));
+					screen.rawBlitFrom(*frame, moviePos);
 				} else {
-					_screen->SHblitFrom(*frame, pos);
+					_screen->SHblitFrom(*frame, moviePos);
 				}
 
 				_screen->update();

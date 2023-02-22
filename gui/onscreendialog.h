@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -42,23 +41,23 @@ private:
 
 public:
 	OnScreenDialog(bool recordingMode);
-	~OnScreenDialog();
-	virtual void close();
-	virtual bool isVisible() const;
-	virtual void reflowLayout();
+	~OnScreenDialog() override;
+	void close() override;
+	bool isVisible() const override;
+	void reflowLayout() override;
 
 	void setReplayedTime(uint32 newTime);
 
-	virtual void handleMouseMoved(int x, int y, int button);
-	virtual void handleMouseDown(int x, int y, int button, int clickCount);
-	virtual void handleMouseUp(int x, int y, int button, int clickCount);
-	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data);
+	void handleMouseMoved(int x, int y, int button) override;
+	void handleMouseDown(int x, int y, int button, int clickCount) override;
+	void handleMouseUp(int x, int y, int button, int clickCount) override;
+	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data) override;
 
 	bool isMouseOver();
 	bool isEditDlgVisible();
 	Dialog *getActiveDlg();
 protected:
-	virtual void releaseFocus();
+	void releaseFocus() override;
 };
 
 } // End of namespace GUI

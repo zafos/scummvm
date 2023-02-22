@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -199,7 +198,7 @@ bool SXFile::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 	else if (strcmp(name, "Delete") == 0) {
 		stack->correctParams(0);
 		close();
-		error("SXFile-Method: \"Delete\" not supported");
+		warning("SXFile-Method: \"Delete\" not supported");
 		//stack->pushBool(BasePlatform::deleteFile(_filename) != false);
 		stack->pushBool(false);
 		return STATUS_OK;
@@ -213,9 +212,11 @@ bool SXFile::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 		/* const char *dest = */ stack->pop()->getString();
 		/* bool overwrite = */ stack->pop()->getBool(true);
 
-		close();
-		error("SXFile-Method: Copy not supported");
-		//stack->pushBool(BasePlatform::copyFile(_filename, Dest, !Overwrite) != false);
+		// Known game that need this:
+		// * Space Madness (to copy bonus wallpapers from data.dcp to /saves/ folder)
+		// * games by Rootfix intertainment (to save temporary screenshot as savegame screenshot)
+		warning("SXFile-Method: Copy not supported");
+
 		stack->pushBool(false);
 		return STATUS_OK;
 	}
@@ -346,7 +347,6 @@ bool SXFile::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, 
 			writeLine = Common::String::format("%s", line);
 		}
 		_writeFile->writeString(writeLine);
-		_writeFile->writeByte(0);
 		stack->pushBool(true);
 
 		return STATUS_OK;
@@ -708,7 +708,7 @@ bool SXFile::scSetProperty(const char *name, ScValue *value) {
 	    char propName[20];
 	    if (_length < OrigLength) {
 	        for(int i=_length; i<OrigLength; i++) {
-	            sprintf(PropName, "%d", i);
+	            Common::sprintf_s(PropName, "%d", i);
 	            _values->DeleteProp(PropName);
 	        }
 	    }
@@ -815,9 +815,8 @@ bool SXFile::persist(BasePersistenceManager *persistMgr) {
 	return STATUS_OK;
 }
 
-// Should replace fopen(..., "wb+") and fopen(..., "w+")
 Common::WriteStream *SXFile::openForWrite(const Common::String &filename, bool binary) {
-	error("SXFile::openForWrite - WriteFiles not supported");
+	return BaseFileManager::getEngineInstance()->openFileForWrite(_filename);
 }
 
 // Should replace fopen(..., "ab+") and fopen(..., "a+")

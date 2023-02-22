@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,16 +24,12 @@
 #include "common/scummsys.h"
 #include "common/config-manager.h"
 #include "common/debug-channels.h"
+#include "common/text-to-speech.h"
 
 namespace Sherlock {
 
 SherlockEngine::SherlockEngine(OSystem *syst, const SherlockGameDescription *gameDesc) :
 		Engine(syst), _gameDescription(gameDesc), _randomSource("Sherlock") {
-	DebugMan.addDebugChannel(kDebugLevelScript,      "scripts", "Script debug level");
-	DebugMan.addDebugChannel(kDebugLevelAdLibDriver, "AdLib",   "AdLib driver debugging");
-	DebugMan.addDebugChannel(kDebugLevelMT32Driver,  "MT32",    "MT32 driver debugging");
-	DebugMan.addDebugChannel(kDebugLevelMusic,       "Music",   "Music debugging");
-
 	_animation = nullptr;
 	_debugger = nullptr;
 	_events = nullptr;
@@ -57,11 +52,12 @@ SherlockEngine::SherlockEngine(OSystem *syst, const SherlockGameDescription *gam
 	_showOriginalSavesDialog = false;
 	_interactiveFl = true;
 	_isScreenDoubled = false;
+	_startupAutosave = false;
 }
 
 SherlockEngine::~SherlockEngine() {
 	delete _animation;
-	delete _debugger;
+	//_debugger is deleted by Engine
 	delete _events;
 	delete _fixedText;
 	delete _journal;
@@ -95,6 +91,7 @@ void SherlockEngine::initialize() {
 	_res = new Resources(this);
 	_animation = new Animation(this);
 	_debugger = Debugger::init(this);
+	setDebugger(_debugger);
 	_events = new Events(this);
 	_fixedText = FixedText::init(this);
 	_inventory = Inventory::init(this);
@@ -140,6 +137,13 @@ Common::Error SherlockEngine::run() {
 		do {
 			showOpening();
 		} while (!shouldQuit() && !_interactiveFl);
+
+		// Signal startup autosave, if there isn't already a save in
+		// that slot.
+		SaveStateDescriptor desc = getMetaEngine()->querySaveMetaInfos(
+			_targetName.c_str(), getAutosaveSlot());
+		if (!desc.isValid())
+			_startupAutosave = true;
 	}
 
 	while (!shouldQuit()) {
@@ -183,6 +187,15 @@ void SherlockEngine::sceneLoop() {
 		if (_people->_savedPos.x == -1) {
 			_canLoadSave = true;
 			_scene->doBgAnim();
+
+			if (_startupAutosave) {
+				// When the game is first started, create an autosave.
+				// This helps with the save dialog to prevent users
+				// accidentally saving in the autosave slot
+				_startupAutosave = false;
+				saveAutosaveIfEnabled();
+			}
+
 			_canLoadSave = false;
 		}
 	}
@@ -233,6 +246,10 @@ void SherlockEngine::loadConfig() {
 	_ui->_helpStyle = ConfMan.getBool("help_style");
 	_ui->_slideWindows = ConfMan.getBool("window_style");
 	_people->_portraitsOn = ConfMan.getBool("portraits_on");
+
+	Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+	if (ttsMan != nullptr)
+		ttsMan->enable(ConfMan.getBool("tts_narrator"));
 }
 
 void SherlockEngine::saveConfig() {
@@ -278,7 +295,7 @@ Common::Error SherlockEngine::loadGameState(int slot) {
 	return Common::kNoError;
 }
 
-Common::Error SherlockEngine::saveGameState(int slot, const Common::String &desc) {
+Common::Error SherlockEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	_saves->saveGame(slot, desc);
 	return Common::kNoError;
 }

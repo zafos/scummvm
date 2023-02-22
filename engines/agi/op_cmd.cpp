@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -33,7 +32,28 @@
 #include "agi/words.h"
 
 #include "common/random.h"
+#include "common/system.h"
 #include "common/textconsole.h"
+
+namespace {
+// Creates a unique log file name each time this function is called.
+// We never want to override an existing log file, so here we create one
+// based on the current game and system time.
+//
+// For example: dumps/agi.kq.20221013214511.log
+Common::String generateLogFileName(Agi::AgiGame *state, Agi::AgiEngine *vm) {
+	TimeDate date;
+	vm->_system->getTimeAndDate(date, true);
+	return Common::String::format("dumps/agi.%s.%d%02d%02d%02d%02d%02d.log",
+								  vm->getTargetName().c_str(),
+								  date.tm_year + 1900,
+								  date.tm_mon + 1,
+								  date.tm_mday,
+								  date.tm_hour,
+								  date.tm_min,
+								  date.tm_sec);
+}
+} // namespace
 
 namespace Agi {
 
@@ -78,7 +98,7 @@ void cmdAssignN(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 	// is then incorrectly assigned to 0. Thus, when the game
 	// is restarted, "Points 0 of 0" is shown. We set the
 	// variable to the correct value here
-	// Fixes bug #1942476 - "AGI: Fan(Get Outta SQ) - Score
+	// Fixes bug #3696 - "AGI: Fan(Get Outta SQ) - Score
 	// is lost on restart"
 	if (vm->getGameID() == GID_GETOUTTASQ && varNr == 7)
 		vm->setVar(varNr, 8);
@@ -750,20 +770,17 @@ void cmdSaveGame(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 		state->_vm->_sound->stopSound();
 	}
 
-	vm->inGameTimerPause();
+	PauseToken pt = vm->pauseEngine();
 
 	if (state->automaticSave) {
 		if (vm->saveGameAutomatic()) {
 			// automatic save succeded
-			vm->inGameTimerResume();
 			return;
 		}
 		// fall back to regular dialog otherwise
 	}
 
 	vm->saveGameDialog();
-
-	vm->inGameTimerResume();
 }
 
 void cmdLoadGame(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
@@ -772,26 +789,60 @@ void cmdLoadGame(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 		state->_vm->_sound->stopSound();
 	}
 
-	vm->inGameTimerPause();
+	PauseToken pt = vm->pauseEngine();
 
 	if (state->automaticSave) {
 		if (vm->loadGameAutomatic()) {
 			// automatic restore succeded
-			vm->inGameTimerResume();
 			return;
 		}
 		// fall back to regular dialog otherwise
 	}
 
 	vm->loadGameDialog();
-
-	vm->inGameTimerResume();
 }
 
 void cmdInitDisk(AgiGame *state, AgiEngine *vm, uint8 *parameter) {             // do nothing
 }
 
-void cmdLog(AgiGame *state, AgiEngine *vm, uint8 *parameter) {              // do nothing
+// The log command logs adds an entry to the game's log file and the console.
+// Neither are enabled by default.
+//
+// Room <#>
+// Input line: <text>
+// <message>
+//
+// To see the logs in your console, use the following arguments to scummvm:
+//   --debugflags=Scripts -d 1
+// To see the logs in a file, create the "dumps" directory.
+//
+void cmdLog(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
+	uint16 textNr = parameter[0];
+	if (state->_curLogic->texts != nullptr && (textNr - 1) <= state->_curLogic->numTexts) {
+		byte currentRoom = vm->getVar(VM_VAR_CURRENT_ROOM);
+		const char *inputLine = (char *)vm->_text->_promptPrevious;
+		const char *message = state->_curLogic->texts[textNr - 1];
+
+		Common::String logMessage = Common::String::format("Room %hhu\nInput line: %s\n%s\n",
+														   currentRoom,
+														   inputLine,
+														   vm->_text->stringPrintf(message));
+
+		debugCN(1, kDebugLevelScripts, "%s", logMessage.c_str());
+
+		Common::DumpFile *&dumpFile = vm->_logFile;
+		if (!dumpFile) {
+			dumpFile = new Common::DumpFile();
+			Common::String logFileName = generateLogFileName(state, vm);
+			dumpFile->open(logFileName);
+		}
+		// The logs will only be written if the "dumps" folder has been created by
+		// the user.
+		if (dumpFile->isOpen()) {
+			dumpFile->writeString(logMessage);
+			dumpFile->flush();
+		}
+	}
 }
 
 void cmdTraceOn(AgiGame *state, AgiEngine *vm, uint8 *parameter) {              // do nothing
@@ -870,7 +921,7 @@ void cmdObjStatusF(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 		break;
 	}
 
-	sprintf(msg,
+	Common::sprintf_s(msg,
 	        "Object %d:\n" \
 	        "x: %d  xsize: %d\n" \
 	        "y: %d  ysize: %d\n" \
@@ -897,7 +948,7 @@ void cmdObjStatusF(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 // unk_177: Disable menus completely -- j5
 // unk_181: Deactivate keypressed control (default control of ego)
 void cmdSetSimple(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
-	if (!(getFeatures() & (GF_AGI256 | GF_AGI256_2))) {
+	if (!(getFeatures() & GF_AGI256)) {
 		// set.simple is called by Larry 1 on Apple IIgs at the store, after answering the 555-6969 phone.
 		// load.sound(16) is called right before it. Interpreter is 2.440-like.
 		// it's called with parameter 16.
@@ -1746,11 +1797,9 @@ void cmdSetGameID(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 
 void cmdPause(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 	// Show pause message box
-	vm->inGameTimerPause();
+	PauseToken pt = vm->pauseEngine();
 
 	state->_vm->_systemUI->pauseDialog();
-
-	vm->inGameTimerResume();
 }
 
 void cmdSetMenu(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
@@ -1758,7 +1807,7 @@ void cmdSetMenu(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 
 	debugC(4, kDebugLevelScripts, "text %02x of %02x", textNr, state->_curLogic->numTexts);
 
-	if (state->_curLogic->texts != NULL && (textNr - 1) <= state->_curLogic->numTexts) {
+	if (state->_curLogic->texts != nullptr && (textNr - 1) <= state->_curLogic->numTexts) {
 		const char *menuText = state->_curLogic->texts[textNr - 1];
 
 		state->_vm->_menu->addMenu(menuText);
@@ -1771,7 +1820,7 @@ void cmdSetMenuItem(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 
 	debugC(4, kDebugLevelScripts, "text %02x of %02x", textNr, state->_curLogic->numTexts);
 
-	if (state->_curLogic->texts != NULL && textNr <= state->_curLogic->numTexts) {
+	if (state->_curLogic->texts != nullptr && textNr <= state->_curLogic->numTexts) {
 		const char *menuItemText = state->_curLogic->texts[textNr];
 
 		state->_vm->_menu->addMenuItem(menuItemText, controllerSlot);
@@ -2073,7 +2122,7 @@ void cmdSetCursorChar(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 	TextMgr *textMgr = state->_vm->_text;
 	uint16 textNr = parameter[0] - 1;
 
-	if (state->_curLogic->texts != NULL && textNr <= state->_curLogic->numTexts) {
+	if (state->_curLogic->texts != nullptr && textNr <= state->_curLogic->numTexts) {
 		textMgr->inputSetCursorChar(*state->_curLogic->texts[textNr]);
 	} else {
 		// default
@@ -2103,7 +2152,7 @@ void cmdSetKey(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 	state->controllerKeyMapping[keyMappingSlot].keycode = key;
 	state->controllerKeyMapping[keyMappingSlot].controllerSlot = controllerSlot;
 
-	state->controllerOccured[controllerSlot] = false;
+	state->controllerOccurred[controllerSlot] = false;
 }
 
 void cmdSetString(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
@@ -2153,7 +2202,7 @@ void cmdClearLines(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 
 	// Residence 44 calls clear.lines(24,0,0), see Sarien bug #558423
 	// Agent06 incorrectly calls clear.lines(1,150,0), see ScummVM bugs
-	// #1935838 and #1935842
+	// #3679 and #3680
 	if (textRowUpper > textRowLower) {
 		warning("cmdClearLines: RowUpper higher than RowLower");
 		textRowLower = textRowUpper;
@@ -2198,15 +2247,9 @@ void cmdPrintAtV(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 // push.script was not available until 2.425, and also not available in 2.440
 void cmdPushScript(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 	// We run AGIMOUSE always as a side effect
-	//if (getFeatures() & GF_AGIMOUSE || true) {
 	vm->setVar(VM_VAR_MOUSE_BUTTONSTATE, state->_vm->_mouse.button);
 	vm->setVar(VM_VAR_MOUSE_X, vm->_mouse.pos.x / 2);
 	vm->setVar(VM_VAR_MOUSE_Y, vm->_mouse.pos.y);
-	/*} else {
-	    if (vm->getVersion() >= 0x2915) {
-	        debug(0, "push.script");
-	    }
-	}*/
 }
 
 void cmdSetPriBase(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
@@ -2249,12 +2292,8 @@ void cmdShakeScreen(AgiGame *state, AgiEngine *vm, uint8 *parameter) {
 	// AGIPAL uses shake.screen values between 100 and 109 to set the palette
 	// (Checked the original AGIPAL-hack's shake.screen-routine's disassembly).
 	if (shakeCount >= 100 && shakeCount < 110) {
-		if (getFeatures() & GF_AGIPAL) {
-			state->_vm->_gfx->setAGIPal(shakeCount);
-			return;
-		} else {
-			warning("It looks like GF_AGIPAL flag is missing");
-		}
+		state->_vm->_gfx->setAGIPal(shakeCount);
+		return;
 	}
 
 	state->_vm->_gfx->shakeScreen(shakeCount);

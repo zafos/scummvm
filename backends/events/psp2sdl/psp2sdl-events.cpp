@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -37,10 +36,18 @@
 
 #include "math.h"
 
+#define TOUCHSCREEN_WIDTH 960
+#define TOUCHSCREEN_HEIGHT 544
+
 PSP2EventSource::PSP2EventSource() {
 	for (int port = 0; port < SCE_TOUCH_PORT_MAX_NUM; port++) {
 		for (int i = 0; i < MAX_NUM_FINGERS; i++) {
 			_finger[port][i].id = -1;
+			_finger[port][i].timeLastDown = 0;
+			_finger[port][i].lastX = 0;
+			_finger[port][i].lastY = 0;
+			_finger[port][i].lastDownX = 0;
+			_finger[port][i].lastDownY = 0;
 		}
 		_multiFingerDragging[port] = DRAG_NONE;
 	}
@@ -50,6 +57,14 @@ PSP2EventSource::PSP2EventSource() {
 			_simulatedClickStartTime[port][i] = 0;
 		}
 	}
+
+	_hiresDX = 0;
+	_hiresDY = 0;
+
+#if SDL_VERSION_ATLEAST(2,0,10)
+	// ensure that touch doesn't create double-events
+	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+#endif
 }
 
 bool PSP2EventSource::pollEvent(Common::Event &event) {
@@ -97,8 +112,8 @@ void PSP2EventSource::preprocessFingerDown(SDL_Event *event) {
 	// id (for multitouch)
 	SDL_FingerID id = event->tfinger.fingerId;
 
-	int x = _km.x / MULTIPLIER;
-	int y = _km.y / MULTIPLIER;
+	int x = _mouseX;
+	int y = _mouseY;
 
 	if (port == 0 && !ConfMan.getBool("frontpanel_touchpad_mode")) {
 		convertTouchXYToGameXY(event->tfinger.x, event->tfinger.y, &x, &y);
@@ -141,8 +156,8 @@ void PSP2EventSource::preprocessFingerUp(SDL_Event *event) {
 		}
 	}
 
-	int x = _km.x / MULTIPLIER;
-	int y = _km.y / MULTIPLIER;
+	int x = _mouseX;
+	int y = _mouseY;
 
 	for (int i = 0; i < MAX_NUM_FINGERS; i++) {
 		if (_finger[port][i].id == id) {
@@ -213,8 +228,10 @@ void PSP2EventSource::preprocessFingerMotion(SDL_Event *event) {
 	}
 
 	if (numFingersDown >= 1) {
-		int x = _km.x / MULTIPLIER;
-		int y = _km.y / MULTIPLIER;
+		int x = _mouseX;
+		int y = _mouseY;
+		int xMax = dynamic_cast<WindowedGraphicsManager *>(_graphicsManager)->getWindowWidth() - 1;
+		int yMax = dynamic_cast<WindowedGraphicsManager *>(_graphicsManager)->getWindowHeight() - 1;
 
 		if (port == 0 && !ConfMan.getBool("frontpanel_touchpad_mode")) {
 			convertTouchXYToGameXY(event->tfinger.x, event->tfinger.y, &x, &y);
@@ -260,20 +277,24 @@ void PSP2EventSource::preprocessFingerMotion(SDL_Event *event) {
 			}
 
 			// convert touch events to relative mouse pointer events
-			// Whenever an SDL_event involving the mouse is processed,
-			// _km.x/y are truncated from subpixel precision to regular pixel precision.
-			// Therefore, there's no need here to deal with subpixel precision in _km.x/y.
-			x = (_km.x / MULTIPLIER + (event->tfinger.dx * 1.25 * speedFactor * _km.x_max));
-			y = (_km.y / MULTIPLIER + (event->tfinger.dy * 1.25 * speedFactor * _km.y_max));
+			// track sub-pixel relative finger motion using the MULTIPLIER
+			_hiresDX += (event->tfinger.dx * 1.25 * speedFactor * xMax * MULTIPLIER);
+			_hiresDY += (event->tfinger.dy * 1.25 * speedFactor * yMax * MULTIPLIER);
+			int xRel = _hiresDX / MULTIPLIER;
+			int yRel = _hiresDY / MULTIPLIER;
+			x = _mouseX + xRel;
+			y = _mouseY + yRel;
+			_hiresDX %= MULTIPLIER;
+			_hiresDY %= MULTIPLIER;
 		}
 
-		if (x > _km.x_max) {
-			x = _km.x_max;
+		if (x > xMax) {
+			x = xMax;
 		} else if (x < 0) {
 			x = 0;
 		}
-		if (y > _km.y_max) {
-			y = _km.y_max;
+		if (y > yMax) {
+			y = yMax;
 		} else if (y < 0) {
 			y = 0;
 		}
@@ -299,10 +320,10 @@ void PSP2EventSource::preprocessFingerMotion(SDL_Event *event) {
 					}
 				}
 				if (numFingersDownLong >= 2) {
-					// starting drag, so push mouse down at current location (back) 
+					// starting drag, so push mouse down at current location (back)
 					// or location of "oldest" finger (front)
-					int mouseDownX = _km.x / MULTIPLIER;
-					int mouseDownY = _km.y / MULTIPLIER;
+					int mouseDownX = _mouseX;
+					int mouseDownY = _mouseY;
 					if (port == 0 && !ConfMan.getBool("frontpanel_touchpad_mode")) {
 						for (int i = 0; i < MAX_NUM_FINGERS; i++) {
 							if (_finger[port][i].id == id) {
@@ -362,51 +383,18 @@ void PSP2EventSource::preprocessFingerMotion(SDL_Event *event) {
 }
 
 void PSP2EventSource::convertTouchXYToGameXY(float touchX, float touchY, int *gameX, int *gameY) {
-	int screenH = _km.y_max;
-	int screenW = _km.x_max;
+	int screenH = dynamic_cast<WindowedGraphicsManager *>(_graphicsManager)->getWindowHeight();
+	int screenW = dynamic_cast<WindowedGraphicsManager *>(_graphicsManager)->getWindowWidth();
 
-	int windowH = g_system->getHeight();
-	int windowW = g_system->getWidth();
-
-	bool fullscreen = ConfMan.getBool("fullscreen");
-	bool aspectRatioCorrection = ConfMan.getBool("aspect_ratio");
-
-	const int dispW = 960;
-	const int dispH = 544;
+	const int dispW = TOUCHSCREEN_WIDTH;
+	const int dispH = TOUCHSCREEN_HEIGHT;
 
 	int x, y, w, h;
 	float sx, sy;
 	float ratio = (float)screenW / (float)screenH;
 
-	if (aspectRatioCorrection && (windowH == 200 || windowH == 400)) {
-		ratio = 4.0 / 3.0;
-	}
-
-	if (fullscreen || screenH >= dispH) {
-		h = dispH;
-		if (aspectRatioCorrection && (windowH == 200 || windowH == 400)) {
-			ratio = ratio * 1.1;
-		}
-		w = h * ratio;
-	} else {
-		if (screenH <= dispH / 2 && screenW <= dispW / 2) {
-			// Use Vita hardware 2x scaling if the picture is really small
-			// this uses the current shader and filtering mode
-			h = screenH * 2;
-			w = screenW * 2;
-		} else {
-			h = screenH;
-			w = screenW;
-		}
-		if (aspectRatioCorrection && (windowH == 200 || windowH == 400)) {
-			// stretch the height only if it fits, otherwise make the width smaller
-			if (((float)w * (1.0 / ratio)) <= (float)dispH) {
-				h = w * (1.0 / ratio);
-			} else {
-				w = h * ratio;
-			}
-		}
-	}
+	h = dispH;
+	w = h * ratio;
 
 	x = (dispW - w) / 2;
 	y = (dispH - h) / 2;
@@ -414,23 +402,12 @@ void PSP2EventSource::convertTouchXYToGameXY(float touchX, float touchY, int *ga
 	sy = (float)h / (float)screenH;
 	sx = (float)w / (float)screenW;
 
-	// Find touch coordinates in terms of Vita screen pixels
+	// Find touch coordinates in terms of screen pixels
 	float dispTouchX = (touchX * (float)dispW);
 	float dispTouchY = (touchY * (float)dispH);
 
-	*gameX = (dispTouchX - x) / sx;
-	*gameY = (dispTouchY - y) / sy;
-
-	if (*gameX < 0) {
-		*gameX = 0;
-	} else if (*gameX > _km.x_max) {
-		*gameX = _km.x_max;
-	}
-	if (*gameY < 0) {
-		*gameY = 0;
-	} else if (*gameY > _km.y_max) {
-		*gameY = _km.y_max;
-	}
+	*gameX = CLIP((int)((dispTouchX - x) / sx), 0, screenW - 1);
+	*gameY = CLIP((int)((dispTouchY - y) / sy), 0, screenH - 1);
 }
 
 void PSP2EventSource::finishSimulatedMouseClicks() {
@@ -448,8 +425,8 @@ void PSP2EventSource::finishSimulatedMouseClicks() {
 					SDL_Event ev;
 					ev.type = SDL_MOUSEBUTTONUP;
 					ev.button.button = simulatedButton;
-					ev.button.x = _km.x / MULTIPLIER;
-					ev.button.y = _km.y / MULTIPLIER;
+					ev.button.x = _mouseX;
+					ev.button.y = _mouseY;
 					SDL_PushEvent(&ev);
 
 					_simulatedClickStartTime[port][i] = 0;

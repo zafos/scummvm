@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,29 +23,14 @@
 
 #include "engines/advancedDetector.h"
 
+#include "common/config-manager.h"
 #include "common/translation.h"
 #include "common/savefile.h"
 #include "common/str-array.h"
 #include "common/system.h"
 
 #include "toltecs/toltecs.h"
-
-
-namespace Toltecs {
-
-struct ToltecsGameDescription {
-	ADGameDescription desc;
-};
-
-uint32 ToltecsEngine::getFeatures() const {
-	return _gameDescription->desc.flags;
-}
-
-Common::Language ToltecsEngine::getLanguage() const {
-	return _gameDescription->desc.language;
-}
-
-}
+#include "toltecs/detection.h"
 
 static const PlainGameDescriptor toltecsGames[] = {
 	{"toltecs", "3 Skulls of the Toltecs"},
@@ -67,13 +51,13 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
 	{
 		// 3 Skulls of the Toltecs English version (alternate)
-		// From bug #3614933
+		// From bug #6393
 		{
 			"toltecs",
 			0,
@@ -81,7 +65,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -95,7 +79,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_PIRATED,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -108,7 +92,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::RU_RUS,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -121,7 +105,21 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::DE_DEU,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
+		},
+	},
+
+	{
+		// 3 Skulls of the Toltecs Polish version
+		// Reported by cachaito in Trac#11134
+		{
+			"toltecs",
+			0,
+			AD_ENTRY1s("WESTERN", "8ec48dd4e52a822d314418f1d3284e64", 337646148),
+			Common::PL_POL,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -134,7 +132,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::FR_FRA,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -147,13 +145,13 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::ES_ESP,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
 	{
 		// 3 Skulls of the Toltecs Hungarian version
-		// From bug #3440641
+		// From bug #5902
 		{
 			"toltecs",
 			0,
@@ -161,7 +159,21 @@ static const ToltecsGameDescription gameDescriptions[] = {
 			Common::HU_HUN,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
+		},
+	},
+
+	{
+		// 3 Skulls of the Toltecs Czech version
+		// Reported by AfBu in Trac#11263
+		{
+			"toltecs",
+			0,
+			AD_ENTRY1s("WESTERN", "57503131c0217c76b07d0b5c14805631", 337644552),
+			Common::CS_CZE,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -169,12 +181,12 @@ static const ToltecsGameDescription gameDescriptions[] = {
 		// 3 Skulls of the Toltecs English Demo version
 		{
 			"toltecs",
-			0,
+			"Demo",
 			AD_ENTRY1s("WESTERN", "53a0abd1c0bc5cad8ba18f0e56877705", 46241833),
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_DEMO,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
 	},
 
@@ -182,13 +194,26 @@ static const ToltecsGameDescription gameDescriptions[] = {
 		// 3 Skulls of the Toltecs German Demo version
 		{
 			"toltecs",
-			0,
+			"Demo",
 			AD_ENTRY1s("WESTERN", "1c85e82712d24f1d5c1ea2a66ddd75c2", 47730038),
 			Common::DE_DEU,
 			Common::kPlatformDOS,
 			ADGF_DEMO,
-			GUIO1(GUIO_NONE)
+			GUIO1(GAMEOPTION_ORIGINAL_SAVELOAD)
 		},
+	},
+
+	{
+		// Fenimore Fillmore: 3 Skulls of the Toltecs, 2019 Casual Brothers remaster (GOG, Steam)
+		{
+			"toltecs",
+			_s("Missing game code"), // Reason for being unsupported
+			AD_ENTRY1s("RData.lzma", "e0adae53ab5e821595a64032a4c2d5bc", 653477695),
+			Common::UNK_LANG,
+			Common::kPlatformWindows,
+			ADGF_REMASTERED | ADGF_UNSUPPORTED,
+			GUIO1(GUIO_NONE)
+		}
 	},
 
 	{ AD_TABLE_END_MARKER }
@@ -196,167 +221,22 @@ static const ToltecsGameDescription gameDescriptions[] = {
 
 } // End of namespace Toltecs
 
-static const ExtraGuiOption toltecsExtraGuiOption = {
-	_s("Use original save/load screens"),
-	_s("Use the original save/load screens instead of the ScummVM ones"),
-	"originalsaveload",
-	false
-};
-
-class ToltecsMetaEngine : public AdvancedMetaEngine {
+class ToltecsMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	ToltecsMetaEngine() : AdvancedMetaEngine(Toltecs::gameDescriptions, sizeof(Toltecs::ToltecsGameDescription), toltecsGames) {
-		_singleId = "toltecs";
+	ToltecsMetaEngineDetection() : AdvancedMetaEngineDetection(Toltecs::gameDescriptions, sizeof(Toltecs::ToltecsGameDescription), toltecsGames) {
 	}
 
-	virtual const char *getName() const {
-		return "Toltecs Engine";
+	const char *getName() const override {
+		return "toltecs";
 	}
 
-	virtual const char *getOriginalCopyright() const {
-		return "Toltecs Engine Revistronic (C) 1996";
+	const char *getEngineName() const override {
+		return "3 Skulls of the Toltecs";
 	}
 
-	virtual bool hasFeature(MetaEngineFeature f) const;
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
-	virtual const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const;
-	SaveStateList listSaves(const char *target) const;
-	virtual int getMaximumSaveSlot() const;
-	void removeSaveState(const char *target, int slot) const;
-	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const;
+	const char *getOriginalCopyright() const override {
+		return "3 Skulls of the Toltecs (C) Revistronic 1996";
+	}
 };
 
-bool ToltecsMetaEngine::hasFeature(MetaEngineFeature f) const {
-	return
-		(f == kSupportsListSaves) ||
-		(f == kSupportsLoadingDuringStartup) ||
-		(f == kSupportsDeleteSave) ||
-		(f == kSavesSupportMetaInfo) ||
-		(f == kSavesSupportThumbnail) ||
-		(f == kSavesSupportCreationDate) ||
-		(f == kSavesSupportPlayTime) ||
-		(f == kSimpleSavesNames);
-}
-
-bool Toltecs::ToltecsEngine::hasFeature(EngineFeature f) const {
-	return
-		(f == kSupportsRTL) ||
-		(f == kSupportsLoadingDuringRuntime) ||
-		(f == kSupportsSavingDuringRuntime);
-}
-
-bool ToltecsMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	const Toltecs::ToltecsGameDescription *gd = (const Toltecs::ToltecsGameDescription *)desc;
-	if (gd) {
-		*engine = new Toltecs::ToltecsEngine(syst, gd);
-	}
-	return gd != 0;
-}
-
-const ExtraGuiOptions ToltecsMetaEngine::getExtraGuiOptions(const Common::String &target) const {
-	ExtraGuiOptions options;
-	options.push_back(toltecsExtraGuiOption);
-	return options;
-}
-
-SaveStateList ToltecsMetaEngine::listSaves(const char *target) const {
-	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
-	Toltecs::ToltecsEngine::SaveHeader header;
-	Common::String pattern = target;
-	pattern += ".###";
-
-	Common::StringArray filenames;
-	filenames = saveFileMan->listSavefiles(pattern.c_str());
-
-	SaveStateList saveList;
-	for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
-		// Obtain the last 3 digits of the filename, since they correspond to the save slot
-		int slotNum = atoi(file->c_str() + file->size() - 3);
-
-		if (slotNum >= 0 && slotNum <= 999) {
-			Common::InSaveFile *in = saveFileMan->openForLoading(file->c_str());
-			if (in) {
-				if (Toltecs::ToltecsEngine::readSaveHeader(in, header) == Toltecs::ToltecsEngine::kRSHENoError) {
-					saveList.push_back(SaveStateDescriptor(slotNum, header.description));
-				}
-				delete in;
-			}
-		}
-	}
-
-	// Sort saves based on slot number.
-	Common::sort(saveList.begin(), saveList.end(), SaveStateDescriptorSlotComparator());
-	return saveList;
-}
-
-int ToltecsMetaEngine::getMaximumSaveSlot() const {
-	return 999;
-}
-
-void ToltecsMetaEngine::removeSaveState(const char *target, int slot) const {
-	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
-	Common::String filename = Toltecs::ToltecsEngine::getSavegameFilename(target, slot);
-
-	saveFileMan->removeSavefile(filename.c_str());
-
-	Common::StringArray filenames;
-	Common::String pattern = target;
-	pattern += ".###";
-	filenames = saveFileMan->listSavefiles(pattern.c_str());
-	Common::sort(filenames.begin(), filenames.end());	// Sort (hopefully ensuring we are sorted numerically..)
-
-	for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
-		// Obtain the last 3 digits of the filename, since they correspond to the save slot
-		int slotNum = atoi(file->c_str() + file->size() - 3);
-
-		// Rename every slot greater than the deleted slot,
-		if (slotNum > slot) {
-			saveFileMan->renameSavefile(file->c_str(), filename.c_str());
-			filename = Toltecs::ToltecsEngine::getSavegameFilename(target, ++slot);
-		}
-	}
-}
-
-SaveStateDescriptor ToltecsMetaEngine::querySaveMetaInfos(const char *target, int slot) const {
-	Common::String filename = Toltecs::ToltecsEngine::getSavegameFilename(target, slot);
-	Common::InSaveFile *in = g_system->getSavefileManager()->openForLoading(filename.c_str());
-
-	if (in) {
-		Toltecs::ToltecsEngine::SaveHeader header;
-		Toltecs::ToltecsEngine::kReadSaveHeaderError error;
-
-		error = Toltecs::ToltecsEngine::readSaveHeader(in, header, false);
-		delete in;
-
-		if (error == Toltecs::ToltecsEngine::kRSHENoError) {
-			SaveStateDescriptor desc(slot, header.description);
-
-			desc.setThumbnail(header.thumbnail);
-
-			if (header.version > 0) {
-				int day = (header.saveDate >> 24) & 0xFF;
-				int month = (header.saveDate >> 16) & 0xFF;
-				int year = header.saveDate & 0xFFFF;
-
-				desc.setSaveDate(year, month, day);
-
-				int hour = (header.saveTime >> 16) & 0xFF;
-				int minutes = (header.saveTime >> 8) & 0xFF;
-
-				desc.setSaveTime(hour, minutes);
-
-				desc.setPlayTime(header.playTime * 1000);
-			}
-
-			return desc;
-		}
-	}
-
-	return SaveStateDescriptor();
-} // End of namespace Toltecs
-
-#if PLUGIN_ENABLED_DYNAMIC(TOLTECS)
-	REGISTER_PLUGIN_DYNAMIC(TOLTECS, PLUGIN_TYPE_ENGINE, ToltecsMetaEngine);
-#else
-	REGISTER_PLUGIN_STATIC(TOLTECS, PLUGIN_TYPE_ENGINE, ToltecsMetaEngine);
-#endif
+REGISTER_PLUGIN_STATIC(TOLTECS_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, ToltecsMetaEngineDetection);

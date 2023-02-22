@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -28,10 +27,6 @@
 #include "agos/agos.h"
 #include "agos/intern.h"
 #include "agos/sound.h"
-
-#ifdef _WIN32_WCE
-extern bool isSmartphone();
-#endif
 
 namespace AGOS {
 
@@ -339,7 +334,7 @@ void AGOSEngine_Simon1::os1_screenTextMsg() {
 	uint vgaSpriteId = getVarOrByte();
 	uint color = getVarOrByte();
 	uint stringId = getNextStringID();
-	const byte *stringPtr = NULL;
+	const byte *stringPtr = nullptr;
 	uint speechId = 0;
 	TextLocation *tl;
 
@@ -365,7 +360,7 @@ void AGOSEngine_Simon1::os1_screenTextMsg() {
 	}
 
 	// WORKAROUND: Several strings in the French version of Simon the Sorcerer 1 set the incorrect width,
-	// causing crashes, or glitches in subtitles. See bug #3512776 for example.
+	// causing crashes, or glitches in subtitles. See bug #6014 for example.
 	if (getGameType() == GType_SIMON1 && _language == Common::FR_FRA) {
 		if ((getFeatures() & GF_TALKIE) && stringId == 33219)
 			tl->width = 96;
@@ -373,7 +368,7 @@ void AGOSEngine_Simon1::os1_screenTextMsg() {
 			tl->width = 96;
 	}
 
-	if (stringPtr != NULL && stringPtr[0] != 0 && (speechId == 0 || _subtitles))
+	if (stringPtr != nullptr && stringPtr[0] != 0 && (speechId == 0 || _subtitles))
 		printScreenText(vgaSpriteId, color, (const char *)stringPtr, tl->x, tl->y, tl->width);
 
 }
@@ -383,7 +378,7 @@ void AGOSEngine_Simon1::os1_playEffect() {
 	uint16 soundId = getVarOrWord();
 
 	if (getGameId() == GID_SIMON1DOS)
-		playSting(soundId);
+		playSfx(soundId, 0, 0);
 	else
 		_sound->playEffects(soundId);
 }
@@ -395,16 +390,16 @@ void AGOSEngine_Simon1::os1_screenTextPObj() {
 
 	SubObject *subObject = (SubObject *)findChildOfType(getNextItemPtr(), kObjectType);
 	if (getFeatures() & GF_TALKIE) {
-		if (subObject != NULL && subObject->objectFlags & kOFVoice) {
+		if (subObject != nullptr && subObject->objectFlags & kOFVoice) {
 			uint offs = getOffsetOfChild2Param(subObject, kOFVoice);
 			playSpeech(subObject->objectFlagValue[offs], vgaSpriteId);
-		} else if (subObject != NULL && subObject->objectFlags & kOFNumber) {
+		} else if (subObject != nullptr && subObject->objectFlags & kOFNumber) {
 			uint offs = getOffsetOfChild2Param(subObject, kOFNumber);
 			playSpeech(subObject->objectFlagValue[offs] + 3550, vgaSpriteId);
 		}
 	}
 
-	if (subObject != NULL && subObject->objectFlags & kOFText && _subtitles) {
+	if (subObject != nullptr && subObject->objectFlags & kOFText && _subtitles) {
 		const char *stringPtr = (const char *)getStringPtrByID(subObject->objectFlagValue[0]);
 		TextLocation *tl = getTextLocation(vgaSpriteId);
 		char buf[256];
@@ -416,15 +411,15 @@ void AGOSEngine_Simon1::os1_screenTextPObj() {
 				k = (j % 10) * 10;
 				k += j / 10;
 				if (!(j % 10))
-					sprintf(buf,"0%d%s", k, stringPtr);
+					Common::sprintf_s(buf,"0%d%s", k, stringPtr);
 				else
-					sprintf(buf,"%d%s", k, stringPtr);
+					Common::sprintf_s(buf,"%d%s", k, stringPtr);
 			} else {
-				sprintf(buf,"%d%s", subObject->objectFlagValue[getOffsetOfChild2Param(subObject, kOFNumber)], stringPtr);
+				Common::sprintf_s(buf,"%d%s", subObject->objectFlagValue[getOffsetOfChild2Param(subObject, kOFNumber)], stringPtr);
 			}
 			stringPtr = buf;
 		}
-		if (stringPtr != NULL && stringPtr[0] != 0)
+		if (stringPtr != nullptr && stringPtr[0] != 0)
 			printScreenText(vgaSpriteId, color, stringPtr, tl->x, tl->y, tl->width);
 	}
 }
@@ -496,7 +491,7 @@ void AGOSEngine_Simon1::os1_scnTxtLongText() {
 
 	if (_speech && speechId != 0)
 		playSpeech(speechId, vgaSpriteId);
-	if (stringPtr != NULL && stringPtr[0] != 0 && _subtitles)
+	if (stringPtr != nullptr && stringPtr[0] != 0 && _subtitles)
 		printScreenText(vgaSpriteId, color, stringPtr, tl->x, tl->y, tl->width);
 }
 
@@ -535,19 +530,19 @@ void AGOSEngine_Simon1::os1_unloadZone() {
 	uint a = getVarOrWord();
 	VgaPointersEntry *vpe = &_vgaBufferPointers[a];
 
-	vpe->sfxFile = NULL;
-	vpe->vgaFile1 = NULL;
-	vpe->vgaFile2 = NULL;
+	vpe->sfxFile = nullptr;
+	vpe->vgaFile1 = nullptr;
+	vpe->vgaFile2 = nullptr;
 }
 
 void AGOSEngine_Simon1::os1_loadStrings() {
 	// 185: load sound files
 	_soundFileId = getVarOrWord();
 	if (getPlatform() == Common::kPlatformAmiga && (getFeatures() & GF_TALKIE)) {
-		char buf[10];
-		sprintf(buf, "%d%s", _soundFileId, "Effects");
+		char buf[13];
+		Common::sprintf_s(buf, "%d%s", _soundFileId, "Effects");
 		_sound->readSfxFile(buf);
-		sprintf(buf, "%d%s", _soundFileId, "simon");
+		Common::sprintf_s(buf, "%d%s", _soundFileId, "simon");
 		_sound->readVoiceFile(buf);
 	}
 }

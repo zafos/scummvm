@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -133,71 +132,53 @@ void GfxTransitions32::processEffects(PlaneShowStyle &showStyle) {
 	switch(showStyle.type) {
 	case kShowStyleHShutterOut:
 		processHShutterOut(showStyle);
-	break;
+		break;
 	case kShowStyleHShutterIn:
 		processHShutterIn(showStyle);
-	break;
+		break;
 	case kShowStyleVShutterOut:
 		processVShutterOut(showStyle);
-	break;
+		break;
 	case kShowStyleVShutterIn:
 		processVShutterIn(showStyle);
-	break;
+		break;
 	case kShowStyleWipeLeft:
 		processWipeLeft(showStyle);
-	break;
+		break;
 	case kShowStyleWipeRight:
 		processWipeRight(showStyle);
-	break;
+		break;
 	case kShowStyleWipeUp:
 		processWipeUp(showStyle);
-	break;
+		break;
 	case kShowStyleWipeDown:
 		processWipeDown(showStyle);
-	break;
+		break;
 	case kShowStyleIrisOut:
 		processIrisOut(showStyle);
-	break;
+		break;
 	case kShowStyleIrisIn:
 		processIrisIn(showStyle);
-	break;
+		break;
 	case kShowStyleDissolveNoMorph:
 	case kShowStyleDissolve:
 		processPixelDissolve(showStyle);
-	break;
+		break;
 	case kShowStyleNone:
 	case kShowStyleFadeOut:
 	case kShowStyleFadeIn:
 	case kShowStyleMorph:
-	break;
+	default:
+		break;
 	}
 }
 
-// TODO: 10-argument version is only in SCI3; argc checks are currently wrong for this version
-// and need to be fixed in future
-void GfxTransitions32::kernelSetShowStyle(const uint16 argc, const reg_t planeObj, const ShowStyleType type, const int16 seconds, const int16 back, const int16 priority, const int16 animate, const int16 frameOutNow, reg_t pFadeArray, int16 divisions, const int16 blackScreen) {
+void GfxTransitions32::kernelSetShowStyle(const reg_t planeObj, const ShowStyleType type, const int16 seconds,
+	const int16 back, const int16 priority, const int16 animate, const int16 frameOutNow,
+	const reg_t pFadeArray, const int16 divisions, const int16 blackScreen) {
 
-	bool hasDivisions = false;
-	bool hasFadeArray = false;
-
-	// KQ7 2.0b uses a mismatched version of the Styler script (SCI2.1early script
-	// for SCI2.1mid engine), so the calls it makes to kSetShowStyle are wrong and
-	// put `divisions` where `pFadeArray` is supposed to be
-	if (getSciVersion() == SCI_VERSION_2_1_MIDDLE && g_sci->getGameId() == GID_KQ7) {
-		hasDivisions = argc > 7;
-		hasFadeArray = false;
-		divisions = argc > 7 ? pFadeArray.toSint16() : -1;
-		pFadeArray = NULL_REG;
-	} else if (getSciVersion() < SCI_VERSION_2_1_MIDDLE) {
-		hasDivisions = argc > 7;
-		hasFadeArray = false;
-	} else if (getSciVersion() < SCI_VERSION_3) {
-		hasDivisions = argc > 8;
-		hasFadeArray = argc > 7;
-	} else {
-		hasDivisions = argc > 9;
-		hasFadeArray = argc > 8;
-	}
+	const bool hasFadeArray = !pFadeArray.isNull();
+	const bool hasDivisions = (divisions != -1);
 
 	bool isFadeUp;
 	int16 color;
@@ -206,7 +187,20 @@ void GfxTransitions32::kernelSetShowStyle(const uint16 argc, const reg_t planeOb
 		color = back;
 	} else {
 		isFadeUp = true;
-		color = 0;
+		color = g_sci->_gfxPalette32->getPlatformBlack();
+	}
+
+	// HACK: Swap Mac black/white colors to PC palette for kShowStyleDissolve.
+	// We perform most SCI32 Mac palette conversions while drawing pics, views, and color CelObjs.
+	// That doesn't work for kShowStyleDisolve, it uses a CelObjMem that's initialized from the
+	// current frameout buffer after Mac palette conversions have already taken place.
+	// Example: GK1 room 471 which dissolves from an already black screen to black.
+	if (type == kShowStyleDissolve && g_sci->getPlatform() == Common::kPlatformMacintosh) {
+		if (color == 0) {
+			color = 255;
+		} else if (color == 255) {
+			color = 0;
+		}
 	}
 
 	Plane *plane = g_sci->_gfxFrameout->getPlanes().findByObject(planeObj);
@@ -244,7 +238,16 @@ void GfxTransitions32::kernelSetShowStyle(const uint16 argc, const reg_t planeOb
 			deleteShowStyle(findIteratorForPlane(planeObj));
 		}
 
-		return;
+		// Do not add kShowStyleNone types to the showStyles list.
+		//
+		// This return was removed in some interpreters, notably the Windows
+		// version of Hoyle 5. In this version, a fade out is done and then
+		// kShowStyleNone is called to enter the new screen without a fade in.
+		// In such cases, we should not return here, so that the code for
+		// queuing kShowStyleNone calls is enabled and the screen palette is
+		// restored in the processNone() call inside processShowStyle().
+		if (g_sci->getGameId() != GID_HOYLE5)
+			return;
 	}
 
 	if (createNewEntry) {

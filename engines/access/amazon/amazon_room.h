@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -42,27 +41,27 @@ private:
 
 	void roomSet();
 protected:
-	virtual void loadRoom(int roomNumber);
+	void loadRoom(int roomNumber) override;
 
-	virtual void reloadRoom();
+	void reloadRoom() override;
 
-	virtual void reloadRoom1();
+	void reloadRoom1() override;
 
-	virtual void setupRoom();
+	void setupRoom() override;
 
-	virtual void mainAreaClick();
+	void mainAreaClick() override;
 
-	virtual void clearRoom();
+	void clearRoom() override;
 
-	virtual void walkCursor();
+	void walkCursor() override;
 public:
 	AmazonRoom(AccessEngine *vm);
 
-	virtual ~AmazonRoom();
+	~AmazonRoom() override;
 
-	virtual void init4Quads();
+	void init4Quads() override;
 
-	virtual void roomMenu();
+	void roomMenu() override;
 };
 
 } // End of namespace Amazon

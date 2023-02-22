@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -39,11 +38,11 @@ class Scene3500 : public Scene {
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 	class Action2 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	SpeakerSText _speakerSText;
@@ -52,7 +51,7 @@ public:
 	Action1 _action1;
 	Action2 _action2;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
 };
 
 class Scene3700 : public Scene {
@@ -68,17 +67,17 @@ class Scene3700 : public Scene {
 		int _countdownCtr;
 
 		Viewer();
-		virtual Common::String getClassName() { return "Viewer"; }
-		virtual void synchronize(Serializer &s);
-		virtual void dispatch();
-		virtual void reposition();
-		virtual void draw();
+		Common::String getClassName() override { return "Viewer"; }
+		void synchronize(Serializer &s) override;
+		void dispatch() override;
+		void reposition() override;
+		void draw() override;
 	};
 
 	/* Actions */
 	class Action1 : public Action {
 	public:
-		virtual void signal();
+		void signal() override;
 	};
 public:
 	Viewer _viewer;
@@ -89,7 +88,7 @@ public:
 	SpeakerMR _speakerMR;
 	ASound _soundHandler;
 
-	virtual void postInit(SceneObjectList *OwnerList = NULL);
+	void postInit(SceneObjectList *OwnerList = NULL) override;
 };
 
 } // End of namespace Ringworld

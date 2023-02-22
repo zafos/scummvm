@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,24 +15,15 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
-#define FORBIDDEN_SYMBOL_EXCEPTION_isalnum
-#define FORBIDDEN_SYMBOL_EXCEPTION_isalpha
-#define FORBIDDEN_SYMBOL_EXCEPTION_isdigit
-#define FORBIDDEN_SYMBOL_EXCEPTION_isnumber
-#define FORBIDDEN_SYMBOL_EXCEPTION_islower
-#define FORBIDDEN_SYMBOL_EXCEPTION_isspace
-#define FORBIDDEN_SYMBOL_EXCEPTION_isupper
-#define FORBIDDEN_SYMBOL_EXCEPTION_isprint
-#define FORBIDDEN_SYMBOL_EXCEPTION_ispunct
-
+#define FORBIDDEN_SYMBOL_EXCEPTION_ctype_h
 
 #include "common/util.h"
 #include "common/debug.h"
+#include "common/translation.h"
 
 namespace Common {
 
@@ -101,7 +92,8 @@ bool parseBool(const String &val, bool &valAsBool) {
 	}
 	if (val.equalsIgnoreCase("false") ||
 		val.equalsIgnoreCase("no") ||
-		val.equals("0")) {
+		val.equals("0") ||
+		val.empty()) {
 		valAsBool = false;
 		return true;
 	}
@@ -117,6 +109,11 @@ bool parseBool(const String &val, bool &valAsBool) {
 		if (c < 0 || c > 127) \
 			return false
 
+bool isAscii(int c) {
+	ENSURE_ASCII_CHAR(c);
+	return true;
+}
+
 bool isAlnum(int c) {
 	ENSURE_ASCII_CHAR(c);
 	return isalnum((byte)c);
@@ -130,6 +127,11 @@ bool isAlpha(int c) {
 bool isDigit(int c) {
 	ENSURE_ASCII_CHAR(c);
 	return isdigit((byte)c);
+}
+
+bool isXDigit(int c) {
+	ENSURE_ASCII_CHAR(c);
+	return isxdigit((byte)c);
 }
 
 bool isLower(int c) {
@@ -155,6 +157,57 @@ bool isPrint(int c) {
 bool isPunct(int c) {
 	ENSURE_ASCII_CHAR(c);
 	return ispunct((byte)c);
+}
+
+bool isCntrl(int c) {
+	ENSURE_ASCII_CHAR(c);
+	return iscntrl((byte)c);
+}
+
+bool isGraph(int c) {
+	ENSURE_ASCII_CHAR(c);
+	return isgraph((byte)c);
+}
+
+bool isBlank(int c) {
+	return c == ' ' || c == '\t';
+}
+
+
+#pragma mark -
+
+
+Common::String getHumanReadableBytes(uint64 bytes, const char *&unitsOut) {
+	if (bytes < 1024) {
+		// I18N: Abbreviation for 'bytes' as data size
+		unitsOut = _s("B");
+		return Common::String::format("%lu", (unsigned long int)bytes);
+	}
+
+	double floating = bytes / 1024.0;
+	// I18N: Abbreviation for 'kilobytes' as data size
+	unitsOut = _s("KB");
+
+	if (floating >= 1024) {
+		floating /= 1024.0;
+		// I18N: Abbreviation for 'megabytes' as data size
+		unitsOut = _s("MB");
+	}
+
+	if (floating >= 1024) {
+		floating /= 1024.0;
+		// I18N: Abbreviation for 'gigabytes' as data size
+		unitsOut = _s("GB");
+	}
+
+	if (floating >= 1024) { // woah
+		floating /= 1024.0;
+		// I18N: Abbreviation for 'terabytes' as data size
+		unitsOut = _s("TB");
+	}
+
+	// print one digit after floating point
+	return Common::String::format("%.1f", floating);
 }
 
 } // End of namespace Common

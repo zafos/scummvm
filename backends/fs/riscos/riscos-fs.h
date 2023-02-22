@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -30,9 +29,10 @@
  *
  * Parts of this class are documented in the base interface class, AbstractFSNode.
  */
-class RISCOSFilesystemNode : public AbstractFSNode {
+class RISCOSFilesystemNode final : public AbstractFSNode {
 protected:
 	Common::String _displayName;
+	Common::String _nativePath;
 	Common::String _path;
 	bool _isDirectory;
 	bool _isValid;
@@ -53,39 +53,26 @@ public:
 	 */
 	RISCOSFilesystemNode(const Common::String &path);
 
-	virtual bool exists() const;
-	virtual Common::String getDisplayName() const { return _displayName; }
-	virtual Common::String getName() const { return _displayName; }
-	virtual Common::String getPath() const { return _path; }
-	virtual bool isDirectory() const { return _isDirectory; }
-	virtual bool isReadable() const;
-	virtual bool isWritable() const;
+	bool exists() const override;
+	Common::U32String getDisplayName() const override { return _displayName; }
+	Common::String getName() const override { return _displayName; }
+	Common::String getPath() const override { return _path; }
+	bool isDirectory() const override { return _isDirectory; }
+	bool isReadable() const override;
+	bool isWritable() const override;
 
-	virtual AbstractFSNode *getChild(const Common::String &n) const;
-	virtual bool getChildren(AbstractFSList &list, ListMode mode, bool hidden) const;
-	virtual AbstractFSNode *getParent() const;
+	AbstractFSNode *getChild(const Common::String &n) const override;
+	bool getChildren(AbstractFSList &list, ListMode mode, bool hidden) const override;
+	AbstractFSNode *getParent() const override;
 
-	virtual Common::SeekableReadStream *createReadStream();
-	virtual Common::WriteStream *createWriteStream();
-	virtual bool create(bool isDirectoryFlag);
-
+	Common::SeekableReadStream *createReadStream() override;
+	Common::SeekableWriteStream *createWriteStream() override;
+	bool createDirectory() override;
 private:
 	/**
-	 * Converts a Unix style path to a RISC OS style path.
-	 *
-	 * @param str Unix style path to convert.
-	 * @return RISC OS style path.
+	 * Tests and sets the _isValid and _isDirectory flags, using OS_File 20.
 	 */
-	static Common::String toRISCOS(Common::String &path);
-
-	/**
-	 * Converts a RISC OS style path to a Unix style path.
-	 *
-	 * @param str RISC OS style path to convert.
-	 * @return Unix style path.
-	 */
-	static Common::String toUnix(Common::String &path);
-
+	virtual void setFlags();
 };
 
 namespace Riscos {

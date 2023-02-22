@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -70,30 +69,30 @@ public:
 	/**
 	 * Chooses and adds a conversation response based on a specified tag Id.
 	 */
-	virtual int chooseResponse(const TTroomScript *roomScript, const TTsentence *sentence, uint tag);
+	int chooseResponse(const TTroomScript *roomScript, const TTsentence *sentence, uint tag) override;
 
 	/**
 	 * Does NPC specific processing of the parsed sentence
 	 */
-	virtual int process(const TTroomScript *roomScript, const TTsentence *sentence);
+	int process(const TTroomScript *roomScript, const TTsentence *sentence) override;
 
 	/**
 	 * Called when the script/id changes
 	 */
-	virtual ScriptChangedResult scriptChanged(const TTroomScript *roomScript, uint id);
+	ScriptChangedResult scriptChanged(const TTroomScript *roomScript, uint id) override;
 
-	virtual int handleQuote(const TTroomScript *roomScript, const TTsentence *sentence,
-		uint tag1, uint tag2, uint remainder);
+	int handleQuote(const TTroomScript *roomScript, const TTsentence *sentence,
+		uint tag1, uint tag2, uint remainder) override;
 
 	/**
 	 * Handles updating NPC state based on specified dialogue Ids and dial positions
 	 */
-	virtual int updateState(uint oldId, uint newId, int index);
+	int updateState(uint oldId, uint newId, int index) override;
 
 	/**
 	 * Handles getting a pre-response
 	 */
-	virtual int preResponse(uint id);
+	int preResponse(uint id) override;
 };
 
 } // End of namespace Titanic

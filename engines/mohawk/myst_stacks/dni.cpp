@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,7 +33,7 @@ namespace Mohawk {
 namespace MystStacks {
 
 Dni::Dni(MohawkEngine_Myst *vm) :
-		MystScriptParser(vm),
+		MystScriptParser(vm, kDniStack),
 		_notSeenAtrus(true),
 		_atrusRunning(false),
 		_waitForLoop(false),
@@ -115,12 +114,12 @@ void Dni::o_handPage(uint16 var, const ArgumentsArray &args) {
 
 		_atrusLeft = true;
 		_waitForLoop = false;
-		_atrusLeftTime = _vm->_system->getMillis();
+		_atrusLeftTime = _vm->getTotalPlayTime();
 	}
 }
 
 void Dni::atrusLeft_run() {
-	if (_vm->_system->getMillis() > _atrusLeftTime + 63333) {
+	if (_vm->getTotalPlayTime() > _atrusLeftTime + 63333) {
 		_video = "atrus2";
 		_videoPos = Common::Point(215, 77);
 		VideoEntryPtr atrus = _vm->playMovie(_video, kDniStack);

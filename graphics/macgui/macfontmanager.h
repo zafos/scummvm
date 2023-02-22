@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,15 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef GRAPHICS_MACGUI_MACFONTMANAGER_H
 #define GRAPHICS_MACGUI_MACFONTMANAGER_H
 
+#include "common/language.h"
+#include "graphics/fonts/bdf.h"
 #include "graphics/fontman.h"
 
 namespace Common {
@@ -33,6 +34,7 @@ namespace Common {
 namespace Graphics {
 
 class MacFONTFont;
+class MacFontFamily;
 
 enum {
 	kMacFontNonStandard = -1,
@@ -66,43 +68,63 @@ enum {
 
 class Font;
 
+struct FontInfo {
+	Common::Language lang;
+	Common::CodePage encoding;
+	int aliasForId;
+	Common::String name;
+
+	FontInfo() : lang(Common::UNK_LANG), encoding(Common::kCodePageInvalid), aliasForId(-1) {}
+};
+
 class MacFont {
 public:
-	MacFont(int id = kMacFontChicago, int size = 12, int slant = kMacFontRegular, FontManager::FontUsage fallback = Graphics::FontManager::kBigGUIFont) {
+	MacFont(int id = kMacFontChicago, int size = 12, int slant = kMacFontRegular) {
 		_id = id;
-		_size = size;
+		_size = size ? size : 12;
 		_slant = slant;
-		_fallback = fallback;
+		_fallback = FontMan.getFontByUsage(Graphics::FontManager::kBigGUIFont);
+		_fallbackName = Common::String(((const BdfFont *)_fallback)->getFamilyName());
 		_generated = false;
+		_truetype = false;
 		_font = NULL;
 	}
 
 	int getId() const { return _id; };
+	void setId(int id) { _id = id; }
 	int getSize() const { return _size; }
 	int getSlant() const { return _slant; }
 	Common::String getName() { return _name; }
-	void setName(Common::String &name) { _name = name; }
-	void setName(const char *name) { _name = name; }
-	FontManager::FontUsage getFallback() { return _fallback; }
+	void setName(Common::String &name) { setName(name.c_str()); }
+	void setName(const char *name);
+	const Graphics::Font *getFallback() { return _fallback; }
 	bool isGenerated() { return _generated; }
 	void setGenerated(bool gen) { _generated = gen; }
-	MacFONTFont *getFont() { return _font; }
-	void setFont(MacFONTFont *font) { _font = font; }
+	bool isTrueType() { return _truetype; }
+	Font *getFont() { return _font; }
+	void setFont(Font *font, bool truetype) { _font = font; _truetype = truetype; }
+	void setFallback(const Font *font, Common::String name = "");
+	Common::String getFallbackName() { return _fallbackName; }
 
 private:
 	int _id;
 	int _size;
 	int _slant;
+	bool _truetype;
 	Common::String _name;
-	FontManager::FontUsage _fallback;
+	const Graphics::Font *_fallback;
+	Common::String _fallbackName;
 
 	bool _generated;
-	MacFONTFont *_font;
+	Font *_font;
 };
 
 class MacFontManager {
 public:
-	MacFontManager();
+	MacFontManager(uint32 mode, Common::Language language);
+	~MacFontManager();
+
+	void setLocalizedFonts();
 
 	/**
 	 * Accessor method to check the presence of built-in fonts.
@@ -115,6 +137,7 @@ public:
 	 * @param fallback Fallback policy in case the desired font isn't there.
 	 * @return The requested font or the fallback.
 	 */
+	const Font *getFont(MacFont *macFont);
 	const Font *getFont(MacFont macFont);
 
 	/**
@@ -123,34 +146,62 @@ public:
 	 * @param size size of the font
 	 * @return the font name or NULL if ID goes beyond the mapping
 	 */
-	const char *getFontName(int id, int size, int slant = kMacFontRegular, bool tryGen = false);
-	const char *getFontName(MacFont &font);
+	const Common::String getFontName(uint16 id, int size, int slant = kMacFontRegular, bool tryGen = false);
+	const Common::String getFontName(MacFont &font);
 	int getFontIdByName(Common::String name);
+
+	Common::Language getFontLanguage(uint16 id);
+	Common::CodePage getFontEncoding(uint16 id);
+	int getFontAliasForId(uint16 id);
+	Common::String getFontName(uint16 id);
 
 	void loadFonts(Common::SeekableReadStream *stream);
 	void loadFonts(const Common::String &fileName);
 	void loadFonts(Common::MacResManager *fontFile);
+	void loadWindowsFont(const Common::String fileName);
 
-	void registerFontMapping(uint16 id, Common::String name);
-	void clearFontMapping();
+	/**
+	 * Register a font name if it doesn't already exist.
+	 * @param name name of the font
+	 * @return the font's ID
+	 */
+	int registerFontName(Common::String name, int preferredId = -1);
+
+	void forceBuiltinFonts() { _builtInFonts = true; }
+	int parseSlantFromName(const Common::String &name);
+
+	const Common::Array<MacFontFamily *> &getFontFamilies() { return _fontFamilies; }
 
 private:
 	void loadFontsBDF();
 	void loadFonts();
+	void loadJapaneseFonts();
 
 	void generateFontSubstitute(MacFont &macFont);
-	void generateFont(MacFont &toFont, MacFont &fromFont);
+	void generateFONTFont(MacFont &toFont, MacFont &fromFont);
+
+#ifdef USE_FREETYPE2
+	void generateTTFFont(MacFont &toFront, Common::SeekableReadStream *stream);
+#endif
 
 private:
 	bool _builtInFonts;
+	bool _japaneseFontsLoaded;
+	uint32 _mode;
+	Common::Language _language;
+	Common::HashMap<Common::String, Graphics::Font *> _winFontRegistry;
 	Common::HashMap<Common::String, MacFont *> _fontRegistry;
+	Common::Array<MacFontFamily *> _fontFamilies;
 
+	Common::HashMap<int, FontInfo *> _fontInfo;
 	Common::HashMap<Common::String, int> _fontIds;
 
-	Common::HashMap<uint16, Common::String> _extraFontNames;
-	Common::HashMap<Common::String, int> _extraFontIds;
-
 	int parseFontSlant(Common::String slant);
+
+	/* Unicode font */
+	Common::HashMap<int, const Graphics::Font *> _uniFonts;
+
+	Common::HashMap<Common::String, Common::SeekableReadStream *> _ttfData;
 };
 
 } // End of namespace Graphics

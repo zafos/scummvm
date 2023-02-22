@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,18 +15,19 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 // Disable symbol overrides so that we can use system headers.
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
 
+#include "common/events.h"
 #include "backends/platform/ios7/ios7_video.h"
+#include "backends/platform/ios7/ios7_touch_controller.h"
+#include "backends/platform/ios7/ios7_mouse_controller.h"
+#include "backends/platform/ios7/ios7_gamepad_controller.h"
 
-#include "graphics/colormasks.h"
-#include "common/system.h"
 #include "backends/platform/ios7/ios7_app_delegate.h"
 
 static int g_needsScreenUpdate = 0;
@@ -36,23 +37,29 @@ static long g_lastTick = 0;
 static int g_frames = 0;
 #endif
 
+void printError(const char *error_message) {
+	NSString *messageString = [NSString stringWithUTF8String:error_message];
+	NSLog(@"%@", messageString);
+	fprintf(stderr, "%s\n", error_message);
+}
+
 #define printOpenGLError() printOglError(__FILE__, __LINE__)
 
-int printOglError(const char *file, int line) {
-	int retCode = 0;
-
-	// returns 1 if an OpenGL error occurred, 0 otherwise.
+void printOglError(const char *file, int line) {
 	GLenum glErr = glGetError();
 	while (glErr != GL_NO_ERROR) {
-		fprintf(stderr, "glError: %u (%s: %d)\n", glErr, file, line);
-		retCode = 1;
+		Common::String error = Common::String::format("glError: %u (%s: %d)", glErr, file, line);
+		printError(error.c_str());
 		glErr = glGetError();
 	}
-	return retCode;
 }
 
 bool iOS7_isBigDevice() {
+#if TARGET_OS_IOS
 	return UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad;
+#elif TARGET_OS_TV
+	return true;
+#endif
 }
 
 static inline void execute_on_main_thread(void (^block)(void)) {
@@ -97,6 +104,8 @@ uint getSizeNextPOT(uint size) {
 
 @implementation iPhoneView
 
+@synthesize pointerPosition;
+
 + (Class)layerClass {
 	return [CAEAGLLayer class];
 }
@@ -111,15 +120,15 @@ uint getSizeNextPOT(uint size) {
 	eaglLayer.opaque = YES;
 	eaglLayer.drawableProperties = @{
 	                                 kEAGLDrawablePropertyRetainedBacking: @NO,
-	                                 kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGB565
+	                                 kEAGLDrawablePropertyColorFormat: kEAGLColorFormatRGBA8,
 	                                };
 
 	_context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
 
 	// In case creating the OpenGL ES context failed, we will error out here.
 	if (_context == nil) {
-		fprintf(stderr, "Could not create OpenGL ES context\n");
-		exit(-1);
+		printError("Could not create OpenGL ES context.");
+		abort();
 	}
 
 	if ([EAGLContext setCurrentContext:_context]) {
@@ -193,22 +202,6 @@ uint getSizeNextPOT(uint size) {
 	uint overlayWidth = (uint) MAX(_renderBufferWidth, _renderBufferHeight);
 	uint overlayHeight = (uint) MIN(_renderBufferWidth, _renderBufferHeight);
 
-	if (iOS7_isBigDevice()) {
-		// On really big displays, like the iPad Pro, we scale the interface down
-		// so that the controls are not too small..
-		while (overlayHeight > 1024) {
-			overlayWidth /= 2;
-			overlayHeight /= 2;
-		}
-	}
-	else {
-		// On small devices, we force the user interface to use the small theme
-		while (overlayHeight > 480) {
-			overlayWidth /= 2;
-			overlayHeight /= 2;
-		}
-	}
-
 	_videoContext.overlayWidth = overlayWidth;
 	_videoContext.overlayHeight = overlayHeight;
 
@@ -225,7 +218,7 @@ uint getSizeNextPOT(uint size) {
 	_overlayCoords[2].x = 0; _overlayCoords[2].y = 0; _overlayCoords[2].u = 0; _overlayCoords[2].v = v;
 	_overlayCoords[3].x = 0; _overlayCoords[3].y = 0; _overlayCoords[3].u = u; _overlayCoords[3].v = v;
 
-	_videoContext.overlayTexture.create((uint16) overlayTextureWidthPOT, (uint16) overlayTextureHeightPOT, Graphics::createPixelFormat<5551>());
+	_videoContext.overlayTexture.create((uint16) overlayTextureWidthPOT, (uint16) overlayTextureHeightPOT, Graphics::PixelFormat(2, 5, 5, 5, 1, 11, 6, 1, 0));
 }
 
 - (void)deleteFramebuffer {
@@ -255,9 +248,8 @@ uint getSizeNextPOT(uint size) {
 	if (compileSuccess == GL_FALSE) {
 		GLchar messages[256];
 		glGetShaderInfoLog(shaderHandle, sizeof(messages), 0, &messages[0]);
-		NSString *messageString = [NSString stringWithUTF8String:messages];
-		NSLog(@"%@", messageString);
-		exit(1);
+		printError(messages);
+		abort();
 	}
 
 	return shaderHandle;
@@ -266,7 +258,8 @@ uint getSizeNextPOT(uint size) {
 - (void)compileShaders {
 	const char *vertexPrg =
 			"uniform vec2 ScreenSize;"
-			"uniform float Shake;"
+			"uniform float ShakeX;"
+			"uniform float ShakeY;"
 			""
 			"attribute vec2 Position;"
 			"attribute vec2 TexCoord;"
@@ -277,7 +270,7 @@ uint getSizeNextPOT(uint size) {
 			"void main(void) {"
 			"	DestColor = vec4(Position.x, Position.y, 0, 1);"
 			"	o_TexCoord = TexCoord;"
-			"	gl_Position = vec4((Position.x / ScreenSize.x) * 2.0 - 1.0, (1.0 - (Position.y + Shake) / ScreenSize.y) * 2.0 - 1.0, 0, 1);"
+			"	gl_Position = vec4(((Position.x + ShakeX) / ScreenSize.x) * 2.0 - 1.0, (1.0 - (Position.y + ShakeY) / ScreenSize.y) * 2.0 - 1.0, 0, 1);"
 			"}";
 
 	const char *fragmentPrg =
@@ -302,14 +295,15 @@ uint getSizeNextPOT(uint size) {
 	glGetProgramiv(programHandle, GL_LINK_STATUS, &linkSuccess);
 	if (linkSuccess == GL_FALSE) {
 		printOpenGLError();
-		exit(1);
+		abort();
 	}
 
 	glUseProgram(programHandle);
 
 	_screenSizeSlot = (GLuint) glGetUniformLocation(programHandle, "ScreenSize");
 	_textureSlot = (GLuint) glGetUniformLocation(programHandle, "Texture");
-	_shakeSlot = (GLuint) glGetUniformLocation(programHandle, "Shake");
+	_shakeXSlot = (GLuint) glGetUniformLocation(programHandle, "ShakeX");
+	_shakeYSlot = (GLuint) glGetUniformLocation(programHandle, "ShakeY");
 
 	_positionSlot = (GLuint) glGetAttribLocation(programHandle, "Position");
 	_textureCoordSlot = (GLuint) glGetAttribLocation(programHandle, "TexCoord");
@@ -349,6 +343,9 @@ uint getSizeNextPOT(uint size) {
 }
 
 - (void)setupGestureRecognizers {
+#if TARGET_OS_IOS
+	UIPinchGestureRecognizer *pinchKeyboard = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(keyboardPinch:)];
+
 	UISwipeGestureRecognizer *swipeRight = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(twoFingersSwipeRight:)];
 	swipeRight.direction = UISwipeGestureRecognizerDirectionRight;
 	swipeRight.numberOfTouchesRequired = 2;
@@ -373,54 +370,110 @@ uint getSizeNextPOT(uint size) {
 	swipeDown.delaysTouchesBegan = NO;
 	swipeDown.delaysTouchesEnded = NO;
 
+	UISwipeGestureRecognizer *swipeRight3 = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(threeFingersSwipeRight:)];
+	swipeRight3.direction = UISwipeGestureRecognizerDirectionRight;
+	swipeRight3.numberOfTouchesRequired = 3;
+	swipeRight3.delaysTouchesBegan = NO;
+	swipeRight3.delaysTouchesEnded = NO;
+
+	UISwipeGestureRecognizer *swipeLeft3 = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(threeFingersSwipeLeft:)];
+	swipeLeft3.direction = UISwipeGestureRecognizerDirectionLeft;
+	swipeLeft3.numberOfTouchesRequired = 3;
+	swipeLeft3.delaysTouchesBegan = NO;
+	swipeLeft3.delaysTouchesEnded = NO;
+
+	UISwipeGestureRecognizer *swipeUp3 = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(threeFingersSwipeUp:)];
+	swipeUp3.direction = UISwipeGestureRecognizerDirectionUp;
+	swipeUp3.numberOfTouchesRequired = 3;
+	swipeUp3.delaysTouchesBegan = NO;
+	swipeUp3.delaysTouchesEnded = NO;
+
+	UISwipeGestureRecognizer *swipeDown3 = [[UISwipeGestureRecognizer alloc] initWithTarget:self action:@selector(threeFingersSwipeDown:)];
+	swipeDown3.direction = UISwipeGestureRecognizerDirectionDown;
+	swipeDown3.numberOfTouchesRequired = 3;
+	swipeDown3.delaysTouchesBegan = NO;
+	swipeDown3.delaysTouchesEnded = NO;
+
 	UITapGestureRecognizer *doubleTapTwoFingers = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(twoFingersDoubleTap:)];
 	doubleTapTwoFingers.numberOfTapsRequired = 2;
 	doubleTapTwoFingers.numberOfTouchesRequired = 2;
 	doubleTapTwoFingers.delaysTouchesBegan = NO;
 	doubleTapTwoFingers.delaysTouchesEnded = NO;
 
+	[self addGestureRecognizer:pinchKeyboard];
 	[self addGestureRecognizer:swipeRight];
 	[self addGestureRecognizer:swipeLeft];
 	[self addGestureRecognizer:swipeUp];
 	[self addGestureRecognizer:swipeDown];
+	[self addGestureRecognizer:swipeRight3];
+	[self addGestureRecognizer:swipeLeft3];
+	[self addGestureRecognizer:swipeUp3];
+	[self addGestureRecognizer:swipeDown3];
 	[self addGestureRecognizer:doubleTapTwoFingers];
 
+	[pinchKeyboard release];
 	[swipeRight release];
 	[swipeLeft release];
 	[swipeUp release];
 	[swipeDown release];
+	[swipeRight3 release];
+	[swipeLeft3 release];
+	[swipeUp3 release];
+	[swipeDown3 release];
 	[doubleTapTwoFingers release];
+#elif TARGET_OS_TV
+	UITapGestureRecognizer *tapUpGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(threeFingersSwipeUp:)];
+	[tapUpGestureRecognizer setAllowedPressTypes:@[@(UIPressTypeUpArrow)]];
+
+	UITapGestureRecognizer *tapDownGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(threeFingersSwipeDown:)];
+	[tapDownGestureRecognizer setAllowedPressTypes:@[@(UIPressTypeDownArrow)]];
+
+	UITapGestureRecognizer *tapLeftGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(threeFingersSwipeLeft:)];
+	[tapLeftGestureRecognizer setAllowedPressTypes:@[@(UIPressTypeLeftArrow)]];
+
+	UITapGestureRecognizer *tapRightGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(threeFingersSwipeRight:)];
+	[tapRightGestureRecognizer setAllowedPressTypes:@[@(UIPressTypeRightArrow)]];
+
+	UILongPressGestureRecognizer *longPressGestureRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(showKeyboard)];
+	[longPressGestureRecognizer setAllowedPressTypes:@[[NSNumber numberWithInteger:UIPressTypePlayPause]]];
+	[longPressGestureRecognizer setMinimumPressDuration:1.0];
+
+	[self addGestureRecognizer:tapUpGestureRecognizer];
+	[self addGestureRecognizer:tapDownGestureRecognizer];
+	[self addGestureRecognizer:tapLeftGestureRecognizer];
+	[self addGestureRecognizer:tapRightGestureRecognizer];
+	[self addGestureRecognizer:longPressGestureRecognizer];
+
+	[tapUpGestureRecognizer release];
+	[tapDownGestureRecognizer release];
+	[tapLeftGestureRecognizer release];
+	[tapRightGestureRecognizer release];
+	[longPressGestureRecognizer release];
+#endif
 }
 
 - (id)initWithFrame:(struct CGRect)frame {
 	self = [super initWithFrame: frame];
 
-#if defined(USE_SCALERS) || defined(USE_HQ_SCALERS)
-	InitScalers(565);
-#endif
+	_backgroundSaveStateTask = UIBackgroundTaskInvalid;
 
 	[self setupGestureRecognizers];
 
-	[self setContentScaleFactor:[[UIScreen mainScreen] scale]];
+	if (@available(iOS 14.0, tvOS 14.0, *)) {
+		_controllers.push_back([[MouseController alloc] initWithView:self]);
+		_controllers.push_back([[GamepadController alloc] initWithView:self]);
+	}
+	_controllers.push_back([[TouchController alloc] initWithView:self]);
 
-#ifdef ENABLE_IOS7_SCALERS
-	_scalerMemorySrc = NULL;
-	_scalerMemoryDst = NULL;
-	_scalerMemorySrcSize = 0;
-	_scalerMemoryDstSize = 0;
-	_scaler = NULL;
-	_scalerScale = 1;
-#endif
+	[self setContentScaleFactor:[[UIScreen mainScreen] scale]];
 
 	_keyboardView = nil;
 	_screenTexture = 0;
 	_overlayTexture = 0;
 	_mouseCursorTexture = 0;
 
-	_scaledShakeOffsetY = 0;
-
-	_firstTouch = NULL;
-	_secondTouch = NULL;
+	_scaledShakeXOffset = 0;
+	_scaledShakeYOffset = 0;
 
 	_eventLock = [[NSLock alloc] init];
 
@@ -440,11 +493,6 @@ uint getSizeNextPOT(uint size) {
 	_videoContext.screenTexture.free();
 	_videoContext.overlayTexture.free();
 	_videoContext.mouseTexture.free();
-
-#ifdef ENABLE_IOS7_SCALERS
-	free(_scalerMemorySrc);
-	free(_scalerMemoryDst);
-#endif
 
 	[_eventLock release];
 	[super dealloc];
@@ -468,79 +516,10 @@ uint getSizeNextPOT(uint size) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE); printOpenGLError();
 }
 
-#ifdef ENABLE_IOS7_SCALERS
-- (void)setScaler {
-	ScalerProc *scaler = NULL;
-	int scalerScale = 1;
-
-	switch (_videoContext.graphicsMode) {
-	case kGraphicsModeNone:
-		break;
-#ifdef USE_SCALERS
-	case kGraphicsMode2xSaI:
-		scaler = _2xSaI;
-		scalerScale = 2;
-		break;
-
-	case kGraphicsModeSuper2xSaI:
-		scaler = Super2xSaI;
-		scalerScale = 2;
-		break;
-
-	case kGraphicsModeSuperEagle:
-		scaler = SuperEagle;
-		scalerScale = 2;
-		break;
-
-	case kGraphicsModeAdvMame2x:
-		scaler = AdvMame2x;
-		scalerScale = 2;
-		break;
-
-	case kGraphicsModeAdvMame3x:
-		scaler = AdvMame3x;
-		scalerScale = 3;
-		break;
-
-#ifdef USE_HQ_SCALERS
-	case kGraphicsModeHQ2x:
-		scaler = HQ2x;
-		scalerScale = 2;
-		break;
-
-	case kGraphicsModeHQ3x:
-		scaler = HQ3x;
-		scalerScale = 3;
-		break;
-#endif
-
-	case kGraphicsModeTV2x:
-		scaler = TV2x;
-		scalerScale = 2;
-		break;
-
-	case kGraphicsModeDotMatrix:
-		scaler = DotMatrix;
-		scalerScale = 2;
-		break;
-#endif
-
-	default:
-		break;
-	}
-
-	_scaler = scaler;
-	_scalerScale = scalerScale;
-}
-#endif
-
 - (void)setGraphicsMode {
 	[self setFilterModeForTexture:_screenTexture];
 	[self setFilterModeForTexture:_overlayTexture];
 	[self setFilterModeForTexture:_mouseCursorTexture];
-#ifdef ENABLE_IOS7_SCALERS
-	[self setScaler];
-#endif
 }
 
 - (void)updateSurface {
@@ -577,7 +556,7 @@ uint getSizeNextPOT(uint size) {
 	CGRect *rect;
 	int maxWidth, maxHeight;
 
-	if (!_videoContext.overlayVisible) {
+	if (!_videoContext.overlayInGUI) {
 		rect = &_gameScreenRect;
 		maxWidth = _videoContext.screenWidth;
 		maxHeight = _videoContext.screenHeight;
@@ -588,7 +567,7 @@ uint getSizeNextPOT(uint size) {
 	}
 
 	if (!maxWidth || !maxHeight) {
-		printf("WARNING: updateMouseCursorScaling called when screen was not ready (%d)!\n", _videoContext.overlayVisible);
+		printf("WARNING: updateMouseCursorScaling called when screen was not ready (%d)!\n", _videoContext.overlayInGUI);
 		return;
 	}
 
@@ -624,6 +603,30 @@ uint getSizeNextPOT(uint size) {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, _videoContext.mouseTexture.w, _videoContext.mouseTexture.h, 0, GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1, _videoContext.mouseTexture.getPixels()); printOpenGLError();
 }
 
+- (void *)getTextureInRGBA8888BE_AsRGBA8888LE {
+	// Allocate a pixel buffer with 32 bits per pixel
+	void *pixelBuffer = malloc(_videoContext.screenTexture.h * _videoContext.screenTexture.w * sizeof(uint32_t));
+	// Copy the texture pixels as we don't want to operate on the
+	memcpy(pixelBuffer, _videoContext.screenTexture.getPixels(), _videoContext.screenTexture.h * _videoContext.screenTexture.w * sizeof(uint32_t));
+
+	// Utilize the Accelerator Framwork to do some byte swapping
+	vImage_Buffer src;
+	src.height = _videoContext.screenTexture.h;
+	src.width = _videoContext.screenTexture.w;
+	src.rowBytes = _videoContext.screenTexture.pitch;
+	src.data = _videoContext.screenTexture.getPixels();
+
+	// Initialise dst with src, change data pointer to pixelBuffer
+	vImage_Buffer dst = src;
+	dst.data = pixelBuffer;
+
+	// Swap pixel channels from RGBA BE to RGBA LE (ABGR)
+	const uint8_t map[4] = { 3, 2, 1, 0 };
+	vImagePermuteChannels_ARGB8888(&src, &dst, map, kvImageNoFlags);
+
+	return pixelBuffer;
+}
+
 - (void)updateMainSurface {
 	glBufferData(GL_ARRAY_BUFFER, sizeof(GLVertex) * 4, _gameScreenCoords, GL_STATIC_DRAW);
 	glVertexAttribPointer(_positionSlot, 2, GL_FLOAT, GL_FALSE, sizeof(GLVertex), 0);
@@ -634,41 +637,18 @@ uint getSizeNextPOT(uint size) {
 	// Unfortunately we have to update the whole texture every frame, since glTexSubImage2D is actually slower in all cases
 	// due to the iPhone internals having to convert the whole texture back from its internal format when used.
 	// In the future we could use several tiled textures instead.
-#ifdef ENABLE_IOS7_SCALERS
-	if (_scaler) {
-		size_t neededSrcMemorySize = (size_t) (_videoContext.screenTexture.pitch * (_videoContext.screenTexture.h + 4));
-		size_t neededDstMemorySize = (size_t) (_videoContext.screenTexture.pitch * (_videoContext.screenTexture.h + 4) * _scalerScale * _scalerScale);
-		if (neededSrcMemorySize != _scalerMemorySrcSize) {
-			_scalerMemorySrc = (uint8_t *) realloc(_scalerMemorySrc, neededSrcMemorySize);
-			_scalerMemorySrcSize = neededSrcMemorySize;
-		}
-		if (neededDstMemorySize != _scalerMemoryDstSize) {
-			_scalerMemoryDst = (uint8_t *) realloc(_scalerMemoryDst, neededDstMemorySize);
-			_scalerMemoryDstSize = neededDstMemorySize;
-		}
-
-		// Clear two lines before
-		memset(_scalerMemorySrc, 0, (size_t) (_videoContext.screenTexture.pitch * 2));
-		// Copy original buffer
-		memcpy(_scalerMemorySrc + _videoContext.screenTexture.pitch * 2, _videoContext.screenTexture.getPixels(), _videoContext.screenTexture.pitch * _videoContext.screenTexture.h);
-		// Clear two lines after
-		memset(_scalerMemorySrc + _videoContext.screenTexture.pitch * (2 + _videoContext.screenTexture.h), 0, (size_t) (_videoContext.screenTexture.pitch * 2));
-		// Apply scaler
-		_scaler(_scalerMemorySrc + _videoContext.screenTexture.pitch * 2,
-		        _videoContext.screenTexture.pitch,
-		        _scalerMemoryDst,
-		        (uint32) (_videoContext.screenTexture.pitch * _scalerScale),
-		        _videoContext.screenTexture.w,
-		        _videoContext.screenTexture.h);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, _videoContext.screenTexture.w * _scalerScale, _videoContext.screenTexture.h * _scalerScale, 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, _scalerMemoryDst); printOpenGLError();
-	}
-	else {
-#endif
+	if (_videoContext.screenTexture.format == Graphics::PixelFormat(4, 8, 8, 8, 8, 0, 8, 16, 24)) {
+		// ABGR8888 in big endian which in little endian is RBGA8888 -> no convertion needed
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, _videoContext.screenTexture.w, _videoContext.screenTexture.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, _videoContext.screenTexture.getPixels()); printOpenGLError();
+	} else if (_videoContext.screenTexture.format == Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0)) {
+		// RGBA8888 (big endian) = ABGR8888 (little endian) -> needs convertion
+		void* pixelBuffer = [self getTextureInRGBA8888BE_AsRGBA8888LE];
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, _videoContext.screenTexture.w, _videoContext.screenTexture.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixelBuffer); printOpenGLError();
+		free(pixelBuffer);
+	} else {
+		// Assuming RGB565
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, _videoContext.screenTexture.w, _videoContext.screenTexture.h, 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, _videoContext.screenTexture.getPixels()); printOpenGLError();
-#ifdef ENABLE_IOS7_SCALERS
 	}
-#endif
-
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); printOpenGLError();
 }
 
@@ -693,14 +673,12 @@ uint getSizeNextPOT(uint size) {
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); printOpenGLError();
 }
 
-- (void)createScreenTexture {
+- (void)setGameScreenCoords{
 	const uint screenTexWidth = getSizeNextPOT(_videoContext.screenWidth);
 	const uint screenTexHeight = getSizeNextPOT(_videoContext.screenHeight);
 
 	_gameScreenCoords[1].u = _gameScreenCoords[3].u = _videoContext.screenWidth / (GLfloat)screenTexWidth;
 	_gameScreenCoords[2].v = _gameScreenCoords[3].v = _videoContext.screenHeight / (GLfloat)screenTexHeight;
-
-	_videoContext.screenTexture.create((uint16) screenTexWidth, (uint16) screenTexHeight, Graphics::createPixelFormat<565>());
 }
 
 - (void)initSurface {
@@ -718,6 +696,14 @@ uint getSizeNextPOT(uint size) {
 	else {
 		screenWidth = MIN(_renderBufferWidth, _renderBufferHeight);
 		screenHeight = MAX(_renderBufferWidth, _renderBufferHeight);
+	}
+
+	if (_keyboardView == nil) {
+		_keyboardView = [[SoftKeyboard alloc] initWithFrame:CGRectZero];
+		[_keyboardView setInputDelegate:self];
+		[self addSubview:[_keyboardView inputView]];
+		[self addSubview: _keyboardView];
+		[self showKeyboard];
 	}
 
 	glBindRenderbuffer(GL_RENDERBUFFER, _viewRenderbuffer); printOpenGLError();
@@ -761,8 +747,6 @@ uint getSizeNextPOT(uint size) {
 			yOffset = (screenHeight - rectHeight) / 2;
 		}
 
-		[_keyboardView hideKeyboard];
-
 		//printf("Rect: %i, %i, %i, %i\n", xOffset, yOffset, rectWidth, rectHeight);
 		_gameScreenRect = CGRectMake(xOffset, yOffset, rectWidth, rectHeight);
 		overlayPortraitRatio = 1.0f;
@@ -770,17 +754,9 @@ uint getSizeNextPOT(uint size) {
 		GLfloat ratio = adjustedHeight / adjustedWidth;
 		int height = (int)(screenWidth * ratio);
 		//printf("Making rect (%u, %u)\n", screenWidth, height);
+
 		_gameScreenRect = CGRectMake(0, 0, screenWidth, height);
 
-		CGRect keyFrame = CGRectMake(0.0f, 0.0f, 0.0f, 0.0f);
-		if (_keyboardView == nil) {
-			_keyboardView = [[SoftKeyboard alloc] initWithFrame:keyFrame];
-			[_keyboardView setInputDelegate:self];
-			[self addSubview:[_keyboardView inputView]];
-			[self addSubview: _keyboardView];
-		}
-
-		[_keyboardView showKeyboard];
 		overlayPortraitRatio = (_videoContext.overlayHeight * ratio) / _videoContext.overlayWidth;
 	}
 	_overlayRect = CGRectMake(0, 0, screenWidth, screenHeight * overlayPortraitRatio);
@@ -795,14 +771,51 @@ uint getSizeNextPOT(uint size) {
 
 	[self setViewTransformation];
 	[self updateMouseCursorScaling];
+	[self adjustViewFrameForSafeArea];
+}
+
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
+
+-(void)adjustViewFrameForSafeArea {
+	// The code below does not quite compile with SDKs older than 11.0.
+	// warning: instance method '-safeAreaInsets' not found (return type defaults to 'id')
+	// error: no viable conversion from 'id' to 'UIEdgeInsets'
+	// So for now disable this code when compiled with an older SDK, which means it is only
+	// available when running on iOS 11+ if it has been compiled on iOS 11+
+#ifdef __IPHONE_11_0
+#if __has_builtin(__builtin_available)
+	if ( @available(iOS 11, tvOS 11, *) ) {
+#else
+	if ( [[[UIApplication sharedApplication] keyWindow] respondsToSelector:@selector(safeAreaInsets)] ) {
+#endif
+		CGRect screenSize = [[UIScreen mainScreen] bounds];
+		CGRect newFrame = screenSize;
+#if TARGET_OS_IOS
+		UIEdgeInsets inset = [[[UIApplication sharedApplication] keyWindow] safeAreaInsets];
+		UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+		if ( orientation == UIInterfaceOrientationPortrait ) {
+			newFrame = CGRectMake(screenSize.origin.x, screenSize.origin.y + inset.top, screenSize.size.width, screenSize.size.height - inset.top);
+		} else if ( orientation == UIInterfaceOrientationLandscapeLeft ) {
+			newFrame = CGRectMake(screenSize.origin.x, screenSize.origin.y, screenSize.size.width - inset.right, screenSize.size.height);
+		} else if ( orientation == UIInterfaceOrientationLandscapeRight ) {
+			newFrame = CGRectMake(screenSize.origin.x + inset.left, screenSize.origin.y, screenSize.size.width - inset.left, screenSize.size.height);
+		}
+#endif
+		self.frame = newFrame;
+	}
+#endif
 }
 
 - (void)setViewTransformation {
 	// Scale the shake offset according to the overlay size. We need this to
 	// adjust the overlay mouse click coordinates when an offset is set.
-	_scaledShakeOffsetY = (int)(_videoContext.shakeOffsetY / (GLfloat)_videoContext.screenHeight * CGRectGetHeight(_overlayRect));
+	_scaledShakeXOffset = (int)(_videoContext.shakeXOffset / (GLfloat)_videoContext.screenWidth * CGRectGetWidth(_overlayRect));
+	_scaledShakeYOffset = (int)(_videoContext.shakeYOffset / (GLfloat)_videoContext.screenHeight * CGRectGetHeight(_overlayRect));
 
-	glUniform1f(_shakeSlot, _scaledShakeOffsetY);
+	glUniform1f(_shakeXSlot, _scaledShakeXOffset);
+	glUniform1f(_shakeYSlot, _scaledShakeYOffset);
 }
 
 - (void)clearColorBuffer {
@@ -841,23 +854,25 @@ uint getSizeNextPOT(uint size) {
 	point.y *= self.contentScaleFactor;
 
 	CGRect *area;
-	int width, height, offsetY;
-	if (_videoContext.overlayVisible) {
+	int width, height, offsetX, offsetY;
+	if (_videoContext.overlayInGUI) {
 		area = &_overlayRect;
 		width = _videoContext.overlayWidth;
 		height = _videoContext.overlayHeight;
-		offsetY = _scaledShakeOffsetY;
+		offsetX = _scaledShakeXOffset;
+		offsetY = _scaledShakeYOffset;
 	} else {
 		area = &_gameScreenRect;
 		width = _videoContext.screenWidth;
 		height = _videoContext.screenHeight;
-		offsetY = _videoContext.shakeOffsetY;
+		offsetX = _videoContext.shakeXOffset;
+		offsetY = _videoContext.shakeYOffset;
 	}
 
 	point.x = (point.x - CGRectGetMinX(*area)) / CGRectGetWidth(*area);
 	point.y = (point.y - CGRectGetMinY(*area)) / CGRectGetHeight(*area);
 
-	*x = (int)(point.x * width);
+	*x = (int)(point.x * width + offsetX);
 	// offsetY describes the translation of the screen in the upward direction,
 	// thus we need to add it here.
 	*y = (int)(point.y * height + offsetY);
@@ -871,94 +886,156 @@ uint getSizeNextPOT(uint size) {
 	return true;
 }
 
-- (void)deviceOrientationChanged:(UIDeviceOrientation)orientation {
-	[self addEvent:InternalEvent(kInputOrientationChanged, orientation, 0)];
-}
-
-- (UITouch *)secondTouchOtherTouchThan:(UITouch *)touch in:(NSSet *)set {
-	NSArray *all = [set allObjects];
-	for (UITouch *t in all) {
-		if (t != touch) {
-			return t;
+- (BOOL)isControllerTypeConnected:(Class)controller {
+	for (GameController *c : _controllers) {
+		if ([c isConnected]) {
+			if ([c isKindOfClass:controller]) {
+				return YES;
+			}
 		}
 	}
-	return nil;
+	return NO;
+}
+
+- (BOOL)isTouchControllerConnected {
+	return [self isControllerTypeConnected:TouchController.class];
+}
+
+- (BOOL)isMouseControllerConnected {
+	if (@available(iOS 14.0, tvOS 14.0, *)) {
+		return [self isControllerTypeConnected:MouseController.class];
+	} else {
+		// Fallback on earlier versions
+		return NO;
+	}
+}
+
+- (BOOL)isGamepadControllerConnected {
+	if (@available(iOS 14.0, tvOS 14.0, *)) {
+		return [self isControllerTypeConnected:GamepadController.class];
+	} else {
+		// Fallback on earlier versions
+		return NO;
+	}
+}
+
+#if TARGET_OS_IOS
+- (void)deviceOrientationChanged:(UIDeviceOrientation)orientation {
+	[self addEvent:InternalEvent(kInputOrientationChanged, orientation, 0)];
+
+	BOOL isLandscape = (self.bounds.size.width > self.bounds.size.height);
+	if (isLandscape) {
+		[self hideKeyboard];
+	} else {
+		[self showKeyboard];
+	}
+}
+#endif
+
+- (void)showKeyboard {
+	[_keyboardView showKeyboard];
+}
+
+- (void)hideKeyboard {
+	[_keyboardView hideKeyboard];
+}
+
+- (BOOL)isKeyboardShown {
+	return [_keyboardView isKeyboardShown];
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
-	int x, y;
-
-	NSSet *allTouches = [event allTouches];
-	if (allTouches.count == 1) {
-		_firstTouch = [allTouches anyObject];
-		CGPoint point = [_firstTouch locationInView:self];
-		if (![self getMouseCoords:point eventX:&x eventY:&y])
-			return;
-
-		[self addEvent:InternalEvent(kInputMouseDown, x, y)];
-	}
-	else if (allTouches.count == 2) {
-		_secondTouch = [self secondTouchOtherTouchThan:_firstTouch in:allTouches];
-		if (_secondTouch) {
-			CGPoint point = [_secondTouch locationInView:self];
-			if (![self getMouseCoords:point eventX:&x eventY:&y])
-				return;
-
-			[self addEvent:InternalEvent(kInputMouseSecondDown, x, y)];
+	for (GameController *c : _controllers) {
+		if ([c isKindOfClass:TouchController.class]) {
+			[(TouchController *)c touchesBegan:touches withEvent:event];
 		}
 	}
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
-	int x, y;
-
-	NSSet *allTouches = [event allTouches];
-	for (UITouch *touch in allTouches) {
-		if (touch == _firstTouch) {
-			CGPoint point = [touch locationInView:self];
-			if (![self getMouseCoords:point eventX:&x eventY:&y])
-				return;
-
-			[self addEvent:InternalEvent(kInputMouseDragged, x, y)];
-		} else if (touch == _secondTouch) {
-			CGPoint point = [touch locationInView:self];
-			if (![self getMouseCoords:point eventX:&x eventY:&y])
-				return;
-
-			[self addEvent:InternalEvent(kInputMouseSecondDragged, x, y)];
+	for (GameController *c : _controllers) {
+		if ([c isKindOfClass:TouchController.class]) {
+			[(TouchController *)c touchesMoved:touches withEvent:event];
 		}
 	}
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
-	int x, y;
-
-	NSSet *allTouches = [event allTouches];
-	if (allTouches.count == 1) {
-		UITouch *touch = [allTouches anyObject];
-		CGPoint point = [touch locationInView:self];
-		if (![self getMouseCoords:point eventX:&x eventY:&y]) {
-			return;
+	for (GameController *c : _controllers) {
+		if ([c isKindOfClass:TouchController.class]) {
+			[(TouchController *)c touchesEnded:touches withEvent:event];
 		}
-
-		[self addEvent:InternalEvent(kInputMouseUp, x, y)];
 	}
-	else if (allTouches.count == 2) {
-		UITouch *touch = [[allTouches allObjects] objectAtIndex:1];
-		CGPoint point = [touch locationInView:self];
-		if (![self getMouseCoords:point eventX:&x eventY:&y])
-			return;
-
-		[self addEvent:InternalEvent(kInputMouseSecondUp, x, y)];
-	}
-	_firstTouch = nil;
-	_secondTouch = nil;
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
-	_firstTouch = nil;
-	_secondTouch = nil;
+	for (GameController *c : _controllers) {
+		if ([c isKindOfClass:TouchController.class]) {
+			[(TouchController *)c touchesEnded:touches withEvent:event];
+		}
+	}
 }
+
+#if TARGET_OS_TV
+// UIKit calls these methods when a button is pressed by the user.
+// These methods are used to determine which button was pressed and
+// to take any needed actions. The default implementation of these
+// methods forwardsm the message up the responder chain.
+// Button presses are already handled by the GameController class for
+// connected game controllers (including the Apple TV remote).
+// The Apple TV remote is not registered as a micro game controller
+// when running the application in tvOS simulator, hence these methods
+// only needs to be implemented for the tvOS simulator to handle presses
+// on the Apple TV remote.
+-(void)pressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+#if TARGET_OS_SIMULATOR
+	UIPress *press = [presses anyObject];
+	if (press.type == UIPressTypeMenu) {
+		// Trigger on pressesEnded
+	} else if (press.type == UIPressTypeSelect || press.type == UIPressTypePlayPause) {
+		[self addEvent:InternalEvent(kInputJoystickButtonDown, press.type == UIPressTypeSelect ? Common::JOYSTICK_BUTTON_A : Common::JOYSTICK_BUTTON_B, 0)];
+	}
+	else {
+		[super pressesBegan:presses withEvent:event];
+	}
+#endif
+}
+
+-(void)pressesEnded:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+#if TARGET_OS_SIMULATOR
+	UIPress *press = [presses anyObject];
+	if (press.type == UIPressTypeMenu) {
+		[self handleMainMenuKey];
+	} else if (press.type == UIPressTypeSelect || press.type == UIPressTypePlayPause) {
+		[self addEvent:InternalEvent(kInputJoystickButtonUp, press.type == UIPressTypeSelect ? Common::JOYSTICK_BUTTON_A : Common::JOYSTICK_BUTTON_B, 0)];
+	}
+	else {
+		[super pressesEnded:presses withEvent:event];
+	}
+#endif
+}
+
+-(void)pressesChanged:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+#if TARGET_OS_SIMULATOR
+	[super pressesChanged:presses withEvent:event];
+#endif
+}
+
+-(void)pressesCancelled:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
+#if TARGET_OS_SIMULATOR
+	[super pressesCancelled:presses withEvent:event];
+#endif
+}
+#endif
+
+#if TARGET_OS_IOS
+- (void)keyboardPinch:(UIPinchGestureRecognizer *)recognizer {
+	if ([recognizer scale] < 0.8)
+		[self showKeyboard];
+	else if ([recognizer scale] > 1.25)
+		[self hideKeyboard];
+}
+#endif
 
 - (void)twoFingersSwipeRight:(UISwipeGestureRecognizer *)recognizer {
 	[self addEvent:InternalEvent(kInputSwipe, kUIViewSwipeRight, 2)];
@@ -976,12 +1053,40 @@ uint getSizeNextPOT(uint size) {
 	[self addEvent:InternalEvent(kInputSwipe, kUIViewSwipeDown, 2)];
 }
 
+- (void)threeFingersSwipeRight:(UISwipeGestureRecognizer *)recognizer {
+	[self addEvent:InternalEvent(kInputSwipe, kUIViewSwipeRight, 3)];
+}
+
+- (void)threeFingersSwipeLeft:(UISwipeGestureRecognizer *)recognizer {
+	[self addEvent:InternalEvent(kInputSwipe, kUIViewSwipeLeft, 3)];
+}
+
+- (void)threeFingersSwipeUp:(UISwipeGestureRecognizer *)recognizer {
+	[self addEvent:InternalEvent(kInputSwipe, kUIViewSwipeUp, 3)];
+}
+
+- (void)threeFingersSwipeDown:(UISwipeGestureRecognizer *)recognizer {
+	[self addEvent:InternalEvent(kInputSwipe, kUIViewSwipeDown, 3)];
+}
+
 - (void)twoFingersDoubleTap:(UITapGestureRecognizer *)recognizer {
 	[self addEvent:InternalEvent(kInputTap, kUIViewTapDouble, 2)];
 }
 
 - (void)handleKeyPress:(unichar)c {
-	[self addEvent:InternalEvent(kInputKeyPressed, c, 0)];
+	if (c == '`') {
+		[self addEvent:InternalEvent(kInputKeyPressed, '\033', 0)];
+	} else {
+		[self addEvent:InternalEvent(kInputKeyPressed, c, 0)];
+	}
+}
+
+- (void)handleMainMenuKey {
+	if ([self isInGame]) {
+		[self addEvent:InternalEvent(kInputMainMenu, 0, 0)];
+	} else {
+		[[UIApplication sharedApplication] performSelector:@selector(suspend)];
+	}
 }
 
 - (void)applicationSuspend {
@@ -990,6 +1095,33 @@ uint getSizeNextPOT(uint size) {
 
 - (void)applicationResume {
 	[self addEvent:InternalEvent(kInputApplicationResumed, 0, 0)];
+}
+
+- (void)saveApplicationState {
+	[self addEvent:InternalEvent(kInputApplicationSaveState, 0, 0)];
+}
+
+- (void)clearApplicationState {
+	[self addEvent:InternalEvent(kInputApplicationClearState, 0, 0)];
+}
+
+- (void)restoreApplicationState {
+	[self addEvent:InternalEvent(kInputApplicationRestoreState, 0, 0)];
+}
+
+- (void) beginBackgroundSaveStateTask {
+	if (_backgroundSaveStateTask == UIBackgroundTaskInvalid) {
+		_backgroundSaveStateTask = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:^{
+			[self endBackgroundSaveStateTask];
+		}];
+	}
+}
+
+- (void) endBackgroundSaveStateTask {
+	if (_backgroundSaveStateTask != UIBackgroundTaskInvalid) {
+		[[UIApplication sharedApplication] endBackgroundTask: _backgroundSaveStateTask];
+		_backgroundSaveStateTask = UIBackgroundTaskInvalid;
+	}
 }
 
 @end

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -45,14 +44,14 @@ private:
 
 public:
 	CDDAStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse);
-	virtual ~CDDAStream();
+	~CDDAStream() override;
 
-	int readBuffer(int16 *buffer, const int numSamples);
-	bool isStereo() const { return true; }
-	int getRate() const { return 44100; }
-	bool endOfData() const { return _stream->eos(); }
-	bool seek(const Audio::Timestamp &where);
-	Audio::Timestamp getLength() const { return _length; }
+	int readBuffer(int16 *buffer, const int numSamples) override;
+	bool isStereo() const override { return true; }
+	int getRate() const override { return 44100; }
+	bool endOfData() const override { return _stream->eos(); }
+	bool seek(const Audio::Timestamp &where) override;
+	Audio::Timestamp getLength() const override { return _length; }
 };
 
 CDDAStream::CDDAStream(Common::SeekableReadStream *stream, DisposeAfterUse::Flag disposeAfterUse) :
@@ -110,11 +109,11 @@ Audio::SeekableAudioStream *makeCDDAStream(
 	Audio::SeekableAudioStream *s = new CDDAStream(stream, disposeAfterUse);
 	if (s && s->endOfData()) {
 		delete s;
-		return 0;
+		return nullptr;
 	} else {
 		return s;
 	}
-	return 0;
+	return nullptr;
 }
 
 } // End of namespace Scumm

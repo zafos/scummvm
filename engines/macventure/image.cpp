@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -115,18 +114,18 @@ void ImageAsset::decodePPIC(ObjID id, Common::Array<byte> &data, uint &bitHeight
 	Common::SeekableReadStream *baseStream = _container->getItem(realID);
 	Common::BitStream32BEMSB stream(baseStream);
 
-	uint8 mode = stream.getBits(3);
+	uint8 mode = stream.getBits<3>();
 	int w, h;
 	if (stream.getBit()) {
-		h = stream.getBits(10);
+		h = stream.getBits<10>();
 	} else {
-		h = stream.getBits(6);
+		h = stream.getBits<6>();
 	}
 
 	if (stream.getBit()) {
-		w = stream.getBits(10);
+		w = stream.getBits<10>();
 	} else {
-		w = stream.getBits(6);
+		w = stream.getBits<6>();
 	}
 
 	rowBytes = ((w + 0xF) >> 3) & 0xFFFE;
@@ -150,6 +149,9 @@ void ImageAsset::decodePPIC(ObjID id, Common::Array<byte> &data, uint &bitHeight
 	case MacVenture::kPPIC3:
 		decodePPIC3(stream, data, bitHeight, bitWidth, rowBytes);
 		break;
+	default:
+		warning("decodePPIC(): Unknown mode!");
+		break;
 	}
 
 	delete baseStream;
@@ -162,7 +164,7 @@ void ImageAsset::decodePPIC0(Common::BitStream32BEMSB &stream, Common::Array<byt
 	uint p = 0;
 	for (uint y = 0; y < bitHeight; y++) {
 		for (uint x = 0; x < words; x++) {
-			v = stream.peekBits(32);
+			v = stream.peekBits<32>();
 			stream.skip(16);
 			v >>= 16 - (stream.pos() % 8);
 			data[p] = (v >> 8) & 0xff; p++;
@@ -215,7 +217,7 @@ void ImageAsset::decodePPIC3(Common::BitStream32BEMSB &stream, Common::Array<byt
 		}
 	}
 
-	bits = stream.getBits(2) + 1;
+	bits = stream.getBits<2>() + 1;
 	uint16 mask = 0;
 	for (uint i = 0; i < 0xf; i++) {
 		if (i) {
@@ -243,9 +245,9 @@ void ImageAsset::decodeHuffGraphic(const PPICHuff &huff, Common::BitStream32BEMS
 	_walkRepeat = 0;
 	_walkLast = 0;
 	if (bitWidth & 3) {
-		flags = stream.getBits(5);
+		flags = stream.getBits<5>();
 	} else {
-		flags = stream.getBits(4) << 1;
+		flags = stream.getBits<4>() << 1;
 	}
 
 	byte odd = 0;
@@ -339,7 +341,7 @@ byte ImageAsset::walkHuff(const PPICHuff &huff, Common::BitStream32BEMSB &stream
 		_walkLast = ((_walkLast << 8) & 0xFF00) | (_walkLast >> 8);
 		return _walkLast & 0xFF;
 	}
-	uint16 dw = stream.peekBits(16);
+	uint16 dw = stream.peekBits<16>();
 	uint16 i = 0;
 	for (;i < 16; i++) {
 		if (huff.masks[i + 1] > dw) {
@@ -353,13 +355,13 @@ byte ImageAsset::walkHuff(const PPICHuff &huff, Common::BitStream32BEMSB &stream
 			_walkLast &= 0xFF;
 			_walkLast |= _walkLast << 8;
 		}
-		_walkRepeat = stream.getBits(3);
+		_walkRepeat = stream.getBits<3>();
 		if (_walkRepeat < 3) {
 			_walkRepeat <<= 4;
-			_walkRepeat |= stream.getBits(4);
+			_walkRepeat |= stream.getBits<4>();
 			if (_walkRepeat < 8) {
 				_walkRepeat <<= 8;
-				_walkRepeat |= stream.getBits(8);
+				_walkRepeat |= stream.getBits<8>();
 			}
 		}
 		_walkRepeat -= 2;
@@ -459,8 +461,8 @@ void ImageAsset::blitDirect(Graphics::ManagedSurface *target, int ox, int oy, co
 		uint bmpofs = (y + sy) * rowBytes;
 		byte pix = 0;
 		for (uint x = 0; x < w; x++) {
-			assert(ox + x <= target->w);
-			assert(oy + y <= target->h);
+			assert(ox + x <= (uint)target->w);
+			assert(oy + y <= (uint)target->h);
 			pix = data[bmpofs + ((x + sx) >> 3)] & (1 << (7 - ((x + sx) & 7)));
 			pix = pix ? kColorBlack : kColorWhite;
 			*((byte *)target->getBasePtr(ox + x, oy + y)) = pix;
@@ -476,8 +478,8 @@ void ImageAsset::blitBIC(Graphics::ManagedSurface *target, int ox, int oy, const
 		uint bmpofs = (y + sy) * rowBytes;
 		byte pix = 0;
 		for (uint x = 0; x < w; x++) {
-			assert(ox + x <= target->w);
-			assert(oy + y <= target->h);
+			assert(ox + x <= (uint)target->w);
+			assert(oy + y <= (uint)target->h);
 			pix = data[bmpofs + ((x + sx) >> 3)] & (1 << (7 - ((x + sx) & 7)));
 			if (pix) {
 				*((byte *)target->getBasePtr(ox + x, oy + y)) = kColorWhite;
@@ -494,8 +496,8 @@ void ImageAsset::blitOR(Graphics::ManagedSurface *target, int ox, int oy, const 
 		uint bmpofs = (y + sy) * rowBytes;
 		byte pix = 0;
 		for (uint x = 0; x < w; x++) {
-			assert(ox + x <= target->w);
-			assert(oy + y <= target->h);
+			assert(ox + x <= (uint)target->w);
+			assert(oy + y <= (uint)target->h);
 			pix = data[bmpofs + ((x + sx) >> 3)] & (1 << (7 - ((x + sx) & 7)));
 			if (pix) {
 				*((byte *)target->getBasePtr(ox + x, oy + y)) = kColorBlack;
@@ -514,8 +516,8 @@ void ImageAsset::blitXOR(Graphics::ManagedSurface *target, int ox, int oy, const
 		for (uint x = 0; x < w; x++) {
 			pix = data[bmpofs + ((x + sx) >> 3)] & (1 << (7 - ((x + sx) & 7)));
 			if (pix) { // We need to xor
-				assert(ox + x <= target->w);
-				assert(oy + y <= target->h);
+				assert(ox + x <= (uint)target->w);
+				assert(oy + y <= (uint)target->h);
 				byte p = *((byte *)target->getBasePtr(ox + x, oy + y));
 				*((byte *)target->getBasePtr(ox + x, oy + y)) =
 					(p == kColorWhite) ? kColorBlack : kColorWhite;
@@ -529,10 +531,10 @@ void ImageAsset::calculateSectionToDraw(Graphics::ManagedSurface *target, int &o
 	calculateSectionInDirection(target->w, bitWidth, ox, sx, w);
 	calculateSectionInDirection(target->h, bitHeight, oy, sy, h);
 
-	assert(w <= target->w);
+	assert(w <= (uint)target->w);
 	assert((int)w >= 0);
 	assert(w <= bitWidth);
-	assert(h <= target->h);
+	assert(h <= (uint)target->h);
 	assert((int)h >= 0);
 	assert(h <= bitHeight);
 }

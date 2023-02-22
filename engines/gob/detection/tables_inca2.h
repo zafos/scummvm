@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -70,6 +69,22 @@
 	0, 0, 0
 },
 
+// US floppy box version 1.0 dated 18.03.1994
+{
+	{
+		"inca2",
+		"",
+		AD_ENTRY1s("intro.stk", "48cc6e6b0b0b343f876290d2700d8eba", 804780),
+		EN_USA,
+		kPlatformDOS,
+		ADGF_NO_FLAGS,
+		GUIO2(GUIO_NOSUBTITLES, GUIO_NOSPEECH)
+	},
+	kGameTypeInca2,
+	kFeaturesAdLib,
+	0, 0, 0
+},
+
 // -- DOS VGA CD --
 
 {
@@ -77,6 +92,20 @@
 		"inca2",
 		"",
 		AD_ENTRY1s("intro.stk", "47c3b452767c4f49ea7b109143e77c30", 916828),
+		EN_USA,
+		kPlatformDOS,
+		ADGF_NO_FLAGS,
+		GUIO2(GUIO_NOSUBTITLES, GUIO_NOSPEECH)
+	},
+	kGameTypeInca2,
+	kFeaturesCD,
+	0, 0, 0
+},
+{
+	{
+		"inca2",
+		"v1.07",
+		AD_ENTRY1s("intro.stk", "b56e4147acc5852c6fc2de5985ab94b0", 804796),
 		EN_USA,
 		kPlatformDOS,
 		ADGF_NO_FLAGS,
@@ -238,7 +267,7 @@
 		},
 		EN_ANY,
 		kPlatformDOS,
-		ADGF_NO_FLAGS,
+		ADGF_DEMO,
 		GUIO2(GUIO_NOSUBTITLES, GUIO_NOSPEECH)
 	},
 	kGameTypeInca2,

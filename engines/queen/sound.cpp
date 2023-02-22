@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -75,22 +74,22 @@ public:
 		else
 			_rate = rate;
 	}
-	~AudioStreamWrapper() {
+	~AudioStreamWrapper() override {
 		delete _stream;
 	}
-	int readBuffer(int16 *buffer, const int numSamples) {
+	int readBuffer(int16 *buffer, const int numSamples) override {
 		return _stream->readBuffer(buffer, numSamples);
 	}
-	bool isStereo() const {
+	bool isStereo() const override {
 		return _stream->isStereo();
 	}
-	bool endOfData() const {
+	bool endOfData() const override {
 		return _stream->endOfData();
 	}
-	bool endOfStream() const {
+	bool endOfStream() const override {
 		return _stream->endOfStream();
 	}
-	int getRate() const {
+	int getRate() const override {
 		return _rate;
 	}
 };
@@ -99,7 +98,7 @@ class SilentSound : public PCSound {
 public:
 	SilentSound(Audio::Mixer *mixer, QueenEngine *vm) : PCSound(mixer, vm) {}
 protected:
-	void playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle) {
+	void playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle) override {
 		// Do nothing
 	}
 };
@@ -108,7 +107,7 @@ class SBSound : public PCSound {
 public:
 	SBSound(Audio::Mixer *mixer, QueenEngine *vm) : PCSound(mixer, vm) {}
 protected:
-	void playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle);
+	void playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle) override;
 };
 
 #ifdef USE_MAD
@@ -116,7 +115,7 @@ class MP3Sound : public PCSound {
 public:
 	MP3Sound(Audio::Mixer *mixer, QueenEngine *vm) : PCSound(mixer, vm) {}
 protected:
-	void playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle) {
+	void playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle) override {
 		Common::SeekableReadStream *tmp = f->readStream(size);
 		assert(tmp);
 		_mixer->playStream(Audio::Mixer::kSFXSoundType, soundHandle, new AudioStreamWrapper(Audio::makeMP3Stream(tmp, DisposeAfterUse::YES)));
@@ -129,7 +128,7 @@ class OGGSound : public PCSound {
 public:
 	OGGSound(Audio::Mixer *mixer, QueenEngine *vm) : PCSound(mixer, vm) {}
 protected:
-	void playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle) {
+	void playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle) override {
 		Common::SeekableReadStream *tmp = f->readStream(size);
 		assert(tmp);
 		_mixer->playStream(Audio::Mixer::kSFXSoundType, soundHandle, new AudioStreamWrapper(Audio::makeVorbisStream(tmp, DisposeAfterUse::YES)));
@@ -142,7 +141,7 @@ class FLACSound : public PCSound {
 public:
 	FLACSound(Audio::Mixer *mixer, QueenEngine *vm) : PCSound(mixer, vm) {}
 protected:
-	void playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle) {
+	void playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle) override {
 		Common::SeekableReadStream *tmp = f->readStream(size);
 		assert(tmp);
 		_mixer->playStream(Audio::Mixer::kSFXSoundType, soundHandle, new AudioStreamWrapper(Audio::makeFLACStream(tmp, DisposeAfterUse::YES)));
@@ -281,15 +280,17 @@ void PCSound::setVolume(int vol) {
 
 void PCSound::playSound(const char *base, bool isSpeech) {
 	char name[13];
-	strcpy(name, base);
+	Common::strcpy_s(name, base);
 	// alter filename to add zeros and append ".SB"
 	for (int i = 0; i < 8; i++) {
 		if (name[i] == ' ')
 			name[i] = '0';
 	}
-	strcat(name, ".SB");
+	Common::strcat_s(name, ".SB");
 	if (isSpeech) {
-		while (_mixer->isSoundHandleActive(_speechHandle)) {
+		// Add _vm->shouldQuit() check here, otherwise game gets stuck
+		// in an infinite loop if we try to quit while a sound is playing...
+		while (_mixer->isSoundHandleActive(_speechHandle) && !_vm->shouldQuit()) {
 			_vm->input()->delay(10);
 		}
 	} else {
@@ -307,7 +308,7 @@ void PCSound::playSound(const char *base, bool isSpeech) {
 
 void SBSound::playSoundData(Common::File *f, uint32 size, Audio::SoundHandle *soundHandle) {
 	// In order to simplify the code, we don't parse the .sb header but hard-code the
-	// values. Refer to tracker item #1876741 for details on the format/fields.
+	// values. Refer to tracker item #3590 for details on the format/fields.
 	int headerSize;
 	f->seek(2, SEEK_CUR);
 	uint16 version = f->readUint16LE();
@@ -459,6 +460,8 @@ void AmigaSound::playSong(int16 song) {
 	case 195:
 		song = 32;
 		break;
+	default:
+		break;
 	}
 
 	if (_lastOverride != 32 && _lastOverride != 44) {
@@ -605,7 +608,7 @@ void AmigaSound::updateMusic() {
 void AmigaSound::playSound(const char *base) {
 	debug(7, "AmigaSound::playSound(%s)", base);
 	char soundName[20];
-	sprintf(soundName, "%s.AMR", base);
+	Common::sprintf_s(soundName, "%s.AMR", base);
 
 	uint32 soundSize;
 	Common::File *f = _vm->resource()->findSound(soundName, &soundSize);
@@ -626,13 +629,13 @@ Audio::AudioStream *AmigaSound::loadModule(const char *base, int num) {
 
 	// load song/pattern data
 	uint32 sngDataSize;
-	sprintf(name, "%s.SNG", base);
+	Common::sprintf_s(name, "%s.SNG", base);
 	uint8 *sngData = _vm->resource()->loadFile(name, 0, &sngDataSize);
 	Common::MemoryReadStream sngStr(sngData, sngDataSize);
 
 	// load instruments/wave data
 	uint32 insDataSize;
-	sprintf(name, "%s.INS", base);
+	Common::sprintf_s(name, "%s.INS", base);
 	uint8 *insData = _vm->resource()->loadFile(name, 0, &insDataSize);
 	Common::MemoryReadStream insStr(insData, insDataSize);
 
@@ -696,7 +699,7 @@ bool AmigaSound::playSpecialSfx(int16 sfx) {
 	case 83: // splash
 		playSound("18SSSSSS");
 		break;
-	case 85: // agression enhancer
+	case 85: // aggression enhancer
 		playSound("138BSSSS");
 		break;
 	case 68: // dino ray

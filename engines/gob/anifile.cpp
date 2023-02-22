@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,7 +33,7 @@
 namespace Gob {
 
 ANIFile::ANIFile(GobEngine *vm, const Common::String &fileName,
-                 uint16 width, uint8 bpp) : _vm(vm),
+				 uint16 width, uint8 bpp) : _vm(vm),
 	_width(width), _bpp(bpp), _hasPadding(false) {
 
 	bool bigEndian = false;
@@ -59,7 +58,7 @@ ANIFile::ANIFile(GobEngine *vm, const Common::String &fileName,
 
 	Common::SeekableReadStream *ani = _vm->_dataIO->getFile(endianFileName);
 	if (ani) {
-		Common::SeekableSubReadStreamEndian sub(ani, 0, ani->size(), bigEndian, DisposeAfterUse::YES);
+		Common::SeekableReadStreamEndianWrapper sub(ani, bigEndian, DisposeAfterUse::YES);
 
 		// The big endian version pads a few fields to even size
 		_hasPadding = bigEndian;
@@ -76,7 +75,7 @@ ANIFile::~ANIFile() {
 		delete *l;
 }
 
-void ANIFile::load(Common::SeekableSubReadStreamEndian &ani, const Common::String &fileName) {
+void ANIFile::load(Common::SeekableReadStreamEndian &ani, const Common::String &fileName) {
 	ani.skip(2); // Unused
 
 	uint16 animationCount = ani.readUint16();
@@ -113,7 +112,7 @@ void ANIFile::load(Common::SeekableSubReadStreamEndian &ani, const Common::Strin
 }
 
 void ANIFile::loadAnimation(Animation &animation, FrameArray &frames,
-                            Common::SeekableSubReadStreamEndian &ani) {
+							Common::SeekableReadStreamEndian &ani) {
 
 	// Animation properties
 
@@ -186,7 +185,7 @@ void ANIFile::loadAnimation(Animation &animation, FrameArray &frames,
 	}
 }
 
-void ANIFile::loadFrames(FrameArray &frames, Common::SeekableSubReadStreamEndian &ani) {
+void ANIFile::loadFrames(FrameArray &frames, Common::SeekableReadStreamEndian &ani) {
 	uint32 curFrame = 0;
 
 	bool end = false;
@@ -234,7 +233,7 @@ void ANIFile::loadFrames(FrameArray &frames, Common::SeekableSubReadStreamEndian
 	}
 }
 
-CMPFile *ANIFile::loadLayer(Common::SeekableSubReadStreamEndian &ani) {
+CMPFile *ANIFile::loadLayer(Common::SeekableReadStreamEndian &ani) {
 	Common::String file = Util::setExtension(Util::readString(ani, 13), "");
 	if (_hasPadding)
 		ani.skip(1);
@@ -258,7 +257,7 @@ const ANIFile::Animation &ANIFile::getAnimationInfo(uint16 animation) const {
 }
 
 bool ANIFile::getCoordinates(uint16 layer, uint16 part,
-                             uint16 &left, uint16 &top, uint16 &right, uint16 &bottom) const {
+							 uint16 &left, uint16 &top, uint16 &right, uint16 &bottom) const {
 
 	if (layer >= _layers.size())
 		return false;
@@ -281,7 +280,7 @@ void ANIFile::draw(Surface &dest, uint16 animation, uint16 frame, int16 x, int16
 }
 
 void ANIFile::drawLayer(Surface &dest, uint16 layer, uint16 part,
-                        int16 x, int16 y, int32 transp) const {
+						int16 x, int16 y, int32 transp) const {
 
 	if (layer >= _layers.size())
 		return;

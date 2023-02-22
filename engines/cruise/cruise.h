@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -56,13 +55,13 @@ struct CRUISEGameDescription;
 class CruiseEngine: public Engine {
 private:
 	bool _preLoad;
-	Debugger *_debugger;
 	PCSound *_sound;
 	Common::StringArray _langStrings;
 	CursorType _savedCursor;
 	uint32 _lastTick;
 	int _gameSpeed;
 	bool _speedFlag;
+	PauseToken _gamePauseToken;
 
 	void initialize();
 	void deinitialize();
@@ -71,7 +70,7 @@ private:
 	int processInput();
 protected:
 	// Engine APIs
-	virtual Common::Error run();
+	Common::Error run() override;
 
 	void shutdown();
 
@@ -79,8 +78,8 @@ protected:
 
 public:
 	CruiseEngine(OSystem * syst, const CRUISEGameDescription *gameDesc);
-	virtual ~ CruiseEngine();
-	virtual bool hasFeature(EngineFeature f) const;
+	~ CruiseEngine() override;
+	bool hasFeature(EngineFeature f) const override;
 
 	int getGameType() const;
 	const char *getGameId() const;
@@ -88,16 +87,16 @@ public:
 	Common::Language getLanguage() const;
 	Common::Platform getPlatform() const;
 	PCSound &sound() { return *_sound; }
-	virtual GUI::Debugger *getDebugger() { return _debugger; }
 	virtual void pauseEngine(bool pause);
 	const char *langString(LangStringId langId) { return _langStrings[(int)langId].c_str(); }
 
 	static const char *getSavegameFile(int saveGameIdx);
-	virtual Common::Error loadGameState(int slot);
-	virtual bool canLoadGameStateCurrently();
-	virtual Common::Error saveGameState(int slot, const Common::String &desc);
-	virtual bool canSaveGameStateCurrently();
-	virtual void syncSoundSettings();
+	Common::Error loadGameState(int slot) override;
+	bool canLoadGameStateCurrently() override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	bool canSaveGameStateCurrently() override;
+	Common::String getSaveStateName(int slot) const override { return getSavegameFile(slot); }
+	void syncSoundSettings() override;
 
 	const CRUISEGameDescription *_gameDescription;
 	void initAllData();

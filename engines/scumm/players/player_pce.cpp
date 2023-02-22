@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,15 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 /*
  * The PSG_HuC6280 class is based on the HuC6280 sound chip emulator
- * by Charles MacDonald (E-mail: cgfm2@hotmail.com, WWW: http://cgfm2.emuviews.com)
- * The implementation used here was taken from MESS (http://www.mess.org/)
+ * by Charles MacDonald (E-mail: cgfm2@hotmail.com, WWW: http://www.techno-junk.org)
+ * The implementation used here was taken from MESS (http://mess.redump.net)
  * the Multiple Emulator Super System (sound/c6280.c).
  * LFO and noise channel support have been removed (not used by Loom PCE).
  */
@@ -340,6 +339,7 @@ void PSG_HuC6280::write(int offset, byte data) {
 			break;
 
 		case 0x40:
+		default:
 			break;
 
 		case 0x80:
@@ -447,7 +447,7 @@ void Player_PCE::setupWaveform(byte bank) {
 
 // A541
 void Player_PCE::procA541(channel_t *channel) {
-	channel->soundDataPtr = NULL;
+	channel->soundDataPtr = nullptr;
 	channel->controlVecShort10 = 0;
 
 	channel->controlVecShort03 = 0;
@@ -510,6 +510,7 @@ void Player_PCE::updateSound() {
 int Player_PCE::readBuffer(int16 *buffer, const int numSamples) {
 	int sampleCopyCnt;
 	int samplesLeft = numSamples;
+	int16 *sampleBufferPtr = _sampleBuffer;
 
 	Common::StackLock lock(_mutex);
 
@@ -517,10 +518,11 @@ int Player_PCE::readBuffer(int16 *buffer, const int numSamples) {
 		// copy samples to output buffer
 		sampleCopyCnt = (samplesLeft < _sampleBufferCnt) ? samplesLeft : _sampleBufferCnt;
 		if (sampleCopyCnt > 0) {
-			memcpy(buffer, _sampleBuffer, sampleCopyCnt * sizeof(int16));
+			memcpy(buffer, sampleBufferPtr, sampleCopyCnt * sizeof(int16));
 			buffer += sampleCopyCnt;
 			samplesLeft -= sampleCopyCnt;
 			_sampleBufferCnt -= sampleCopyCnt;
+			sampleBufferPtr += sampleCopyCnt;
 		}
 
 		if (samplesLeft == 0)
@@ -530,12 +532,13 @@ int Player_PCE::readBuffer(int16 *buffer, const int numSamples) {
 		updateSound();
 		_psg->update(_sampleBuffer, _samplesPerPeriod / 2);
 		_sampleBufferCnt = _samplesPerPeriod;
+		sampleBufferPtr = _sampleBuffer;
 	}
 
 	// copy remaining samples to the front of the buffer
 	if (_sampleBufferCnt > 0) {
-		memmove(&_sampleBuffer[0],
-			&_sampleBuffer[_samplesPerPeriod - _sampleBufferCnt],
+		memmove(_sampleBuffer,
+			sampleBufferPtr,
 			_sampleBufferCnt * sizeof(int16));
 	}
 

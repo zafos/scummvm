@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,14 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #ifndef BLADERUNNER_UI_SCROLLBOX_H
 #define BLADERUNNER_UI_SCROLLBOX_H
 
+#include "bladerunner/color.h"
 #include "bladerunner/ui/ui_component.h"
 
 #include "common/array.h"
@@ -31,22 +31,22 @@
 
 namespace BladeRunner {
 
-typedef void UIScrollBoxCallback(void *callbackData, void *source, int lineData, int mouseButton);
+typedef void UIScrollBoxClickedCallback(void *callbackData, void *source, int lineData, int mouseButton);
 
 class UIScrollBox : public UIComponent {
 	static const int kLineHeight = 10;
-	static const int k3DFrameColors[];
-	static const int kTextBackgroundColors[];
-	static const int kTextColors1[];
-	static const int kTextColors2[];
-	static const int kTextColors3[];
-	static const int kTextColors4[];
+	static const Color256 k3DFrameColors[];
+	static const Color256 kTextBackgroundColors[];
+	static const Color256 kTextColors1[];
+	static const Color256 kTextColors2[];
+	static const Color256 kTextColors3[];
+	static const Color256 kTextColors4[];
 
 	struct Line {
 		Common::String text;
-		int lineData;
-		int flags;
-		int checkboxFrame;
+		int    lineData;
+		int    flags;
+		uint32 checkboxFrame;
 	};
 
 	int                   _selectedLineState;
@@ -67,16 +67,16 @@ class UIScrollBox : public UIComponent {
 
 	bool                  _mouseButton;
 
-	UIScrollBoxCallback  *_lineSelectedCallback;
-	void                 *_callbackData;
+	UIScrollBoxClickedCallback   *_lineSelectedCallback;
+	void                         *_callbackData;
 
 	bool                  _isVisible;
 	int                   _style;
 	bool                  _center;
 
-	int                   _timeLastScroll;
-	int                   _timeLastCheckbox;
-	int                   _timeLastHighlight;
+	uint32                _timeLastScroll;
+	uint32                _timeLastCheckbox;
+	uint32                _timeLastHighlight;
 
 	int                   _highlightFrame;
 
@@ -89,18 +89,42 @@ class UIScrollBox : public UIComponent {
 	int                   _maxLinesVisible;
 	int                   _firstLineVisible;
 
+	bool                  _mouseOver;
+
 public:
-	UIScrollBox(BladeRunnerEngine *vm, UIScrollBoxCallback *lineSelectedCallback, void *callbackData, int maxLineCount, int style, bool center, Common::Rect rect,Common::Rect scrollBarRect);
-	~UIScrollBox();
+	UIScrollBox(BladeRunnerEngine *vm,
+	            UIScrollBoxClickedCallback *lineSelectedCallback,
+	            void *callbackData,
+	            int maxLineCount,
+	            int style,
+	            bool center,
+	            Common::Rect rect,
+	            Common::Rect scrollBarRect);
 
-	void draw(Graphics::Surface &surface);
+	~UIScrollBox() override;
 
-	void handleMouseMove(int mouseX, int mouseY);
-	void handleMouseDown(bool alternateButton);
-	void handleMouseUp(bool alternateButton);
+	void draw(Graphics::Surface &surface) override;
+
+	void handleMouseMove(int mouseX, int mouseY) override;
+	void handleMouseDown(bool alternateButton) override;
+	void handleMouseUp(bool alternateButton) override;
+	void handleMouseScroll(int direction) override;
 
 	void show();
 	void hide();
+	bool isVisible();
+	bool hasFocus();
+
+	void setBoxTop(int top);
+	void setBoxLeft(int left);
+	void setBoxWidth(uint16 width);
+	void setScrollbarTop(int top);
+	void setScrollbarLeft(int left);
+	void setScrollbarWidth(uint16 width);
+
+	int    getBoxLeft();
+	uint16 getBoxWidth();
+
 
 	void clearLines();
 	void addLine(const Common::String &text, int lineData, int flags);
@@ -108,6 +132,9 @@ public:
 	void sortLines();
 
 	int getSelectedLineData();
+	Common::String getLineText(int lineData);
+	int getMaxLinesVisible();
+	int getLineCount();
 
 	void checkAll();
 	void uncheckAll();

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -26,6 +25,7 @@
  * Copyright (c) 2011 Jan Nedoma
  */
 
+#include "engines/wintermute/base/base_engine.h"
 #include "engines/wintermute/base/file/base_package.h"
 #include "engines/wintermute/base/file/base_file_entry.h"
 #include "engines/wintermute/base/file/dcpackage.h"
@@ -90,6 +90,15 @@ void TPackageHeader::readFromStream(Common::ReadStream *stream) {
 	_gameVersion = stream->readUint32LE();
 
 	_priority = stream->readByte();
+
+	// HACK: reversion1 and reversion2 for Linux & Mac use some hacked Wintermute
+	// They provide "xlanguage_*.dcp" packages with 0x00 priority and change priority for a single package in runtime
+	// We already filter unwanted "xlanguage_*.dcp" packages at BaseFileManager::registerPackages()
+	// So, let's just raise the priority for all "xlanguage_*.dcp" here to the value of Windows version packages
+	if (_priority == 0 && BaseEngine::instance().getGameId().hasPrefix("reversion")) {
+		_priority = 0x02;
+	}
+
 	_cd = stream->readByte();
 	_masterIndex = stream->readByte();
 	stream->readByte(); // To align the next byte...
@@ -132,6 +141,8 @@ PackageSet::PackageSet(Common::FSNode file, const Common::String &filename, bool
 		debugC(kWintermuteDebugFileAccess | kWintermuteDebugLog, "  Warning: package file '%s' is outdated.", filename.c_str());
 	}
 	_priority = hdr._priority;
+	_version  = hdr._gameVersion;
+
 	// new in v2
 	if (hdr._packageVersion == PACKAGE_VERSION) {
 		uint32 dirOffset;
@@ -206,6 +217,7 @@ PackageSet::PackageSet(Common::FSNode file, const Common::String &filename, bool
 				fileEntry->_length = length;
 				fileEntry->_compressedLength = compLength;
 				fileEntry->_flags = flags;
+				fileEntry->_filename = upcName;
 
 				_files[upcName] = Common::ArchiveMemberPtr(fileEntry);
 			} else {
@@ -234,7 +246,8 @@ PackageSet::~PackageSet() {
 	_packages.clear();
 }
 
-bool PackageSet::hasFile(const Common::String &name) const {
+bool PackageSet::hasFile(const Common::Path &path) const {
+	Common::String name = path.toString();
 	Common::String upcName = name;
 	upcName.toUppercase();
 	Common::HashMap<Common::String, Common::ArchiveMemberPtr>::const_iterator it;
@@ -254,7 +267,8 @@ int PackageSet::listMembers(Common::ArchiveMemberList &list) const {
 	return count;
 }
 
-const Common::ArchiveMemberPtr PackageSet::getMember(const Common::String &name) const {
+const Common::ArchiveMemberPtr PackageSet::getMember(const Common::Path &path) const {
+	Common::String name = path.toString();
 	Common::String upcName = name;
 	upcName.toUppercase();
 	Common::HashMap<Common::String, Common::ArchiveMemberPtr>::const_iterator it;
@@ -262,7 +276,8 @@ const Common::ArchiveMemberPtr PackageSet::getMember(const Common::String &name)
 	return Common::ArchiveMemberPtr(it->_value);
 }
 
-Common::SeekableReadStream *PackageSet::createReadStreamForMember(const Common::String &name) const {
+Common::SeekableReadStream *PackageSet::createReadStreamForMember(const Common::Path &path) const {
+	Common::String name = path.toString();
 	Common::String upcName = name;
 	upcName.toUppercase();
 	Common::HashMap<Common::String, Common::ArchiveMemberPtr>::const_iterator it;

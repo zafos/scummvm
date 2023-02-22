@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,6 +24,7 @@
 #include "common/system.h"
 #include "common/savefile.h"
 #include "common/translation.h"
+#include "common/text-to-speech.h"
 
 #include "engines/util.h"
 
@@ -37,17 +37,10 @@
 
 namespace Lure {
 
-static LureEngine *int_engine = NULL;
+static LureEngine *int_engine = nullptr;
 
 LureEngine::LureEngine(OSystem *system, const LureGameDescription *gameDesc)
 	: Engine(system), _gameDescription(gameDesc), _rnd("lure") {
-
-	DebugMan.addDebugChannel(kLureDebugScripts, "scripts", "Scripts debugging");
-	DebugMan.addDebugChannel(kLureDebugAnimations, "animations", "Animations debugging");
-	DebugMan.addDebugChannel(kLureDebugHotspots, "hotspots", "Hotspots debugging");
-	DebugMan.addDebugChannel(kLureDebugFights, "fights", "Fights debugging");
-	DebugMan.addDebugChannel(kLureDebugSounds, "sounds", "Sounds debugging");
-	DebugMan.addDebugChannel(kLureDebugStrings, "strings", "Strings debugging");
 }
 
 Common::Error LureEngine::init() {
@@ -61,7 +54,7 @@ Common::Error LureEngine::init() {
 	Common::File f;
 	VersionStructure version;
 	if (!f.open(SUPPORT_FILENAME)) {
-		GUIError(_("Unable to locate the '%s' engine data file."), SUPPORT_FILENAME);
+		GUIErrorMessageFormat(_("Unable to locate the '%s' engine data file."), SUPPORT_FILENAME);
 		return Common::kUnknownError;
 	}
 
@@ -70,10 +63,10 @@ Common::Error LureEngine::init() {
 	f.close();
 
 	if (READ_LE_UINT16(&version.id) != 0xffff) {
-		GUIError(_("The '%s' engine data file is corrupt."), SUPPORT_FILENAME);
+		GUIErrorMessageFormat(_("The '%s' engine data file is corrupt."), SUPPORT_FILENAME);
 		return Common::kUnknownError;
 	} else if ((version.vMajor != LURE_DAT_MAJOR) || (version.vMinor != LURE_DAT_MINOR)) {
-		GUIError(_("Incorrect version of the '%s' engine data file found. Expected %d.%d but got %d.%d."),
+		GUIErrorMessageFormat(_("Incorrect version of the '%s' engine data file found. Expected %d.%d but got %d.%d."),
 			SUPPORT_FILENAME, LURE_DAT_MAJOR, LURE_DAT_MINOR,
 			version.vMajor, version.vMinor);
 		return Common::kUnknownError;
@@ -96,13 +89,14 @@ Common::Error LureEngine::init() {
 	// Setup mixer
 	syncSoundSettings();
 
+	Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+	if (ttsMan != nullptr)
+		ttsMan->enable(ConfMan.getBool("tts_narrator"));
+
 	return Common::kNoError;
 }
 
 LureEngine::~LureEngine() {
-	// Remove all of our debug levels here
-	DebugMan.clearAllDebugChannels();
-
 	if (_initialized) {
 		// Delete and deinitialize subsystems
 		Surface::deinitialize();
@@ -158,6 +152,16 @@ Common::Error LureEngine::go() {
 
 	// Play the game
 	if (!shouldQuit()) {
+		_screen->empty();
+
+		if (Sound.isRoland() && Sound.hasNativeMT32()) {
+			// Initialize Roland MT-32 timbres
+			Sound.loadSection(ROLAND_MAIN_SYSEX_RESOURCE_ID);
+			Sound.initCustomTimbres();
+		}
+	}
+
+	if (!shouldQuit()) {
 		// Play the game
 		_saveLoadAllowed = true;
 		Sound.loadSection(Sound.isRoland() ? ROLAND_MAIN_SOUND_RESOURCE_ID : ADLIB_MAIN_SOUND_RESOURCE_ID);
@@ -181,14 +185,14 @@ void LureEngine::pauseEngineIntern(bool pause) {
 const char *LureEngine::generateSaveName(int slotNumber) {
 	static char buffer[15];
 
-	sprintf(buffer, "lure.%.3d", slotNumber);
+	Common::sprintf_s(buffer, "lure.%.3d", slotNumber);
 	return buffer;
 }
 
 bool LureEngine::saveGame(uint8 slotNumber, Common::String &caption) {
 	Common::WriteStream *f = this->_saveFileMan->openForSaving(
 		generateSaveName(slotNumber));
-	if (f == NULL)
+	if (f == nullptr)
 		return false;
 
 	f->write("lure", 5);
@@ -212,7 +216,7 @@ bool LureEngine::saveGame(uint8 slotNumber, Common::String &caption) {
 bool LureEngine::loadGame(uint8 slotNumber) {
 	Common::ReadStream *f = this->_saveFileMan->openForLoading(
 		generateSaveName(slotNumber));
-	if (f == NULL)
+	if (f == nullptr)
 		return false;
 
 	// Check for header
@@ -248,22 +252,6 @@ bool LureEngine::loadGame(uint8 slotNumber) {
 	return true;
 }
 
-void LureEngine::GUIError(const char *msg, ...) {
-	char buffer[STRINGBUFLEN];
-	va_list va;
-
-	// Generate the full error message
-	va_start(va, msg);
-	vsnprintf(buffer, STRINGBUFLEN, msg, va);
-	va_end(va);
-
-	GUIErrorMessage(buffer);
-}
-
-GUI::Debugger *LureEngine::getDebugger() {
-	return !Game::isCreated() ? NULL : &Game::getReference().debugger();
-}
-
 void LureEngine::syncSoundSettings() {
 	Engine::syncSoundSettings();
 
@@ -273,8 +261,8 @@ void LureEngine::syncSoundSettings() {
 Common::String *LureEngine::detectSave(int slotNumber) {
 	Common::ReadStream *f = this->_saveFileMan->openForLoading(
 		generateSaveName(slotNumber));
-	if (f == NULL) return NULL;
-	Common::String *result = NULL;
+	if (f == nullptr) return nullptr;
+	Common::String *result = nullptr;
 
 	// Check for header
 	char buffer[5];

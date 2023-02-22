@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,7 +26,7 @@
 #include "common/config-manager.h"
 #include "common/file.h"
 #include "common/translation.h"
-#include "common/unzip.h"
+#include "common/compression/unzip.h"
 
 namespace Networking {
 
@@ -164,7 +163,8 @@ bool HandlerUtils::hasPermittedPrefix(const Common::String &path) {
 #else
 	prefix = ConfMan.get("savepath");
 #endif
-	return (normalized.hasPrefix(normalizePath(prefix)));
+	return normalized.hasPrefix(normalizePath(prefix))
+	       || normalizePath(prefix).compareTo(normalized + "/") == 0;
 }
 
 bool HandlerUtils::permittedPath(const Common::String path) {
@@ -172,7 +172,7 @@ bool HandlerUtils::permittedPath(const Common::String path) {
 }
 
 void HandlerUtils::setMessageHandler(Client &client, Common::String message, Common::String redirectTo) {
-	Common::String response = "<html><head><title>ScummVM</title></head><body>{message}</body></html>";
+	Common::String response = "<html><head><title>ScummVM</title><meta charset=\"utf-8\"/></head><body>{message}</body></html>";
 
 	// load stylish response page from the archive
 	Common::SeekableReadStream *const stream = getArchiveFile(INDEX_PAGE_NAME);
@@ -194,7 +194,7 @@ void HandlerUtils::setFilesManagerErrorMessageHandler(Client &client, Common::St
 			message.c_str(),
 			client.queryParameter("ajax") == "true" ? "AJAX" : "",
 			"%2F", //that's encoded "/"
-			_("Back to the files manager")
+			Common::convertFromU32String(_("Back to the files manager")).c_str()
 		),
 		redirectTo
 	);

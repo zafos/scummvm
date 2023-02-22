@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,51 +15,79 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
-#include "base/plugins.h"
-
-#include "engines/advancedDetector.h"
 
 #include "bladerunner/bladerunner.h"
 #include "bladerunner/detection_tables.h"
+#include "bladerunner/savefile.h"
+
+#include "common/config-manager.h"
+#include "common/system.h"
+#include "common/savefile.h"
+#include "common/serializer.h"
+#include "common/translation.h"
+
+#include "engines/advancedDetector.h"
+
+static const DebugChannelDef debugFlagList[] = {
+	{BladeRunner::kDebugScript, "Script", "Debug the scripts"},
+	DEBUG_CHANNEL_END
+};
 
 namespace BladeRunner {
 
 static const PlainGameDescriptor bladeRunnerGames[] = {
 	{"bladerunner", "Blade Runner"},
-	{0, 0}
+	{"bladerunner-final", "Blade Runner with restored content"},
+	{"bladerunner-ee", "Blade Runner: Enhanced Edition"},
+	{nullptr, nullptr}
 };
 
 } // End of namespace BladeRunner
 
-class BladeRunnerMetaEngine : public AdvancedMetaEngine {
+class BladeRunnerMetaEngineDetection : public AdvancedMetaEngineDetection {
 public:
-	BladeRunnerMetaEngine() : AdvancedMetaEngine(BladeRunner::gameDescriptions, sizeof(BladeRunner::gameDescriptions[0]), BladeRunner::bladeRunnerGames) {
-	}
+	BladeRunnerMetaEngineDetection();
 
-	virtual const char *getName() const {
-		return "Blade Runner Engine";
-	}
-
-	virtual const char *getOriginalCopyright() const {
-		return "Blade Runner (C) Westwood Studios.";
-	}
-
-	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
+	const char *getName() const override;
+	const char *getEngineName() const override;
+	const char *getOriginalCopyright() const override;
+	const DebugChannelDef *getDebugChannels() const override;
 };
 
-bool BladeRunnerMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	*engine = new BladeRunner::BladeRunnerEngine(syst, desc);
-
-	return true;
+BladeRunnerMetaEngineDetection::BladeRunnerMetaEngineDetection()
+	: AdvancedMetaEngineDetection(
+		BladeRunner::gameDescriptions,
+		sizeof(BladeRunner::gameDescriptions[0]),
+		BladeRunner::bladeRunnerGames) {
+		// Setting this, allows the demo files to be copied in the BladeRunner
+		// game data folder and be detected and subsequently launched without
+		// any issues (eg. like ScummVM launching Blade Runner instead of the demo).
+		// Although the demo files are not part of the original game's installation
+		// or CD content, it's nice to support the use case whereby the user
+		// manually copies the demo files in the Blade Runner game data folder
+		// and expects ScummVM to detect both, offer a choice on which to add,
+		// and finally launch the proper one depending on which was added.
+		_flags = kADFlagUseExtraAsHint;
 }
 
-#if PLUGIN_ENABLED_DYNAMIC(BLADERUNNER)
-	REGISTER_PLUGIN_DYNAMIC(BLADERUNNER, PLUGIN_TYPE_ENGINE, BladeRunnerMetaEngine);
-#else
-	REGISTER_PLUGIN_STATIC(BLADERUNNER, PLUGIN_TYPE_ENGINE, BladeRunnerMetaEngine);
-#endif
+const char *BladeRunnerMetaEngineDetection::getName() const {
+	return "bladerunner";
+}
+
+const char *BladeRunnerMetaEngineDetection::getEngineName() const {
+	return "Blade Runner";
+}
+
+const char *BladeRunnerMetaEngineDetection::getOriginalCopyright() const {
+	return "Blade Runner (C) 1997 Westwood Studios";
+}
+
+const DebugChannelDef *BladeRunnerMetaEngineDetection::getDebugChannels() const {
+	return debugFlagList;
+}
+
+REGISTER_PLUGIN_STATIC(BLADERUNNER_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, BladeRunnerMetaEngineDetection);

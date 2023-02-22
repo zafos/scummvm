@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -29,11 +28,11 @@
 #include "bladerunner/game_flags.h"
 #include "bladerunner/game_info.h"
 #include "bladerunner/font.h"
+#include "bladerunner/shape.h"
 #include "bladerunner/script/kia_script.h"
 #include "bladerunner/text_resource.h"
 #include "bladerunner/ui/kia.h"
 #include "bladerunner/ui/kia_log.h"
-#include "bladerunner/ui/kia_shapes.h"
 #include "bladerunner/ui/ui_container.h"
 #include "bladerunner/ui/ui_image_picker.h"
 #include "bladerunner/ui/ui_scroll_box.h"
@@ -57,7 +56,7 @@ KIASectionClues::KIASectionClues(BladeRunnerEngine *vm, ActorClues *clues) : KIA
 
 	_buttons = new UIImagePicker(_vm, 2);
 
-	_cluesScrollBox = new UIScrollBox(_vm, scrollBoxCallback, this, _vm->_gameInfo->getClueCount(), 1, false, Common::Rect(312, 172, 500, 376), Common::Rect(506, 160, 506, 394));
+	_cluesScrollBox = new UIScrollBox(_vm, scrollBoxCallback, this, kClueCount, 1, false, Common::Rect(312, 172, 500, 376), Common::Rect(506, 160, 506, 394));
 	_uiContainer->add(_cluesScrollBox);
 
 	_filterScrollBox = new UIScrollBox(_vm, scrollBoxCallback, this, 128, 1, false, Common::Rect(142, 162, 291, 376), Common::Rect(120, 160, 120, 370));
@@ -78,6 +77,18 @@ KIASectionClues::~KIASectionClues() {
 	delete _cluesScrollBox;
 	delete _buttons;
 	delete _uiContainer;
+}
+
+void KIASectionClues::reset() {
+	_debugIntangible = false;
+	_debugNop = 0;
+
+	_mouseX = 0;
+	_mouseY = 0;
+
+	for (int i = 0; i < _filterCount; ++i) {
+		_filters[i] = true;
+	}
 }
 
 void KIASectionClues::open() {
@@ -108,10 +119,10 @@ void KIASectionClues::close() {
 void KIASectionClues::draw(Graphics::Surface &surface) {
 	_uiContainer->draw(surface);
 
-	_vm->_mainFont->drawColor(_vm->_textKIA->getText(0), surface, 300, 162, 0x77DF);
-	_vm->_mainFont->drawColor(_vm->_textKIA->getText(2), surface, 440, 426, 0x2991);
-	_vm->_mainFont->drawColor(_vm->_textKIA->getText(1), surface, 440, 442, 0x2991);
-	_vm->_mainFont->drawColor(_vm->_textKIA->getText(4), surface, 440, 458, 0x2991);
+	_vm->_mainFont->drawString(&surface, _vm->_textKIA->getText(0), 300, 162, surface.w, surface.format.RGBToColor(232, 240, 255));
+	_vm->_mainFont->drawString(&surface, _vm->_textKIA->getText(2), 440, 426, surface.w, surface.format.RGBToColor(80, 96, 136));
+	_vm->_mainFont->drawString(&surface, _vm->_textKIA->getText(1), 440, 442, surface.w, surface.format.RGBToColor(80, 96, 136));
+	_vm->_mainFont->drawString(&surface, _vm->_textKIA->getText(4), 440, 458, surface.w, surface.format.RGBToColor(80, 96, 136));
 
 	int clueId = _cluesScrollBox->getSelectedLineData();
 	if (clueId != -1) {
@@ -123,7 +134,7 @@ void KIASectionClues::draw(Graphics::Surface &surface) {
 		} else {
 			text.clear();
 		}
-		_vm->_mainFont->drawColor(text, surface, 490, 426, 0x46BF);
+		_vm->_mainFont->drawString(&surface, text, 490, 426, surface.w, surface.format.RGBToColor(136, 168, 255));
 
 		int crimeId = _vm->_crimesDatabase->getCrime(clueId);
 		if (crimeId != -1) {
@@ -131,25 +142,25 @@ void KIASectionClues::draw(Graphics::Surface &surface) {
 		} else {
 			text.clear();
 		}
-		_vm->_mainFont->drawColor(text, surface, 490, 442, 0x46BF);
+		_vm->_mainFont->drawString(&surface, text, 490, 442, surface.w, surface.format.RGBToColor(136, 168, 255));
 
 		int assetType = _vm->_crimesDatabase->getAssetType(clueId);
-		if (assetType != -1) {
+		if (assetType != kClueTypeIntangible) {
 			text = _vm->_textClueTypes->getText(assetType);
 		} else {
 			text.clear();
 		}
-		_vm->_mainFont->drawColor(text, surface, 490, 458, 0x46BF);
+		_vm->_mainFont->drawString(&surface, text, 490, 458, surface.w, surface.format.RGBToColor(136, 168, 255));
 	}
 
 	_buttons->draw(surface);
 	_buttons->drawTooltip(surface, _mouseX, _mouseY);
 
 	if (_debugNop) {
-		_vm->_mainFont->drawColor(Common::String::format("Debug display: %s", _vm->_textActorNames->getText(_debugNop)), surface, 120, 132, 0x7FE0);
+		_vm->_mainFont->drawString(&surface, Common::String::format("Debug display: %s", _vm->_textActorNames->getText(_debugNop)), 120, 132, surface.w, surface.format.RGBToColor(255, 255, 0));
 	}
 	if (_debugIntangible) {
-		_vm->_mainFont->drawColor("Debug Mode: Showing intangible clues.", surface, 220, 105, 0x7FE0);
+		_vm->_mainFont->drawString(&surface, "Debug Mode: Showing intangible clues.", 220, 105, surface.w, surface.format.RGBToColor(255, 255, 0));
 	}
 }
 
@@ -174,6 +185,10 @@ void KIASectionClues::handleMouseUp(bool mainButton) {
 	}
 }
 
+void KIASectionClues::handleMouseScroll(int direction) {
+	_uiContainer->handleMouseScroll(direction);
+}
+
 void KIASectionClues::saveToLog() {
 	_vm->_kia->_log->add(0, sizeof(bool) * _filterCount, _filters.data());
 }
@@ -194,7 +209,7 @@ void KIASectionClues::scrollBoxCallback(void *callbackData, void *source, int li
 	} else if (source == self->_cluesScrollBox && lineData >= 0) {
 		if (mouseButton) {
 			if (self->_vm->_gameFlags->query(kFlagKIAPrivacyAddon)) {
-				self->_vm->_audioPlayer->playAud(self->_vm->_gameInfo->getSfxTrack(511), 70, 0, 0, 50, 0);
+				self->_vm->_audioPlayer->playAud(self->_vm->_gameInfo->getSfxTrack(kSfxBEEP15), 70, 0, 0, 50, 0);
 
 				if (self->_clues->isPrivate(lineData)) {
 					self->_clues->setPrivate(lineData, false);
@@ -216,7 +231,7 @@ void KIASectionClues::mouseUpCallback(int buttonId, void *callbackData) {
 	KIASectionClues *self = (KIASectionClues *)callbackData;
 
 	if (buttonId <= 1) {
-		self->_vm->_audioPlayer->playAud(self->_vm->_gameInfo->getSfxTrack(510), 100, 0, 0, 50, 0);
+		self->_vm->_audioPlayer->playAud(self->_vm->_gameInfo->getSfxTrack(kSfxBEEP10A), 100, 0, 0, 50, 0);
 	}
 
 	self->onButtonPressed(buttonId);
@@ -267,10 +282,11 @@ void KIASectionClues::populateFilters() {
 	};
 
 	for (int i = 0; i < kClueCount; ++i) {
-		if (_clues->isAcquired(i)) {
-			int assetType = _vm->_crimesDatabase->getAssetType(i);
-			int crimeId = _vm->_crimesDatabase->getCrime(i);
-			if (_debugIntangible || assetType != -1) {
+		int clueId = i;
+		if (_clues->isAcquired(clueId)) {
+			int assetType = _vm->_crimesDatabase->getAssetType(clueId);
+			int crimeId = _vm->_crimesDatabase->getCrime(clueId);
+			if (_debugIntangible || assetType != kClueTypeIntangible) {
 				availableFilters[getLineIdForAssetType(assetType)] = true;
 				availableFilters[getLineIdForCrimeId(crimeId)] = true;
 			}
@@ -366,18 +382,31 @@ void KIASectionClues::populateFilters() {
 void KIASectionClues::populateClues() {
 	_cluesScrollBox->clearLines();
 	for (int i = 0; i < kClueCount; ++i) {
-		if (_clues->isAcquired(i)) {
-			int assetType = _vm->_crimesDatabase->getAssetType(i);
-			int crimeId = _vm->_crimesDatabase->getCrime(i);
-			if (assetType != -1 || _debugIntangible) {
-				if(_filters[getLineIdForAssetType(assetType)] && _filters[getLineIdForCrimeId(crimeId)]) {
+		int clueId = i;
+		if (_clues->isAcquired(clueId)) {
+			int assetType = _vm->_crimesDatabase->getAssetType(clueId);
+			int crimeId = _vm->_crimesDatabase->getCrime(clueId);
+			if (assetType != kClueTypeIntangible || _debugIntangible) {
+				if (_filters[getLineIdForAssetType(assetType)] && _filters[getLineIdForCrimeId(crimeId)]) {
 					int flags = 0x30;
-					if (_clues->isPrivate(i)) {
+#if BLADERUNNER_ORIGINAL_BUGS
+					if (_clues->isPrivate(clueId)) {
 						flags = 0x08;
-					} else if (_clues->isViewed(i)) {
+					} else if (_clues->isViewed(clueId)) {
 						flags = 0x10;
 					}
-					_cluesScrollBox->addLine(_vm->_crimesDatabase->getClueText(i), i, flags);
+#else
+					if (_clues->isPrivate(clueId)) {
+						flags |= 0x08;
+					}
+					if (_clues->isViewed(clueId)) {
+						flags &= ~0x20;
+					}
+					if (_vm->_cutContent && _clues->isSharedWithMainframe(clueId)) {
+						flags |= 0x40;
+					}
+#endif // BLADERUNNER_ORIGINAL_BUGS
+					_cluesScrollBox->addLine(_vm->_crimesDatabase->getClueText(clueId), clueId, flags);
 				}
 			}
 		}

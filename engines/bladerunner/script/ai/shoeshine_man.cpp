@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -58,7 +57,7 @@ void AIScriptShoeshineMan::ClickedByPlayer() {
 		return;
 	}
 
-	if (!Loop_Actor_Walk_To_XYZ(kActorMcCoy, -1098.15f, -0.04f, -201.53f, 0, true, false, 0)) {
+	if (!Loop_Actor_Walk_To_XYZ(kActorMcCoy, -1098.15f, -0.04f, -201.53f, 0, true, false, false)) {
 		Actor_Set_Goal_Number(kActorShoeshineMan, 102);
 		Actor_Face_Actor(kActorMcCoy, kActorShoeshineMan, true);
 		Actor_Says_With_Pause(kActorShoeshineMan, 0, 1.2f, 13);
@@ -70,15 +69,15 @@ void AIScriptShoeshineMan::ClickedByPlayer() {
 	}
 }
 
-void AIScriptShoeshineMan::EnteredScene(int sceneId) {
+void AIScriptShoeshineMan::EnteredSet(int setId) {
 	// return false;
 }
 
-void AIScriptShoeshineMan::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptShoeshineMan::OtherAgentEnteredThisSet(int otherActorId) {
 	// return false;
 }
 
-void AIScriptShoeshineMan::OtherAgentExitedThisScene(int otherActorId) {
+void AIScriptShoeshineMan::OtherAgentExitedThisSet(int otherActorId) {
 	// return false;
 }
 
@@ -108,6 +107,7 @@ bool AIScriptShoeshineMan::GoalChanged(int currentGoalNumber, int newGoalNumber)
 		Actor_Put_In_Set(kActorShoeshineMan, kSetDR01_DR02_DR04);
 		Actor_Set_At_XYZ(kActorShoeshineMan, -1160.0f, -0.04f, -235.0f, 524);
 		break;
+
 	case 101:
 		AI_Movement_Track_Flush(kActorShoeshineMan);
 		AI_Movement_Track_Append(kActorShoeshineMan, 281, 0);
@@ -132,33 +132,40 @@ bool AIScriptShoeshineMan::ChangeAnimationMode(int mode) {
 			_animationFrame = 0;
 		}
 		break;
+
 	case 1:
 		_animationState = 1;
 		_animationFrame = 0;
 		break;
+
 	case 3:
 		_animationState = 2;
 		_animationFrame = 0;
 		_state = false;
 		break;
+
 	case 12:
 		_animationState = 3;
 		_animationFrame = 0;
 		_state = false;
 		break;
+
 	case 13:
 		_animationState = 4;
 		_animationFrame = 0;
 		_state = false;
 		break;
+
 	case 23:
 		_animationState = 5;
 		_animationFrame = 0;
 		break;
+
 	case 29:
 		_animationState = 6;
 		_animationFrame = 0;
 		break;
+
 	default:
 		break;
 	}

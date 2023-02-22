@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,23 +33,9 @@
 #include "common/random.h"
 #include "common/language.h"
 
-namespace Wintermute {
+#include "engines/wintermute/detection.h"
 
-enum WMETargetExecutable {
-	OLDEST_VERSION,
-	WME_1_0_0,
-	WME_1_1_0,
-	WME_1_2_0,
-	WME_1_3_0,
-	WME_1_4_0,
-	WME_1_5_0,
-	WME_1_6_0,
-	WME_1_7_0,
-	WME_1_8_0,
-	WME_1_8_6,
-	WME_1_9_0,
-	LATEST_VERSION
-};
+namespace Wintermute {
 
 class BaseFileManager;
 class BaseRegistry;
@@ -70,10 +55,11 @@ class BaseEngine : public Common::Singleton<Wintermute::BaseEngine> {
 	SystemClassRegistry *_classReg;
 	Common::Language _language;
 	WMETargetExecutable _targetExecutable;
+	uint32 _flags;
 public:
 	BaseEngine();
-	~BaseEngine();
-	static void createInstance(const Common::String &targetName, const Common::String &gameId, Common::Language lang, WMETargetExecutable targetExecutable = LATEST_VERSION);
+	~BaseEngine() override;
+	static void createInstance(const Common::String &targetName, const Common::String &gameId, Common::Language lang, WMETargetExecutable targetExecutable, uint32 flags);
 
 	void setGameRef(BaseGame *gameRef) { _gameRef = gameRef; }
 
@@ -91,9 +77,17 @@ public:
 	Common::String getGameTargetName() const { return _targetName; }
 	Common::String getGameId() const { return _gameId; }
 	Common::Language getLanguage() const { return _language; }
+	uint32 getFlags() const { return _flags; }
 	WMETargetExecutable getTargetExecutable() const {
 		return _targetExecutable;
 	}
+	static bool isFoxTailCheck(WMETargetExecutable t, WMETargetExecutable v1=FOXTAIL_OLDEST_VERSION, WMETargetExecutable v2=FOXTAIL_LATEST_VERSION) {
+		return t >= v1 && t <= v2;
+	}
+	bool isFoxTail(WMETargetExecutable v1=FOXTAIL_OLDEST_VERSION, WMETargetExecutable v2=FOXTAIL_LATEST_VERSION) const {
+		return isFoxTailCheck(_targetExecutable, v1, v2);
+	}
+	void addFlags(uint32 flags) { _flags |= flags; }
 };
 
 } // End of namespace Wintermute

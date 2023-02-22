@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -62,6 +61,7 @@ struct SciWorkaroundEntry {
 
 extern const SciWorkaroundEntry arithmeticWorkarounds[];
 extern const SciWorkaroundEntry uninitializedReadWorkarounds[];
+extern const SciWorkaroundEntry uninitializedReadForParamWorkarounds[];
 extern const SciWorkaroundEntry kAbs_workarounds[];
 extern const SciWorkaroundEntry kCelHigh_workarounds[];
 extern const SciWorkaroundEntry kCelWide_workarounds[];
@@ -73,10 +73,13 @@ extern const SciWorkaroundEntry kDoAudioResume_workarounds[];
 extern const SciWorkaroundEntry kDoSoundPlay_workarounds[];
 extern const SciWorkaroundEntry kDoSoundFade_workarounds[];
 extern const SciWorkaroundEntry kFileIOOpen_workarounds[];
+extern const SciWorkaroundEntry kFileIOCheckFreeSpace_workarounds[];
+extern const SciWorkaroundEntry kFileIOReadString_workarounds[];
 extern const SciWorkaroundEntry kFindKey_workarounds[];
 extern const SciWorkaroundEntry kFrameOut_workarounds[];
 extern const SciWorkaroundEntry kDeleteKey_workarounds[];
 extern const SciWorkaroundEntry kGetAngle_workarounds[];
+extern const SciWorkaroundEntry kGetCWD_workarounds[];
 extern const SciWorkaroundEntry kGraphDrawLine_workarounds[];
 extern const SciWorkaroundEntry kGraphSaveBox_workarounds[];
 extern const SciWorkaroundEntry kGraphRestoreBox_workarounds[];
@@ -86,6 +89,7 @@ extern const SciWorkaroundEntry kGraphFillBoxAny_workarounds[];
 extern const SciWorkaroundEntry kGraphRedrawBox_workarounds[];
 extern const SciWorkaroundEntry kIsObject_workarounds[];
 extern const SciWorkaroundEntry kListAt_workarounds[];
+extern const SciWorkaroundEntry kLock_workarounds[];
 extern const SciWorkaroundEntry kMemory_workarounds[];
 extern const SciWorkaroundEntry kMoveCursor_workarounds[];
 extern const SciWorkaroundEntry kNewWindow_workarounds[];
@@ -96,7 +100,6 @@ extern const SciWorkaroundEntry kPalVaryMergeStart_workarounds[];
 extern const SciWorkaroundEntry kPlatform32_workarounds[];
 extern const SciWorkaroundEntry kRandom_workarounds[];
 extern const SciWorkaroundEntry kReadNumber_workarounds[];
-extern const SciWorkaroundEntry kResCheck_workarounds[];
 extern const SciWorkaroundEntry kPaletteUnsetFlag_workarounds[];
 extern const SciWorkaroundEntry kSetCursor_workarounds[];
 extern const SciWorkaroundEntry kArraySetElements_workarounds[];
@@ -110,6 +113,50 @@ extern const SciWorkaroundEntry kStringNew_workarounds[];
 extern const SciWorkaroundEntry kScrollWindowAdd_workarounds[];
 
 extern SciWorkaroundSolution trackOriginAndFindWorkaround(int index, const SciWorkaroundEntry *workaroundList, SciCallOrigin *trackOrigin);
+
+enum SciMessageWorkaroundType {
+	MSG_WORKAROUND_NONE,        // only used by terminator or when no workaround was found
+	MSG_WORKAROUND_REMAP,       // use a different tuple instead
+	MSG_WORKAROUND_FAKE,        // use a hard-coded response
+	MSG_WORKAROUND_EXTRACT      // use text from a different record, optionally a substring
+};
+
+enum SciMedia : uint {
+	SCI_MEDIA_ALL,
+	SCI_MEDIA_FLOPPY,
+	SCI_MEDIA_CD,
+	SCI_MEDIA_MAC, // mac floppy
+};
+
+struct SciMessageWorkaroundSolution {
+	SciMessageWorkaroundType type;
+	int module;
+	byte noun;
+	byte verb;
+	byte cond;
+	byte seq;
+	byte talker;
+	uint32 substringIndex;
+	uint32 substringLength;
+	const char *text;
+};
+
+struct SciMessageWorkaroundEntry {
+	SciGameId gameId;
+	SciMedia media;
+	kLanguage language;
+	int roomNumber;
+	int module;
+	byte noun;
+	byte verb;
+	byte cond;
+	byte seq;
+	SciMessageWorkaroundSolution solution;
+};
+
+extern SciMessageWorkaroundSolution findMessageWorkaround(int module, byte noun, byte verb, byte cond, byte seq);
+extern ResourceId remapAudio36ResourceId(const ResourceId &resourceId);
+extern ResourceId remapSync36ResourceId(const ResourceId &resourceId);
 
 } // End of namespace Sci
 

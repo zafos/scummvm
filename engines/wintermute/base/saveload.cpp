@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -38,6 +37,10 @@
 #include "engines/wintermute/base/gfx/base_renderer.h"
 #include "engines/wintermute/base/sound/base_sound.h"
 #include "engines/wintermute/base/scriptables/script.h"
+#ifdef ENABLE_WME3D
+#include "engines/wintermute/base/gfx/xmodel.h"
+#endif
+
 #include "common/savefile.h"
 #include "common/config-manager.h"
 
@@ -101,6 +104,7 @@ bool SaveLoad::saveGame(int slot, const char *desc, bool quickSave, BaseGame *ga
 				pm->putDWORD(BaseEngine::instance().getRandomSource()->getSeed());
 				if (DID_SUCCEED(ret = pm->saveFile(filename))) {
 					ConfMan.setInt("most_recent_saveslot", slot);
+					ConfMan.flushToDisk();
 				}
 			}
 		}
@@ -119,6 +123,9 @@ bool SaveLoad::initAfterLoad() {
 	SystemClassRegistry::getInstance()->enumInstances(afterLoadSubFrame, "BaseSubFrame", nullptr);
 	SystemClassRegistry::getInstance()->enumInstances(afterLoadSound,    "BaseSound",    nullptr);
 	SystemClassRegistry::getInstance()->enumInstances(afterLoadFont,     "BaseFontTT",   nullptr);
+#ifdef ENABLE_WME3D
+	SystemClassRegistry::getInstance()->enumInstances(afterLoadXModel,   "XModel",       nullptr);
+#endif
 	SystemClassRegistry::getInstance()->enumInstances(afterLoadScript,   "ScScript",  nullptr);
 	// AdGame:
 	SystemClassRegistry::getInstance()->enumInstances(afterLoadScene,   "AdScene",   nullptr);
@@ -152,37 +159,48 @@ void SaveLoad::afterLoadFont(void *font, void *data) {
 	((BaseFont *)font)->afterLoad();
 }
 
+#ifdef ENABLE_WME3D
+//////////////////////////////////////////////////////////////////////////
+void SaveLoad::afterLoadXModel(void *model, void *data) {
+	((XModel *)model)->initializeSimple();
+}
+#endif
+
 //////////////////////////////////////////////////////////////////////////
 void SaveLoad::afterLoadScript(void *script, void *data) {
 	((ScScript *)script)->afterLoad();
 }
 
 Common::String SaveLoad::getSaveSlotFilename(int slot) {
+	Common::String filename;
 	BasePersistenceManager *pm = new BasePersistenceManager();
-	Common::String filename = pm->getFilenameForSlot(slot);
-	delete pm;
+	if (pm) {
+		filename = pm->getFilenameForSlot(slot);
+		delete pm;
+	}
 	debugC(kWintermuteDebugSaveGame, "getSaveSlotFileName(%d) = %s", slot, filename.c_str());
 	return filename;
 }
 
-bool SaveLoad::getSaveSlotDescription(int slot, char *buffer) {
-	buffer[0] = '\0';
-
+Common::String SaveLoad::getSaveSlotDescription(int slot) {
+	Common::String description;
 	Common::String filename = getSaveSlotFilename(slot);
 	BasePersistenceManager *pm = new BasePersistenceManager();
-	if (!pm) {
-		return false;
+	if ((pm->initLoad(filename))) {
+		description = pm->_savedDescription;
 	}
-
-	if (!(pm->initLoad(filename))) {
-		delete pm;
-		return false;
-	}
-
-	strcpy(buffer, pm->_savedDescription);
 	delete pm;
+	return description;
+}
 
-	return true;
+void SaveLoad::getSaveSlotTimestamp(int slot, TimeDate *time) {
+	memset(time, 0, sizeof(TimeDate));
+	Common::String filename = getSaveSlotFilename(slot);
+	BasePersistenceManager *pm = new BasePersistenceManager();
+	if ((pm->initLoad(filename))) {
+		*time = pm->getSavedTimestamp();
+	}
+	delete pm;
 }
 
 bool SaveLoad::isSaveSlotUsed(int slot) {

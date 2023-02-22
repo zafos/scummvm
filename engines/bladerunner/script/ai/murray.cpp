@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,7 +24,7 @@
 namespace BladeRunner {
 
 AIScriptMurray::AIScriptMurray(BladeRunnerEngine *vm) : AIScriptBase(vm) {
-	_flag = false;
+	_resumeIdleAfterFramesetCompletesFlag = false;
 }
 
 void AIScriptMurray::Initialize() {
@@ -34,28 +33,33 @@ void AIScriptMurray::Initialize() {
 	_animationStateNext = 0;
 	_animationNext = 0;
 
-	_flag = false;
+	_resumeIdleAfterFramesetCompletesFlag = false;
 	Actor_Put_In_Set(kActorMurray, kSetHF01);
 	Actor_Set_At_XYZ(kActorMurray, 566.07f, -0.01f, -205.43f, 271);
 	Actor_Set_Goal_Number(kActorMurray, 0);
 }
 
 bool AIScriptMurray::Update() {
-	if (Global_Variable_Query(kVariableChapter) == 4 && Actor_Query_Goal_Number(kActorMurray) != 300)
+	if (Global_Variable_Query(kVariableChapter) == 4
+	 && Actor_Query_Goal_Number(kActorMurray) != 300
+	) {
 		Actor_Set_Goal_Number(kActorMurray, 300);
-
-	if (Player_Query_Current_Set() == 37) {
-		if (!Actor_Query_In_Set(kActorMcCoy, kSetHF01)
-				|| !Actor_Query_In_Set(kActorMurray, kSetHF01)
-				|| Actor_Query_Inch_Distance_From_Actor(kActorMcCoy, kActorMurray) >= 48
-				|| Game_Flag_Query(377)) {
-			return false;
-		}
-
-		Actor_Set_Goal_Number(kActorMurray, 1);
 	}
 
-	return true;
+	if (Player_Query_Current_Set() != kSetHF01) {
+		return true;
+	}
+
+	if ( Actor_Query_In_Set(kActorMcCoy, kSetHF01)
+	 &&  Actor_Query_In_Set(kActorMurray, kSetHF01)
+	 &&  Actor_Query_Inch_Distance_From_Actor(kActorMcCoy, kActorMurray) < 48
+	 && !Game_Flag_Query(kFlagHF01MurrayMiaIntro)
+	) {
+		Actor_Set_Goal_Number(kActorMurray, 1);
+		return true;
+	}
+
+	return false;
 }
 
 void AIScriptMurray::TimerExpired(int timer) {
@@ -74,15 +78,15 @@ void AIScriptMurray::ClickedByPlayer() {
 	//return false;
 }
 
-void AIScriptMurray::EnteredScene(int sceneId) {
+void AIScriptMurray::EnteredSet(int setId) {
 	// return false;
 }
 
-void AIScriptMurray::OtherAgentEnteredThisScene(int otherActorId) {
+void AIScriptMurray::OtherAgentEnteredThisSet(int otherActorId) {
 	// return false;
 }
 
-void AIScriptMurray::OtherAgentExitedThisScene(int otherActorId) {
+void AIScriptMurray::OtherAgentExitedThisSet(int otherActorId) {
 	// return false;
 }
 
@@ -118,68 +122,68 @@ bool AIScriptMurray::GoalChanged(int currentGoalNumber, int newGoalNumber) {
 bool AIScriptMurray::UpdateAnimation(int *animation, int *frame) {
 	switch (_animationState) {
 	case 0:
-		*animation = 698;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(698))
+		*animation = kModelAnimationMurrayIdle;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMurrayIdle))
 			_animationFrame = 0;
 		break;
 
 	case 1:
-		*animation = 700;
-		if (!_animationFrame && _flag) {
+		*animation = kModelAnimationMurrayCalmTalk;
+		if (_animationFrame == 0 && _resumeIdleAfterFramesetCompletesFlag) {
 			_animationState = 0;
 		} else {
-			_animationFrame++;
-			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(700))
+			++_animationFrame;
+			if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMurrayCalmTalk))
 				_animationFrame = 0;
 		}
 		break;
 
 	case 2:
-		*animation = 701;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(701)) {
+		*animation = kModelAnimationMurrayMoreCalmTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMurrayMoreCalmTalk)) {
 			_animationFrame = 0;
 			_animationState = 1;
-			*animation = 700;
+			*animation = kModelAnimationMurrayCalmTalk;
 		}
 		break;
 
 	case 3:
-		*animation = 702;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(702)) {
+		*animation = kModelAnimationMurrayExplainTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMurrayExplainTalk)) {
 			_animationFrame = 0;
 			_animationState = 1;
-			*animation = 700;
+			*animation = kModelAnimationMurrayCalmTalk;
 		}
 		break;
 
 	case 4:
-		*animation = 703;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(703)) {
+		*animation = kModelAnimationMurrayMoreExplainTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMurrayMoreExplainTalk)) {
 			_animationFrame = 0;
 			_animationState = 1;
-			*animation = 700;
+			*animation = kModelAnimationMurrayCalmTalk;
 		}
 		break;
 
 	case 5:
-		*animation = 704;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(704)) {
+		*animation = kModelAnimationMurrayCautionTalk;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMurrayCautionTalk)) {
 			_animationFrame = 0;
 			_animationState = 1;
-			*animation = 700;
+			*animation = kModelAnimationMurrayCalmTalk;
 		}
 		break;
 
 	case 6:
-		*animation = 699;
-		_animationFrame++;
-		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(699)) {
-			*animation = 698;
+		*animation = kModelAnimationMurrayGestureGive;
+		++_animationFrame;
+		if (_animationFrame >= Slice_Animation_Query_Number_Of_Frames(kModelAnimationMurrayGestureGive)) {
+			*animation = kModelAnimationMurrayIdle;
 			_animationFrame = 0;
 			_animationState = 0;
 		}
@@ -196,46 +200,43 @@ bool AIScriptMurray::UpdateAnimation(int *animation, int *frame) {
 
 bool AIScriptMurray::ChangeAnimationMode(int mode) {
 	switch (mode) {
-	case 0:
+	case kAnimationModeIdle:
 		if (_animationState > 0 && _animationState <= 5) {
-			_flag = true;
+			_resumeIdleAfterFramesetCompletesFlag = true;
 		} else {
 			_animationState = 0;
 			_animationFrame = 0;
 		}
 		break;
 
-	case 3:
+	case kAnimationModeTalk:
 		_animationState = 1;
 		_animationFrame = 0;
-		_flag = false;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		break;
 
 	case 12:
 		_animationState = 2;
 		_animationFrame = 0;
-		_flag = false;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		break;
 
 	case 13:
 		_animationState = 3;
 		_animationFrame = 0;
-		_flag = false;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		break;
 
 	case 14:
 		_animationState = 4;
 		_animationFrame = 0;
-		_flag = false;
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		break;
 
 	case 15:
 		_animationState = 5;
 		_animationFrame = 0;
-		_flag = false;
-		break;
-
-	default:
+		_resumeIdleAfterFramesetCompletesFlag = false;
 		break;
 	}
 

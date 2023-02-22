@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -34,7 +33,7 @@ namespace Neverhood {
 class Module2800 : public Module {
 public:
 	Module2800(NeverhoodEngine *vm, Module *parentModule, int which);
-	virtual ~Module2800();
+	~Module2800() override;
 protected:
 	int _sceneNum;
 	uint32 _currentMusicFileHash;
@@ -47,7 +46,7 @@ protected:
 class Scene2801 : public Scene {
 public:
 	Scene2801(NeverhoodEngine *vm, Module *parentModule, int which);
-	virtual ~Scene2801();
+	~Scene2801() override;
 protected:
 	Sprite *_asTape;
 	uint32 _paletteHash;
@@ -57,7 +56,7 @@ protected:
 class Scene2802 : public Scene {
 public:
 	Scene2802(NeverhoodEngine *vm, Module *parentModule, int which);
-	virtual ~Scene2802();
+	~Scene2802() override;
 protected:
 	SmackerPlayer *_smackerPlayer;
 	uint _currRadioMusicIndex;
@@ -223,7 +222,7 @@ protected:
 class Scene2810 : public Scene {
 public:
 	Scene2810(NeverhoodEngine *vm, Module *parentModule, int which);
-	virtual ~Scene2810();
+	~Scene2810() override;
 protected:
 	Sprite *_sprite1;
 	Sprite *_sprite2;

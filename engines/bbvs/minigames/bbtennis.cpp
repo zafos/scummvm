@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -81,6 +80,8 @@ void MinigameBbTennis::buildDrawList(DrawList &drawList) {
 		break;
 	case 2:
 		buildDrawList2(drawList);
+		break;
+	default:
 		break;
 	}
 }
@@ -153,6 +154,8 @@ void MinigameBbTennis::buildDrawList1(DrawList &drawList) {
 				}
 				break;
 
+			default:
+				break;
 			}
 
 			drawList.add(index, x, y, priority);
@@ -220,14 +223,14 @@ MinigameBbTennis::Obj *MinigameBbTennis::getFreeObject() {
 	for (int i = 0; i < kMaxObjectsCount; ++i)
 		if (_objects[i].kind == 0)
 			return &_objects[i];
-	return 0;
+	return nullptr;
 }
 
 MinigameBbTennis::Obj *MinigameBbTennis::findTennisBall(int startObjIndex) {
 	for (int i = startObjIndex; i < kMaxObjectsCount; ++i)
 		if (_objects[i].kind == 2)
 			return &_objects[i];
-	return 0;
+	return nullptr;
 }
 
 bool MinigameBbTennis::isHit(Obj *obj1, Obj *obj2) {
@@ -254,6 +257,8 @@ void MinigameBbTennis::initObjects() {
 		break;
 	case 2:
 		initObjects2();
+		break;
+	default:
 		break;
 	}
 }
@@ -306,6 +311,8 @@ void MinigameBbTennis::initVars() {
 	case 2:
 		initVars2();
 		break;
+	default:
+		break;
 	}
 }
 
@@ -348,6 +355,8 @@ bool MinigameBbTennis::updateStatus(int mouseX, int mouseY, uint mouseButtons) {
 		return updateStatus1(mouseX, mouseY, mouseButtons);
 	case 2:
 		return updateStatus2(mouseX, mouseY, mouseButtons);
+	default:
+		break;
 	}
 	return false;
 }
@@ -479,6 +488,8 @@ void MinigameBbTennis::updateObjs() {
 			break;
 		case 7:
 			updateEnemyTennisBall(i);
+			break;
+		default:
 			break;
 		}
 	}
@@ -691,6 +702,8 @@ void MinigameBbTennis::updateSquirrel(int objIndex) {
 			}
 			break;
 
+		default:
+			break;
 	}
 
 	if (obj->status != 4) {
@@ -862,6 +875,8 @@ void MinigameBbTennis::updateTennisPlayer(int objIndex) {
 	case 8:
 		break;
 
+	default:
+		break;
 	}
 
 	if (obj->status != 8) {
@@ -940,6 +955,8 @@ void MinigameBbTennis::updateThrower(int objIndex) {
 		}
 		break;
 
+	default:
+		break;
 	}
 
 	if (obj->status != 3) {
@@ -1023,6 +1040,9 @@ void MinigameBbTennis::updateNetPlayer(int objIndex) {
 		}
 		break;
 
+	case 4:
+		break;
+
 	case 5:
 		if (--obj->ticks == 0) {
 			++obj->frameIndex;
@@ -1032,9 +1052,8 @@ void MinigameBbTennis::updateNetPlayer(int objIndex) {
 		}
 		break;
 
-	case 4:
+	default:
 		break;
-
 	}
 
 	if (obj->status < 4 && obj->frameIndex != 31) {
@@ -1171,6 +1190,8 @@ void MinigameBbTennis::makeEnemyBall(int x, int y, int frameIndex) {
 		obj->fltStepY = (float)((y - 180) / 6);
 		break;
 
+	default:
+		break;
 	}
 
 }

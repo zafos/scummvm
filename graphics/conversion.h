@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -27,7 +26,14 @@
 
 namespace Graphics {
 
-struct PixelFormat;
+/**
+ * @defgroup graphics_conversion Conversions
+ * @ingroup graphics
+ *
+ * @brief Graphics conversion operations.
+ *
+ * @{
+ */
 
 /** Converting a color from YUV to RGB colorspace. */
 inline static void YUV2RGB(byte y, byte u, byte v, byte &r, byte &g, byte &b) {
@@ -43,35 +49,7 @@ inline static void RGB2YUV(byte r, byte g, byte b, byte &y, byte &u, byte &v) {
 	v = CLIP<int>( ((r * 512) >> 10) - ((g * 429) >> 10) - ((b *  83) >> 10) + 128, 0, 255);
 }
 
-// TODO: generic YUV to RGB blit
-
-/**
- * Blits a rectangle from one graphical format to another.
- *
- * @param dst		the buffer which will recieve the converted graphics data
- * @param src		the buffer containing the original graphics data
- * @param dstPitch	width in bytes of one full line of the dest buffer
- * @param srcPitch	width in bytes of one full line of the source buffer
- * @param w			the width of the graphics data
- * @param h			the height of the graphics data
- * @param dstFmt	the desired pixel format
- * @param srcFmt	the original pixel format
- * @return			true if conversion completes successfully,
- *					false if there is an error.
- *
- * @note Blitting to a 3Bpp destination is not supported
- * @note This can convert a surface in place, regardless of the
- *       source and destination format, as long as there is enough
- *       space for the destination. The dstPitch / srcPitch ratio
- *       must at least equal the dstBpp / srcBpp ratio for
- *       dstPitch >= srcPitch and at most dstBpp / srcBpp for
- *       dstPitch < srcPitch though.
- */
-bool crossBlit(byte *dst, const byte *src,
-               const uint dstPitch, const uint srcPitch,
-               const uint w, const uint h,
-               const Graphics::PixelFormat &dstFmt, const Graphics::PixelFormat &srcFmt);
-
+/** @} */
 } // End of namespace Graphics
 
 #endif // GRAPHICS_CONVERSION_H

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -80,13 +79,13 @@ private:
 	ResourceType getResourceType(const Common::String &resourceName) const;
 public:
 	explicit HagArchive(MADSEngine *vm);
-	virtual ~HagArchive();
+	~HagArchive() override;
 
 	// Archive implementation
-	virtual bool hasFile(const Common::String &name) const;
-	virtual int listMembers(Common::ArchiveMemberList &list) const;
-	virtual const Common::ArchiveMemberPtr getMember(const Common::String &name) const;
-	virtual Common::SeekableReadStream *createReadStreamForMember(const Common::String &name) const;
+	bool hasFile(const Common::Path &path) const override;
+	int listMembers(Common::ArchiveMemberList &list) const override;
+	const Common::ArchiveMemberPtr getMember(const Common::Path &path) const override;
+	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override;
 };
 
 const char *const MADSCONCAT_STRING = "MADSCONCAT";
@@ -99,7 +98,8 @@ HagArchive::~HagArchive() {
 }
 
 // Archive implementation
-bool HagArchive::hasFile(const Common::String &name) const {
+bool HagArchive::hasFile(const Common::Path &path) const {
+	Common::String name = path.toString();
 	HagIndex hagIndex;
 	HagEntry hagEntry;
 	return getHeaderEntry(name, hagIndex, hagEntry);
@@ -122,14 +122,16 @@ int HagArchive::listMembers(Common::ArchiveMemberList &list) const {
 	return members;
 }
 
-const Common::ArchiveMemberPtr HagArchive::getMember(const Common::String &name) const {
+const Common::ArchiveMemberPtr HagArchive::getMember(const Common::Path &path) const {
+	Common::String name = path.toString();
 	if (!hasFile(name))
 		return Common::ArchiveMemberPtr();
 
 	return Common::ArchiveMemberPtr(new Common::GenericArchiveMember(name, this));
 }
 
-Common::SeekableReadStream *HagArchive::createReadStreamForMember(const Common::String &name) const {
+Common::SeekableReadStream *HagArchive::createReadStreamForMember(const Common::Path &path) const {
+	Common::String name = path.toString();
 	HagIndex hagIndex;
 	HagEntry hagEntry;
 
@@ -154,14 +156,26 @@ void HagArchive::loadIndex(MADSEngine *vm) {
  		if (sectionIndex == 0 && !Common::File::exists("SECTION0.HAG"))
 			continue;
 
+		// Rex Nebular and Dragonsphere demos only have sections 1 and 9 - skip the rest
+		if ((vm->getGameID() == GType_RexNebular || vm->getGameID() == GType_Dragonsphere) && vm->isDemo())  {
+			if (sectionIndex != 1 && sectionIndex != 9)
+				continue;
+		}
+
+		// Phantom demo only has sections 1, 2 and 9 - skip the rest
+		if (vm->getGameID() == GType_Phantom && vm->isDemo())  {
+			if (sectionIndex != 1 && sectionIndex != 2 && sectionIndex != 9)
+				continue;
+		}
+
 		// Dragonsphere does not have some sections - skip them
 		if (vm->getGameID() == GType_Dragonsphere)  {
 			if (sectionIndex == 7 || sectionIndex == 8)
 				continue;
 		}
 
-		// Phantom does not have some sections - skip them
-		if (vm->getGameID() == GType_Phantom)  {
+		// Phantom and Forest don't have some sections - skip them
+		if (vm->getGameID() == GType_Phantom || vm->getGameID() == GType_Forest)  {
 			if (sectionIndex == 6 || sectionIndex == 7 || sectionIndex == 8)
 				continue;
 		}

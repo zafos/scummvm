@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,7 +46,7 @@ private:
 public:
 	DisplayHotspot(int regionId, ...);
 
-	virtual void doAction(int action) {
+	void doAction(int action) override {
 		if (!performAction(action))
 			SceneHotspot::doAction(action);
 	}
@@ -60,7 +59,7 @@ private:
 public:
 	DisplayObject(int firstAction, ...);
 
-	virtual void doAction(int action) {
+	void doAction(int action) override {
 		if (!performAction(action))
 			SceneHotspot::doAction(action);
 	}
@@ -70,11 +69,11 @@ class SceneObjectExt : public SceneObject {
 public:
 	int _state;
 
-	virtual void synchronize(Serializer &s) {
+	void synchronize(Serializer &s) override {
 		SceneObject::synchronize(s);
 		s.syncAsSint16LE(_state);
 	}
-	virtual Common::String getClassName() { return "SceneObjectExt"; }
+	Common::String getClassName() override { return "SceneObjectExt"; }
 };
 
 class SceneArea : public SavedObject {
@@ -89,14 +88,14 @@ public:
 	Rect _bounds;
 public:
 	SceneArea();
-	~SceneArea();
+	~SceneArea() override;
 
 	void setup(int resNum, int rlbNum, int subNum, int actionId);
 	void draw2();
 	void display();
 	void restore();
 
-	virtual void synchronize(Serializer &s);
+	void synchronize(Serializer &s) override;
 	virtual void draw(bool flag);
 	virtual void wait();
 };
@@ -104,6 +103,8 @@ public:
 /*--------------------------------------------------------------------------*/
 
 class RingworldInvObjectList : public InvObjectList {
+private:
+	bool _ESP;
 public:
 	InvObject _stunner;
 	InvObject _scanner;
@@ -141,31 +142,31 @@ public:
 public:
 	RingworldInvObjectList();
 
-	virtual Common::String getClassName() { return "RingworldInvObjectList"; }
+	Common::String getClassName() override { return "RingworldInvObjectList"; }
 };
 
 #define RING_INVENTORY (*((::TsAGE::Ringworld::RingworldInvObjectList *)g_globals->_inventory))
 
 class RingworldGame: public Game {
 public:
-	virtual void start();
-	virtual void restart();
-	virtual void endGame(int resNum, int lineNum);
+	void start() override;
+	void restart() override;
+	void endGame(int resNum, int lineNum) override;
 
-	virtual Scene *createScene(int sceneNumber);
-	virtual void processEvent(Event &event);
-	virtual void rightClick();
-	virtual bool canSaveGameStateCurrently();
-	virtual bool canLoadGameStateCurrently();
+	Scene *createScene(int sceneNumber) override;
+	void processEvent(Event &event) override;
+	void rightClick() override;
+	bool canSaveGameStateCurrently() override;
+	bool canLoadGameStateCurrently() override;
 };
 
 class NamedHotspot : public SceneHotspot {
 public:
 	NamedHotspot();
 
-	virtual void doAction(int action);
-	virtual Common::String getClassName() { return "NamedHotspot"; }
-	virtual void synchronize(Serializer &s);
+	void doAction(int action) override;
+	Common::String getClassName() override { return "NamedHotspot"; }
+	void synchronize(Serializer &s) override;
 };
 
 class NamedHotspotExt : public NamedHotspot {
@@ -173,8 +174,8 @@ public:
 	int _flag;
 	NamedHotspotExt() { _flag = 0; }
 
-	virtual Common::String getClassName() { return "NamedHotspot"; }
-	virtual void synchronize(Serializer &s) {
+	Common::String getClassName() override { return "NamedHotspot"; }
+	void synchronize(Serializer &s) override {
 		NamedHotspot::synchronize(s);
 		s.syncAsSint16LE(_flag);
 	}

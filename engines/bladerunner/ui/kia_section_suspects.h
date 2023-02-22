@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -31,7 +30,7 @@ namespace BladeRunner {
 
 class ActorClues;
 class BladeRunnerEngine;
-class Shape;
+class Shapes;
 class UICheckBox;
 class UIContainer;
 class UIImagePicker;
@@ -77,38 +76,40 @@ class KIASectionSuspects : public KIASectionBase {
 	int   _mouseX;
 	int   _mouseY;
 
-	int    _suspectPhotoShapeId;
-	Shape *_suspectPhotoShape;
+	int     _suspectPhotoShapeId;
+	int     _suspectPhotoNotUsed;
+	Shapes *_suspectPhotoShapes;
 
 public:
 	int                 _crimeSelected;
 
 public:
 	KIASectionSuspects(BladeRunnerEngine *vm, ActorClues *clues);
-	~KIASectionSuspects();
+	~KIASectionSuspects() override;
 
-	void open();
-	void close();
+	void reset();
 
-	void draw(Graphics::Surface &surface);
+	void open() override;
+	void close() override;
 
-	void handleMouseMove(int mouseX, int mouseY);
-	void handleMouseDown(bool mainButton);
-	void handleMouseUp(bool mainButton);
+	void draw(Graphics::Surface &surface) override;
+
+	void handleMouseMove(int mouseX, int mouseY) override;
+	void handleMouseDown(bool mainButton) override;
+	void handleMouseUp(bool mainButton) override;
+	void handleMouseScroll(int direction) override;
 
 	void saveToLog();
 	void loadFromLog();
 
 	void selectSuspect(int suspectId);
 
-	static const char *scrambleSuspectsName(const char *name);
-
 private:
 	static void scrollBoxCallback(void *callbackData, void *source, int lineData, int mouseButton);
 	static void checkBoxCallback(void *callbackData, void *source);
 	static void mouseUpCallback(int buttonId, void *callbackData);
 
-	void onButtonPressed(int buttonId);
+	void onButtonPressed(int buttonId) override;
 
 	void populateAcquiredClues();
 	void populateSuspects();

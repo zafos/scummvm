@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -526,6 +525,8 @@ void DropDownMenu::setupMenuWith() {
 			_activeMenuItem.setupOption("Buy an onion", 'o', "", !_vm->_objects[kObjectOnion - 1]);
 			_verbStr = _verbStr + 105;
 			break;
+		default:
+			break;
 		}
 	}
 	_activeMenuItem.display();
@@ -548,6 +549,8 @@ void DropDownMenu::runMenuGame() {
 		break;
 	case 4:
 		_vm->callVerb(kVerbCodeInfo);
+		break;
+	default:
 		break;
 	}
 }
@@ -575,6 +578,8 @@ void DropDownMenu::runMenuFile() {
 		break;
 	case 5:
 		_vm->callVerb(kVerbCodeQuit);
+		break;
+	default:
 		break;
 	}
 }
@@ -612,6 +617,8 @@ void DropDownMenu::runMenuAction() {
 			avvy->_speedX = kWalk;
 		_vm->_animation->updateSpeed();
 		}
+		break;
+	default:
 		break;
 	}
 }
@@ -809,23 +816,27 @@ Common::String DropDownMenu::getThing(byte which) {
 	switch (which) {
 	case kObjectWine:
 		switch (_vm->_wineState) {
-	case 1:
-	case 4:
-		result = Common::String(things[which - 1]);
-		break;
-	case 3:
-		result = "Vinegar";
-		break;
+		case 1:
+		case 4:
+			result = Common::String(things[which - 1]);
+			break;
+		case 3:
+			result = "Vinegar";
+			break;
+		default:
+			break;
 		}
 		break;
 	case kObjectOnion:
-		if (_vm->_rottenOnion)
+		if (_vm->_rottenOnion) {
 			result = Common::String("rotten onion");
-		else
+		} else {
 			result = Common::String(things[which - 1]);
+		}
 		break;
 	default:
 		result = Common::String(things[which - 1]);
+		break;
 	}
 	return result;
 }

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -29,10 +28,12 @@
 #include "engines/wintermute/base/base_file_manager.h"
 #include "engines/wintermute/base/base_persistence_manager.h"
 #include "engines/wintermute/base/file/base_disk_file.h"
+#include "engines/wintermute/base/file/base_savefile_manager_file.h"
 #include "engines/wintermute/base/file/base_save_thumb_file.h"
 #include "engines/wintermute/base/file/base_package.h"
 #include "engines/wintermute/base/base_engine.h"
 #include "engines/wintermute/wintermute.h"
+#include "common/algorithm.h"
 #include "common/debug.h"
 #include "common/str.h"
 #include "common/tokenizer.h"
@@ -44,7 +45,7 @@
 #include "common/file.h"
 #include "common/savefile.h"
 #include "common/fs.h"
-#include "common/unzip.h"
+#include "common/compression/unzip.h"
 
 namespace Wintermute {
 
@@ -103,7 +104,7 @@ byte *BaseFileManager::readWholeFile(const Common::String &filename, uint32 *siz
 
 	buffer = new byte[file->size() + 1];
 	if (buffer == nullptr) {
-		debugC(kWintermuteDebugFileAccess | kWintermuteDebugLog, "Error allocating buffer for file '%s' (%d bytes)", filename.c_str(), file->size() + 1);
+		debugC(kWintermuteDebugFileAccess | kWintermuteDebugLog, "Error allocating buffer for file '%s' (%d bytes)", filename.c_str(), (int)file->size() + 1);
 		closeFile(file);
 		return nullptr;
 	}
@@ -132,6 +133,7 @@ bool BaseFileManager::addPath(TPathType type, const Common::FSNode &path) {
 
 	switch (type) {
 	case PATH_SINGLE:
+	default:
 		//  _singlePaths.push_back(path);
 		error("TODO: Allow adding single-paths");
 		break;
@@ -180,7 +182,7 @@ bool BaseFileManager::registerPackages(const Common::FSList &fslist) {
 	for (Common::FSList::const_iterator it = fslist.begin(); it != fslist.end(); ++it) {
 		debugC(kWintermuteDebugFileAccess, "Adding %s", it->getName().c_str());
 		if (it->getName().contains(".dcp")) {
-			if (registerPackage(*it)) {
+			if (registerPackage(*it, it->getName())) {
 				addPath(PATH_PACKAGE, *it);
 			}
 		}
@@ -192,8 +194,8 @@ bool BaseFileManager::registerPackages(const Common::FSList &fslist) {
 bool BaseFileManager::registerPackages() {
 	debugC(kWintermuteDebugFileAccess | kWintermuteDebugLog, "Scanning packages");
 
-	// We need the target name as a Common::String to perform some game-specific hacks.
-	Common::String targetName = BaseEngine::instance().getGameTargetName();
+	// We need game flags to perform some game-specific hacks.
+	uint32 flags = BaseEngine::instance().getFlags();
 
 	// Register without using SearchMan, as otherwise the FSNode-based lookup in openPackage will fail
 	// and that has to be like that to support the detection-scheme.
@@ -201,7 +203,7 @@ bool BaseFileManager::registerPackages() {
 	for (Common::FSList::const_iterator it = _packagePaths.begin(); it != _packagePaths.end(); ++it) {
 		debugC(kWintermuteDebugFileAccess, "Should register folder: %s %s", it->getPath().c_str(), it->getName().c_str());
 		if (!it->getChildren(files, Common::FSNode::kListFilesOnly)) {
-			warning("getChildren() failed for path: %s", it->getDisplayName().c_str());
+			warning("getChildren() failed for path: %s", it->getName().c_str());
 		}
 		for (Common::FSList::const_iterator fileIt = files.begin(); fileIt != files.end(); ++fileIt) {
 			// To prevent any case sensitivity issues we make the filename
@@ -218,57 +220,104 @@ bool BaseFileManager::registerPackages() {
 				searchSignature = true;
 			}
 
-			// HACK: for Reversion1, avoid loading xlanguage_pt.dcp from the main folder:
-			if (_language != Common::PT_BRA && targetName.hasPrefix("reversion1")) {
-				if (fileName == "xlanguage_pt.dcp") {
-					continue;
-				}
-			}
-
 			// Again, make the parent's name all lowercase to avoid any case
 			// issues.
 			Common::String parentName = it->getName();
 			parentName.toLowercase();
 
+			// Avoid registering all the resolutions for SD/HD games
+			if (flags & GF_IGNORE_HD_FILES && fileName.hasSuffix("_hd.dcp")) {
+				continue;
+			} else if (flags & GF_IGNORE_SD_FILES && fileName.hasSuffix("_sd.dcp")) {
+				continue;
+			}
+
 			// Avoid registering all the language files
 			// TODO: Select based on the gameDesc.
-			if (_language != Common::UNK_LANG && (parentName == "language" || parentName == "languages")) {
+			if (_language != Common::UNK_LANG) {
 				// English
-				if (_language == Common::EN_ANY && (fileName != "english.dcp" && fileName != "xlanguage_en.dcp")) {
-					continue;
+				if (fileName == "english.dcp" || fileName == "xlanguage_en.dcp" || fileName == "english_language_pack.dcp") {
+					if (_language != Common::EN_ANY) {
+						continue;
+					}
 				// Chinese
-				} else if (_language == Common::ZH_CNA && (fileName != "chinese.dcp" && fileName != "xlanguage_nz.dcp")) {
-					continue;
+				} else if (fileName == "chinese.dcp" || fileName == "xlanguage_nz.dcp" || fileName == "chinese_language_pack.dcp") {
+					if (_language != Common::ZH_ANY) {
+						continue;
+					}
+				// Simplified Chinese
+				} else if (fileName == "xlanguage_zh_s.dcp") {
+					if (_language != Common::ZH_CHN) {
+						continue;
+					}
+				// Traditional Chinese
+				} else if (fileName == "xlanguage_zh_t.dcp") {
+					if (_language != Common::ZH_TWN) {
+						continue;
+					}
 				// Czech
-				} else if (_language == Common::CZ_CZE && (fileName != "czech.dcp" && fileName != "xlanguage_cz.dcp")) {
-					continue;
+				} else if (fileName == "czech.dcp" || fileName == "xlanguage_cz.dcp" || fileName == "czech_language_pack.dcp") {
+					if (_language != Common::CS_CZE) {
+						continue;
+					}
 				// French
-				} else if (_language == Common::FR_FRA && (fileName != "french.dcp" && fileName != "xlanguage_fr.dcp")) {
-					continue;
+				} else if (fileName == "french.dcp" || fileName == "xlanguage_fr.dcp" || fileName == "french_language_pack.dcp") {
+					if (_language != Common::FR_FRA) {
+						continue;
+					}
 				// German
-				} else if (_language == Common::DE_DEU && (fileName != "german.dcp" && fileName != "xlanguage_de.dcp")) {
-					continue;
+				} else if (fileName == "german.dcp" || fileName == "xlanguage_de.dcp" || fileName == "german_language_pack.dcp") {
+					if (_language != Common::DE_DEU) {
+						continue;
+					}
 				// Italian
-				} else if (_language == Common::IT_ITA && (fileName != "italian.dcp" && fileName != "xlanguage_it.dcp")) {
-					continue;
+				} else if (fileName == "italian.dcp" || fileName == "xlanguage_it.dcp" || fileName == "italian_language_pack.dcp") {
+					if (_language != Common::IT_ITA) {
+						continue;
+					}
 				// Latvian
-				} else if (_language == Common::LV_LAT && (fileName != "latvian.dcp" && fileName != "xlanguage_lv.dcp")) {
-					// TODO: 'latvian.dcp' is just guesswork. Is there any
-					// game using Latvian and using this filename?
-					continue;
+				} else if (fileName == "latvian.dcp" || fileName == "xlanguage_lv.dcp" || fileName == "latvian_language_pack.dcp") {
+					if (_language != Common::LV_LVA) {
+						continue;
+					}
+				// Persian
+				} else if (fileName == "persian.dcp" || fileName == "xlanguage_fa.dcp" || fileName == "persian_language_pack.dcp") {
+					if (_language != Common::FA_IRN) {
+						continue;
+					}
 				// Polish
-				} else if (_language == Common::PL_POL && (fileName != "polish.dcp" && fileName != "xlanguage_pl.dcp")) {
-					continue;
+				} else if (fileName == "polish.dcp" || fileName == "xlanguage_pl.dcp" || fileName == "polish_language_pack.dcp") {
+					if (_language != Common::PL_POL) {
+						continue;
+					}
 				// Portuguese
-				} else if (_language == Common::PT_BRA && (fileName != "portuguese.dcp" && fileName != "xlanguage_pt.dcp")) {
-					continue;
+				} else if (fileName == "portuguese.dcp" || fileName == "xlanguage_pt.dcp" || fileName == "portuguese_language_pack.dcp") {
+					if (_language != Common::PT_BRA) {
+						continue;
+					}
 				// Russian
-				} else if (_language == Common::RU_RUS && (fileName != "russian.dcp" && fileName != "xlanguage_ru.dcp")) {
+				} else if (fileName == "russian.dcp" || fileName == "xlanguage_ru.dcp" || fileName == "russian_language_pack.dcp") {
+					if (_language != Common::RU_RUS) {
+						continue;
+					}
+				// Serbian
+				} else if (fileName == "serbian.dcp" || fileName == "xlanguage_sr.dcp" || fileName == "serbian_language_pack.dcp") {
+					if (_language != Common::SR_SRB) {
+						continue;
+					}
+				// Spanish
+				} else if (fileName == "spanish.dcp" || fileName == "xlanguage_es.dcp" || fileName == "spanish_language_pack.dcp") {
+					if (_language != Common::ES_ESP) {
+						continue;
+					}
+				// generic
+				} else if (fileName.hasPrefix("xlanguage_")) {
+					warning("Unknown language package: %s", fileName.c_str());
 					continue;
 				}
 			}
 			debugC(kWintermuteDebugFileAccess, "Registering %s %s", fileIt->getPath().c_str(), fileIt->getName().c_str());
-			registerPackage((*fileIt), "", searchSignature);
+			registerPackage((*fileIt), fileName, searchSignature);
 		}
 	}
 
@@ -279,7 +328,8 @@ bool BaseFileManager::registerPackages() {
 
 bool BaseFileManager::registerPackage(Common::FSNode file, const Common::String &filename, bool searchSignature) {
 	PackageSet *pack = new PackageSet(file, filename, searchSignature);
-	_packages.add(file.getName(), pack, pack->getPriority() , true);
+	_packages.add(filename, pack, pack->getPriority() , true);
+	_versions[filename] = pack->getVersion();
 
 	return STATUS_OK;
 }
@@ -316,7 +366,21 @@ Common::SeekableReadStream *BaseFileManager::openPkgFile(const Common::String &f
 	return file;
 }
 
+//////////////////////////////////////////////////////////////////////////
+uint32 BaseFileManager::getPackageVersion(const Common::String &filename) {
+	Common::HashMap<Common::String, uint32>::iterator it = _versions.find(filename);
+	if (it != _versions.end()) {
+		return it->_value;
+	}
+	return 0;
+}
+
+//////////////////////////////////////////////////////////////////////////
 bool BaseFileManager::hasFile(const Common::String &filename) {
+	Common::String backwardSlashesPath = filename;
+	// correct slashes
+	Common::replace(backwardSlashesPath.begin(), backwardSlashesPath.end(), '/', '\\');
+
 	if (scumm_strnicmp(filename.c_str(), "savegame:", 9) == 0) {
 		BasePersistenceManager pm(BaseEngine::instance().getGameTargetName());
 		if (filename.size() <= 9) {
@@ -325,16 +389,37 @@ bool BaseFileManager::hasFile(const Common::String &filename) {
 		int slot = atoi(filename.c_str() + 9);
 		return pm.getSaveExists(slot);
 	}
+	if (sfmFileExists(filename)) {
+		return true;
+	}
 	if (diskFileExists(filename)) {
 		return true;
 	}
-	if (_packages.hasFile(filename)) {
+	if (_packages.hasFile(backwardSlashesPath)) {
 		return true;    // We don't bother checking if the file can actually be opened, something bigger is wrong if that is the case.
 	}
 	if (!_detectionMode && _resources->hasFile(filename)) {
 		return true;
 	}
 	return false;
+}
+
+//////////////////////////////////////////////////////////////////////////
+int BaseFileManager::listMatchingPackageMembers(Common::ArchiveMemberList &list, const Common::String &pattern) {
+	return _packages.listMatchingMembers(list, pattern);
+}
+
+//////////////////////////////////////////////////////////////////////////
+int BaseFileManager::listMatchingFiles(Common::StringArray &list, const Common::String &pattern) {
+	list = sfmFileList(pattern);
+
+	Common::ArchiveMemberList files;
+	listMatchingDiskFileMembers(files, pattern);
+	for (Common::ArchiveMemberList::const_iterator it = files.begin(); it != files.end(); ++it) {
+		list.push_back((*it)->getName());
+	}
+
+	return list.size();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -349,6 +434,17 @@ Common::SeekableReadStream *BaseFileManager::openFile(const Common::String &file
 		_openFiles.push_back(file);
 	}
 	return file;
+}
+
+
+//////////////////////////////////////////////////////////////////////////
+Common::WriteStream *BaseFileManager::openFileForWrite(const Common::String &filename) {
+	if (strcmp(filename.c_str(), "") == 0) {
+		return nullptr;
+	}
+	debugC(kWintermuteDebugFileAccess, "Open file %s for write", filename.c_str());
+
+	return openFileForWriteRaw(filename);
 }
 
 
@@ -381,6 +477,11 @@ Common::SeekableReadStream *BaseFileManager::openFileRaw(const Common::String &f
 		return ret;
 	}
 
+	ret = openSfmFile(filename);
+	if (ret) {
+		return ret;
+	}
+
 	ret = openDiskFile(filename);
 	if (ret) {
 		return ret;
@@ -394,6 +495,19 @@ Common::SeekableReadStream *BaseFileManager::openFileRaw(const Common::String &f
 	if (!_detectionMode) {
 		ret = _resources->createReadStreamForMember(filename);
 	}
+	if (ret) {
+		return ret;
+	}
+
+	debugC(kWintermuteDebugFileAccess ,"BFileManager::OpenFileRaw - Failed to open %s", filename.c_str());
+	return nullptr;
+}
+
+//////////////////////////////////////////////////////////////////////////
+Common::WriteStream *BaseFileManager::openFileForWriteRaw(const Common::String &filename) {
+	Common::WriteStream *ret = nullptr;
+
+	ret = openSfmFileForWrite(filename);
 	if (ret) {
 		return ret;
 	}

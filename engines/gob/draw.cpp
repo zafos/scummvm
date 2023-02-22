@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -55,14 +54,14 @@ Draw::Draw(GobEngine *vm) : _vm(vm) {
 	_destSurface = 0;
 
 	_letterToPrint = 0;
-	_textToPrint = 0;
-	_hotspotText = 0;
+	_textToPrint = nullptr;
+	_hotspotText = nullptr;
 
 	_backDeltaX = 0;
 	_backDeltaY = 0;
 
 	for (int i = 0; i < kFontCount; i++)
-		_fonts[i] = 0;
+		_fonts[i] = nullptr;
 
 	_spritesArray.resize(kSpriteCount);
 
@@ -113,13 +112,6 @@ Draw::Draw(GobEngine *vm) : _vm(vm) {
 	}
 
 	_cursorCount         = 0;
-	_doCursorPalettes    = 0;
-	_cursorPalettes      = 0;
-	_cursorKeyColors     = 0;
-	_cursorPaletteStarts = 0;
-	_cursorPaletteCounts = 0;
-	_cursorHotspotsX     = 0;
-	_cursorHotspotsY     = 0;
 
 	_palLoadData1[0] = 0;
 	_palLoadData1[1] = 17;
@@ -138,14 +130,6 @@ Draw::Draw(GobEngine *vm) : _vm(vm) {
 }
 
 Draw::~Draw() {
-	delete[] _cursorPalettes;
-	delete[] _doCursorPalettes;
-	delete[] _cursorKeyColors;
-	delete[] _cursorPaletteStarts;
-	delete[] _cursorPaletteCounts;
-	delete[] _cursorHotspotsX;
-	delete[] _cursorHotspotsY;
-
 	for (int i = 0; i < kFontCount; i++)
 		delete _fonts[i];
 }
@@ -381,7 +365,52 @@ void Draw::adjustCoords(char adjust, int16 *coord1, int16 *coord2) {
 			if (coord1)
 				*coord1 = *coord1 * 2 + 1;
 			break;
+
+		default:
+			break;
 	}
+}
+
+void Draw::resizeCursors(int16 width, int16 height, int16 count, bool transparency) {
+	if (width <= 0)
+		width = _vm->_draw->_cursorWidth;
+	if (height <= 0)
+		height = _vm->_draw->_cursorHeight;
+
+	_vm->_draw->_transparentCursor = transparency;
+
+	bool sameCursorDimensions = (_vm->_draw->_cursorWidth == width) && (_vm->_draw->_cursorHeight == height);
+
+	// Cursors sprite already big enough
+	if (sameCursorDimensions &&
+		_vm->_draw->_cursorCount >= count)
+		return;
+
+	debugC(5, kDebugGraphics, "Resizing cursors: size %dx%d -> %dx%d, cursor count %d -> %d)",
+		   _vm->_draw->_cursorWidth,
+		   _vm->_draw->_cursorHeight,
+		   width,
+		   height,
+		   _vm->_draw->_cursorCount,
+		   count);
+	SurfacePtr oldCursorsSprites = _vm->_draw->_cursorSprites;
+	int oldCursorCount = _vm->_draw->_cursorCount;
+	_vm->_draw->_cursorCount  = count;
+	_vm->_draw->_cursorWidth  = width;
+	_vm->_draw->_cursorHeight = height;
+
+	_vm->_draw->freeSprite(Draw::kCursorSurface);
+	_vm->_draw->_cursorSprites.reset();
+	_vm->_draw->_cursorSpritesBack.reset();
+
+	_vm->_draw->initSpriteSurf(Draw::kCursorSurface, width * count, height, 2);
+
+	_vm->_draw->_cursorSpritesBack = _vm->_draw->_spritesArray[Draw::kCursorSurface];
+	_vm->_draw->_cursorSprites     = _vm->_draw->_cursorSpritesBack;
+
+	if (sameCursorDimensions && oldCursorCount < count)
+		_vm->_draw->_cursorSprites->blit(*oldCursorsSprites);
+	oldCursorsSprites.reset();
 }
 
 int Draw::stringLength(const char *str, uint16 fontIndex) {
@@ -471,7 +500,7 @@ void Draw::printTextCentered(int16 id, int16 left, int16 top, int16 right,
 	else
 		width = strlen(str) * font.getCharWidth();
 
-	adjustCoords(1, &width, 0);
+	adjustCoords(1, &width, nullptr);
 	_destSpriteX += (right - left + 1 - width) / 2;
 
 	spriteOperation(DRAW_PRINTTEXT);
@@ -512,7 +541,7 @@ void Draw::oPlaytoons_sub_F_1B(uint16 id, int16 left, int16 top, int16 right, in
 		_vm->_game->_script->pop();
 	}
 
-	strcpy(paramStr, tmpStr);
+	Common::strcpy_s(paramStr, 200, tmpStr);
 
 	if (fontIndex >= kFontCount) {
 		warning("Draw::oPlaytoons_sub_F_1B(): Font %d > Count %d", fontIndex, kFontCount);
@@ -549,7 +578,7 @@ void Draw::oPlaytoons_sub_F_1B(uint16 id, int16 left, int16 top, int16 right, in
 				_destSpriteY = offY;
 				_textToPrint = str;
 				width = stringLength(str, fontIndex);
-				adjustCoords(1, &width, NULL);
+				adjustCoords(1, &width, nullptr);
 				_destSpriteX += (top - left + 1 - width) / 2;
 				spriteOperation(DRAW_PRINTTEXT);
 				offY += deltaY + _fonts[fontIndex]->getCharHeight();
@@ -562,7 +591,7 @@ void Draw::oPlaytoons_sub_F_1B(uint16 id, int16 left, int16 top, int16 right, in
 				_destSpriteY = right;
 			_textToPrint = paramStr;
 			width = stringLength(paramStr, fontIndex);
-			adjustCoords(1, &width, NULL);
+			adjustCoords(1, &width, nullptr);
 			_destSpriteX += (top - left + 1 - width) / 2;
 			spriteOperation(DRAW_PRINTTEXT);
 		}
@@ -684,7 +713,7 @@ void Draw::wobble(Surface &surfDesc) {
 
 Font *Draw::loadFont(const char *path) const {
 	if (!_vm->_dataIO->hasFile(path))
-		return 0;
+		return nullptr;
 
 	int32 size;
 	byte *data = _vm->_dataIO->getFile(path, size);
@@ -702,7 +731,7 @@ bool Draw::loadFont(uint16 fontIndex, const char *path) {
 
 	_fonts[fontIndex] = loadFont(path);
 
-	return _fonts[fontIndex] != 0;
+	return _fonts[fontIndex] != nullptr;
 }
 
 } // End of namespace Gob

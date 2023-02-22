@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -61,55 +60,52 @@ public:
 	RenderedImage(uint width, uint height, bool &result);
 	RenderedImage();
 
-	virtual ~RenderedImage();
+	~RenderedImage() override;
 
-	virtual int getWidth() const {
+	int getWidth() const override {
 		return _surface.w;
 	}
-	virtual int getHeight() const {
+	int getHeight() const override {
 		return _surface.h;
-	}
-	virtual GraphicEngine::COLOR_FORMATS getColorFormat() const {
-		return GraphicEngine::CF_ARGB32;
 	}
 
 	void copyDirectly(int posX, int posY);
 
-	virtual bool blit(int posX = 0, int posY = 0,
+	bool blit(int posX = 0, int posY = 0,
 	                  int flipping = Graphics::FLIP_NONE,
 	                  Common::Rect *pPartRect = NULL,
 	                  uint color = BS_ARGB(255, 255, 255, 255),
 	                  int width = -1, int height = -1,
-					  RectangleList *updateRects = 0);
-	virtual bool fill(const Common::Rect *pFillRect, uint color);
-	virtual bool setContent(const byte *pixeldata, uint size, uint offset = 0, uint stride = 0);
+					  RectangleList *updateRects = 0) override;
+	bool fill(const Common::Rect *pFillRect, uint color) override;
+	bool setContent(const byte *pixeldata, uint size, uint offset = 0, uint stride = 0) override;
 	void replaceContent(byte *pixeldata, int width, int height);
-	virtual uint getPixel(int x, int y);
+	uint getPixel(int x, int y) override;
 
-	virtual bool isBlitSource() const {
+	bool isBlitSource() const override {
 		return true;
 	}
-	virtual bool isBlitTarget() const {
+	bool isBlitTarget() const override {
 		return false;
 	}
-	virtual bool isScalingAllowed() const {
+	bool isScalingAllowed() const override {
 		return true;
 	}
-	virtual bool isFillingAllowed() const {
+	bool isFillingAllowed() const override {
 		return false;
 	}
-	virtual bool isAlphaAllowed() const {
+	bool isAlphaAllowed() const override {
 		return true;
 	}
-	virtual bool isColorModulationAllowed() const {
+	bool isColorModulationAllowed() const override {
 		return true;
 	}
-	virtual bool isSetContentAllowed() const {
+	bool isSetContentAllowed() const override {
 		return true;
 	}
 
 	void setIsTransparent(bool isTransparent) { _isTransparent = isTransparent; }
-	virtual bool isSolid() const { return !_isTransparent; }
+	bool isSolid() const override { return !_isTransparent; }
 
 private:
 	Graphics::TransparentSurface _surface;

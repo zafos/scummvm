@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -37,8 +36,6 @@
 #include "engines/wintermute/base/gfx/base_renderer.h"
 #include "engines/wintermute/base/scriptables/script_value.h"
 #include "engines/wintermute/base/scriptables/script_stack.h"
-#include "graphics/transform_tools.h"
-#include "graphics/transform_struct.h"
 
 namespace Wintermute {
 
@@ -119,7 +116,7 @@ bool BaseSubFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 	Rect32 rect;
 	int r = 255, g = 255, b = 255;
 	int ar = 255, ag = 255, ab = 255, alpha = 255;
-	bool custoTrans = false;
+	bool customTrans = false;
 	rect.setEmpty();
 	char *surfaceFile = nullptr;
 
@@ -134,7 +131,7 @@ bool BaseSubFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 
 		case TOKEN_TRANSPARENT:
 			parser.scanStr(params, "%d,%d,%d", &r, &g, &b);
-			custoTrans = true;
+			customTrans = true;
 			break;
 
 		case TOKEN_RECT:
@@ -180,6 +177,9 @@ bool BaseSubFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 		case TOKEN_EDITOR_PROPERTY:
 			parseEditorProperty(params, false);
 			break;
+
+		default:
+			break;
 		}
 	}
 	if (cmd == PARSERR_TOKENNOTFOUND) {
@@ -188,7 +188,7 @@ bool BaseSubFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 	}
 
 	if (surfaceFile != nullptr) {
-		if (custoTrans) {
+		if (customTrans) {
 			setSurface(surfaceFile, false, r, g, b, lifeTime, keepLoaded);
 		} else {
 			setSurface(surfaceFile, true, 0, 0, 0, lifeTime, keepLoaded);
@@ -196,7 +196,7 @@ bool BaseSubFrame::loadBuffer(char *buffer, int lifeTime, bool keepLoaded) {
 	}
 
 	_alpha = BYTETORGBA(ar, ag, ab, alpha);
-	if (custoTrans) {
+	if (customTrans) {
 		_transparent = BYTETORGBA(r, g, b, 0xFF);
 	}
 
@@ -264,16 +264,7 @@ bool BaseSubFrame::draw(int x, int y, BaseObject *registerOwner, float zoomX, fl
 	}
 
 	if (rotate != Graphics::kDefaultAngle) {
-		Point32 boxOffset, rotatedHotspot, hotspotOffset;
-		Common::Point origin(x, y);
-		Common::Point newOrigin;
-		Rect32 oldRect1 = getRect();
-		Common::Rect oldRect(oldRect1.left, oldRect1.top, oldRect1.right, oldRect1.bottom);
-		Common::Point newHotspot;
-		Graphics::TransformStruct transform = Graphics::TransformStruct(zoomX, zoomY, (uint32)rotate, _hotspotX, _hotspotY, blendMode, alpha, _mirrorX, _mirrorY, 0, 0);
-		Rect32 newRect = Graphics::TransformTools::newRect(oldRect, transform, &newHotspot);
-		newOrigin = origin - newHotspot;
-		res = _surface->displayTransform(newOrigin.x, newOrigin.y, oldRect, newRect, transform);
+		res = _surface->displayTransRotate(x, y, (uint32)rotate, _hotspotX, _hotspotY, getRect(), zoomX, zoomY, alpha, blendMode, _mirrorX, _mirrorY);
 	} else {
 		if (zoomX == Graphics::kDefaultZoomX && zoomY == Graphics::kDefaultZoomY) {
 			res = _surface->displayTrans(x - _hotspotX, y - _hotspotY, getRect(), alpha, blendMode, _mirrorX, _mirrorY);
@@ -430,6 +421,57 @@ bool BaseSubFrame::scCallMethod(ScScript *script, ScStack *stack, ScStack *thisS
 		}
 		return STATUS_OK;
 	}
+
+#ifdef ENABLE_FOXTAIL
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetHeight
+	// Used to find sprite center at methods.script in fix_offset()
+	// Return value is integer
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetHeight") == 0) {
+		stack->correctParams(0);
+		if (_surface) {
+			stack->pushInt(_surface->getHeight());
+		} else {
+			stack->pushNULL();
+		}
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetWidth
+	// Used to find sprite center at methods.script in fix_offset()
+	// Return value is integer
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetWidth") == 0) {
+		stack->correctParams(0);
+		if (_surface) {
+			stack->pushInt(_surface->getWidth());
+		} else {
+			stack->pushNULL();
+		}
+		return STATUS_OK;
+	}
+
+	//////////////////////////////////////////////////////////////////////////
+	// [FoxTail] GetPixelAt
+	// Used for dynamic light at mixing.script in make_RGB() and make_HSV()
+	// Return value is passed to Game.GetRValue(), Game.GetGValue(), etc...
+	//////////////////////////////////////////////////////////////////////////
+	else if (strcmp(name, "GetPixelAt") == 0) {
+		stack->correctParams(2);
+		int x = stack->pop()->getInt();
+		int y = stack->pop()->getInt();
+		byte r, g, b, a;
+		if (_surface && _surface->getPixel(x, y, &r, &g, &b, &a)) {
+			uint32 pixel = BYTETORGBA(r, g, b, a);
+			stack->pushInt(pixel);
+		} else {
+			stack->pushNULL();
+		}
+		return STATUS_OK;
+	}
+#endif
 
 	//////////////////////////////////////////////////////////////////////////
 	// SetImage
@@ -643,7 +685,7 @@ bool BaseSubFrame::setSurface(const Common::String &filename, bool defaultCK, by
 	_surface = _gameRef->_surfaceStorage->addSurface(filename, defaultCK, ckRed, ckGreen, ckBlue, lifeTime, keepLoaded);
 	if (_surface) {
 		_surfaceFilename = new char[filename.size() + 1];
-		strcpy(_surfaceFilename, filename.c_str());
+		Common::strcpy_s(_surfaceFilename, filename.size() + 1, filename.c_str());
 
 		_cKDefault = defaultCK;
 		_cKRed = ckRed;

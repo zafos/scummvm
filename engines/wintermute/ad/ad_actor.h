@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -29,13 +28,13 @@
 #ifndef WINTERMUTE_ADACTOR_H
 #define WINTERMUTE_ADACTOR_H
 
-
 #include "engines/wintermute/dctypes.h"    // Added by ClassView
 #include "engines/wintermute/ad/ad_types.h"    // Added by ClassView
 #include "engines/wintermute/ad/ad_talk_holder.h"
 #include "engines/wintermute/coll_templ.h"
 #include "engines/wintermute/base/base_point.h" // Added by ClassView
 #include "engines/wintermute/persistent.h"
+
 #include "common/str.h"
 
 namespace Wintermute {
@@ -47,15 +46,15 @@ class AdActor : public AdTalkHolder {
 public:
 	TDirection angleToDirection(int angle);
 	DECLARE_PERSISTENT(AdActor, AdTalkHolder)
-	virtual int32 getHeight() override;
-	BaseSprite *getTalkStance(const char *stance);
+	int32 getHeight() override;
+	BaseSprite *getTalkStance(const char *stance) override;
 	virtual void goTo(int x, int y, TDirection afterWalkDir = DI_NONE);
 	BasePoint *_targetPoint;
-	virtual bool update();
-	virtual bool display();
+	bool update() override;
+	bool display() override;
 	virtual void turnTo(TDirection dir);
 	AdActor(BaseGame *inGame/*=nullptr*/);
-	virtual ~AdActor();
+	~AdActor() override;
 	bool loadFile(const char *filename);
 	bool loadBuffer(char *buffer, bool complete = true);
 
@@ -79,14 +78,14 @@ private:
 	Common::String _turnLeftAnimName;
 	Common::String _turnRightAnimName;
 	BaseArray<AdSpriteSet *> _anims;
-	virtual bool playAnim(const char *filename);
+	bool playAnim(const char *filename) override;
 	AdSpriteSet *getAnimByName(const Common::String &animName);
 
 	// scripting interface
-	virtual ScValue *scGetProperty(const Common::String &name) override;
-	virtual bool scSetProperty(const char *name, ScValue *value) override;
-	virtual bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
-	virtual const char *scToString() override;
+	ScValue *scGetProperty(const Common::String &name) override;
+	bool scSetProperty(const char *name, ScValue *value) override;
+	bool scCallMethod(ScScript *script, ScStack *stack, ScStack *thisStack, const char *name) override;
+	const char *scToString() override;
 
 	bool setDefaultAnimNames();
 	BaseSprite *getTalkStanceOld(const char *stance);

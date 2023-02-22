@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -421,22 +420,43 @@ void EngineState::saveLoadWithSerializer(Common::Serializer &s) {
 	if (getSciVersion() >= SCI_VERSION_2) {
 		g_sci->_video32->beforeSaveLoadWithSerializer(s);
 	}
+
+	if (getSciVersion() >= SCI_VERSION_2 &&
+		s.isLoading() &&
+		g_sci->getPlatform() == Common::kPlatformMacintosh) {
+		g_sci->_gfxFrameout->deletePlanesForMacRestore();
+	}
 #endif
 
 	_segMan->saveLoadWithSerializer(s);
 
 	g_sci->_soundCmd->syncPlayList(s);
 
-#ifdef ENABLE_SCI32
 	if (getSciVersion() >= SCI_VERSION_2) {
+#ifdef ENABLE_SCI32
 		g_sci->_gfxPalette32->saveLoadWithSerializer(s);
 		g_sci->_gfxRemap32->saveLoadWithSerializer(s);
 		g_sci->_gfxCursor32->saveLoadWithSerializer(s);
 		g_sci->_audio32->saveLoadWithSerializer(s);
 		g_sci->_video32->saveLoadWithSerializer(s);
-	} else
 #endif
+	} else {
 		g_sci->_gfxPalette16->saveLoadWithSerializer(s);
+	}
+
+	// Stop any currently playing audio when loading.
+	// Loading is not normally allowed while audio is being played in SCI games.
+	// Stopping sounds is needed in ScummVM, as the player may load via
+	// Control - F5 at any point, even while a sound is playing.
+	if (s.isLoading()) {
+		if (getSciVersion() >= SCI_VERSION_2) {
+#ifdef ENABLE_SCI32
+			g_sci->_audio32->stop(kAllChannels);
+#endif
+		} else {
+			g_sci->_audio->stopAllAudio();
+		}
+	}
 }
 
 void Vocabulary::saveLoadWithSerializer(Common::Serializer &s) {
@@ -548,7 +568,7 @@ void Script::saveLoadWithSerializer(Common::Serializer &s) {
 
 	s.skip(4, VER(14), VER(19));		// OBSOLETE: Used to be _numExports
 	s.skip(4, VER(14), VER(19));		// OBSOLETE: Used to be _numSynonyms
-	s.syncAsSint32LE(_lockers);
+	s.syncAsUint32LE(_lockers);
 
 	// Sync _objects. This is a hashmap, and we use the following on disk format:
 	// First we store the number of items in the hashmap, then we store each
@@ -668,6 +688,9 @@ void MusicEntry::saveLoadWithSerializer(Common::Serializer &s) {
 	s.syncAsSint16LE(fadeStep);
 	s.syncAsSint32LE(fadeTicker);
 	s.syncAsSint32LE(fadeTickerStep);
+	s.syncAsByte(fadeSetVolume, VER(46));
+	s.syncAsByte(fadeCompleted, VER(46));
+	s.syncAsByte(stopAfterFading, VER(45));
 	s.syncAsByte(status);
 	if (s.getVersion() >= 32)
 		s.syncAsByte(playBed);
@@ -681,9 +704,9 @@ void MusicEntry::saveLoadWithSerializer(Common::Serializer &s) {
 	// pMidiParser and pStreamAud will be initialized when the
 	// sound list is reconstructed in gamestate_restore()
 	if (s.isLoading()) {
-		soundRes = 0;
-		pMidiParser = 0;
-		pStreamAud = 0;
+		soundRes = nullptr;
+		pMidiParser = nullptr;
+		pStreamAud = nullptr;
 		reverb = -1;	// invalid reverb, will be initialized in processInitSound()
 	}
 }
@@ -730,7 +753,18 @@ void SoundCommandParser::reconstructPlayList() {
 			if (_soundVersion >= SCI_VERSION_1_EARLY)
 				writeSelectorValue(_segMan, entry->soundObj, SELECTOR(vol), entry->volume);
 
-			processPlaySound(entry->soundObj, entry->playBed);
+			processPlaySound(entry->soundObj, entry->playBed, true);
+		}
+	}
+
+	// Emulate the original SCI0 behavior: If no sound with status kSoundPlaying was found we
+	// look for the first sound with status kSoundPaused and start that. It relies on a correctly
+	// sorted playlist, but we have that...
+	if (_soundVersion <= SCI_VERSION_0_LATE && !_music->getFirstSlotWithStatus(kSoundPlaying)) {
+		if (MusicEntry *pSnd = _music->getFirstSlotWithStatus(kSoundPaused)) {
+			writeSelectorValue(_segMan, pSnd->soundObj, SELECTOR(loop), pSnd->loop);
+			writeSelectorValue(_segMan, pSnd->soundObj, SELECTOR(priority), pSnd->priority);
+			processPlaySound(pSnd->soundObj, pSnd->playBed, true);
 		}
 	}
 }
@@ -813,11 +847,18 @@ void GfxPalette::palVarySaveLoadPalette(Common::Serializer &s, Palette *palette)
 }
 
 void GfxPalette::saveLoadWithSerializer(Common::Serializer &s) {
+	if (s.isLoading()) {
+		// Palette cycling schedules must be reset on load because we persist the engine tick count.
+		// Otherwise, loading during cycling leaves the animation stuck until the new lower tick count
+		// reaches the stale scheduled values. (Example: SQ5 Kiz Urazgubi waterfalls)
+		// SSCI didn't persist or reset engine tick count so it didn't need to reset the schedules.
+		_schedules.clear();
+	}
 	if (s.getVersion() >= 25) {
 		// We need to save intensity of the _sysPalette at least for kq6 when entering the dark cave (room 390)
 		//  from room 340. scripts will set intensity to 60 for this room and restore them when leaving.
 		//  Sierra SCI is also doing this (although obviously not for SCI0->SCI01 games, still it doesn't hurt
-		//  to save it everywhere). Refer to bug #3072868
+		//  to save it everywhere). Refer to bug #5383
 		s.syncBytes(_sysPalette.intensity, 256);
 	}
 	if (s.getVersion() >= 24) {
@@ -1174,10 +1215,61 @@ void SegManager::reconstructClones() {
 
 #pragma mark -
 
+bool gamestate_save(EngineState *s, int saveId, const Common::String &savename, const Common::String &version) {
+	Common::SaveFileManager *saveFileMan = g_sci->getSaveFileManager();
+	const Common::String filename = g_sci->getSavegameName(saveId);
+
+	Common::OutSaveFile *saveStream = saveFileMan->openForSaving(filename);
+	if (saveStream == nullptr) {
+		warning("Error opening savegame \"%s\" for writing", filename.c_str());
+		return false;
+	}
+
+	if (!gamestate_save(s, saveStream, savename, version)) {
+		warning("Saving the game failed");
+		saveStream->finalize();
+		delete saveStream;
+		return false;
+	}
+
+	saveStream->finalize();
+	if (saveStream->err()) {
+		warning("Writing the savegame failed");
+		delete saveStream;
+		return false;
+	}
+
+	delete saveStream;
+	return true;
+}
 
 bool gamestate_save(EngineState *s, Common::WriteStream *fh, const Common::String &savename, const Common::String &version) {
 	Common::Serializer ser(nullptr, fh);
-	set_savegame_metadata(ser, fh, savename, version);
+	Common::String ver = version;
+
+	// If the game version is empty, we are probably saving from the GMM, so read it
+	// from the version global and then the VERSION file
+	if (ver == "") {
+		// The version global was originally 28 but then became 27.
+		// When it was 28, 27 was a volume level, so differentiate by type.
+		reg_t versionRef = s->variables[VAR_GLOBAL][kGlobalVarVersionNew];
+		if (versionRef.isNumber()) {
+			versionRef = s->variables[VAR_GLOBAL][kGlobalVarVersionOld];
+		}
+#ifdef ENABLE_SCI32
+		// LSL7 and Phant2 store the version string as an object instead of a reference
+		if (s->_segMan->isObject(versionRef)) {
+			versionRef = readSelector(s->_segMan, versionRef, SELECTOR(data));
+		}
+#endif
+		ver = s->_segMan->getString(versionRef);
+		if (ver == "") {
+			Common::ScopedPtr<Common::SeekableReadStream> versionFile(SearchMan.createReadStreamForMember("VERSION"));
+			ver = versionFile ? versionFile->readLine() : "";
+		}
+	}
+
+	set_savegame_metadata(ser, fh, savename, ver);
 	s->saveLoadWithSerializer(ser);		// FIXME: Error handling?
 	if (g_sci->_gfxPorts)
 		g_sci->_gfxPorts->saveLoadWithSerializer(ser);
@@ -1190,10 +1282,51 @@ bool gamestate_save(EngineState *s, Common::WriteStream *fh, const Common::Strin
 	return true;
 }
 
-extern void showScummVMDialog(const Common::String &message);
+extern int showScummVMDialog(const Common::U32String &message, const Common::U32String &altButton = Common::U32String(), bool alignCenter = true);
 
 void gamestate_afterRestoreFixUp(EngineState *s, int savegameId) {
 	switch (g_sci->getGameId()) {
+	case GID_CAMELOT: {
+		// WORKAROUND: CAMELOT depends on its dynamic menu state persisting. The menu items'
+		//  enabled states determines when the player can draw or sheathe their sword and
+		//  open a purse. If these aren't updated then the player may be unable to perform
+		//  necessary actions, or may be able to perform unexpected ones that break the game.
+		//  Since we don't persist menu state (yet) we need to recreate it from game state.
+		//
+		// - Action \ Open Purse: Enabled while one of the purses is in inventory.
+		// - Action \ Draw Sword: Enabled while flag 3 is set, unless disabled by room scripts.
+		// * The text "Draw Sword" toggles to "Sheathe Sword" depending on global 124,
+		//   but this is only cosmetic. Exported proc #1 in script 997 refreshes this
+		//   when the sword status or room changes.
+		//
+		// After evaluating all the scripts that disable the sword, we enforce the few
+		//  that prevent breaking the game: room 50 under the aqueduct and sitting with
+		//  the scholar while in room 82 (ego view 84).
+		//
+		// FIXME: Save and restore full menu state as SSCI did and don't apply these
+		//  workarounds when restoring saves that contain menu state.
+
+		// Action \ Open Purse
+		reg_t enablePurse = NULL_REG;
+		Common::Array<reg_t> purses = s->_segMan->findObjectsByName("purse");
+		reg_t ego = s->variables[VAR_GLOBAL][0];
+		for (uint i = 0; i < purses.size(); ++i) {
+			reg_t purseOwner = readSelector(s->_segMan, purses[i], SELECTOR(owner));
+			if (purseOwner == ego) {
+				enablePurse = TRUE_REG;
+				break;
+			}
+		}
+		g_sci->_gfxMenu->kernelSetAttribute(1281 >> 8, 1281 & 0xFF, SCI_MENU_ATTRIBUTE_ENABLED, enablePurse);
+
+		// Action \ Draw Sword
+		bool hasSword = (s->variables[VAR_GLOBAL][250].getOffset() & 0x1000); // flag 3
+		bool underAqueduct = (s->variables[VAR_GLOBAL][11].getOffset() == 50);
+		bool sittingWithScholar = (readSelectorValue(s->_segMan, ego, SELECTOR(view)) == 84);
+		reg_t enableSword = (hasSword && !underAqueduct && !sittingWithScholar) ? TRUE_REG : NULL_REG;
+		g_sci->_gfxMenu->kernelSetAttribute(1283 >> 8, 1283 & 0xFF, SCI_MENU_ATTRIBUTE_ENABLED, enableSword);
+		break;
+	}
 	case GID_MOTHERGOOSE:
 		// WORKAROUND: Mother Goose SCI0
 		//  Script 200 / rm200::newRoom will set global C5h directly right after creating a child to the
@@ -1208,6 +1341,9 @@ void gamestate_afterRestoreFixUp(EngineState *s, int savegameId) {
 		//  saving a previously restored game.
 		// We set the current savedgame-id directly and remove the script
 		//  code concerning this via script patch.
+		// We also set this in kSaveGame so that the global is correct even if no restoring occurs,
+		//  otherwise the auto-delete script at the end of the SCI1.1 floppy version breaks if
+		//  the game is played from start to finish. (bug #5294)
 		s->variables[VAR_GLOBAL][0xB3].setOffset(SAVEGAMEID_OFFICIALRANGE_START + savegameId);
 		break;
 	case GID_JONES:
@@ -1228,6 +1364,20 @@ void gamestate_afterRestoreFixUp(EngineState *s, int savegameId) {
 		g_sci->_gfxMenu->kernelSetAttribute(515 >> 8, 515 & 0xFF, SCI_MENU_ATTRIBUTE_ENABLED, TRUE_REG);    // Game -> Restore Game
 		g_sci->_gfxMenu->kernelSetAttribute(1025 >> 8, 1025 & 0xFF, SCI_MENU_ATTRIBUTE_ENABLED, TRUE_REG);  // Status -> Statistics
 		g_sci->_gfxMenu->kernelSetAttribute(1026 >> 8, 1026 & 0xFF, SCI_MENU_ATTRIBUTE_ENABLED, TRUE_REG);  // Status -> Goals
+		break;
+	case GID_KQ5:
+		// WORKAROUND: We allow users to choose if they want the older KQ5 CD Windows cursors. These
+		//  are black and white Cursor resources instead of the color View resources in the DOS version.
+		//  This setting affects how KQCursor objects are initialized and might have changed since the
+		//  game was saved. The scripts don't expect this since it wasn't an option in the original.
+		//  In order for the cursors to correctly use the current setting, we need to clear the "number"
+		//  property of every KQCursor when restoring when Windows cursors are disabled.
+		if (g_sci->isCD() && !g_sci->_features->useWindowsCursors()) {
+			Common::Array<reg_t> cursors = s->_segMan->findObjectsBySuperClass("KQCursor");
+			for (uint i = 0; i < cursors.size(); ++i) {
+				writeSelector(s->_segMan, cursors[i], SELECTOR(number), NULL_REG);
+			}
+		}
 		break;
 	case GID_KQ6:
 		if (g_sci->isCD()) {
@@ -1250,15 +1400,31 @@ void gamestate_afterRestoreFixUp(EngineState *s, int savegameId) {
 		}
 		break;
 	case GID_PQ2:
-		// HACK: Same as above - enable the save game menu option when loading in PQ2 (bug #6875).
-		// It gets disabled in the game's death screen.
+		// HACK: Same as in Jones - enable the save game menu option when loading in
+		// PQ2 (bug #6875). It gets disabled in the game's death screen.
 		g_sci->_gfxMenu->kernelSetAttribute(2, 1, SCI_MENU_ATTRIBUTE_ENABLED, TRUE_REG);	// Game -> Save Game
 		break;
 #ifdef ENABLE_SCI32
+	case GID_KQ7:
+		if (Common::checkGameGUIOption(GAMEOPTION_UPSCALE_VIDEOS, ConfMan.get("guioptions"))) {
+			uint16 value = ConfMan.getBool("enable_video_upscale") ? 32 : 0;
+			s->variables[VAR_GLOBAL][kGlobalVarKQ7UpscaleVideos] = make_reg(0, value);
+		}
+		break;
 	case GID_PHANTASMAGORIA2:
 		if (Common::checkGameGUIOption(GAMEOPTION_ENABLE_CENSORING, ConfMan.get("guioptions"))) {
 			s->variables[VAR_GLOBAL][kGlobalVarPhant2CensorshipFlag] = make_reg(0, ConfMan.getBool("enable_censoring"));
 		}
+		break;
+	case GID_SHIVERS:
+		// WORKAROUND: When loading a saved game from the GMM in the same scene in
+		// Shivers, we end up with the same draw list, but the scene palette is not
+		// set properly. Normally, Shivers does a room change when showing the saved
+		// game list, which does not occur when loading directly from the GMM. When
+		// loading from the GMM, at this point all of the visible planes and items
+		// are deleted, so calling frameOut here helps reset the game palette
+		// properly, like when changing a room.
+		g_sci->_gfxFrameout->frameOut(true);
 		break;
 #endif
 	default:
@@ -1266,10 +1432,27 @@ void gamestate_afterRestoreFixUp(EngineState *s, int savegameId) {
 	}
 }
 
+bool gamestate_restore(EngineState *s, int saveId) {
+	Common::SaveFileManager *saveFileMan = g_sci->getSaveFileManager();
+	const Common::String filename = g_sci->getSavegameName(saveId);
+	Common::SeekableReadStream *saveStream = saveFileMan->openForLoading(filename);
+
+	if (saveStream == nullptr) {
+		warning("Savegame #%d not found", saveId);
+		return false;
+	}
+
+	gamestate_restore(s, saveStream);
+	delete saveStream;
+
+	gamestate_afterRestoreFixUp(s, saveId);
+	return true;
+}
+
 void gamestate_restore(EngineState *s, Common::SeekableReadStream *fh) {
 	SavegameMetadata meta;
 
-	Common::Serializer ser(fh, 0);
+	Common::Serializer ser(fh, nullptr);
 	sync_SavegameMetadata(ser, meta);
 
 	if (fh->eos()) {
@@ -1283,7 +1466,7 @@ void gamestate_restore(EngineState *s, Common::SeekableReadStream *fh) {
 			if (meta.version < MINIMUM_SAVEGAME_VERSION) {
 				showScummVMDialog(_("The format of this saved game is obsolete, unable to load it"));
 			} else {
-				Common::String msg = Common::String::format(_("Savegame version is %d, maximum supported is %0d"), meta.version, CURRENT_SAVEGAME_VERSION);
+				Common::U32String msg = Common::U32String::format(_("Savegame version is %d, maximum supported is %0d"), meta.version, CURRENT_SAVEGAME_VERSION);
 				showScummVMDialog(msg);
 			}
 

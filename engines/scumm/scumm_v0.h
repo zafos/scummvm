@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -66,7 +65,7 @@ protected:
 public:
 	ScummEngine_v0(OSystem *syst, const DetectorResult &dr);
 
-	virtual void resetScumm();
+	void resetScumm() override;
 
 	byte walkboxFindTarget(Actor *a, int destbox, Common::Point walkdest);
 
@@ -75,22 +74,22 @@ public:
 	int DelayCalculateDelta();
 
 protected:
-	virtual void resetRoomObject(ObjectData *od, const byte *room, const byte *searchptr = NULL);
+	void resetRoomObject(ObjectData *od, const byte *room, const byte *searchptr = NULL) override;
 
-	virtual void setupOpcodes();
+	void setupOpcodes() override;
 
-	virtual void setupScummVars();
-	virtual void resetScummVars();
-	virtual void scummLoop(int delta);
-	virtual void decodeParseString();
+	void setupScummVars() override;
+	void resetScummVars() override;
+	void scummLoop(int delta) override;
+	void decodeParseString() override;
 
-	virtual void processInput();
+	void processInput() override;
 
-	virtual void saveLoadWithSerializer(Common::Serializer &s);
+	void saveLoadWithSerializer(Common::Serializer &s) override;
 
-	virtual bool objIsActor(int obj);
-	virtual int objToActor(int obj);
-	virtual int actorToObj(int actor);
+	bool objIsActor(int obj) override;
+	int objToActor(int obj) override;
+	int actorToObj(int actor) override;
 
 	// V0 MM Verb commands
 	int getVerbPrepId();
@@ -99,11 +98,11 @@ protected:
 	void verbExec();
 
 	virtual void runSentenceScript();
-	virtual void checkAndRunSentenceScript();
+	void checkAndRunSentenceScript() override;
 	bool checkPendingWalkAction();
 	bool checkSentenceComplete();
-	virtual void checkExecVerbs();
-	virtual void handleMouseOver(bool updateInventory);
+	void checkExecVerbs() override;
+	void handleMouseOver(bool updateInventory) override;
 	int verbPrepIdType(int verbid);
 	void resetVerbs();
 	void verbDemoMode();
@@ -118,18 +117,18 @@ protected:
 
 	void switchActor(int slot);
 
-	virtual int getVarOrDirectWord(byte mask);
-	virtual uint fetchScriptWord();
+	int getVarOrDirectWord(byte mask) override;
+	uint fetchScriptWord() override;
 
-	virtual int getActiveObject();
+	int getActiveObject() override;
 
-	void resetSentence();
+	void resetSentence() override;
 
-	bool areBoxesNeighbors(int box1nr, int box2nr);
+	bool areBoxesNeighbors(int box1nr, int box2nr) override;
 
 	bool ifEqualActiveObject2Common(bool checkType);
 
-	virtual int getCurrentLights() const;
+	int getCurrentLights() const override;
 
 	/* Version 0 script opcodes */
 	void o_stopCurrentScript();

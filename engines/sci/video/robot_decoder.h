@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -33,7 +32,7 @@
 #include "sci/graphics/helpers.h"        // for GuiResourceId
 #include "sci/graphics/screen_item32.h"  // for ScaleInfo, ScreenItem (ptr o...
 
-namespace Common { class SeekableSubReadStreamEndian; }
+namespace Common { class SeekableReadStreamEndian; }
 namespace Sci {
 class Plane;
 class SegManager;
@@ -320,7 +319,7 @@ public:
 	};
 
 	RobotAudioStream(const int32 bufferSize);
-	virtual ~RobotAudioStream();
+	~RobotAudioStream() override;
 
 	/**
 	 * Adds a new audio packet to the stream.
@@ -435,13 +434,13 @@ private:
 #pragma mark RobotAudioStream - AudioStream implementation
 public:
 	int readBuffer(Audio::st_sample_t *outBuffer, int numSamples) override;
-	virtual bool isStereo() const override { return false; };
-	virtual int getRate() const override { return 22050; };
-	virtual bool endOfData() const override {
+	bool isStereo() const override { return false; };
+	int getRate() const override { return 22050; };
+	bool endOfData() const override {
 		Common::StackLock lock(_mutex);
 		return _readHeadAbs >= _writeHeadAbs;
 	};
-	virtual bool endOfStream() const override {
+	bool endOfStream() const override {
 		Common::StackLock lock(_mutex);
 		return _finished && endOfData();
 	}
@@ -645,7 +644,7 @@ private:
 	/**
 	 * The read stream containing raw robot data.
 	 */
-	Common::SeekableSubReadStreamEndian *_stream;
+	Common::SeekableReadStreamEndian *_stream;
 
 	/**
 	 * The current status of the player.

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,11 +23,6 @@
 #define POSIX_FILESYSTEM_H
 
 #include "backends/fs/abstract-fs.h"
-
-#ifdef MACOSX
-#include <sys/types.h>
-#endif
-#include <unistd.h>
 
 /**
  * Implementation of the ScummVM file system API based on POSIX.
@@ -59,23 +53,23 @@ public:
 	 */
 	POSIXFilesystemNode(const Common::String &path);
 
-	virtual bool exists() const { return access(_path.c_str(), F_OK) == 0; }
-	virtual Common::String getDisplayName() const { return _displayName; }
-	virtual Common::String getName() const { return _displayName; }
-	virtual Common::String getPath() const { return _path; }
-	virtual bool isDirectory() const { return _isDirectory; }
-	virtual bool isReadable() const { return access(_path.c_str(), R_OK) == 0; }
-	virtual bool isWritable() const { return access(_path.c_str(), W_OK) == 0; }
+	bool exists() const override;
+	Common::U32String getDisplayName() const override { return _displayName; }
+	Common::String getName() const override { return _displayName; }
+	Common::String getPath() const override { return _path; }
+	bool isDirectory() const override { return _isDirectory; }
+	bool isReadable() const override;
+	bool isWritable() const override;
 
-	virtual AbstractFSNode *getChild(const Common::String &n) const;
-	virtual bool getChildren(AbstractFSList &list, ListMode mode, bool hidden) const;
-	virtual AbstractFSNode *getParent() const;
+	AbstractFSNode *getChild(const Common::String &n) const override;
+	bool getChildren(AbstractFSList &list, ListMode mode, bool hidden) const override;
+	AbstractFSNode *getParent() const override;
 
-	virtual Common::SeekableReadStream *createReadStream();
-	virtual Common::WriteStream *createWriteStream();
-	virtual bool create(bool isDirectoryFlag);
+	Common::SeekableReadStream *createReadStream() override;
+	Common::SeekableWriteStream *createWriteStream() override;
+	bool createDirectory() override;
 
-private:
+protected:
 	/**
 	 * Tests and sets the _isValid and _isDirectory flags, using the stat() function.
 	 */

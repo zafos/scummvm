@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -30,6 +29,7 @@
 #include "common/hashmap.h"
 #include "common/hash-str.h"
 #include "common/func.h"
+#include "common/ptr.h"
 #include "common/scummsys.h"
 
 #include "engines/engine.h"
@@ -48,18 +48,31 @@ class WriteStream;
 class SeekableReadStream;
 class File;
 struct Event;
+class RandomSource;
 }
 
 namespace Adl {
 
+Common::String getDiskImageName(const AdlGameDescription &adlDesc, byte volume);
+GameType getGameType(const AdlGameDescription &desc);
+GameVersion getGameVersion(const AdlGameDescription &desc);
+Common::Language getLanguage(const AdlGameDescription &desc);
+Common::Platform getPlatform(const AdlGameDescription &desc);
+
 class Console;
 class Display;
 class GraphicsMan;
-struct AdlGameDescription;
 class ScriptEnv;
 
 enum kDebugChannels {
 	kDebugChannelScript = 1 << 0
+};
+
+enum ADLAction {
+	kADLActionNone,
+	kADLActionQuit,
+
+	kADLActionCount
 };
 
 // Save and restore opcodes
@@ -115,10 +128,19 @@ public:
 	ScriptEnv(const Command &cmd, byte room, byte verb, byte noun) :
 			_cmd(cmd), _room(room), _verb(verb), _noun(noun), _ip(0) { }
 
+	virtual ~ScriptEnv() { }
+
+	enum kOpType {
+		kOpTypeDone,
+		kOpTypeCond,
+		kOpTypeAct
+	};
+
 	byte op() const { return _cmd.script[_ip]; }
+	virtual kOpType getOpType() const = 0;
 	// We keep this 1-based for easier comparison with the original engine
 	byte arg(uint i) const { return _cmd.script[_ip + i]; }
-	void skip(uint i) { _ip += i; }
+	virtual void next(uint numArgs) = 0;
 
 	bool isMatch() const {
 		return (_cmd.room == IDI_ANY || _cmd.room == _room) &&
@@ -126,15 +148,15 @@ public:
 		       (_cmd.noun == IDI_ANY || _cmd.noun == _noun);
 	}
 
-	byte getCondCount() const { return _cmd.numCond; }
-	byte getActCount() const { return _cmd.numAct; }
 	byte getNoun() const { return _noun; }
 	const Command &getCommand() const { return _cmd; }
+
+protected:
+	byte _ip;
 
 private:
 	const Command &_cmd;
 	const byte _room, _verb, _noun;
-	byte _ip;
 };
 
 enum {
@@ -229,7 +251,7 @@ struct RoomData {
 class AdlEngine : public Engine {
 friend class Console;
 public:
-	virtual ~AdlEngine();
+	~AdlEngine() override;
 
 	bool pollEvent(Common::Event &event) const;
 	void bell(uint count = 1) const;
@@ -238,19 +260,22 @@ protected:
 	AdlEngine(OSystem *syst, const AdlGameDescription *gd);
 
 	// Engine
-	Common::Error loadGameState(int slot);
-	Common::Error saveGameState(int slot, const Common::String &desc);
-	bool canSaveGameStateCurrently();
+	Common::Error loadGameState(int slot) override;
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
+	bool canSaveGameStateCurrently() override;
+	Common::String getSaveStateName(int slot) const override;
+	int getAutosaveSlot() const override { return 15; }
 
 	Common::String getDiskImageName(byte volume) const { return Adl::getDiskImageName(*_gameDescription, volume); }
 	GameType getGameType() const { return Adl::getGameType(*_gameDescription); }
 	GameVersion getGameVersion() const { return Adl::getGameVersion(*_gameDescription); }
+	Common::Language getLanguage() const { return Adl::getLanguage(*_gameDescription); }
 	virtual void gameLoop();
 	virtual void loadState(Common::ReadStream &stream);
 	virtual void saveState(Common::WriteStream &stream);
 	Common::String readString(Common::ReadStream &stream, byte until = 0) const;
 	Common::String readStringAt(Common::SeekableReadStream &stream, uint offset, byte until = 0) const;
-	void openFile(Common::File &file, const Common::String &name) const;
+	void extractExeStrings(Common::ReadStream &stream, uint16 printAddr, Common::StringArray &strings) const;
 
 	virtual void printString(const Common::String &str) = 0;
 	virtual Common::String loadMessage(uint idx) const = 0;
@@ -261,7 +286,8 @@ protected:
 	virtual Common::String getLine();
 	Common::String inputString(byte prompt = 0) const;
 	byte inputKey(bool showCursor = true) const;
-	void getInput(uint &verb, uint &noun);
+	virtual void getInput(uint &verb, uint &noun);
+	Common::String getWord(const Common::String &line, uint &index) const;
 
 	virtual Common::String formatVerbError(const Common::String &verb) const;
 	virtual Common::String formatNounError(const Common::String &verb, const Common::String &noun) const;
@@ -283,35 +309,48 @@ protected:
 	void loadDroppedItemOffsets(Common::ReadStream &stream, byte count);
 
 	// Opcodes
-	int o1_isItemInRoom(ScriptEnv &e);
-	int o1_isMovesGT(ScriptEnv &e);
-	int o1_isVarEQ(ScriptEnv &e);
-	int o1_isCurPicEQ(ScriptEnv &e);
-	int o1_isItemPicEQ(ScriptEnv &e);
+	typedef Common::SharedPtr<Common::Functor1<ScriptEnv &, int> > Opcode;
 
-	int o1_varAdd(ScriptEnv &e);
-	int o1_varSub(ScriptEnv &e);
-	int o1_varSet(ScriptEnv &e);
-	int o1_listInv(ScriptEnv &e);
-	int o1_moveItem(ScriptEnv &e);
-	int o1_setRoom(ScriptEnv &e);
-	int o1_setCurPic(ScriptEnv &e);
-	int o1_setPic(ScriptEnv &e);
-	int o1_printMsg(ScriptEnv &e);
-	int o1_setLight(ScriptEnv &e);
-	int o1_setDark(ScriptEnv &e);
-	int o1_save(ScriptEnv &e);
-	int o1_restore(ScriptEnv &e);
-	int o1_restart(ScriptEnv &e);
-	int o1_quit(ScriptEnv &e);
-	int o1_placeItem(ScriptEnv &e);
-	int o1_setItemPic(ScriptEnv &e);
-	int o1_resetPic(ScriptEnv &e);
-	template <Direction D>
-	int o1_goDirection(ScriptEnv &e);
-	int o1_takeItem(ScriptEnv &e);
-	int o1_dropItem(ScriptEnv &e);
-	int o1_setRoomPic(ScriptEnv &e);
+	template <class T>
+	Opcode opcode(int (T::*f)(ScriptEnv &)) {
+		return Opcode(new Common::Functor1Mem<ScriptEnv &, int, T>(static_cast<T *>(this), f));
+	}
+
+	virtual int o_isItemInRoom(ScriptEnv &e);
+	virtual int o_isMovesGT(ScriptEnv &e);
+	virtual int o_isVarEQ(ScriptEnv &e);
+	virtual int o_isCurPicEQ(ScriptEnv &e);
+	virtual int o_isItemPicEQ(ScriptEnv &e);
+
+	virtual int o_varAdd(ScriptEnv &e);
+	virtual int o_varSub(ScriptEnv &e);
+	virtual int o_varSet(ScriptEnv &e);
+	virtual int o_listInv(ScriptEnv &e);
+	virtual int o_moveItem(ScriptEnv &e);
+	virtual int o_setRoom(ScriptEnv &e);
+	virtual int o_setCurPic(ScriptEnv &e);
+	virtual int o_setPic(ScriptEnv &e);
+	virtual int o_printMsg(ScriptEnv &e);
+	virtual int o_setLight(ScriptEnv &e);
+	virtual int o_setDark(ScriptEnv &e);
+	virtual int o_save(ScriptEnv &e);
+	virtual int o_restore(ScriptEnv &e);
+	virtual int o_restart(ScriptEnv &e);
+	virtual int o_quit(ScriptEnv &e);
+	virtual int o_placeItem(ScriptEnv &e);
+	virtual int o_setItemPic(ScriptEnv &e);
+	virtual int o_resetPic(ScriptEnv &e);
+	virtual int o_takeItem(ScriptEnv &e);
+	virtual int o_dropItem(ScriptEnv &e);
+	virtual int o_setRoomPic(ScriptEnv &e);
+
+	virtual int goDirection(ScriptEnv &e, Direction D);
+	int o_goNorth(ScriptEnv &e) { return goDirection(e, IDI_DIR_NORTH); }
+	int o_goSouth(ScriptEnv &e) { return goDirection(e, IDI_DIR_SOUTH); }
+	int o_goEast(ScriptEnv &e) { return goDirection(e, IDI_DIR_EAST); }
+	int o_goWest(ScriptEnv &e) { return goDirection(e, IDI_DIR_WEST); }
+	int o_goUp(ScriptEnv &e) { return goDirection(e, IDI_DIR_UP); }
+	int o_goDown(ScriptEnv &e) { return goDirection(e, IDI_DIR_DOWN); }
 
 	// Graphics
 	void drawPic(byte pic, Common::Point pos = Common::Point()) const;
@@ -338,6 +377,7 @@ protected:
 	void doActions(ScriptEnv &env);
 	bool doOneCommand(const Commands &commands, byte verb, byte noun);
 	void doAllCommands(const Commands &commands, byte verb, byte noun);
+	virtual ScriptEnv *createScriptEnv(const Command &cmd, byte room, byte verb, byte noun);
 
 	// Debug functions
 	static Common::String toAscii(const Common::String &str);
@@ -356,8 +396,7 @@ protected:
 	bool _textMode;
 
 	// Opcodes
-	typedef Common::Functor1<ScriptEnv &, int> Opcode;
-	Common::Array<const Opcode *> _condOpcodes, _actOpcodes;
+	Common::Array<Opcode> _condOpcodes, _actOpcodes;
 	// Message strings in data file
 	Common::Array<DataBlockPtr> _messages;
 	// Picture data
@@ -384,6 +423,8 @@ protected:
 		Common::String lineFeeds;
 	} _strings;
 
+	uint32 _verbErrorPos, _nounErrorPos;
+
 	struct {
 		uint cantGoThere;
 		uint dontUnderstand;
@@ -399,8 +440,13 @@ protected:
 	bool _isRestarting, _isRestoring, _isQuitting;
 	bool _canSaveNow, _canRestoreNow;
 	bool _abortScript;
+	Common::RandomSource *_random;
 
 	const AdlGameDescription *_gameDescription;
+
+	mutable Common::File *_inputScript;
+	mutable uint _scriptDelay;
+	mutable bool _scriptPaused;
 
 private:
 	virtual void runIntro() { }
@@ -411,18 +457,18 @@ private:
 	virtual void loadRoom(byte roomNr) = 0;
 	virtual void showRoom() = 0;
 	virtual void switchRegion(byte region) { }
-
+	void runScript(const char *filename) const;
+	void stopScript() const;
+	void setScriptDelay(uint scriptDelay) const { _scriptDelay = scriptDelay; }
+	Common::String getScriptLine() const;
 	// Engine
-	Common::Error run();
-	bool hasFeature(EngineFeature f) const;
-	bool canLoadGameStateCurrently();
+	Common::Error run() override;
+	bool hasFeature(EngineFeature f) const override;
+	bool canLoadGameStateCurrently() override;
 
 	// Text input
 	byte convertKey(uint16 ascii) const;
-	Common::String getWord(const Common::String &line, uint &index) const;
 
-	Console *_console;
-	GUI::Debugger *getDebugger() { return _console; }
 	byte _saveVerb, _saveNoun, _restoreVerb, _restoreNoun;
 };
 

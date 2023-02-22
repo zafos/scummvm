@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -70,6 +69,9 @@ protected:
 	/** FolderDownloadRequest-related */
 	FolderDownloadRequest *_downloadFolderRequest;
 
+	/** Whether user manually enabled the Storage. */
+	bool _isEnabled;
+
 	/** Returns default error callback (printErrorResponse). */
 	virtual Networking::ErrorCallback getErrorPrintingCallback();
 
@@ -114,6 +116,16 @@ public:
 	* @returns  some unique storage name (for example, "Dropbox (user@example.com)")
 	*/
 	virtual Common::String name() const = 0;
+
+	/**
+	 * Return whether Storage has been manually enabled by user.
+	 */
+	bool isEnabled() const;
+
+	/**
+	 * Set _isEnabled to true.
+	 */
+	void enable();
 
 	/**
 	 * Public Cloud API comes down there.
@@ -170,8 +182,17 @@ public:
 	/** Returns whether there is a SavesSyncRequest running. */
 	virtual bool isSyncing();
 
-	/** Returns a number in [0, 1] range which represents current sync progress (1 = complete). */
+	/** Returns a number in [0, 1] range which represents current sync downloading progress (1 = complete). */
 	virtual double getSyncDownloadingProgress();
+
+	struct SyncDownloadingInfo {
+		uint64 bytesDownloaded = 0, bytesToDownload = 0;
+		uint64 filesDownloaded = 0, filesToDownload = 0;
+		bool inProgress = false;
+	};
+
+	/** Fills a struct with numbers about current sync downloading progress. */
+	virtual void getSyncDownloadingInfo(SyncDownloadingInfo &info);
 
 	/** Returns a number in [0, 1] range which represents current sync progress (1 = complete). */
 	virtual double getSyncProgress();
@@ -181,9 +202,6 @@ public:
 
 	/** Cancels running sync. */
 	virtual void cancelSync();
-
-	/** Sets SavesSyncRequest's target to given CommandReceiver. */
-	virtual void setSyncTarget(GUI::CommandReceiver *target);
 
 protected:
 	/** Finishes the sync. Shows an OSD message. */

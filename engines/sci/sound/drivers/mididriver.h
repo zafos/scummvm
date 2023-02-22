@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -24,8 +23,10 @@
 #define SCI_SFX_SOFTSEQ_MIDIDRIVER_H
 
 #include "sci/sci.h"
+#include "sci/util.h"
 #include "audio/mididrv.h"
 #include "common/error.h"
+#include "common/platform.h"
 
 namespace Sci {
 
@@ -87,7 +88,7 @@ public:
 	}
 	virtual int open(ResourceManager *resMan) { return _driver->open(); }
 	virtual void close() { _driver->close(); }
-	virtual void send(uint32 b) { _driver->send(b); }
+	void send(uint32 b) override { _driver->send(b); }
 	virtual uint32 getBaseTempo() { return _driver->getBaseTempo(); }
 	virtual bool hasRhythmChannel() const = 0;
 	virtual void setTimerCallback(void *timer_param, Common::TimerManager::TimerProc timer_proc) { _driver->setTimerCallback(timer_param, timer_proc); }
@@ -106,8 +107,6 @@ public:
 		return _driver ? _driver->property(MIDI_PROP_MASTER_VOLUME, 0xffff) : 0;
 	}
 
-	virtual void onNewSound() {}
-
 	// Returns the current reverb, or -1 when no reverb is active
 	int8 getReverb() const { return _reverb; }
 	// Sets the current reverb, used mainly in MT-32
@@ -121,18 +120,36 @@ public:
 		}
 	}
 
+	// Prepares the driver for the playback of SCI0 midi tracks.
+	// The main purpose is the assignment of voices ("hardware" sound channels) to the 16 midi parts.
+	// This is basically the predecessor of the 0x4B midi event.
+	// Some drivers also do other things in here.
+	virtual void initTrack(SciSpan<const byte> &) {}
+
+	// There are several sound drivers which weren' part of the
+	// original game setup and came in the form of aftermarket patches.
+	// This method allows each driver to report missing patch or other
+	// required files which will then be displayed in an error dialog box.
+	// The method returns only a single string (instead of a string list),
+	// because no more than two files will be required.
+	virtual const char *reportMissingFiles() { return 0; }
+
 protected:
 	SciVersion _version;
 };
 
 extern MidiPlayer *MidiPlayer_AdLib_create(SciVersion version);
-extern MidiPlayer *MidiPlayer_AmigaMac_create(SciVersion version);
+extern MidiPlayer *MidiPlayer_AmigaMac0_create(SciVersion version, Common::Platform platform);
+extern MidiPlayer *MidiPlayer_AmigaMac1_create(SciVersion version, Common::Platform platform);
 extern MidiPlayer *MidiPlayer_PCJr_create(SciVersion version);
 extern MidiPlayer *MidiPlayer_PCSpeaker_create(SciVersion version);
 extern MidiPlayer *MidiPlayer_CMS_create(SciVersion version);
+extern MidiPlayer *MidiPlayer_MacSci0_create(SciVersion version);
 extern MidiPlayer *MidiPlayer_Midi_create(SciVersion version);
 extern MidiPlayer *MidiPlayer_Fb01_create(SciVersion version);
+extern MidiPlayer *MidiPlayer_Casio_create(SciVersion version, MusicType midiType);
 extern MidiPlayer *MidiPlayer_FMTowns_create(SciVersion version);
+extern MidiPlayer *MidiPlayer_PC9801_create(SciVersion version);
 
 } // End of namespace Sci
 

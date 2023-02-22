@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -49,15 +48,17 @@ public:
 	ActorWalk(BladeRunnerEngine *vm);
 	~ActorWalk();
 
-	bool setup(int actorId, bool runFlag, const Vector3 &from, const Vector3 &to, bool unk1, bool *arrived);
+	void reset(); // added method for bug fix (bad new game state for player actor) and better management of object
+
+	bool setup(int actorId, bool runFlag, const Vector3 &from, const Vector3 &to, bool mustReach, bool *arrived);
 	void getCurrentPosition(int actorId, Vector3 *pos, int *facing) const;
 	bool tick(int actorId, float stepDistance, bool flag);
 
 	bool isWalking() const { return _walking; }
 	bool isRunning() const { return _running; }
 
-	bool isXYZEmpty(float x, float y, float z, int actorId) const;
-	bool findNearestEmptyPosition(int actorId, const Vector3 &from, int distance, Vector3 &out) const;
+	bool isXYZOccupied(float x, float y, float z, int actorId) const;
+	bool findEmptyPositionAround(int actorId, const Vector3 &from, int distance, Vector3 &out) const;
 
 	void stop(int actorId, bool immediately, int combatAnimationMode, int animationMode);
 	void run(int actorId);
@@ -68,7 +69,7 @@ public:
 private:
 	int nextOnPath(int actorId, const Vector3 &from, const Vector3 &to, Vector3 &next) const;
 
-	bool findNearestEmptyPositionToOriginalDestination(int actorId, Vector3 &out) const;
+	bool findEmptyPositionAroundToOriginalDestination(int actorId, Vector3 &out) const;
 
 	bool addNearActors(int skipActorId);
 

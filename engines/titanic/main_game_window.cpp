@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -54,7 +53,7 @@ CMainGameWindow::~CMainGameWindow() {
 	delete _project;
 }
 
-void CMainGameWindow::applicationStarting() {
+bool CMainGameWindow::applicationStarting() {
 	// Set the video mode
 	CScreenManager *screenManager = CScreenManager::setCurrent();
 	screenManager->setMode(640, 480, 16, 0, true);
@@ -79,8 +78,8 @@ void CMainGameWindow::applicationStarting() {
 
 	// Set up the game project, and get game slot
 	int saveSlot = getSavegameSlot();
-	if (saveSlot == -2)
-		return;
+	if (saveSlot == EXIT_GAME)
+		return false;
 
 	// Create game view and manager
 	_gameView = new CSTGameView(this);
@@ -107,6 +106,7 @@ void CMainGameWindow::applicationStarting() {
 	enterRoomMsg.execute(room, nullptr, MSGFLAG_SCAN);
 
 	_gameManager->markAllDirty();
+	return true;
 }
 
 int CMainGameWindow::getSavegameSlot() {
@@ -345,12 +345,7 @@ void CMainGameWindow::mouseWheel(const Point &mousePos, bool wheelUp) {
 }
 
 void CMainGameWindow::keyDown(Common::KeyState keyState) {
-	if (keyState.keycode == Common::KEYCODE_d && (keyState.flags & Common::KBD_CTRL)) {
-		// Attach to the debugger
-		_vm->_debugger->attach();
-		_vm->_debugger->onFrame();
-
-	} else if (keyState.keycode == Common::KEYCODE_c && (keyState.flags & Common::KBD_CTRL)) {
+	if (keyState.keycode == Common::KEYCODE_c && (keyState.flags & Common::KBD_CTRL)) {
 		// Cheat action
 		if (_project && g_vm->canLoadGameStateCurrently()) {
 			CViewItem *newView = _project->parseView("Cheat Room.Node 1.Cheat Rooms View");
@@ -359,10 +354,10 @@ void CMainGameWindow::keyDown(Common::KeyState keyState) {
 
 	} else if (keyState.keycode == Common::KEYCODE_F5) {
 		// Show the GMM save dialog
-		g_vm->showScummVMSaveDialog();
+		g_vm->saveGameDialog();
 	} else if (keyState.keycode == Common::KEYCODE_F7) {
 		// Show the GMM load dialog
-		g_vm->showScummVMRestoreDialog();
+		g_vm->loadGameDialog();
 	} else if (_inputAllowed) {
 		_gameManager->_inputTranslator.keyDown(keyState);
 	}

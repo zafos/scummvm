@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -37,37 +36,37 @@
 namespace Drascula {
 
 DrasculaEngine::DrasculaEngine(OSystem *syst, const DrasculaGameDescription *gameDesc) : Engine(syst), _gameDescription(gameDesc) {
-	_charMap = 0;
-	_itemLocations = 0;
-	_polX = 0;
-	_polY = 0;
-	_verbBarX = 0;
-	_x1d_menu = 0;
-	_y1d_menu = 0;
-	_frameX = 0;
-	_candleX = 0;
-	_candleY = 0;
-	_pianistX = 0;
-	_drunkX = 0;
-	_roomPreUpdates = 0;
-	_roomUpdates = 0;
-	_roomActions = 0;
-	_text = 0;
-	_textd = 0;
-	_textb = 0;
-	_textbj = 0;
-	_texte = 0;
-	_texti = 0;
-	_textl = 0;
-	_textp = 0;
-	_textt = 0;
-	_textvb = 0;
-	_textsys = 0;
-	_texthis = 0;
-	_textverbs = 0;
-	_textmisc = 0;
-	_textd1 = 0;
-	_talkSequences = 0;
+	_charMap = nullptr;
+	_itemLocations = nullptr;
+	_polX = nullptr;
+	_polY = nullptr;
+	_verbBarX = nullptr;
+	_x1d_menu = nullptr;
+	_y1d_menu = nullptr;
+	_frameX = nullptr;
+	_candleX = nullptr;
+	_candleY = nullptr;
+	_pianistX = nullptr;
+	_drunkX = nullptr;
+	_roomPreUpdates = nullptr;
+	_roomUpdates = nullptr;
+	_roomActions = nullptr;
+	_text = nullptr;
+	_textd = nullptr;
+	_textb = nullptr;
+	_textbj = nullptr;
+	_texte = nullptr;
+	_texti = nullptr;
+	_textl = nullptr;
+	_textp = nullptr;
+	_textt = nullptr;
+	_textvb = nullptr;
+	_textsys = nullptr;
+	_texthis = nullptr;
+	_textverbs = nullptr;
+	_textmisc = nullptr;
+	_textd1 = nullptr;
+	_talkSequences = nullptr;
 	_currentSaveSlot = 0;
 
 	term_int = 0;
@@ -150,23 +149,21 @@ DrasculaEngine::DrasculaEngine(OSystem *syst, const DrasculaGameDescription *gam
 	_rightMouseButton = 0;
 	*textName = 0;
 
-	crosshairCursor = 0;
-	mouseCursor = 0;
-	bgSurface = 0;
-	backSurface = 0;
-	cursorSurface = 0;
-	drawSurface3 = 0;
-	drawSurface2 = 0;
-	tableSurface = 0;
-	extraSurface = 0;
-	screenSurface = 0;
-	frontSurface = 0;
+	crosshairCursor = nullptr;
+	mouseCursor = nullptr;
+	bgSurface = nullptr;
+	backSurface = nullptr;
+	cursorSurface = nullptr;
+	drawSurface3 = nullptr;
+	drawSurface2 = nullptr;
+	tableSurface = nullptr;
+	extraSurface = nullptr;
+	screenSurface = nullptr;
+	frontSurface = nullptr;
 	previousMusic = 0;
 	roomMusic = 0;
 
 	_rnd = new Common::RandomSource("drascula");
-
-	_console = 0;
 
 	const Common::FSNode gameDataDir(ConfMan.get("path"));
 	SearchMan.addSubDirectoryMatching(gameDataDir, "audio");
@@ -177,7 +174,7 @@ DrasculaEngine::DrasculaEngine(OSystem *syst, const DrasculaGameDescription *gam
 
 	_keyBufferHead = _keyBufferTail = 0;
 
-	_roomHandlers = 0;
+	_roomHandlers = nullptr;
 }
 
 DrasculaEngine::~DrasculaEngine() {
@@ -185,8 +182,6 @@ DrasculaEngine::~DrasculaEngine() {
 	stopSound();
 
 	freeRoomsTable();
-
-	delete _console;
 
 	free(_charMap);
 	free(_itemLocations);
@@ -223,7 +218,7 @@ DrasculaEngine::~DrasculaEngine() {
 
 bool DrasculaEngine::hasFeature(EngineFeature f) const {
 	return
-		(f == kSupportsRTL || f == kSupportsLoadingDuringRuntime || f == kSupportsSavingDuringRuntime);
+		(f == kSupportsReturnToLauncher || f == kSupportsLoadingDuringRuntime || f == kSupportsSavingDuringRuntime);
 }
 
 Common::Error DrasculaEngine::run() {
@@ -254,7 +249,7 @@ Common::Error DrasculaEngine::run() {
 		_lang = kEnglish;
 	}
 
-	_console = new Console(this);
+	setDebugger(new Console(this));
 
 	if (!loadDrasculaDat())
 		return Common::kUnknownError;
@@ -274,10 +269,19 @@ Common::Error DrasculaEngine::run() {
 	// Check if a save is loaded from the launcher
 	int directSaveSlotLoading = ConfMan.getInt("save_slot");
 	if (directSaveSlotLoading >= 0) {
+		// Set the current chapter to -1. This forces the load to happen
+		// later during the game loop, and not now.
+		currentChapter = -1;
 		loadGame(directSaveSlotLoading);
+		currentChapter++;
 	}
 
-	checkCD();
+	if (!existExtractedCDAudioFiles()
+	    && !isDataAndCDAudioReadFromSameCD()) {
+		warnMissingExtractedCDAudio();
+	}
+
+	allocMemory();
 
 	while (!shouldQuit()) {
 		int i;
@@ -318,8 +322,6 @@ Common::Error DrasculaEngine::run() {
 		for (i = 0; i < 8; i++)
 			actorFrames[i] = 0;
 		actorFrames[kFrameVonBraun] = 1;
-
-		allocMemory();
 
 		_subtitlesDisabled = !ConfMan.getBool("subtitles");
 
@@ -382,6 +384,8 @@ Common::Error DrasculaEngine::run() {
 		currentChapter++;
 	}
 
+	freeMemory();
+
 	return Common::kNoError;
 }
 
@@ -391,7 +395,6 @@ void DrasculaEngine::endChapter() {
 	black();
 	MusicFadeout();
 	stopMusic();
-	freeMemory();
 }
 
 bool DrasculaEngine::runCurrentChapter() {
@@ -573,15 +576,7 @@ bool DrasculaEngine::runCurrentChapter() {
 
 		_canSaveLoad = true;
 		delay(25);
-#ifndef _WIN32_WCE
-		// FIXME
-		// This and the following #ifndefs disable the excess updateEvents() calls *within* the game loop.
-		// Events such as keypresses or mouse clicks are dropped on the ground with no processing
-		// by these calls. They are properly handled by the implicit call through getScan() below.
-		// It is not a good practice to not process events and indeed this created problems with synthesized
-		// events in the wince port.
 		updateEvents();
-#endif
 		_canSaveLoad = false;
 		if (_loadedDifferentChapter)
 			return true;
@@ -589,12 +584,7 @@ bool DrasculaEngine::runCurrentChapter() {
 		if (!_menuScreen && takeObject == 1)
 			checkObjects();
 
-#ifdef _WIN32_WCE
-		if (_rightMouseButton) {
-			if (_menuScreen) {
-#else
 		if (_rightMouseButton == 1 && _menuScreen) {
-#endif
 			_rightMouseButton = 0;
 			if (currentChapter == 2) {
 				loadPic(menuBackground, cursorSurface);
@@ -605,24 +595,18 @@ bool DrasculaEngine::runCurrentChapter() {
 			}
 			setPalette((byte *)&gamePalette);
 			_menuScreen = false;
-#ifndef _WIN32_WCE
 			// FIXME: This call here is in hope that it will catch the rightmouseup event so the
 			// next if block won't be executed. This too is not a good coding practice. I've recoded it
 			// with a mutual exclusive if block for the menu. I would commit this properly but I cannot test
 			// for other (see Desktop) ports right now.
 			updateEvents();
-#endif
-#ifdef _WIN32_WCE
-			} else {
-#else
 		}
 
 		// Do not show the inventory screen in chapter 5, if the right mouse button is clicked
 		// while the plug (object 16) is held
-		// Fixes bug #2059621 - "DRASCULA: Plug bug"
+		// Fixes bug #3885 - "DRASCULA: Plug bug"
 		if (_rightMouseButton == 1 && !_menuScreen &&
 			!(currentChapter == 5 && pickedObject == 16)) {
-#endif
 			_rightMouseButton = 0;
 			_characterMoved = false;
 			if (trackProtagonist == 2)
@@ -641,14 +625,9 @@ bool DrasculaEngine::runCurrentChapter() {
 				loadPic("icons.alg", cursorSurface);
 			}
 			_menuScreen = true;
-#ifndef _WIN32_WCE
 			updateEvents();
-#endif
 			selectVerb(kVerbNone);
 		}
-#ifdef _WIN32_WCE
-		}
-#endif
 
 		if (_leftMouseButton == 1 && _menuBar) {
 			selectVerbFromBar();
@@ -714,9 +693,6 @@ bool DrasculaEngine::runCurrentChapter() {
 		} else if (key == Common::KEYCODE_ESCAPE) {
 			if (!confirmExit())
 				return false;
-		} else if (key == Common::KEYCODE_TILDE || key == Common::KEYCODE_BACKQUOTE) {
-			_console->attach();
-			_console->onFrame();
 		} else if (currentChapter == 6 && key == Common::KEYCODE_0 && _roomNumber == 61) {
 			loadPic("alcbar.alg", bgSurface, 255);
 		}
@@ -837,18 +813,9 @@ void DrasculaEngine::updateEvents() {
 
 	updateMusic();
 
-#ifdef _WIN32_WCE
-	if (eventMan->pollEvent(event)) {
-#else
 	while (eventMan->pollEvent(event)) {
-#endif
 		switch (event.type) {
 		case Common::EVENT_KEYDOWN:
-			if (event.kbd.keycode == Common::KEYCODE_d && event.kbd.hasFlags(Common::KBD_CTRL)) {
-				// Start the debugger
-				getDebugger()->attach();
-				getDebugger()->onFrame();
-			}
 			addKeyToBuffer(event.kbd);
 			break;
 		case Common::EVENT_KEYUP:
@@ -963,9 +930,11 @@ bool DrasculaEngine::loadDrasculaDat() {
 	in.open(filename.c_str());
 
 	if (!in.isOpen()) {
-		Common::String errorMessage = Common::String::format(_("Unable to locate the '%s' engine data file."), filename.c_str());
+		const char *msg = _s("Unable to locate the '%s' engine data file.");
+
+		Common::U32String errorMessage = Common::U32String::format(_(msg), filename.c_str());
 		GUIErrorMessage(errorMessage);
-		warning("%s", errorMessage.c_str());
+		warning(msg, filename.c_str());
 
 		return false;
 	}
@@ -977,9 +946,10 @@ bool DrasculaEngine::loadDrasculaDat() {
 	buf[8] = '\0';
 
 	if (strcmp(buf, "DRASCULA") != 0) {
-		Common::String errorMessage = Common::String::format(_("The '%s' engine data file is corrupt."), filename.c_str());
+		const char *msg = _s("The '%s' engine data file is corrupt.");
+		Common::U32String errorMessage = Common::U32String::format(_(msg), filename.c_str());
 		GUIErrorMessage(errorMessage);
-		warning("%s", errorMessage.c_str());
+		warning(msg, filename.c_str());
 
 		return false;
 	}
@@ -987,11 +957,10 @@ bool DrasculaEngine::loadDrasculaDat() {
 	ver = in.readByte();
 
 	if (ver != DRASCULA_DAT_VER) {
-		Common::String errorMessage = Common::String::format(
-			_("Incorrect version of the '%s' engine data file found. Expected %d.%d but got %d.%d."),
-			filename.c_str(), DRASCULA_DAT_VER, 0, ver, 0);
+		const char *msg = _s("Incorrect version of the '%s' engine data file found. Expected %d.%d but got %d.%d.");
+		Common::U32String errorMessage = Common::U32String::format(_(msg), filename.c_str(), DRASCULA_DAT_VER, 0, ver, 0);
 		GUIErrorMessage(errorMessage);
-		warning("%s", errorMessage.c_str());
+		warning(msg, filename.c_str(), DRASCULA_DAT_VER, 0, ver, 0);
 
 		return false;
 	}
@@ -1133,7 +1102,7 @@ char **DrasculaEngine::loadTexts(Common::File &in) {
 	int numTexts = in.readUint16BE();
 	char **res = (char **)malloc(sizeof(char *) * numTexts);
 	int entryLen;
-	char *pos = 0;
+	char *pos = nullptr;
 	int len;
 
 	for (int lang = 0; lang < _numLangs; lang++) {

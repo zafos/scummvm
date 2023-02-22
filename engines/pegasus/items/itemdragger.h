@@ -7,10 +7,10 @@
  * Additional copyright for this file:
  * Copyright (C) 1995-1997 Presto Studios, Inc.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -39,7 +38,7 @@ class Sprite;
 class SpriteDragger : public Tracker {
 public:
 	SpriteDragger();
-	virtual ~SpriteDragger() {}
+	~SpriteDragger() override {}
 
 	void setDragSprite(Sprite *);
 	Sprite *getDragSprite() { return _draggingSprite; }
@@ -47,8 +46,8 @@ public:
 	void setDragConstraints(const Common::Rect &, const Common::Rect &);
 	void getDragConstraints(Common::Rect &, Common::Rect &) const;
 
-	void startTracking(const Input &);
-	void continueTracking(const Input&);
+	void startTracking(const Input &) override;
+	void continueTracking(const Input&) override;
 
 	Hotspot *getLastHotspot() const { return _lastHotspot; }
 
@@ -73,16 +72,16 @@ class PegasusEngine;
 class ItemDragger : public SpriteDragger {
 public:
 	ItemDragger(PegasusEngine *);
-	virtual ~ItemDragger() {}
+	~ItemDragger() override {}
 
 	void setHighlightBounds();
-	void startTracking(const Input &);
-	void stopTracking(const Input &);
-	bool stopTrackingInput(const Input &);
+	void startTracking(const Input &) override;
+	void stopTracking(const Input &) override;
+	bool stopTrackingInput(const Input &) override;
 
 protected:
-	virtual void enterHotspot(Hotspot *);
-	virtual void exitHotspot(Hotspot *);
+	void enterHotspot(Hotspot *) override;
+	void exitHotspot(Hotspot *) override;
 
 	PegasusEngine *_owner;
 	DropHighlight _inventoryHighlight;

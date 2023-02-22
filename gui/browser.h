@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -25,47 +24,39 @@
 
 #include "gui/dialog.h"
 #include "common/fs.h"
+#include "common/str.h"
 
 namespace GUI {
 
 class ListWidget;
-class StaticTextWidget;
+class EditTextWidget;
 class CheckboxWidget;
 class CommandSender;
 
 class BrowserDialog : public Dialog {
 public:
-	BrowserDialog(const char *title, bool dirBrowser);
+	BrowserDialog(const Common::U32String &title, bool dirBrowser);
 
-#ifdef MACOSX
-	~BrowserDialog();
-	virtual int runModal();
-#else
-	virtual void open();
-
-	virtual void handleCommand(CommandSender *sender, uint32 cmd, uint32 data);
-#endif
+	int runModal() override;
+	void open() override;
+	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data) override;
 
 	const Common::FSNode	&getResult() { return _choice; }
 
 protected:
-#ifdef MACOSX
-	const void *_titleRef;
-	const void *_chooseRef;
-#else
 	ListWidget		*_fileList;
-	StaticTextWidget	*_currentPath;
+	EditTextWidget	*_currentPath;
 	Common::FSNode	_node;
-	Common::FSList			_nodeContent;
+	Common::FSList	_nodeContent;
+
 	bool _showHidden;
 	CheckboxWidget *_showHiddenWidget;
-#endif
-	Common::FSNode	_choice;
-	bool			_isDirBrowser;
 
-#ifndef MACOSX
+	Common::FSNode		_choice;
+	Common::U32String	_title;
+	bool				_isDirBrowser;
+
 	void updateListing();
-#endif
 };
 
 } // End of namespace GUI

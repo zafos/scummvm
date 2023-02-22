@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Original license header:
  *
@@ -26,10 +25,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -37,8 +36,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -46,13 +44,13 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#undef ARRAYSIZE // winnt.h defines ARRAYSIZE, but we want our own one...
 
 #include "backends/audiocd/win32/win32-audiocd.h"
 
 #include "audio/audiostream.h"
 #include "backends/audiocd/audiocd-stream.h"
 #include "backends/audiocd/default/default-audiocd.h"
+#include "backends/platform/sdl/win32/win32_wrapper.h"
 #include "common/array.h"
 #include "common/config-manager.h"
 #include "common/debug.h"
@@ -64,7 +62,7 @@
 #include <winioctl.h>
 #if _MSC_VER < 1900
 // WORKAROUND: Older versions of MSVC might not supply DDK headers by default.
-// Visual Studio 2015 contains the required headers. We use a compatability
+// Visual Studio 2015 contains the required headers. We use a compatibility
 // header from MinGW's w32api for all older versions.
 // TODO: Limit this to the Visual Studio versions which actually require this.
 #include "msvc/ntddcdrm.h"
@@ -75,15 +73,15 @@
 #include <ntddcdrm.h>
 #endif
 
-class Win32AudioCDStream : public AudioCDStream {
+class Win32AudioCDStream final : public AudioCDStream {
 public:
 	Win32AudioCDStream(HANDLE handle, const TRACK_DATA &startEntry, const TRACK_DATA &endEntry);
 	~Win32AudioCDStream();
 
 protected:
-	uint getStartFrame() const;
-	uint getEndFrame() const;
-	bool readFrame(int frame, int16 *buffer);
+	uint getStartFrame() const override;
+	uint getEndFrame() const override;
+	bool readFrame(int frame, int16 *buffer) override;
 
 private:
 	HANDLE _driveHandle;
@@ -140,23 +138,24 @@ bool Win32AudioCDStream::readFrame(int frame, int16 *buffer) {
 	           buffer,
 	           kBytesPerFrame,
 	           &bytesReturned,
-	           NULL);
+	           nullptr);
 }
 
 
-class Win32AudioCDManager : public DefaultAudioCDManager {
+class Win32AudioCDManager final : public DefaultAudioCDManager {
 public:
 	Win32AudioCDManager();
 	~Win32AudioCDManager();
 
-	virtual bool open();
-	virtual void close();
-	virtual bool play(int track, int numLoops, int startFrame, int duration, bool onlyEmulate = false,
-		Audio::Mixer::SoundType soundType = Audio::Mixer::kMusicSoundType);
+	bool open() override;
+	void close() override;
+	bool play(int track, int numLoops, int startFrame, int duration, bool onlyEmulate,
+			Audio::Mixer::SoundType soundType) override;
+	bool isDataAndCDAudioReadFromSameCD() override;
 
 protected:
-	virtual bool openCD(int drive);
-	virtual bool openCD(const Common::String &drive);
+	bool openCD(int drive) override;
+	bool openCD(const Common::String &drive) override;
 
 private:
 	bool loadTOC();
@@ -198,7 +197,9 @@ bool Win32AudioCDManager::openCD(int drive) {
 
 	// Construct the drive path and try to open it
 	Common::String drivePath = Common::String::format("\\\\.\\%c:", drives[drive]);
-	_driveHandle = CreateFileA(drivePath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+	TCHAR *tDrivePath = Win32::stringToTchar(drivePath);
+	_driveHandle = CreateFile(tDrivePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	free(tDrivePath);
 	if (_driveHandle == INVALID_HANDLE_VALUE) {
 		warning("Failed to open drive %c:\\, error %d", drives[drive], (int)GetLastError());
 		return false;
@@ -229,7 +230,9 @@ bool Win32AudioCDManager::openCD(const Common::String &drive) {
 
 	// Construct the drive path and try to open it
 	Common::String drivePath = Common::String::format("\\\\.\\%c:", drives[0]);
-	_driveHandle = CreateFileA(drivePath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+	TCHAR *tDrivePath = Win32::stringToTchar(drivePath);
+	_driveHandle = CreateFile(tDrivePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	free(tDrivePath);
 	if (_driveHandle == INVALID_HANDLE_VALUE) {
 		warning("Failed to open drive %c:\\, error %d", drives[0], (int)GetLastError());
 		return false;
@@ -319,7 +322,7 @@ bool Win32AudioCDManager::loadTOC() {
 	                  &tocData,
 	                  sizeof(tocData),
 	                  &bytesReturned,
-	                  NULL);
+	                  nullptr);
 	if (!result) {
 		debug("Failed to query the CD TOC: %d", (int)GetLastError());
 		return false;
@@ -356,8 +359,10 @@ Win32AudioCDManager::DriveList Win32AudioCDManager::detectDrives() {
 	char gameDrive = 0;
 	if (ConfMan.hasKey("path")) {
 		Common::String gamePath = ConfMan.get("path");
-		char fullPath[MAX_PATH];
-		DWORD result = GetFullPathNameA(gamePath.c_str(), sizeof(fullPath), fullPath, 0);
+		TCHAR *tGamePath = Win32::stringToTchar(gamePath);
+		TCHAR fullPath[MAX_PATH];
+		DWORD result = GetFullPathName(tGamePath, MAX_PATH, fullPath, nullptr);
+		free(tGamePath);
 
 		if (result > 0 && result < sizeof(fullPath) && Common::isAlpha(fullPath[0]) && fullPath[1] == ':' && tryAddDrive(toupper(fullPath[0]), drives))
 			gameDrive = drives[0];
@@ -372,15 +377,33 @@ Win32AudioCDManager::DriveList Win32AudioCDManager::detectDrives() {
 }
 
 bool Win32AudioCDManager::tryAddDrive(char drive, DriveList &drives) {
-	Common::String drivePath = Common::String::format("%c:\\", drive);
-
-	// Ensure it's an actual CD drive
-	if (GetDriveTypeA(drivePath.c_str()) != DRIVE_CDROM)
+	if (!Win32::isDriveCD(drive)) {
 		return false;
+	}
 
 	debug(2, "Detected drive %c:\\ as a CD drive", drive);
 	drives.push_back(drive);
 	return true;
+}
+
+bool Win32AudioCDManager::isDataAndCDAudioReadFromSameCD() {
+	// It is a known bug under Windows that games that play CD audio cause
+	// ScummVM to crash if the data files are read from the same CD.
+	char driveLetter;
+	const Common::FSNode gameDataDir(ConfMan.get("path"));
+	if (!gameDataDir.getPath().empty()) {
+		driveLetter = gameDataDir.getPath()[0];
+	} else {
+		// That's it! I give up!
+		Common::FSNode currentDir(".");
+		if (!currentDir.getPath().empty()) {
+			driveLetter = currentDir.getPath()[0];
+		} else {
+			return false;
+		}
+	}
+
+	return Win32::isDriveCD(driveLetter);
 }
 
 AudioCDManager *createWin32AudioCDManager() {

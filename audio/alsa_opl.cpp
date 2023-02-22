@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -210,6 +209,9 @@ void OPL::write(int port, int val) {
 			break;
 		case Config::kOpl3:
 			writeOplReg(chip, index[chip], val);
+			break;
+		default:
+			break;
 		}
 	} else {
 		switch(_type) {
@@ -225,6 +227,9 @@ void OPL::write(int port, int val) {
 			break;
 		case Config::kOpl3:
 			index[chip] = val;
+			break;
+		default:
+			break;
 		}
 	}
 }
@@ -244,6 +249,9 @@ void OPL::writeReg(int r, int v) {
 		break;
 	case Config::kOpl3:
 		writeOplReg(r >= 0x100, r & 0xff, v);
+		break;
+	default:
+		break;
 	}
 }
 
@@ -305,6 +313,9 @@ void OPL::writeOplReg(int c, int r, int v) {
 		case 0xf0:
 			_oper[idx].waveform = v & (_type == Config::kOpl3 ? 0x7 : 0x3);
 			snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_SET_VOICE, (void *)&_oper[idx]);
+			break;
+		default:
+			break;
 		}
 	} else {
 		// Voice
@@ -337,6 +348,9 @@ void OPL::writeOplReg(int c, int r, int v) {
 				_oper[opIdx].right = _oper[opIdx + 3].right = (v >> 5) & 0x1;
 			}
 			snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_SET_VOICE, (void *)&_oper[opIdx]);
+			break;
+		default:
+			break;
 		}
 	}
 }

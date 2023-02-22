@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,14 +15,13 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
 #include "titanic/star_control/star_crosshairs.h"
 #include "titanic/star_control/star_markers.h"
-#include "titanic/star_control/star_camera.h"
+#include "titanic/star_control/camera.h"
 #include "titanic/star_control/star_field.h"
 #include "titanic/star_control/star_ref.h"
 #include "titanic/support/simple_file.h"
@@ -135,7 +134,7 @@ void CStarCrosshairs::selectStar(int index, CVideoSurface *surface,
 	}
 }
 
-bool CStarCrosshairs::fn1(CStarField *starField, CSurfaceArea *surfaceArea, CStarCamera *camera) {
+bool CStarCrosshairs::fn1(CStarField *starField, CSurfaceArea *surfaceArea, CCamera *camera) {
 	int count = starField->baseFn2(surfaceArea, camera);
 
 	if (count > 0) {
@@ -149,7 +148,7 @@ bool CStarCrosshairs::fn1(CStarField *starField, CSurfaceArea *surfaceArea, CSta
 	}
 }
 
-void CStarCrosshairs::fn2(CVideoSurface *surface, CStarField *starField, CStarMarkers *markers) {
+void CStarCrosshairs::decMatches(CVideoSurface *surface, CStarField *starField, CStarMarkers *markers) {
 	if (_matchIndex <= -1) {
 		if (_entryIndex > -1) {
 			drawEntry(_entryIndex, surface, starField, markers);
@@ -170,7 +169,7 @@ void CStarCrosshairs::incMatches() {
 }
 
 FPoint CStarCrosshairs::getPosition() const {
-	return (_entryIndex >= 0 && _entryIndex <= 2) ? 
+	return (_entryIndex >= 0 && _entryIndex <= 2) ?
 		FPoint(_entries[_entryIndex]) : FPoint();
 }
 

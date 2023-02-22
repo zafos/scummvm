@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -42,17 +41,17 @@ GraphicsManager::GraphicsManager(HopkinsEngine *vm) {
 	_initGraphicsFl = false;
 	_screenWidth = _screenHeight = 0;
 	_screenLineSize = 0;
-	_palettePixels = NULL;
+	_palettePixels = nullptr;
 	_lineNbr = 0;
-	_videoPtr = NULL;
+	_videoPtr = nullptr;
 	_scrollOffset = 0;
 	_scrollPosX = 0;
 	_largeScreenFl = false;
 	_oldScrollPosX = 0;
-	_backBuffer = NULL;
-	_frontBuffer = NULL;
-	_screenBuffer = NULL;
-	_backupScreen = NULL;
+	_backBuffer = nullptr;
+	_frontBuffer = nullptr;
+	_screenBuffer = nullptr;
+	_backupScreen = nullptr;
 	_showDirtyRects = false;
 
 	_lineNbr2 = 0;
@@ -113,7 +112,7 @@ void GraphicsManager::setGraphicalMode(int width, int height) {
 		_frontBuffer = _vm->_globals->allocMemory(SCREEN_WIDTH * 2 * SCREEN_HEIGHT);
 		_screenBuffer = _vm->_globals->allocMemory(SCREEN_WIDTH * 2 * SCREEN_HEIGHT);
 
-		_videoPtr = NULL;
+		_videoPtr = nullptr;
 		_screenWidth = width;
 		_screenHeight = height;
 
@@ -145,7 +144,7 @@ void GraphicsManager::lockScreen() {
 void GraphicsManager::unlockScreen() {
 	assert(_videoPtr);
 	if (--_lockCounter == 0) {
-		_videoPtr = NULL;
+		_videoPtr = nullptr;
 	}
 }
 
@@ -676,6 +675,7 @@ void GraphicsManager::updateScreen() {
 
 	// Update the screen
 	g_system->updateScreen();
+	debugC(1, kDebugGraphics, "updateScreen()");
 }
 
 void GraphicsManager::copyWinscanVbe3(const byte *srcData, byte *destSurface) {
@@ -1141,10 +1141,12 @@ void GraphicsManager::displayDirtyRects() {
 }
 
 void GraphicsManager::displayRefreshRects() {
-	Graphics::Surface *screenSurface = NULL;
+	debugC(1, kDebugGraphics, "displayRefreshRects() start");
+	Graphics::Surface *screenSurface = nullptr;
 	if (_showDirtyRects) {
 		screenSurface = g_system->lockScreen();
 		g_system->copyRectToScreen(_screenBuffer, _screenLineSize, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+		debugC(1, kDebugGraphics, "\tcopyRectToScreen(_screenBuffer, %d, %d, %d, %d, %d) - Full Blit", _screenLineSize, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 	}
 
 	// Loop through copying over any  specified rects to the screen
@@ -1153,6 +1155,7 @@ void GraphicsManager::displayRefreshRects() {
 
 		byte *srcP = _screenBuffer + _screenLineSize * r.top + (r.left * 2);
 		g_system->copyRectToScreen(srcP, _screenLineSize, r.left, r.top, r.width(), r.height());
+		debugC(1, kDebugGraphics, "\tcopyRectToScreen(_screenBuffer[%d][%d], %d, %d, %d, %d, %d) - Rect Blit", (r.left * 2), (_screenLineSize * r.top), _screenLineSize, r.left, r.top, r.width(), r.height());
 
 		if (_showDirtyRects)
 			screenSurface->frameRect(r, 0xffffff);
@@ -1162,6 +1165,7 @@ void GraphicsManager::displayRefreshRects() {
 		g_system->unlockScreen();
 
 	resetRefreshRects();
+	debugC(1, kDebugGraphics, "displayRefreshRects() end");
 }
 
 /**
@@ -1905,7 +1909,7 @@ void GraphicsManager::drawVerticalLine(byte *surface, int xp, int yp, int height
  */
 void GraphicsManager::backupScreen() {
 	// Allocate a new data block for the screen, if necessary
-	if (_vm->_graphicsMan->_backupScreen == NULL)
+	if (_vm->_graphicsMan->_backupScreen == nullptr)
 		_vm->_graphicsMan->_backupScreen = _vm->_globals->allocMemory(SCREEN_WIDTH * 2 * SCREEN_HEIGHT);
 
 	// Backup the screen
@@ -1923,7 +1927,7 @@ void GraphicsManager::restoreScreen() {
 	Common::copy(_vm->_graphicsMan->_backupScreen, _vm->_graphicsMan->_backupScreen +
 		SCREEN_WIDTH * 2 * SCREEN_HEIGHT, _vm->_graphicsMan->_backBuffer);
 	_vm->_globals->freeMemory(_vm->_graphicsMan->_backupScreen);
-	_backupScreen = NULL;
+	_backupScreen = nullptr;
 }
 
 } // End of namespace Hopkins

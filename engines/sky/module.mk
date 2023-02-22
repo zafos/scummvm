@@ -5,14 +5,13 @@ MODULE_OBJS := \
 	compact.o \
 	control.o \
 	debug.o \
-	detection.o \
 	disk.o \
 	grid.o \
 	hufftext.o \
 	intro.o \
 	logic.o \
+	metaengine.o \
 	mouse.o \
-	rnc_deco.o \
 	screen.o \
 	sky.o \
 	sound.o \
@@ -31,3 +30,6 @@ endif
 
 # Include common rules
 include $(srcdir)/rules.mk
+
+# Detection objects
+DETECT_OBJS += $(MODULE)/detection.o

@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -90,7 +89,6 @@ LabEngine::LabEngine(OSystem *syst, const ADGameDescription *gameDesc)
 	_roomsFound = nullptr;
 	_specialLocks = nullptr;
 	_utils = nullptr;
-	_console = nullptr;
 	_journalBackImage = nullptr;
 
 	_lastTooLong = false;
@@ -137,9 +135,6 @@ LabEngine::LabEngine(OSystem *syst, const ADGameDescription *gameDesc)
 }
 
 LabEngine::~LabEngine() {
-	// Remove all of our debug levels here
-	DebugMan.clearAllDebugChannels();
-
 	freeMapData();
 	delete[] _rooms;
 	delete[] _inventory;
@@ -154,7 +149,6 @@ LabEngine::~LabEngine() {
 	delete _graphics;
 	delete _specialLocks;
 	delete _utils;
-	delete _console;
 	delete _journalBackImage;
 }
 
@@ -172,16 +166,12 @@ Common::Error LabEngine::run() {
 	_anim = new Anim(this);
 	_specialLocks = new SpecialLocks(this);
 	_utils = new Utils(this);
-	_console = new Console(this);
+	setDebugger(new Console(this));
 	_journalBackImage = new Image(this);
 
 	go();
 
 	return Common::kNoError;
-}
-
-Common::String LabEngine::generateSaveFileName(uint slot) {
-	return Common::String::format("%s.%03u", _targetName.c_str(), slot);
 }
 
 void LabEngine::drawStaticMessage(byte index) {
@@ -218,7 +208,7 @@ Common::Error LabEngine::loadGameState(int slot) {
 	return (result) ? Common::kNoError : Common::kUserCanceled;
 }
 
-Common::Error LabEngine::saveGameState(int slot, const Common::String &desc) {
+Common::Error LabEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	bool result = saveGame(slot, desc);
 	return (result) ? Common::kNoError : Common::kUserCanceled;
 }

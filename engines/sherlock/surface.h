@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -50,6 +49,7 @@ public:
 	 * Constructor
 	 */
 	BaseSurface(int width, int height);
+	BaseSurface(int width_, int height_, const Graphics::PixelFormat &pf);
 
 	/**
 	 * Draws a surface on this surface
@@ -71,6 +71,9 @@ public:
 	virtual void SHblitFrom(const Graphics::Surface &src, const Common::Point &destPos, const Common::Rect &srcBounds) {
 		Graphics::ManagedSurface::blitFrom(src, srcBounds, destPos);
 	}
+
+	virtual void SHbitmapBlitFrom(const byte *src, int width, int height, int pitchSrc, const Common::Point &pt,
+				      int overrideColor = 0);
 
 	/**
 	 * Draws an image frame at a given position within this surface with transparency
@@ -118,10 +121,11 @@ protected:
 	* Override the addDirtyRect from Graphics::Screen, since for standard
 	* surfaces we don't need dirty rects to be tracked
 	*/
-	virtual void addDirtyRect(const Common::Rect &r) {}
+	void addDirtyRect(const Common::Rect &r) override {}
 public:
 	Surface() : BaseSurface() {}
 	Surface(int width_, int height_) : BaseSurface(width_, height_) {}
+	Surface(int width_, int height_, const Graphics::PixelFormat &pf) : BaseSurface(width_, height_, pf) {}
 };
 
 } // End of namespace Sherlock

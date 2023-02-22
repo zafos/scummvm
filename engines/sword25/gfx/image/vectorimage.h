@@ -4,10 +4,10 @@
  * are too numerous to list here. Please refer to the COPYRIGHT
  * file distributed with this source distribution.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,8 +15,7 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
 
@@ -47,10 +46,10 @@ namespace Sword25 {
 class VectorImage;
 
 /**
-    @brief Pfadinformationen zu BS_VectorImageElement Objekten
+	@brief Pfadinformationen zu BS_VectorImageElement Objekten
 
-    Jedes BS_VectorImageElement besteht aus Kantenzügen, oder auch Pfaden. Jeder dieser Pfad hat Eigenschaften, die in Objekten diesen Typs
-    gespeichert werden.
+	Jedes BS_VectorImageElement besteht aus KantenzÃ¼gen, oder auch Pfaden. Jeder dieser Pfad hat Eigenschaften, die in Objekten diesen Typs
+	gespeichert werden.
 */
 
 class VectorPathInfo {
@@ -88,8 +87,8 @@ private:
 };
 
 /**
-    @brief Ein Element eines Vektorbild. Ein BS_VectorImage besteht aus diesen Elementen, die jeweils einen Teil der Graphik definieren.
-           Werden alle Elemente eines Vektorbildes übereinandergelegt, ergibt sich das komplette Bild.
+	@brief Ein Element eines Vektorbild. Ein BS_VectorImage besteht aus diesen Elementen, die jeweils einen Teil der Graphik definieren.
+		   Werden alle Elemente eines Vektorbildes Ã¼bereinandergelegt, ergibt sich das komplette Bild.
 */
 class VectorImageElement {
 	friend class VectorImage;
@@ -148,15 +147,15 @@ private:
 
 
 /**
-    @brief Eine Vektorgraphik
+	@brief Eine Vektorgraphik
 
-    Objekte dieser Klasse enthalten die Informationen eines SWF-Shapes.
+	Objekte dieser Klasse enthalten die Informationen eines SWF-Shapes.
 */
 
 class VectorImage : public Image {
 public:
 	VectorImage(const byte *pFileData, uint fileSize, bool &success, const Common::String &fname);
-	~VectorImage();
+	~VectorImage() override;
 
 	uint getElementCount() const {
 		return _elements.size();
@@ -172,48 +171,45 @@ public:
 	//
 	// Die abstrakten Methoden von BS_Image
 	//
-	virtual int getWidth() const {
+	int getWidth() const override {
 		return _boundingBox.width();
 	}
-	virtual int getHeight() const {
+	int getHeight() const override {
 		return _boundingBox.height();
 	}
-	virtual GraphicEngine::COLOR_FORMATS getColorFormat() const {
-		return GraphicEngine::CF_ARGB32;
-	}
-	virtual bool fill(const Common::Rect *pFillRect = 0, uint color = BS_RGB(0, 0, 0));
+	bool fill(const Common::Rect *pFillRect = 0, uint color = BS_RGB(0, 0, 0)) override;
 
 	void render(int width, int height);
 
-	virtual uint getPixel(int x, int y);
-	virtual bool isBlitSource() const {
+	uint getPixel(int x, int y) override;
+	bool isBlitSource() const override {
 		return true;
 	}
-	virtual bool isBlitTarget() const {
+	bool isBlitTarget() const override {
 		return false;
 	}
-	virtual bool isScalingAllowed() const {
+	bool isScalingAllowed() const override {
 		return true;
 	}
-	virtual bool isFillingAllowed() const {
+	bool isFillingAllowed() const override {
 		return false;
 	}
-	virtual bool isAlphaAllowed() const {
+	bool isAlphaAllowed() const override {
 		return true;
 	}
-	virtual bool isColorModulationAllowed() const {
+	bool isColorModulationAllowed() const override {
 		return true;
 	}
-	virtual bool isSetContentAllowed() const {
+	bool isSetContentAllowed() const override {
 		return false;
 	}
-	virtual bool setContent(const byte *pixeldata, uint size, uint offset, uint stride);
-	virtual bool blit(int posX = 0, int posY = 0,
+	bool setContent(const byte *pixeldata, uint size, uint offset, uint stride) override;
+	bool blit(int posX = 0, int posY = 0,
 	                  int flipping = Graphics::FLIP_NONE,
 	                  Common::Rect *pPartRect = NULL,
 	                  uint color = BS_ARGB(255, 255, 255, 255),
 	                  int width = -1, int height = -1,
-					  RectangleList *updateRects = 0);
+					  RectangleList *updateRects = 0) override;
 
 	class SWFBitStream;
 
