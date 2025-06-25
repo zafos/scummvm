@@ -681,7 +681,7 @@ void Kernel::mapFunctions(GameFeatures *features) {
 									while (kernelSubLeft) {
 										kernelSubLeft--;
 										kernelSubMapBack--;
-										if (kernelSubMapBack->name == kernelSubMap->name) {
+										if (!strcmp(kernelSubMapBack->name, kernelSubMap->name)) {
 											if (kernelSubMapBack->signature) {
 												subFunctions[subId].signature = parseKernelSignature(kernelSubMap->name, kernelSubMapBack->signature);
 												break;
@@ -771,7 +771,7 @@ void Kernel::loadKernelNames(GameFeatures *features) {
 			// function has been replaced with kPortrait. In KQ6 Mac,
 			// kPlayBack has been replaced by kShowMovie.
 			if ((g_sci->getPlatform() == Common::kPlatformWindows) || 
-				(g_sci->getPlatform() == Common::kPlatformDOS && g_sci->forceHiresGraphics()))
+				(g_sci->getPlatform() == Common::kPlatformDOS && g_sci->useHiresGraphics()))
 				_kernelNames[0x26] = "Portrait";
 			else if (g_sci->getPlatform() == Common::kPlatformMacintosh)
 				_kernelNames[0x84] = "ShowMovie";
@@ -783,12 +783,15 @@ void Kernel::loadKernelNames(GameFeatures *features) {
 			_kernelNames[0x89] = "KawaHacks";
 		}
 
-		_kernelNames[0x71] = "PalVary";
-
-		// At least EcoQuest 1 demo uses kGetMessage instead of kMessage.
-		// Detect which function to use.
-		if (features->detectMessageFunctionType() == SCI_VERSION_1_1)
+		// EcoQuest 1 demo uses kGetMessage and kMoveCursor (SCI_VERSION_1_LATE)
+		// instead of kMessage and kPalVary (SCI_VERSION_1_1).
+		// Detect which functions to use from message resource version.
+		if (features->detectMessageFunctionType() == SCI_VERSION_1_1) {
+			_kernelNames[0x71] = "PalVary";
 			_kernelNames[0x7c] = "Message";
+		} else {
+			_kernelNames[0x71] = "MoveCursor";
+		}
 		break;
 
 #ifdef ENABLE_SCI32
@@ -931,7 +934,8 @@ Common::String Kernel::lookupText(reg_t address, int index) {
 	if (textlen)
 		return seeker;
 
-	error("Index %d out of bounds in text.%03d", _index, address.getOffset());
+	warning("Index %d out of bounds in text.%03d", _index, address.getOffset());
+	return "";
 }
 
 // TODO: script_adjust_opcode_formats should probably be part of the

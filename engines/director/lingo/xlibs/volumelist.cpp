@@ -25,10 +25,11 @@
  * Yearn2Learn: The Flintstones Coloring Book
  *
  *************************************/
+
 /*
  * v1.0, ©1989, 1990 Eric Carlson, Apple Computer, Inc.
  * VolumeList(«“nodialog:ErrMsg”»)
-*/
+ */
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
@@ -38,22 +39,22 @@
 
 namespace Director {
 
-const char *VolumeList::xlibName = "VolumeList";
-const char *VolumeList::fileNames[] = {
-	"VolumeList",
-	0
+const char *const VolumeList::xlibName = "VolumeList";
+const XlibFileDesc VolumeList::fileNames[] = {
+	{ "VolumeList",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static BuiltinProto builtins[] = {
+static const BuiltinProto builtins[] = {
 	{ "VolumeList", VolumeList::m_volumelist, 0, 0, 300, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
-void VolumeList::open(int type) {
+void VolumeList::open(ObjectType type, const Common::Path &path) {
 	g_lingo->initBuiltIns(builtins);
 }
 
-void VolumeList::close(int type) {
+void VolumeList::close(ObjectType type) {
 	g_lingo->cleanupBuiltIns(builtins);
 }
 

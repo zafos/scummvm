@@ -20,27 +20,26 @@
  */
 
 #include "common/file.h"
-#include "common/config-manager.h"
 
 #include "graphics/macgui/macwindowmanager.h"
 
 #include "director/director.h"
 #include "director/cast.h"
-#include "director/castmember.h"
+#include "director/debugger.h"
 #include "director/frame.h"
 #include "director/movie.h"
+#include "director/picture.h"
 #include "director/score.h"
 #include "director/sprite.h"
-#include "director/window.h"
 #include "director/util.h"
+#include "director/window.h"
+#include "director/castmember/castmember.h"
+#include "director/castmember/text.h"
 
-#include "director/lingo/lingo.h"
 #include "director/lingo/lingo-ast.h"
 #include "director/lingo/lingo-code.h"
 #include "director/lingo/lingo-codegen.h"
-#include "director/lingo/lingo-gr.h"
 #include "director/lingo/lingo-the.h"
-#include "director/lingo/lingo-object.h"
 
 namespace Director {
 
@@ -109,6 +108,10 @@ Symbol& Symbol::operator=(const Symbol &s) {
 	return *this;
 }
 
+bool Symbol::operator==(Symbol &s) const {
+	return ctx == s.ctx && (name->equalsIgnoreCase(*s.name));
+}
+
 void Symbol::reset() {
 	*refCount -= 1;
 	// Coverity thinks that we always free memory, as it assumes
@@ -155,18 +158,14 @@ LingoState::~LingoState() {
 		if (callstack[i]->retLocalVars)
 			delete callstack[i]->retLocalVars;
 		if (callstack[i]->retContext) {
-			*callstack[i]->retContext->_refCount -= 1;
-			if (*callstack[i]->retContext->_refCount == 0)
-				delete callstack[i]->retContext;
+			callstack[i]->retContext->decRefCount();
 		}
 		delete callstack[i];
 	}
 	if (localVars)
 		delete localVars;
 	if (context) {
-		*context->_refCount -= 1;
-		if (*context->_refCount == 0)
-			delete context;
+		context->decRefCount();
 	}
 
 }
@@ -178,6 +177,8 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 	_currentChannelId = -1;
 	_globalCounter = 0;
 	_freezeState = false;
+	_freezePlay = false;
+	_playDone = false;
 	_abort = false;
 	_expectError = false;
 	_caughtError = false;
@@ -192,7 +193,7 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 	_itemDelimiter = ',';
 	_exitLock = false;
 	_preLoadEventAbort = false;
-	_romanLingo = (_vm->getLanguage() != Common::JA_JPN); // Japanrdr gamrs typically require 3-byte encodings
+	_romanLingo = (_vm->getLanguage() != Common::JA_JPN); // Japanese games typically require double-byte encoding
 
 	_searchPath.type = ARRAY;
 	_searchPath.u.farr = new FArray;
@@ -220,7 +221,7 @@ Lingo::Lingo(DirectorEngine *vm) : _vm(vm) {
 	initMethods();
 	initXLibs();
 
-	warning("Lingo Inited");
+	debugC(1, kDebugLingoExec, "Lingo inited");
 }
 
 Lingo::~Lingo() {
@@ -228,10 +229,13 @@ Lingo::~Lingo() {
 	cleanupFuncs();
 	cleanupMethods();
 	delete _compiler;
+	for (auto &it : _openXLibsState) {
+		delete it._value;
+	}
 }
 
 void Lingo::reloadBuiltIns() {
-	debug("Reloading builtins");
+	debugC(1, kDebugLingoExec, "Reloading builtins");
 	cleanupBuiltIns();
 	cleanUpTheEntities();
 	cleanupMethods();
@@ -246,18 +250,24 @@ void Lingo::reloadBuiltIns() {
 LingoArchive::~LingoArchive() {
 	// First cleanup the ScriptContexts that are only in LctxContexts.
 	// LctxContexts has a huge overlap with scriptContexts.
-	for (ScriptContextHash::iterator it = lctxContexts.begin(); it != lctxContexts.end(); ++it){
-		ScriptContext *script = it->_value;
-		if (script->getOnlyInLctxContexts())
-			delete script;
+	for (auto &it : lctxContexts){
+		ScriptContext *script = it._value;
+		if (script->getOnlyInLctxContexts()) {
+			script->decRefCount();
+		}
 	}
 
 	for (int i = 0; i <= kMaxScriptType; i++) {
-		for (ScriptContextHash::iterator it = scriptContexts[i].begin(); it != scriptContexts[i].end(); ++it) {
-			*it->_value->_refCount -= 1;
-			if (*it->_value->_refCount <= 0)
-				delete it->_value;
+		for (auto &it : scriptContexts[i]) {
+			it._value->decRefCount();
 		}
+	}
+
+	for (auto &it : factoryContexts) {
+		for (auto &jt : *it._value) {
+			jt._value->decRefCount();
+		}
+		delete it._value;
 	}
 }
 
@@ -280,7 +290,7 @@ ScriptContext *LingoArchive::findScriptContext(uint16 id) {
 Common::String LingoArchive::getName(uint16 id) {
 	Common::String result;
 	if (id >= names.size()) {
-		warning("Name id %d not in list", id);
+		warning("LingoArchive::getName: Name id %d not in list", id);
 		return result;
 	}
 	result = names[id];
@@ -293,14 +303,30 @@ Common::String LingoArchive::formatFunctionList(const char *prefix) {
 		result += Common::String::format("%s%s:\n", prefix, scriptType2str((ScriptType)i));
 		if (scriptContexts[i].size() == 0)
 			result += Common::String::format("%s  [empty]\n", prefix);
-		for (ScriptContextHash::iterator it = scriptContexts[i].begin(); it != scriptContexts[i].end(); ++it) {
-			result += Common::String::format("%s  %d", prefix, it->_key);
-			CastMemberInfo *cmi = cast->getCastMemberInfo(it->_key);
+		for (auto &it : scriptContexts[i]) {
+			result += Common::String::format("%s  %d", prefix, it._key);
+			CastMemberInfo *cmi = cast->getCastMemberInfo(it._key);
 			if (cmi && !cmi->name.empty()) {
 				result += Common::String::format(" \"%s\"", cmi->name.c_str());
 			}
 			result += ":\n";
-			result += (*it->_value).formatFunctionList(Common::String::format("%s    ", prefix).c_str());
+			result += it._value->formatFunctionList(Common::String::format("%s    ", prefix).c_str());
+		}
+	}
+	result += Common::String::format("%sFactories:\n", prefix);
+	if (factoryContexts.empty()) {
+		result += Common::String::format("%s  [empty]\n", prefix);
+	} else {
+		for (auto it : factoryContexts) {
+			result += Common::String::format("%s  %d:\n", prefix, it._key);
+			if (it._value->empty()) {
+				result += Common::String::format("%s    [empty]\n", prefix);
+			} else {
+				for (auto jt : *it._value) {
+					result += Common::String::format("%s    %s:\n", prefix, jt._key.c_str());
+					result += jt._value->formatFunctionList(Common::String::format("%s      ", prefix).c_str());
+				}
+			}
 		}
 	}
 	return result;
@@ -313,7 +339,7 @@ Symbol Lingo::getHandler(const Common::String &name) {
 	if (_state->context && _state->context->_functionHandlers.contains(name))
 		return _state->context->_functionHandlers[name];
 
-	sym = g_director->getCurrentMovie()->getHandler(name);
+	sym = g_director->getCurrentMovie()->getHandler(name, _state->context ? _state->context->_castLibHint : 0);
 	if (sym.type != VOIDSYM)
 		return sym;
 
@@ -322,9 +348,36 @@ Symbol Lingo::getHandler(const Common::String &name) {
 	return sym;
 }
 
+
+void LingoArchive::patchCode(const Common::U32String &code, ScriptType type, uint16 id, const char *scriptName, uint32 preprocFlags) {
+	debugC(1, kDebugCompile, "LingoArchive::patchCode: Patching code for type %s(%d) with id %d in '%s%s'\n"
+			"***********\n%s\n\n***********", scriptType2str(type), type, id, utf8ToPrintable(g_director->getCurrentPath()).c_str(), utf8ToPrintable(cast->getMacName()).c_str(), formatStringForDump(code.encode()).c_str());
+	if (!getScriptContext(type, id)) {
+		// If there's no existing script context, don't try and patch it.
+		warning("Script not defined for type %d, id %d", type, id);
+		return;
+	}
+
+	ScriptContext *sc = g_lingo->_compiler->compileLingo(code, nullptr, type, CastMemberID(id, cast->_castLibID), scriptName, false, preprocFlags);
+
+	if (sc) {
+		for (auto &it : sc->_functionHandlers) {
+			it._value.ctx = scriptContexts[type][id];
+			scriptContexts[type][id]->_functionHandlers[it._key] = it._value;
+			functionHandlers[it._key] = it._value;
+			if (g_lingo->_eventHandlerTypeIds.contains(it._key)) {
+				scriptContexts[type][id]->_eventHandlers[g_lingo->_eventHandlerTypeIds[it._key]] = it._value;
+			}
+		}
+		sc->_functionHandlers.clear();
+		delete sc;
+	}
+}
+
+
 void LingoArchive::addCode(const Common::U32String &code, ScriptType type, uint16 id, const char *scriptName, uint32 preprocFlags) {
-	debugC(1, kDebugCompile, "Add code for type %s(%d) with id %d in '%s%s'\n"
-			"***********\n%s\n\n***********", scriptType2str(type), type, id, utf8ToPrintable(g_director->getCurrentPath()).c_str(), utf8ToPrintable(cast->getMacName()).c_str(), code.encode().c_str());
+	debugC(1, kDebugCompile, "LingoArchive::addCode: Add code for type %s(%d) with id %d in '%s%s'\n"
+			"***********\n%s\n\n***********", scriptType2str(type), type, id, utf8ToPrintable(g_director->getCurrentPath()).c_str(), utf8ToPrintable(cast->getMacName()).c_str(), formatStringForDump(code.encode()).c_str());
 
 	if (getScriptContext(type, id)) {
 		// Replace the pre-existing context but warn about it.
@@ -343,7 +396,7 @@ void LingoArchive::addCode(const Common::U32String &code, ScriptType type, uint1
 	ScriptContext *sc = g_lingo->_compiler->compileLingo(code, this, type, CastMemberID(id, cast->_castLibID), contextName, false, preprocFlags);
 	if (sc) {
 		scriptContexts[type][id] = sc;
-		*sc->_refCount += 1;
+		sc->incRefCount();
 	}
 }
 
@@ -352,10 +405,7 @@ void LingoArchive::removeCode(ScriptType type, uint16 id) {
 	if (!ctx)
 		return;
 
-	*ctx->_refCount -= 1;
-	if (*ctx->_refCount <= 0) {
-		delete ctx;
-	}
+	ctx->decRefCount();
 	scriptContexts[type].erase(id);
 }
 
@@ -367,8 +417,8 @@ void LingoArchive::replaceCode(const Common::U32String &code, ScriptType type, u
 Common::String Lingo::formatStack() {
 	Common::String stack;
 
-	for (uint i = 0; i < _stack.size(); i++) {
-		Datum d = _stack[i];
+	for (uint i = 0; i < _state->stack.size(); i++) {
+		Datum d = _state->stack[i];
 		stack += Common::String::format("<%s> ", d.asString(true).c_str());
 	}
 	return stack;
@@ -400,6 +450,9 @@ Common::String Lingo::formatCallStack(uint pc) {
 			if (frame->sp.ctx && frame->sp.ctx->_id) {
 				result += Common::String::format("%d:", frame->sp.ctx->_id);
 			}
+			if (frame->sp.ctx && frame->sp.ctx->isFactory()) {
+				result += Common::String::format("%s:", frame->sp.ctx->getName().c_str());
+			}
 			result += Common::String::format("%s at [%5d]\n",
 				frame->sp.name->c_str(),
 				framePc
@@ -426,6 +479,9 @@ Common::String Lingo::formatFrame() {
 	if (_state->context->_id)
 		result += Common::String::format("%d:", _state->context->_id);
 	CFrame *frame = callstack[callstack.size() - 1];
+	if (frame->sp.ctx && frame->sp.ctx->isFactory()) {
+		result += Common::String::format("%s:", frame->sp.ctx->getName().c_str());
+	}
 	if (frame->sp.type == VOIDSYM || !frame->sp.name)
 		result += "[unknown]";
 	else
@@ -560,10 +616,26 @@ Common::String Lingo::formatFunctionBody(Symbol &sym) {
 	return result;
 }
 
-void Lingo::execute() {
+bool Lingo::execute(int targetFrame) {
 	uint localCounter = 0;
 
-	while (!_abort && !_freezeState && _state->script && (*_state->script)[_state->pc] != STOP) {
+	while (!_abort && !_freezeState && !_playDone && _state->script && (*_state->script)[_state->pc] != STOP) {
+		if (targetFrame != -1 && (int)_state->callstack.size() == targetFrame)
+			break;
+
+		if ((_exec._state == kPause) || (_exec._shouldPause && _exec._shouldPause())) {
+			// if execution is in pause -> poll event + update screen
+			_exec._state = kPause;
+			Common::EventManager *eventMan = g_system->getEventManager();
+			while (_exec._state == kPause && !eventMan->shouldQuit() && (!g_engine || !eventMan->shouldReturnToLauncher())) {
+				Common::Event event;
+				while (eventMan->pollEvent(event)) {
+				}
+				g_system->delayMillis(10);
+				g_system->updateScreen();
+			}
+		}
+
 		if (_globalCounter > 1000 && debugChannelSet(-1, kDebugFewFramesOnly)) {
 			warning("Lingo::execute(): Stopping due to debug few frames only");
 			_vm->getCurrentMovie()->getScore()->_playState = kPlayStopped;
@@ -573,11 +645,12 @@ void Lingo::execute() {
 		// process events every so often
 		if (localCounter > 0 && localCounter % 100 == 0) {
 			_vm->processEvents();
+			// Also process update widgets!
+			Movie *movie = g_director->getCurrentMovie();
+			Score *score = movie->getScore();
+			score->updateWidgets(true);
+
 			g_system->updateScreen();
-			if (_vm->getCurrentMovie()->getScore()->_playState == kPlayStopped) {
-				_freezeState = true;
-				break;
-			}
 		}
 
 		uint current = _state->pc;
@@ -619,10 +692,15 @@ void Lingo::execute() {
 		}
 	}
 
-	if (_freezeState) {
+	bool result = !_freezeState;
+	if (_freezePlay) {
+		debugC(5, kDebugLingoExec, "Lingo::execute(): Called play, pausing execution to the play buffer");
+		freezePlayState();
+	} else if (_freezeState) {
 		debugC(5, kDebugLingoExec, "Lingo::execute(): Context is frozen, pausing execution");
 		freezeState();
-	} else if (_abort || _vm->getCurrentMovie()->getScore()->_playState == kPlayStopped) {
+	// Returning from a script with "play done" does not freeze the state. Instead it obliterates it.
+	} else if (_abort || _playDone || _vm->getCurrentMovie()->getScore()->_playState == kPlayStopped) {
 		// Clean up call stack
 		while (_state->callstack.size()) {
 			popContext(true);
@@ -630,26 +708,29 @@ void Lingo::execute() {
 	}
 	_abort = false;
 	_freezeState = false;
+	_freezePlay = false;
 
 	g_debugger->stepHook();
+	// return true if execution finished, false if the context froze for later
+	return result;
 }
 
 void Lingo::executeScript(ScriptType type, CastMemberID id) {
 	Movie *movie = _vm->getCurrentMovie();
 	if (!movie) {
-		warning("Request to execute script with no movie");
+		warning("Lingo::executeScript: Request to execute script with no movie");
 		return;
 	}
 
 	ScriptContext *sc = movie->getScriptContext(type, id);
 
 	if (!sc) {
-		debugC(3, kDebugLingoExec, "Request to execute non-existent script type %d id %d of castLib %d", type, id.member, id.castLib);
+		debugC(3, kDebugLingoExec, "Lingo::executeScript: Request to execute non-existent script type %d id %d of castLib %d", type, id.member, id.castLib);
 		return;
 	}
 
 	if (!sc->_eventHandlers.contains(kEventGeneric)) {
-		debugC(3, kDebugLingoExec, "Request to execute script type %d id %d of castLib %d with no scopeless lingo", type, id.member, id.castLib);
+		debugC(3, kDebugLingoExec, "Lingo::executeScript: Request to execute script type %d id %d of castLib %d with no scopeless lingo", type, id.member, id.castLib);
 		return;
 	}
 
@@ -660,11 +741,13 @@ void Lingo::executeScript(ScriptType type, CastMemberID id) {
 	execute();
 }
 
-void Lingo::executeHandler(const Common::String &name) {
+void Lingo::executeHandler(const Common::String &name, int numargs) {
 	debugC(1, kDebugLingoExec, "Executing script handler : %s", name.c_str());
 	Symbol sym = getHandler(name);
-	LC::call(sym, 0, false);
-	execute();
+
+	int frame = _state->callstack.size();
+	LC::call(sym, numargs, false);
+	execute(frame);
 }
 
 void Lingo::lingoError(const char *s, ...) {
@@ -721,14 +804,16 @@ void Lingo::resetLingo() {
 	resetLingoGo();
 }
 
-int Lingo::getAlignedType(const Datum &d1, const Datum &d2, bool numsOnly) {
+int Lingo::getAlignedType(const Datum &d1, const Datum &d2, bool equality) {
 	int opType = VOID;
 
 	int d1Type = d1.type;
 	int d2Type = d2.type;
 
-	if (d1Type == d2Type && (!numsOnly || d1Type == INT || d1Type == FLOAT))
-		return d1Type;
+	if (equality) {
+		if (d1Type == STRING && d2Type == STRING)
+			return STRING;
+	}
 
 	if (d1Type == STRING) {
 		Common::String src = d1.asString();
@@ -737,7 +822,11 @@ int Lingo::getAlignedType(const Datum &d1, const Datum &d2, bool numsOnly) {
 			strtod(src.c_str(), &endPtr);
 			if (*endPtr == 0) {
 				d1Type = FLOAT;
+			} else if (!equality) {
+				d1Type = INT;
 			}
+		} else {
+			d1Type = VOID;
 		}
 	}
 	if (d2Type == STRING) {
@@ -747,7 +836,11 @@ int Lingo::getAlignedType(const Datum &d1, const Datum &d2, bool numsOnly) {
 			strtod(src.c_str(), &endPtr);
 			if (*endPtr == 0) {
 				d2Type = FLOAT;
+			} else if (!equality) {
+				d2Type = INT;
 			}
+		} else {
+			d2Type = VOID;
 		}
 	}
 
@@ -761,12 +854,15 @@ int Lingo::getAlignedType(const Datum &d1, const Datum &d2, bool numsOnly) {
 	if (d2Type == OBJECT)
 		d2Type = STRING;
 
-	if (d1Type == FLOAT || d2Type == FLOAT) {
+	if ((d1Type == FLOAT && d2Type == INT) || (d1Type == INT && d2Type == FLOAT)) {
 		opType = FLOAT;
-	} else if (d1Type == INT && d2Type == INT) {
-		opType = INT;
 	} else if ((d1Type == STRING && d2Type == INT) || (d1Type == INT && d2Type == STRING)) {
 		opType = STRING;
+	} else if ((d1Type == SYMBOL && d2Type != SYMBOL) || (d2Type == SYMBOL && d1Type != SYMBOL)) {
+		// some fun undefined behaviour: adding anything to a symbol returns an int.
+		opType = INT;
+	} else if (d1Type == d2Type) {
+		opType = d1Type;
 	}
 
 	return opType;
@@ -838,9 +934,33 @@ Datum::Datum(AbstractObject *val) {
 	ignoreGlobal = false;
 }
 
+Datum::Datum(CastMember *val) {
+	u.obj = val;
+	if (val) {
+		type = MEDIA;
+		refCount = val->getRefCount();
+		*refCount += 1;
+	} else {
+		type = VOID;
+		refCount = new int;
+		*refCount = 1;
+	}
+	ignoreGlobal = false;
+}
+
 Datum::Datum(const CastMemberID &val) {
 	u.cast = new CastMemberID(val);
 	type = CASTREF;
+	refCount = new int;
+	*refCount = 1;
+	ignoreGlobal = false;
+}
+
+Datum::Datum(const Common::Point &point) {
+	type = POINT;
+	u.farr = new FArray;
+	u.farr->arr.push_back(Datum(point.x));
+	u.farr->arr.push_back(Datum(point.y));
 	refCount = new int;
 	*refCount = 1;
 	ignoreGlobal = false;
@@ -874,6 +994,8 @@ void Datum::reset() {
 		case FLOAT:
 		case ARGC:
 		case ARGCNORET:
+		case CASTLIBREF:
+		case SPRITEREF:
 			break;
 		case VARREF:
 		case GLOBALREF:
@@ -891,12 +1013,17 @@ void Datum::reset() {
 		case PARRAY:
 			delete u.parr;
 			break;
+		case MEDIA:
+			delete u.obj;
+			break;
 		case OBJECT:
 			if (u.obj->getObjType() == kWindowObj) {
-				Window *window = static_cast<Window *>(u.obj);
-				g_director->_wm->removeWindow(window);
-				g_director->_wm->removeMarked();
+				// Window has an override for decRefCount, use it directly
+				*refCount += 1;
+				static_cast<Window *>(u.obj)->decRefCount();
 			} else {
+				// *refCount is copied between the Datum and the Object,
+				// so should be safe to delete the Object
 				delete u.obj;
 			}
 			break;
@@ -910,11 +1037,14 @@ void Datum::reset() {
 		case MENUREF:
 			delete u.menu;
 			break;
+		case PICTUREREF:
+			delete u.picture;
+			break;
 		default:
 			warning("Datum::reset(): Unprocessed REF type %d", type);
 			break;
 		}
-		if (type != OBJECT) // object owns refCount
+		if (type != OBJECT && type != MEDIA) // object owns refCount
 			delete refCount;
 	}
 #endif
@@ -936,11 +1066,12 @@ int Datum::asInt() const {
 		{
 			Common::String src = asString();
 			char *endPtr = nullptr;
-			int result = strtol(src.c_str(), &endPtr, 10);
+			float result = strtof(src.c_str(), &endPtr);
 			if (*endPtr == 0) {
-				res = result;
+				res = (int)result;
 			} else {
-				warning("Invalid int '%s'", src.c_str());
+				warning("Invalid number '%s'", src.c_str());
+				res = (int)((uint64)u.s & 0xffffffffL);
 			}
 		}
 		break;
@@ -956,6 +1087,11 @@ int Datum::asInt() const {
 		} else {
 			res = (int)u.f;
 		}
+		break;
+	case SYMBOL:
+		// Undefined behaviour, but relied on by bad game code that e.g. adds things to symbols.
+		// Return a 32-bit number that's sort of related.
+		res = (int)((uint64)u.s & 0xffffffffL);
 		break;
 	default:
 		warning("Incorrect operation asInt() for type: %s", type2str());
@@ -975,7 +1111,8 @@ double Datum::asFloat() const {
 			if (*endPtr == 0) {
 				res = result;
 			} else {
-				warning("Invalid float '%s'", src.c_str());
+				warning("Invalid number '%s'", src.c_str());
+				res = (int)((uint64)u.s & 0xffffffffL);
 			}
 		}
 		break;
@@ -1009,8 +1146,6 @@ Common::String Datum::asString(bool printonly) const {
 		break;
 	case FLOAT:
 		s = Common::String::format(g_lingo->_floatPrecisionFormat.c_str(), u.f);
-		if (printonly)
-			s += "f";		// 0.0f
 		break;
 	case STRING:
 		if (!printonly) {
@@ -1025,6 +1160,9 @@ Common::String Datum::asString(bool printonly) const {
 		} else {
 			s = Common::String::format("#%s", u.s->c_str());
 		}
+		break;
+	case MEDIA:
+		s = Common::String::format("media %08x", ((uint32)(size_t)((void *)u.obj)) & 0xffffffff);
 		break;
 	case OBJECT:
 		if (!printonly) {
@@ -1061,8 +1199,14 @@ Common::String Datum::asString(bool printonly) const {
 	case CASTREF:
 		s = Common::String::format("member %d of castLib %d", u.cast->member, u.cast->castLib);
 		break;
+	case CASTLIBREF:
+		s = Common::String::format("castLib %d", u.i);
+		break;
 	case FIELDREF:
 		s = Common::String::format("field %d of castLib %d", u.cast->member, u.cast->castLib);
+		break;
+	case SPRITEREF:
+		s = Common::String::format("sprite %d", u.i);
 		break;
 	case CHUNKREF:
 		{
@@ -1135,6 +1279,9 @@ Common::String Datum::asString(bool printonly) const {
 	case MENUREF:
 		s = Common::String::format("menu(%d, %d)", u.menu->menuIdNum, u.menu->menuItemIdNum);
 		break;
+	case PICTUREREF:
+		s = Common::String::format("picture: %p", (void*)u.picture->_picture);
+		break;
 	default:
 		warning("Incorrect operation asString() for type: %s", type2str());
 	}
@@ -1142,11 +1289,11 @@ Common::String Datum::asString(bool printonly) const {
 	return s;
 }
 
-CastMemberID Datum::asMemberID(CastType castType) const {
+CastMemberID Datum::asMemberID(CastType castType, int castLib) const {
 	if (type == CASTREF || type == FIELDREF)
 		return *u.cast;
 
-	return g_lingo->resolveCastMember(*this, 0, castType);
+	return g_lingo->resolveCastMember(*this, castLib, castType);
 }
 
 Common::Point Datum::asPoint() const {
@@ -1156,6 +1303,32 @@ Common::Point Datum::asPoint() const {
 	}
 
 	return Common::Point(u.farr->arr[0].asInt(), u.farr->arr[1].asInt());
+}
+
+Datum Datum::clone() const {
+	Datum result;
+	switch (type) {
+	case ARRAY:
+		result.type = ARRAY;
+		result.u.farr = new FArray;
+		for (auto &it : u.farr->arr) {
+			result.u.farr->arr.push_back(it.clone());
+		}
+		result.u.farr->_sorted = u.farr->_sorted;
+		break;
+	case PARRAY:
+		result.type = PARRAY;
+		result.u.parr = new PArray;
+		for (auto &it : u.parr->arr) {
+			result.u.parr->arr.push_back(PCell(it.p.clone(), it.v.clone()));
+		}
+		result.u.parr->_sorted = u.parr->_sorted;
+		break;
+	default:
+		result = *this;
+		break;
+	}
+	return result;
 }
 
 bool Datum::isRef() const {
@@ -1170,6 +1343,14 @@ bool Datum::isCastRef() const {
 	return (type == CASTREF || type == FIELDREF);
 }
 
+bool Datum::isArray() const {
+	return (type == ARRAY || type == POINT || type == RECT);
+}
+
+bool Datum::isNumeric() const {
+	return (type == INT || type == FLOAT);
+}
+
 const char *Datum::type2str(bool ilk) const {
 	static char res[20];
 
@@ -1182,6 +1363,8 @@ const char *Datum::type2str(bool ilk) const {
 		return ilk ? "linearlist" : "ARRAY";
 	case CASTREF:
 		return "CASTREF";
+	case CASTLIBREF:
+		return "CASTLIBREF";
 	case CHUNKREF:
 		return "CHUNKREF";
 	case FIELDREF:
@@ -1196,10 +1379,14 @@ const char *Datum::type2str(bool ilk) const {
 		return "LOCALREF";
 	case MENUREF:
 		return "MENUREF";
+	case MEDIA:
+		return ilk ? "media" : "MEDIA";
 	case OBJECT:
 		return ilk ? "object" : "OBJECT";
 	case PARRAY:
 		return ilk ? "proplist" : "PARRAY";
+	case PICTUREREF:
+		return ilk ? "picture" :  "PICTUREREF";
 	case POINT:
 		return ilk ? "point" : "POINT";
 	case PROPREF:
@@ -1220,8 +1407,16 @@ const char *Datum::type2str(bool ilk) const {
 	}
 }
 
-int Datum::equalTo(Datum &d, bool ignoreCase) const {
-	int alignType = g_lingo->getAlignedType(*this, d, false);
+int Datum::equalTo(const Datum &d, bool ignoreCase) const {
+	// VOID can only be equal to VOID and INT 0 (on the right)
+	if (type == VOID && d.type == VOID) {
+		return 1;
+	} else if (type == VOID) {
+		return d.type == INT && d.u.i == 0;
+	} else if (d.type == VOID) {
+		return 0;
+	}
+	int alignType = g_lingo->getAlignedType(*this, d, true);
 
 	switch (alignType) {
 	case FLOAT:
@@ -1231,76 +1426,107 @@ int Datum::equalTo(Datum &d, bool ignoreCase) const {
 	case STRING:
 	case SYMBOL:
 		if (ignoreCase) {
-			return g_lingo->normalizeString(asString()).equals(g_lingo->normalizeString(d.asString()));
+			return compareStringEquality(g_lingo->normalizeString(asString()), g_lingo->normalizeString(d.asString()));
 		} else {
-			return asString().equals(d.asString());
+			return compareStringEquality(asString(), d.asString());
 		}
+	case MEDIA:
 	case OBJECT:
 		return u.obj == d.u.obj;
 	case CASTREF:
 		return *u.cast == *d.u.cast;
+	case CASTLIBREF:
+	case PICTUREREF:
+		return 0; // Original always returns 0 on picture reference comparison
 	default:
+		debugC(1, kDebugLingoExec, "Datum::equalTo(): Invalid equality check between types %s and %s", type2str(), d.type2str());
 		break;
 	}
 	return 0;
 }
 
-bool Datum::operator==(Datum &d) const {
+bool Datum::operator==(const Datum &d) const {
 	return equalTo(d);
 }
 
-bool Datum::operator>(Datum &d) const {
-	return compareTo(d) == kCompareGreater;
+bool Datum::operator>(const Datum &d) const {
+	return compareTo(d) & kCompareGreater;
 }
 
-bool Datum::operator<(Datum &d) const {
-	return compareTo(d) == kCompareLess;
+bool Datum::operator<(const Datum &d) const {
+	return compareTo(d) & kCompareLess;
 }
 
-bool Datum::operator>=(Datum &d) const {
-	CompareResult res = compareTo(d);
-	return res == kCompareGreater || res == kCompareEqual;
+bool Datum::operator>=(const Datum &d) const {
+	return compareTo(d) & kCompareGreaterEqual;
 }
 
-bool Datum::operator<=(Datum &d) const {
-	CompareResult res = compareTo(d);
-	return res == kCompareLess || res == kCompareEqual;
+bool Datum::operator<=(const Datum &d) const {
+	return compareTo(d) & kCompareLessEqual;
 }
 
-CompareResult Datum::compareTo(Datum &d) const {
-	int alignType = g_lingo->getAlignedType(*this, d, false);
+uint32 Datum::compareTo(const Datum &d) const {
+	// VOID will always be treated as:
+	// - equal to VOID
+	// - less than -and- equal to INT 0 (yes, really)
+	// - less than any other type
+	if (type == VOID && d.type == VOID) {
+		return kCompareEqual | kCompareLessEqual | kCompareGreaterEqual;
+	} else if (type == VOID && d.type == INT && d.u.i == 0) {
+		return kCompareLess | kCompareEqual | kCompareLessEqual;
+	} else if (type == VOID) {
+		return kCompareLess | kCompareLessEqual;
+	} else if (d.type == VOID) {
+		return kCompareGreater | kCompareGreaterEqual;
+	}
+
+	int alignType = g_lingo->getAlignedType(*this, d, true);
 
 	if (alignType == FLOAT) {
 		double f1 = asFloat();
 		double f2 = d.asFloat();
 		if (f1 < f2) {
-			return kCompareLess;
+			return kCompareLess | kCompareLessEqual;
 		} else if (f1 == f2) {
-			return kCompareEqual;
+			return kCompareEqual | kCompareLessEqual | kCompareGreaterEqual;
 		} else {
-			return kCompareGreater;
+			return kCompareGreater | kCompareGreaterEqual;
 		}
 	} else if (alignType == INT) {
 		double i1 = asInt();
 		double i2 = d.asInt();
 		if (i1 < i2) {
-			return kCompareLess;
+			return kCompareLess | kCompareLessEqual;
 		} else if (i1 == i2) {
-			return kCompareEqual;
+			return kCompareEqual | kCompareLessEqual | kCompareGreaterEqual;
 		} else {
-			return kCompareGreater;
+			return kCompareGreater | kCompareGreaterEqual;
 		}
-	} else if (alignType == STRING) {
-		int res = compareStrings(asString(), d.asString());
+	} else if (alignType == STRING || alignType == SYMBOL) {
+		uint32 result = 0;
+		// Strings can be equal and less/greater than at the same time.
+		// Equality is determined by whether the characters
+		// match based on the equality table, whereas less/greater
+		// than status is determined by the order of the characters
+		// in the order table.
+		bool eq = compareStringEquality(asString(), d.asString());
+		int res = compareStringOrder(asString(), d.asString());
 		if (res < 0) {
-			return kCompareLess;
+			result = kCompareLess | kCompareLessEqual;
+			if (eq) {
+				result |= kCompareEqual;
+			}
 		} else if (res == 0) {
-			return kCompareEqual;
+			result = kCompareEqual | kCompareLessEqual | kCompareGreaterEqual;
 		} else {
-			return kCompareGreater;
+			result = kCompareGreater | kCompareGreaterEqual;
+			if (eq) {
+				result |= kCompareEqual;
+			}
 		}
+		return result;
 	} else {
-		warning("Invalid comparison between types %s and %s", type2str(), d.type2str());
+		warning("Datum::compareTo(): Invalid comparison between types %s and %s", type2str(), d.type2str());
 		return kCompareError;
 	}
 }
@@ -1309,16 +1535,16 @@ void Lingo::runTests() {
 	Common::File inFile;
 	Common::ArchiveMemberList fsList;
 	SearchMan.listMatchingMembers(fsList, "*.lingo");
-	Common::StringArray fileList;
+	Common::Array<Common::Path> fileList;
 
 	LingoArchive *mainArchive = g_director->getCurrentMovie()->getMainLingoArch();
 
-	Common::String startMovie = _vm->getStartMovie().startMovie;
-	if (startMovie.size() > 0) {
+	Common::Path startMovie = Common::Path(_vm->getStartMovie().startMovie, g_director->_dirSeparator);
+	if (!startMovie.empty()) {
 		fileList.push_back(startMovie);
 	} else {
-		for (Common::ArchiveMemberList::iterator it = fsList.begin(); it != fsList.end(); ++it)
-			fileList.push_back((*it)->getName());
+		for (auto &it : fsList)
+			fileList.push_back(it->getPathInArchive());
 	}
 
 	Common::sort(fileList.begin(), fileList.end());
@@ -1334,13 +1560,13 @@ void Lingo::runTests() {
 
 			stream->read(script, size);
 
-			debug(">> Compiling file %s of size %d, id: %d", fileList[i].c_str(), size, counter);
+			debug(">> Compiling file %s of size %d, id: %d", fileList[i].toString(g_director->_dirSeparator).c_str(), size, counter);
 
 			mainArchive->addCode(Common::U32String(script, Common::kMacRoman), kTestScript, counter);
 
 			if (!debugChannelSet(-1, kDebugCompileOnly)) {
 				if (!_compiler->_hadError)
-					executeScript(kTestScript, CastMemberID(counter, 0));
+					executeScript(kTestScript, CastMemberID(counter, DEFAULT_CAST_LIB));
 				else
 					debug(">> Skipping execution");
 			}
@@ -1368,26 +1594,34 @@ void Lingo::executeImmediateScripts(Frame *frame) {
 }
 
 void Lingo::executePerFrameHook(int frame, int subframe) {
-	if (_vm->getVersion() < 400) {
-		if (_perFrameHook.type == OBJECT) {
-			Symbol method = _perFrameHook.u.obj->getMethod("mAtFrame");
-			if (method.type != VOIDSYM) {
-				debugC(1, kDebugLingoExec, "Executing perFrameHook : <%s>(mAtFrame, %d, %d)", _perFrameHook.asString(true).c_str(), frame, subframe);
-				push(_perFrameHook);
-				push(frame);
-				push(subframe);
-				LC::call(method, 3, false);
-				execute();
-			}
-		}
-	} else if (_actorList.u.farr->arr.size() > 0) {
-		for (uint i = 0; i < _actorList.u.farr->arr.size(); i++) {
-			Datum actor = _actorList.u.farr->arr[i];
-			Symbol method = actor.u.obj->getMethod("stepFrame");
-			if (method.nargs == 1)
-				push(actor);
-			LC::call(method, method.nargs, false);
+	// Execute perFrameHook and actorList stepFrame, if any is available
+	// Starting D4, stepFrame of each objects in actorList is executed
+	// however the support for legacy mAtFrame is still there. (in future versions)
+	if (_perFrameHook.type == OBJECT) {
+		Symbol method = _perFrameHook.u.obj->getMethod("mAtFrame");
+		if (method.type != VOIDSYM) {
+			debugC(1, kDebugLingoExec, "Executing perFrameHook : <%s>(mAtFrame, %d, %d)", _perFrameHook.asString(true).c_str(), frame, subframe);
+			push(_perFrameHook);
+			push(frame);
+			push(subframe);
+			LC::call(method, 3, false);
 			execute();
+		}
+	}
+
+	if (_vm->getVersion() >= 400) {
+		if (_actorList.u.farr->arr.size() > 0 && _vm->getVersion() >= 400) {
+			for (uint i = 0; i < _actorList.u.farr->arr.size(); i++) {
+				Datum actor = _actorList.u.farr->arr[i];
+				Symbol method = actor.u.obj->getMethod("stepFrame");
+				if (method.type != VOIDSYM) {
+					debugC(1, kDebugLingoExec, "Executing perFrameHook : <%s>, frame %d, subframe %d", actor.asString(true).c_str(), frame, subframe);
+					if (method.nargs == 1)
+						push(actor);
+					LC::call(method, method.nargs, false);
+					execute();
+				}
+			}
 		}
 	}
 }
@@ -1405,11 +1639,19 @@ void Lingo::cleanLocalVars() {
 Common::String Lingo::formatAllVars() {
 	Common::String result;
 
+	Common::Array<Common::String> keyBuffer;
+
 	result += Common::String("  Local vars:\n");
 	if (_state->localVars) {
-		for (DatumHash::iterator i = _state->localVars->begin(); i != _state->localVars->end(); ++i) {
-			result += Common::String::format("    %s - [%s] %s\n", (*i)._key.c_str(), (*i)._value.type2str(), (*i)._value.asString(true).c_str());
+		for (auto &it : *_state->localVars) {
+			keyBuffer.push_back(it._key);
 		}
+		Common::sort(keyBuffer.begin(), keyBuffer.end());
+		for (auto &i : keyBuffer) {
+			Datum &val = _state->localVars->getVal(i);
+			result += Common::String::format("    %s - [%s] %s\n", i.c_str(), val.type2str(), formatStringForDump(val.asString(true)).c_str());
+		}
+		keyBuffer.clear();
 	} else {
 		result += Common::String("    (no local vars)\n");
 	}
@@ -1418,16 +1660,28 @@ Common::String Lingo::formatAllVars() {
 	if (_state->me.type == OBJECT && _state->me.u.obj->getObjType() & (kFactoryObj | kScriptObj)) {
 		ScriptContext *script = static_cast<ScriptContext *>(_state->me.u.obj);
 		result += Common::String("  Instance/property vars: \n");
-		for (DatumHash::iterator i = script->_properties.begin(); i != script->_properties.end(); ++i) {
-			result += Common::String::format("    %s - [%s] %s\n", (*i)._key.c_str(), (*i)._value.type2str(), (*i)._value.asString(true).c_str());
+		for (uint32 i = 1; i <= script->getPropCount(); i++) {
+			keyBuffer.push_back(script->getPropAt(i));
 		}
+		Common::sort(keyBuffer.begin(), keyBuffer.end());
+		for (auto &i : keyBuffer) {
+			Datum val = script->getProp(i);
+			result += Common::String::format("    %s - [%s] %s\n", i.c_str(), val.type2str(), formatStringForDump(val.asString(true)).c_str());
+		}
+		keyBuffer.clear();
 		result += Common::String("\n");
 	}
 
 	result += Common::String("  Global vars:\n");
-	for (DatumHash::iterator i = _globalvars.begin(); i != _globalvars.end(); ++i) {
-		result += Common::String::format("    %s - [%s] %s\n", (*i)._key.c_str(), (*i)._value.type2str(), (*i)._value.asString(true).c_str());
+	for (auto &it : _globalvars) {
+		keyBuffer.push_back(it._key);
 	}
+	Common::sort(keyBuffer.begin(), keyBuffer.end());
+	for (auto &i : keyBuffer) {
+		Datum &val = _globalvars.getVal(i);
+		result += Common::String::format("    %s - [%s] %s\n", i.c_str(), val.type2str(), formatStringForDump(val.asString(true)).c_str());
+	}
+	keyBuffer.clear();
 	result += Common::String("\n");
 	return result;
 }
@@ -1686,18 +1940,22 @@ CastMemberID Lingo::resolveCastMember(const Datum &memberID, const Datum &castLi
 
 	switch (memberID.type) {
 	case STRING:
-		{
-			CastMember *member = movie->getCastMemberByNameAndType(memberID.asString(), castLib.asInt(), type);
-			if (member)
-				return CastMemberID(member->getID(), castLib.asInt());
-
-			warning("Lingo::resolveCastMember: reference to non-existent cast member: %s", memberID.asString().c_str());
-			return CastMemberID(-1, castLib.asInt());
-		}
+		return movie->getCastMemberIDByNameAndType(memberID.asString(), castLib.asInt(), type);
 		break;
 	case INT:
 	case FLOAT:
-		return CastMemberID(memberID.asInt(), castLib.asInt());
+		if (g_director->getVersion() >= 500 && memberID.asInt() > 0x20000) {
+			// Composite ID
+			return CastMemberID().fromMultiplex(memberID.asInt());
+		}
+		if (castLib.asInt() == 0) {
+			// When specifying 0 as the castlib, D5 will assume this
+			// means the default (i.e. first) cast library. It will not
+			// try other libraries for matches if the member is a number.
+			return CastMemberID(memberID.asInt(), DEFAULT_CAST_LIB);
+		} else {
+			return CastMemberID(memberID.asInt(), castLib.asInt());
+		}
 		break;
 	case VOID:
 		warning("Lingo::resolveCastMember: reference to VOID member ID");
@@ -1709,9 +1967,77 @@ CastMemberID Lingo::resolveCastMember(const Datum &memberID, const Datum &castLi
 	return CastMemberID(-1, castLib.asInt());
 }
 
+CastMemberID Lingo::toCastMemberID(const Datum &member, const Datum &castLib) {
+	// Used specifically for unpacking CastMemberIDs when provided by the bytecode
+	// as two Datums. Multiplex IDs are supported, but auto-truncated.
+	Movie *movie = g_director->getCurrentMovie();
+	if (!movie) {
+		warning("Lingo::toCastMemberID: No movie set");
+		return CastMemberID(-1, 0);
+	}
+	CastMemberID res;
+	if (castLib.type == VOID) {
+		if (member.isCastRef()) {
+			res = member.asMemberID();
+		} else if (member.isNumeric()) {
+			res = movie->getCastMemberIDByMember(member.asInt());
+		} else {
+			res = movie->getCastMemberIDByName(member.asString());
+		}
+	} else {
+		int libId = -1;
+		if (castLib.type == CASTLIBREF) {
+			libId = castLib.u.i;
+		} else if (castLib.isNumeric()) {
+			libId = castLib.asInt();
+		} else {
+			libId = movie->getCastLibIDByName(castLib.asString());
+		}
+		if (member.isCastRef()) {
+			res = member.asMemberID();
+		} else if (member.isNumeric()) {
+			res = CastMemberID().fromMultiplex(member.asInt());
+			if (libId != 0)
+				res.castLib = libId;
+		} else {
+			res = movie->getCastMemberIDByNameAndType(member.asString(), libId, kCastTypeAny);
+		}
+	}
+	return res;
+}
+
 void Lingo::exposeXObject(const char *name, Datum obj) {
 	_globalvars[name] = obj;
 	_globalvars[name].ignoreGlobal = true;
+}
+
+void Lingo::addBreakpoint(Breakpoint &bp) {
+	bp.id = _bpNextId;
+	_breakpoints.push_back(bp);
+	_bpNextId++;
+}
+
+bool Lingo::delBreakpoint(int id) {
+	for (auto it = _breakpoints.begin(); it != _breakpoints.end(); ++it) {
+		if (it->id == id) {
+			it = _breakpoints.erase(it);
+			return true;
+		}
+	}
+	return false;
+}
+
+Breakpoint *Lingo::getBreakpoint(int id) {
+	for (auto &it : _breakpoints) {
+		if (it.id == id) {
+			return &it;
+		}
+	}
+	return nullptr;
+}
+
+PictureReference::~PictureReference() {
+	delete _picture;
 }
 
 } // End of namespace Director

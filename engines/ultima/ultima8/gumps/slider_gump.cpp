@@ -21,11 +21,11 @@
 
 #include "ultima/ultima8/gumps/slider_gump.h"
 #include "ultima/ultima8/games/game_data.h"
-#include "ultima/ultima8/graphics/gump_shape_archive.h"
+#include "ultima/ultima8/gfx/gump_shape_archive.h"
 #include "ultima/ultima8/gumps/widgets/sliding_widget.h"
-#include "ultima/ultima8/graphics/fonts/font.h"
-#include "ultima/ultima8/graphics/fonts/rendered_text.h"
-#include "ultima/ultima8/graphics/fonts/font_manager.h"
+#include "ultima/ultima8/gfx/fonts/font.h"
+#include "ultima/ultima8/gfx/fonts/rendered_text.h"
+#include "ultima/ultima8/gfx/fonts/font_manager.h"
 #include "ultima/ultima8/gumps/widgets/button_widget.h"
 #include "ultima/ultima8/usecode/uc_process.h"
 #include "ultima/ultima8/kernel/kernel.h"
@@ -145,7 +145,7 @@ void SliderGump::InitGump(Gump *newparent, bool take_focus) {
 void SliderGump::ChildNotify(Gump *child, uint32 message) {
 	switch (child->GetIndex()) {
 	case OK_INDEX:
-		if (message == ButtonWidget::BUTTON_CLICK)
+		if (message == ButtonWidget::BUTTON_CLICK || message == ButtonWidget::BUTTON_DOUBLE)
 			Close();
 		break;
 	case LEFT_INDEX:

@@ -24,6 +24,8 @@
 #include "common/util.h"
 #include "common/translation.h"
 
+#include "backends/keymapper/keymapper.h"
+
 #include "gui/saveload.h"
 
 #include "mads/mads.h"
@@ -285,6 +287,13 @@ void DialogsNebular::showDialog() {
 	while (_pendingDialog != DIALOG_NONE && !_vm->shouldQuit()) {
 		DialogId dialogId = _pendingDialog;
 		_pendingDialog = DIALOG_NONE;
+
+		Common::Keymapper *keymapper = _vm->getEventManager()->getKeymapper();
+		if (dialogId == MADS::DIALOG_MAIN_MENU) {
+			keymapper->getKeymap("menu-shortcuts")->setEnabled(true);
+		} else {
+			keymapper->getKeymap("menu-shortcuts")->setEnabled(false);
+		}
 
 		switch (dialogId) {
 		case DIALOG_MAIN_MENU: {
@@ -568,7 +577,7 @@ void PictureDialog::save() {
 	_vm->_screen->translate(map);
 
 	// Load the inventory picture
-	Common::String setName = Common::String::format("*OB%.3d.SS", _objectId);
+	Common::Path setName(Common::String::format("*OB%.3d.SS", _objectId));
 	SpriteAsset *asset = new SpriteAsset(_vm, setName, 0x8000);
 	palette.setFullPalette(palette._mainPalette);
 
@@ -885,9 +894,9 @@ void GameDialog::handleEvents() {
 	// Process pending events
 	events.pollEvents();
 
-	if (events.isKeyPressed()) {
-		switch (events.getKey().keycode) {
-		case Common::KEYCODE_ESCAPE:
+	if (events.isActionTriggered()) {
+		switch (events.getAction()) {
+		case kActionEscape:
 			_selectedLine = 0;
 			break;
 		default:

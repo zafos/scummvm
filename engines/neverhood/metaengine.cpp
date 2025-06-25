@@ -23,7 +23,6 @@
 
 #include "engines/advancedDetector.h"
 #include "common/file.h"
-#include "common/translation.h"
 
 #include "neverhood/dialogs.h"
 #include "neverhood/neverhood.h"
@@ -57,13 +56,13 @@ bool NeverhoodEngine::applyResourceFixes() const {
 
 } // End of namespace Neverhood
 
-class NeverhoodMetaEngine : public AdvancedMetaEngine {
+class NeverhoodMetaEngine : public AdvancedMetaEngine<ADGameDescription> {
 public:
 	const char *getName() const override {
 		return "neverhood";
 	}
 
-	GUI::OptionsContainerWidget *buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const {
+	GUI::OptionsContainerWidget *buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const override {
 		return new Neverhood::NeverhoodOptionsWidget(boss, name, target);
 	}
 
@@ -72,7 +71,7 @@ public:
 
 	SaveStateList listSaves(const char *target) const override;
 	int getMaximumSaveSlot() const override;
-	void removeSaveState(const char *target, int slot) const override;
+	bool removeSaveState(const char *target, int slot) const override;
 	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
 };
 
@@ -133,10 +132,10 @@ int NeverhoodMetaEngine::getMaximumSaveSlot() const {
 	return 999;
 }
 
-void NeverhoodMetaEngine::removeSaveState(const char *target, int slot) const {
+bool NeverhoodMetaEngine::removeSaveState(const char *target, int slot) const {
 	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
 	Common::String filename = Neverhood::NeverhoodEngine::getSavegameFilename(target, slot);
-	saveFileMan->removeSavefile(filename.c_str());
+	return saveFileMan->removeSavefile(filename.c_str());
 }
 
 SaveStateDescriptor NeverhoodMetaEngine::querySaveMetaInfos(const char *target, int slot) const {

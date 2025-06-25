@@ -43,7 +43,6 @@
 #include "graphics/fontman.h"
 #include "graphics/surface.h"
 #include "graphics/pixelformat.h"
-#include "graphics/palette.h"
 #include "graphics/font.h"
 
 #include "gui/message.h"
@@ -169,12 +168,18 @@ int MidiDriver_MT32::open() {
 	debug(4, _s("Initializing MT-32 Emulator"));
 
 	Common::File controlFile;
-	if (!controlFile.open("CM32L_CONTROL.ROM") && !controlFile.open("MT32_CONTROL.ROM"))
-		error("Error opening MT32_CONTROL.ROM / CM32L_CONTROL.ROM. Check that your Extra Path in Paths settings is set to the correct directory");
-
 	Common::File pcmFile;
-	if (!pcmFile.open("CM32L_PCM.ROM") && !pcmFile.open("MT32_PCM.ROM"))
-		error("Error opening MT32_PCM.ROM / CM32L_PCM.ROM. Check that your Extra Path in Paths settings is set to the correct directory");
+	if (!controlFile.open("CM32L_CONTROL.ROM") || !pcmFile.open("CM32L_PCM.ROM")) {
+		controlFile.close();
+		pcmFile.close();
+		debug("Unable to open CM32L_CONTROL.ROM / CM32L_PCM.ROM. Falling back to MT32");
+
+		if (!controlFile.open("MT32_CONTROL.ROM") || !pcmFile.open("MT32_PCM.ROM")) {
+			controlFile.close();
+			pcmFile.close();
+			error("Error opening (CM32L_CONTROL.ROM / CM32L_PCM.ROM) or (MT32_CONTROL.ROM / MT32_PCM.ROM). Check that your Extra Path in Paths settings is set to the correct directory");
+		}
+	}
 
 	_controlData = new byte[controlFile.size()];
 	controlFile.read(_controlData, controlFile.size());
@@ -441,7 +446,7 @@ public:
 	}
 
 	MusicDevices getDevices() const override;
-	bool checkDevice(MidiDriver::DeviceHandle) const override;
+	bool checkDevice(MidiDriver::DeviceHandle, int flags, bool quiet) const override;
 	Common::Error createInstance(MidiDriver **mididriver, MidiDriver::DeviceHandle = 0) const override;
 };
 
@@ -451,10 +456,11 @@ MusicDevices MT32EmuMusicPlugin::getDevices() const {
 	return devices;
 }
 
-bool MT32EmuMusicPlugin::checkDevice(MidiDriver::DeviceHandle) const {
+bool MT32EmuMusicPlugin::checkDevice(MidiDriver::DeviceHandle, int flags, bool quiet) const {
 	if (!((Common::File::exists("MT32_CONTROL.ROM") && Common::File::exists("MT32_PCM.ROM")) ||
 		(Common::File::exists("CM32L_CONTROL.ROM") && Common::File::exists("CM32L_PCM.ROM")))) {
-			warning("The MT-32 emulator requires one of the two following file sets (not bundled with ScummVM):\n Either 'MT32_CONTROL.ROM' and 'MT32_PCM.ROM' or 'CM32L_CONTROL.ROM' and 'CM32L_PCM.ROM'");
+			if (!quiet)
+				warning("The MT-32 emulator requires one of the two following file sets (not bundled with ScummVM):\n Either 'MT32_CONTROL.ROM' and 'MT32_PCM.ROM' or 'CM32L_CONTROL.ROM' and 'CM32L_PCM.ROM'");
 			return false;
 	}
 

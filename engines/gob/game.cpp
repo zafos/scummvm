@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/endian.h"
@@ -447,6 +453,24 @@ bool TotFunctions::call(const Tot &tot, uint16 offset) const {
 	return true;
 }
 
+Common::String TotFunctions::getFunctionName(const Common::String &totFile, uint16 offset) const {
+	int index = find(totFile);
+	if (index < 0) {
+		warning("TotFunctions::getFunctionName(): No such TOT \"%s\"", totFile.c_str());
+		return "";
+	}
+
+	const Tot &tot = _tots[index];
+
+	Common::List<Function>::const_iterator it;
+	for (it = tot.functions.begin(); it != tot.functions.end(); ++it) {
+		if (it->offset == offset)
+			return it->name;
+	}
+
+	return "";
+}
+
 
 Game::Game(GobEngine *vm) : _vm(vm), _environments(_vm), _totFunctions(_vm) {
 	_captureCount = 0;
@@ -456,6 +480,9 @@ Game::Game(GobEngine *vm) : _vm(vm), _environments(_vm), _totFunctions(_vm) {
 
 	_handleMouse = 0;
 	_forceHandleMouse = 0;
+	_hasForwardedEventsFromVideo = false;
+	_forwardedMouseButtonsFromVideo = kMouseButtonsNone;
+	_forwardedKeyFromVideo = 0;
 	_noScroll = true;
 	_preventScroll = false;
 
@@ -512,7 +539,7 @@ void Game::prepareStart() {
 	_startTimeKey = _vm->_util->getTimeKey();
 }
 
-void Game::playTot(int16 function) {
+void Game::playTot(int32 function) {
 	int16 *oldNestLevel      = _vm->_inter->_nestLevel;
 	int16 *oldBreakFrom      = _vm->_inter->_breakFromLevel;
 	int16 *oldCaptureCounter = _vm->_scenery->_pCaptureCounter;
@@ -573,6 +600,13 @@ void Game::playTot(int16 function) {
 				_vm->_draw->blitCursor();
 				_vm->_inter->_terminate = 2;
 				break;
+			}
+
+			if (_vm->getGameType() == kGameTypeAdibou1 ||
+				_vm->getGameType() == kGameTypeAdi2) { // TODO: maybe needed by other games
+				_vm->_draw->_needAdjust = _vm->_game->_script->getData()[58];
+				if (_vm->_draw->_needAdjust <= 1 || _vm->_draw->_needAdjust >= 8)
+					_vm->_draw->_needAdjust = 2;
 			}
 
 			_resources->load(_curTotFile);
@@ -666,6 +700,9 @@ void Game::capturePush(int16 left, int16 top, int16 width, int16 height) {
 	if (_captureCount == 20)
 		error("Game::capturePush(): Capture stack overflow");
 
+	_vm->_draw->adjustCoords(0, &left, &top);
+	_vm->_draw->adjustCoords(0, &width, &height);
+
 	_captureStack[_captureCount].left = left;
 	_captureStack[_captureCount].top = top;
 	_captureStack[_captureCount].right = left + width;
@@ -688,7 +725,11 @@ void Game::capturePush(int16 left, int16 top, int16 width, int16 height) {
 	_vm->_draw->_destSpriteX = 0;
 	_vm->_draw->_destSpriteY = 0;
 	_vm->_draw->_transparency = 0;
-	_vm->_draw->spriteOperation(0);
+
+	int16 savedNeedAdjust = _vm->_draw->_needAdjust;
+	_vm->_draw->_needAdjust = 10;
+	_vm->_draw->spriteOperation(DRAW_BLITSURF);
+	_vm->_draw->_needAdjust = savedNeedAdjust;
 	_captureCount++;
 }
 
@@ -710,7 +751,10 @@ void Game::capturePop(char doDraw) {
 		_vm->_draw->_destSurface = Draw::kBackSurface;
 		_vm->_draw->_spriteLeft = _vm->_draw->_destSpriteX & 0xF;
 		_vm->_draw->_spriteTop = 0;
-		_vm->_draw->spriteOperation(0);
+		int16 savedNeedAdjust = _vm->_draw->_needAdjust;
+		_vm->_draw->_needAdjust = 10;
+		_vm->_draw->spriteOperation(DRAW_BLITSURF);
+		_vm->_draw->_needAdjust = savedNeedAdjust;
 	}
 	_vm->_draw->freeSprite(Draw::kCaptureSurface + _captureCount);
 }
@@ -791,6 +835,8 @@ void Game::evaluateScroll() {
 int16 Game::checkKeys(int16 *pMouseX, int16 *pMouseY,
 		MouseButtons *pButtons, char handleMouse) {
 
+	if (_vm->getGameType() == kGameTypeAdibou2)
+		_vm->_vidPlayer->updateLive();
 	_vm->_util->processInput(true);
 
 	if (_vm->_mult->_multData && _vm->_inter->_variables &&
@@ -817,7 +863,15 @@ int16 Game::checkKeys(int16 *pMouseX, int16 *pMouseY,
 			*pButtons = kMouseButtonsNone;
 	}
 
-	return _vm->_util->checkKey();
+	int16 key = _vm->_util->checkKey();
+	if (_vm->_game->_hasForwardedEventsFromVideo) {
+		if (pButtons)
+			*pButtons = _vm->_game->_forwardedMouseButtonsFromVideo;
+		key = _vm->_game->_forwardedKeyFromVideo;
+		_vm->_game->_hasForwardedEventsFromVideo = false;
+	}
+
+	return key;
 }
 
 void Game::start() {
@@ -1004,6 +1058,13 @@ bool Game::callFunction(const Common::String &tot, const Common::String &functio
 		return _totFunctions.call(tot, Common::String(function.c_str(), 16));
 
 	return _totFunctions.call(tot, function);
+}
+
+Common::String Game::getFunctionName(const Common::String &tot, uint16 offset) {
+	if (_totFunctions.find(tot) < 0)
+		loadFunctions(tot, 0);
+
+	return _totFunctions.getFunctionName(tot, offset);
 }
 
 } // End of namespace Gob

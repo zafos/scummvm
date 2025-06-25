@@ -24,7 +24,7 @@
 
 #include "ultima/ultima8/kernel/object.h"
 #include "ultima/ultima8/misc/rect.h"
-#include "ultima/ultima8/graphics/frame_id.h"
+#include "ultima/ultima8/gfx/frame_id.h"
 #include "ultima/shared/std/containers.h"
 #include "ultima/ultima8/misc/classtype.h"
 
@@ -309,6 +309,9 @@ public:
 	//
 	// A mouse click on a gump will make it focus, IF it wants it.
 	//
+	// It is often preferrable to handle both click and double events
+	// rather than only the up event to avoid unintended clicks after
+	// performing intended action.
 
 	// Return Gump that handled event
 	virtual Gump       *onMouseDown(int button, int32 mx, int32 my);

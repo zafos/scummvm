@@ -25,7 +25,7 @@
 #define FORBIDDEN_SYMBOL_EXCEPTION_time_h
 
 #include "backends/base-backend.h"
-#include "graphics/palette.h"
+#include "graphics/paletteman.h"
 #include "base/main.h"
 #include "audio/mixer_intern.h"
 #include "backends/graphics/graphics.h"
@@ -55,7 +55,14 @@ enum GraphicsModeID {
 	RGB565,
 	RGB555,
 	RGB5A1,
+	RGBA4,
 	CLUT8
+};
+
+enum Screen {
+	kScreenTop = 0x10000002,
+	kScreenBottom,
+	kScreenBoth,
 };
 
 enum TransactionState {
@@ -112,6 +119,10 @@ public:
 	Common::KeymapArray getGlobalKeymaps() override;
 	Common::KeymapperDefaultBindings *getKeymapperDefaultBindings() override;
 
+	void registerDefaultSettings(const Common::String &target) const override;
+	GUI::OptionsContainerWidget *buildBackendOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const override;
+	void applyBackendSettings() override;
+
 	virtual uint32 getMillis(bool skipRecord = false);
 	virtual void delayMillis(uint msecs);
 	virtual void getTimeAndDate(TimeDate &td, bool skipRecord = false) const;
@@ -126,7 +137,7 @@ public:
 	virtual void fatalError();
 	virtual void quit();
 
-	virtual Common::String getDefaultConfigFileName();
+	virtual Common::Path getDefaultConfigFileName();
 	void addSysArchivesToSearchSet(Common::SearchSet &s, int priority) override;
 
 	// Graphics
@@ -182,6 +193,7 @@ public:
 
 	void updateFocus();
 	void updateMagnify();
+	void updateBacklight();
 	void updateConfig();
 	void updateSize();
 
@@ -192,12 +204,11 @@ private:
 	void destroyAudio();
 	void initEvents();
 	void destroyEvents();
-	void runOptionsDialog();
 
 	void flushGameScreen();
 	void flushCursor();
 
-	virtual Common::String getDefaultLogFileName();
+	virtual Common::Path getDefaultLogFileName();
 	virtual Common::WriteStream *createLogFile();
 
 protected:
@@ -223,6 +234,7 @@ private:
 	Graphics::PixelFormat _pfCursor;
 	byte _palette[3 * 256];
 	byte _cursorPalette[3 * 256];
+	uint32 _paletteMap[256];
 
 	Graphics::Surface _gameScreen;
 	bool _gameTextureDirty;
@@ -288,11 +300,16 @@ private:
 	u16 _magWidth, _magHeight;
 	u16 _magCenterX, _magCenterY;
 
-	Common::String _logFilePath;
+	Common::Path _logFilePath;
 
 public:
 	// Pause
 	PauseToken _sleepPauseToken;
+
+	bool _showCursor;
+	bool _snapToBorder;
+	bool _stretchToFit;
+	Screen _screen;
 };
 
 } // namespace N3DS

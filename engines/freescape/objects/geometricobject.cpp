@@ -22,9 +22,13 @@
 // Based on Phantasma code by Thomas Harte (2013),
 // available at https://github.com/TomHarte/Phantasma/ (MIT)
 
+#include "common/system.h"
+
 #include "freescape/objects/geometricobject.h"
 
 namespace Freescape {
+
+extern FCLInstructionVector *duplicateCondition(FCLInstructionVector *condition);
 
 int GeometricObject::numberOfColoursForObjectOfType(ObjectType type) {
 	switch (type) {
@@ -117,10 +121,12 @@ GeometricObject::GeometricObject(
 	const Math::Vector3d &origin_,
 	const Math::Vector3d &size_,
 	Common::Array<uint8> *colours_,
-	Common::Array<uint16> *ordinates_,
+	Common::Array<uint8> *ecolours_,
+	Common::Array<float> *ordinates_,
 	FCLInstructionVector conditionInstructions_,
 	Common::String conditionSource_) {
 	_type = type_;
+	assert(_type != kGroupType);
 	_flags = flags_;
 
 	if (isDestroyed()) // If the object is destroyed, restore it
@@ -140,10 +146,19 @@ GeometricObject::GeometricObject(
 	if (colours_)
 		_colours = colours_;
 
-	_ordinates = nullptr;
+	_ecolours = nullptr;
 
-	if (ordinates_)
+	if (ecolours_)
+		_ecolours = ecolours_;
+
+	_cyclingColors = false; // This needs to be set manually
+	_ordinates = nullptr;
+	_initialOrdinates = nullptr;
+
+	if (ordinates_) {
 		_ordinates = ordinates_;
+		_initialOrdinates = new Common::Array<float>(*_ordinates);
+	}
 	_condition = conditionInstructions_;
 	_conditionSource = conditionSource_;
 
@@ -154,7 +169,7 @@ GeometricObject::GeometricObject(
 
 			_type = kLineType;
 			assert(!_ordinates);
-			_ordinates = new Common::Array<uint16>();
+			_ordinates = new Common::Array<float>();
 			_ordinates->push_back(_origin.x());
 			_ordinates->push_back(_origin.y());
 			_ordinates->push_back(_origin.z());
@@ -163,7 +178,8 @@ GeometricObject::GeometricObject(
 			_ordinates->push_back(_origin.y() + _size.y());
 			_ordinates->push_back(_origin.z() + _size.z());
 		}
-	}
+	} else if (isPyramid(_type))
+		assert(_size.x() > 0 && _size.y() > 0 && _size.z() > 0);
 
 	computeBoundingBox();
 }
@@ -173,38 +189,86 @@ void GeometricObject::setOrigin(Math::Vector3d origin_) {
 	computeBoundingBox();
 }
 
+void GeometricObject::offsetOrigin(Math::Vector3d origin_) {
+	if (isPolygon(_type)) {
+		Math::Vector3d offset = origin_ - _origin;
+		for (int i = 0; i < int(_ordinates->size()); i = i + 3) {
+			float ordinate = 0;
+			ordinate = (*_ordinates)[i];
+			ordinate +=  offset.x();
+			assert(ordinate >= 0);
+			(*_ordinates)[i] = ordinate;
+
+			ordinate = (*_ordinates)[i + 1];
+			ordinate +=  offset.y();
+			assert(ordinate >= 0);
+			(*_ordinates)[i + 1] = ordinate;
+
+			ordinate = (*_ordinates)[i + 2];
+			ordinate +=  offset.z();
+			assert(ordinate >= 0);
+			(*_ordinates)[i + 2] = ordinate;
+		}
+	}
+	setOrigin(origin_);
+}
+
 void GeometricObject::scale(int factor) {
 	_origin = _origin / factor;
 	_size = _size / factor;
 	if (_ordinates) {
 		for (uint i = 0; i < _ordinates->size(); i++) {
-			// This division is always exact because each ordinate was multipled by 32
 			(*_ordinates)[i] = (*_ordinates)[i] / factor;
+			if (_initialOrdinates)
+				(*_initialOrdinates)[i] = (*_initialOrdinates)[i] / factor;
 		}
 	}
 	computeBoundingBox();
 }
 
+void GeometricObject::restoreOrdinates() {
+	if (!isPolygon(_type))
+		return;
+
+	for (uint i = 0; i < _ordinates->size(); i++)
+		(*_ordinates)[i] = (*_initialOrdinates)[i];
+
+	computeBoundingBox();
+}
+
 Object *GeometricObject::duplicate() {
-	Common::Array<uint8> *colours_copy = nullptr;
-	Common::Array<uint16> *ordinates_copy = nullptr;
+	Common::Array<uint8> *coloursCopy = nullptr;
+	Common::Array<uint8> *ecoloursCopy = nullptr;
+	Common::Array<float> *ordinatesCopy = nullptr;
+	FCLInstructionVector *conditionCopy = nullptr;
 
 	if (_colours)
-		colours_copy = new Common::Array<uint8>(*_colours);
+		coloursCopy = new Common::Array<uint8>(*_colours);
+
+	if (_ecolours)
+		ecoloursCopy = new Common::Array<uint8>(*_ecolours);
 
 	if (_ordinates)
-		ordinates_copy = new Common::Array<uint16>(*_ordinates);
+		ordinatesCopy = new Common::Array<float>(*_ordinates);
 
-	return new GeometricObject(
+	conditionCopy = duplicateCondition(&_condition);
+	assert(conditionCopy);
+
+	GeometricObject *copy = new GeometricObject(
 		_type,
 		_objectID,
 		_flags,
 		_origin,
 		_size,
-		colours_copy,
-		ordinates_copy,
-		_condition,
-		_conditionSource);
+		coloursCopy,
+		ecoloursCopy,
+		ordinatesCopy,
+		*conditionCopy,
+		_conditionSource
+	);
+
+	copy->_cyclingColors = _cyclingColors;
+	return copy;
 }
 
 void GeometricObject::computeBoundingBox() {
@@ -349,6 +413,31 @@ void GeometricObject::computeBoundingBox() {
 GeometricObject::~GeometricObject() {
 	delete _colours;
 	delete _ordinates;
+	delete _initialOrdinates;
+}
+
+// This function returns when the object is a line, but it is not a straight line
+bool GeometricObject::isLineButNotStraight() {
+	if (_type != kLineType)
+		return false;
+
+	if (!_ordinates)
+		return false;
+
+	if (_ordinates->size() != 6)
+		return false;
+
+	// At least two coordinates should be the same to be a straight line
+	if ((*_ordinates)[0] == (*_ordinates)[3] && (*_ordinates)[1] == (*_ordinates)[4])
+		return false;
+
+	if ((*_ordinates)[0] == (*_ordinates)[3] && (*_ordinates)[2] == (*_ordinates)[5])
+		return false;
+
+	if ((*_ordinates)[1] == (*_ordinates)[4] && (*_ordinates)[2] == (*_ordinates)[5])
+		return false;
+
+	return true;
 }
 
 bool GeometricObject::isDrawable() { return true; }
@@ -361,26 +450,31 @@ bool GeometricObject::collides(const Math::AABB &boundingBox_) {
 	if (isDestroyed() || isInvisible() || !_boundingBox.isValid() || !boundingBox_.isValid())
 		return false;
 
-	return (_boundingBox.getMax().x() > boundingBox_.getMin().x() &&
-			_boundingBox.getMin().x() < boundingBox_.getMax().x() &&
-			_boundingBox.getMax().y() > boundingBox_.getMin().y() &&
-			_boundingBox.getMin().y() < boundingBox_.getMax().y() &&
-			_boundingBox.getMax().z() > boundingBox_.getMin().z() &&
-			_boundingBox.getMin().z() < boundingBox_.getMax().z());
+	return _boundingBox.collides(boundingBox_);
 }
 
-void GeometricObject::draw(Freescape::Renderer *gfx) {
+void GeometricObject::draw(Renderer *gfx, float offset) {
+	if (_cyclingColors) {
+		assert(_colours);
+		if (g_system->getMillis() % 10 == 0)
+			for (uint i = 0; i < _colours->size(); i++) {
+				(*_colours)[i] = ((*_colours)[i] + 1) % 0xf;
+				if (_ecolours)
+					(*_ecolours)[i] = ((*_ecolours)[i] + 1) % 0xf;
+			}
+	}
+
 	if (this->getType() == kCubeType) {
-		gfx->renderCube(_origin, _size, _colours);
+		gfx->renderCube(_origin, _size, _colours, _ecolours, offset);
 	} else if (this->getType() == kRectangleType) {
-		gfx->renderRectangle(_origin, _size, _colours);
+		gfx->renderRectangle(_origin, _size, _colours, _ecolours, offset);
 	} else if (isPyramid(this->getType())) {
-		gfx->renderPyramid(_origin, _size, _ordinates, _colours, this->getType());
+		gfx->renderPyramid(_origin, _size, _ordinates, _colours, _ecolours, this->getType());
 	} else if (this->isPlanar() && _type <= 14) {
 		if (this->getType() == kTriangleType)
 			assert(_ordinates->size() == 9);
 
-		gfx->renderPolygon(_origin, _size, _ordinates, _colours);
+		gfx->renderPolygon(_origin, _size, _ordinates, _colours, _ecolours, offset);
 	}
 }
 

@@ -52,13 +52,10 @@ public:
 	enum {
 		PROP_TEMPO_BASE,
 		PROP_LIMIT_PLAYERS,
-		PROP_RECYCLE_PLAYERS
-	};
-
-	enum {
-		kFlagNewSystem	=	1 << 0,
-		kFlagNativeMT32 =	1 << 1,
-		kFlagRolandGS =		1 << 2
+		PROP_RECYCLE_PLAYERS,
+		PROP_QUALITY,
+		PROP_MUSICVOLUME,
+		PROP_SFXVOLUME
 	};
 
 public:
@@ -74,12 +71,12 @@ public:
 public:
 	virtual void startSoundWithNoteOffset(int sound, int offset) = 0;
 
-	// MusicEngine base class methods.
-	// Not actually redefined here because none are implemented.
+	// MusicEngine base class methods. Only this one is implemented:
+	void setQuality(int qual) override { property(PROP_QUALITY, qual); }
 
 public:
 	// Factory methods
-	static IMuse *create(ScummEngine *vm, MidiDriver *nativeMidiDriver, MidiDriver *adlibMidiDriver, MidiDriverFlags sndType, uint32 flags);
+	static IMuse *create(ScummEngine *vm, MidiDriver *nativeMidiDriver, MidiDriver *adlibMidiDriver, MidiDriverFlags sndType, bool nativeMT32);
 };
 
 } // End of namespace Scumm

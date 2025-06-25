@@ -36,6 +36,7 @@ class OSystem;
 
 namespace Graphics {
 class Font;
+class MacWindowManager;
 }
 
 namespace Common {
@@ -44,6 +45,16 @@ namespace Common {
 }
 
 namespace GUI {
+
+enum {
+	kActionEnd,
+	kActionShiftEnd,
+	kActionHome,
+	kActionShiftHome,
+	kActionCopy,
+	kActionCut,
+	kActionPaste,
+};
 
 enum {
 	kIconsSetLoadedCmd  = 'icns'
@@ -88,6 +99,7 @@ public:
 	void processEvent(const Common::Event &event, Dialog *const activeDialog);
 	Common::Keymap *getKeymap() const;
 	void scheduleTopDialogRedraw();
+	void scheduleFullRedraw();
 
 	bool isActive() const	{ return ! _dialogStack.empty(); }
 
@@ -105,11 +117,10 @@ public:
 	float getScaleFactor() const { return _scaleFactor; }
 	void computeScaleFactor();
 
+	bool useLowResGUI() const { return _baseWidth <= 320; }
+
 	bool useRTL() const { return _useRTL; }
 	void setLanguageRTL();
-
-	void setDialogPaddings(int l, int r);
-	int getOverlayOffset() { return _topDialogRightPadding - _topDialogLeftPadding; }
 
 	const Graphics::Font &getFont(ThemeEngine::FontStyle style = ThemeEngine::kFontStyleBold) const { return *(_theme->getFont(style)); }
 	int getFontHeight(ThemeEngine::FontStyle style = ThemeEngine::kFontStyleBold) const { return _theme->getFontHeight(style); }
@@ -142,6 +153,8 @@ public:
 
 	void displayTopDialogOnly(bool mode);
 
+	Graphics::MacWindowManager *getWM();
+
 protected:
 	enum RedrawStatus {
 		kRedrawDisabled = 0,
@@ -168,14 +181,13 @@ protected:
 
 	bool		_useRTL;
 
-	int			_topDialogLeftPadding;
-	int			_topDialogRightPadding;
-
 	bool		_displayTopDialogOnly;
 
 	Common::Mutex _iconsMutex;
 	Common::SearchSet _iconsSet;
 	bool _iconsSetChanged;
+
+	Graphics::MacWindowManager *_wm = nullptr;
 
 	// position and time of last mouse click (used to detect double clicks)
 	struct MousePos {
@@ -193,8 +205,8 @@ protected:
 	} _lastTooltipShown;
 
 	// mouse cursor state
-	int		_cursorAnimateCounter;
-	int		_cursorAnimateTimer;
+	uint32	_cursorAnimateCounter;
+	uint32	_cursorAnimateTimer;
 	byte	_cursor[2048];
 
 	// delayed deletion of GuiObject
@@ -214,6 +226,8 @@ protected:
 	void closeTopDialog();
 
 	void redraw();
+	void redrawInternalTopDialogOnly();
+	void redrawInternal();
 
 	void setupCursor();
 	void animateCursor();
@@ -224,6 +238,8 @@ protected:
 
 	void giveFocusToDialog(Dialog *dialog);
 	void setLastMousePos(int16 x, int16 y);
+
+	void emptyTrash(Dialog *const activeDialog);
 };
 
 } // End of namespace GUI

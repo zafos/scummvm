@@ -19,74 +19,77 @@
  *
  */
 
+/**************************************************
+ *
+ * USED IN:
+ * DEVO Presents: Adventures of the Smart Patrol
+ * The Dark Eye
+ *
+ **************************************************/
+
+/*
+ * -- SpaceMgr XObject. Copyright 1995 Inscape v1.0b1 10March95 BDL
+ * SpaceMgr
+ * I      mNew                                                                --Creates a new instance
+ * X      mDispose                                                            --Disposes XObject instance
+ * I                  mLastError                                                                                      --Last error code
+ * I                  mMemUsed                                                                                                --RAM occupied by this object and data
+ * S                  mListData                                                                                               --List all data
+ * I      mSortAll                                                            --Sort internal arrays
+ * IS     mCheckForDups, bool                 --Set to true to check for Duplicate items before adding an element
+ * IS     mParseText, text                            --Parse Text into a space structure
+ * S                  mGetCurData                                                                                     --List Current data
+ * ISSSS      mSetCurData, sc, s, n, v                                --pass in names of elements to make current
+ * ISS                mAddSpaceCollection, name, data --Add a Space Collection
+ * IS                 mRemoveSpaceCollection, name            --Remove a Space Collection
+ * IS                 mSetCurSpaceCollection, name            --Set current SpaceCollection
+ * S                  mGetCurSpaceCollection                                  --Get current SpaceCollection
+ * SS                 mGetSpaceCollection, name                               --Get SpaceCollection with name
+ * ISS                mAddSpace, name, data                                           --Add a Space
+ * IS                 mRemoveSpace, name                                                      --Remove a Space
+ * IS                 mSetCurSpace, name                                                      --Set current Space
+ * S                  mGetCurSpace                                                                            --Get current Space
+ * SS                 mGetSpace, name                                                                 --Get Space with name
+ * ISS                mAddNode, name, data                                            --Add a Node
+ * IS                 mRemoveNode, name                                                               --Remove a Node
+ * IS                 mSetCurNode, name                                                               --Set current Node
+ * S                  mGetCurNode                                                                                     --Get current Node
+ * SS                 mGetNode, name                                                                  --Get Node with name
+ * ISS                mAddView, name, data                                            --Add a View
+ * IS                 mRemoveView, name                                                               --Remove a View
+ * IS                 mSetCurView, name                                                               --Set current View
+ * S                  mGetCurView                                                                                     --Get current View
+ * SS                 mGetView, name                                                                  --Get View with name
+ * ISS                mAddLocalLink, name, data                               --Add a link to the current view
+ * IS                 mRemoveLocalLink, name                                  --Remove a link from the current View
+ * I                  mRemoveLocalLinks                                                               --Remove all links from the current View
+ * SS                 mGetLocalLink, name                                                     --Get link with name from the current view
+ * S                  mGetLocalLinks                                                                  --Get all links from the current view
+ * ISS                mAddGlobalLink, name, data                      --Add a global link
+ * IS                 mRemoveGlobalLink, name                                 --Remove a global link
+ * SS                 mGetGlobalLink, name                                            --Get global link with name
+ * S                  mGetGlobalLinks                                                                 --Get list of all global links
+ */
+
 #include "common/system.h"
 #include "common/tokenizer.h"
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/spacemgr.h"
+#include "director/util.h"
 
 namespace Director {
 
-/**************************************************
- *
- * USED IN:
- * DEVO Presents: Adventures of the Smart Patrol
- *
- **************************************************/
-/*
--- SpaceMgr XObject. Copyright 1995 Inscape v1.0b1 10March95 BDL
-SpaceMgr
-I      mNew                                                                --Creates a new instance
-X      mDispose                                                            --Disposes XObject instance
-I                  mLastError                                                                                      --Last error code
-I                  mMemUsed                                                                                                --RAM occupied by this object and data
-S                  mListData                                                                                               --List all data
-I      mSortAll                                                            --Sort internal arrays
-IS     mCheckForDups, bool                 --Set to true to check for Duplicate items before adding an element
-IS     mParseText, text                            --Parse Text into a space structure
-S                  mGetCurData                                                                                     --List Current data
-ISSSS      mSetCurData, sc, s, n, v                                --pass in names of elements to make current
-ISS                mAddSpaceCollection, name, data --Add a Space Collection
-IS                 mRemoveSpaceCollection, name            --Remove a Space Collection
-IS                 mSetCurSpaceCollection, name            --Set current SpaceCollection
-S                  mGetCurSpaceCollection                                  --Get current SpaceCollection
-SS                 mGetSpaceCollection, name                               --Get SpaceCollection with name
-ISS                mAddSpace, name, data                                           --Add a Space
-IS                 mRemoveSpace, name                                                      --Remove a Space
-IS                 mSetCurSpace, name                                                      --Set current Space
-S                  mGetCurSpace                                                                            --Get current Space
-SS                 mGetSpace, name                                                                 --Get Space with name
-ISS                mAddNode, name, data                                            --Add a Node
-IS                 mRemoveNode, name                                                               --Remove a Node
-IS                 mSetCurNode, name                                                               --Set current Node
-S                  mGetCurNode                                                                                     --Get current Node
-SS                 mGetNode, name                                                                  --Get Node with name
-ISS                mAddView, name, data                                            --Add a View
-IS                 mRemoveView, name                                                               --Remove a View
-IS                 mSetCurView, name                                                               --Set current View
-S                  mGetCurView                                                                                     --Get current View
-SS                 mGetView, name                                                                  --Get View with name
-ISS                mAddLocalLink, name, data                               --Add a link to the current view
-IS                 mRemoveLocalLink, name                                  --Remove a link from the current View
-I                  mRemoveLocalLinks                                                               --Remove all links from the current View
-SS                 mGetLocalLink, name                                                     --Get link with name from the current view
-S                  mGetLocalLinks                                                                  --Get all links from the current view
-ISS                mAddGlobalLink, name, data                      --Add a global link
-IS                 mRemoveGlobalLink, name                                 --Remove a global link
-SS                 mGetGlobalLink, name                                            --Get global link with name
-S                  mGetGlobalLinks                                                                 --Get list of all global links
-*/
-
-const char *SpaceMgr::xlibName = "SpaceMgr";
-const char *SpaceMgr::fileNames[] = {
-	"SpaceMgr",
-	"SPACEMGR",
-	nullptr
+const char *const SpaceMgr::xlibName = "SpaceMgr";
+const XlibFileDesc SpaceMgr::fileNames[] = {
+	{ "SpaceMgr",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",					SpaceMgr::m_new,					0, 0,	400 },	// D4
 	{ "dispose",				SpaceMgr::m_dispose,				1, 1,	400 },	// D4
 	{ "lastError",				SpaceMgr::m_lastError,				0, 0,	400 },	// D4
@@ -133,22 +136,18 @@ SpaceMgrXObject::SpaceMgrXObject(ObjectType ObjectType) :Object<SpaceMgrXObject>
 	_objType = ObjectType;
 }
 
-void SpaceMgr::open(int type) {
+void SpaceMgr::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		SpaceMgrXObject::initMethods(xlibMethods);
 		SpaceMgrXObject *xobj = new SpaceMgrXObject(kXObj);
 		g_lingo->exposeXObject(xlibName, xobj);
-	} else if (type == kXtraObj) {
-		// TODO - Implement Xtra
 	}
 }
 
-void SpaceMgr::close(int type) {
+void SpaceMgr::close(ObjectType type) {
 	if (type == kXObj) {
 		SpaceMgrXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
-	} else if (type == kXtraObj) {
-		// TODO - Implement Xtra
 	}
 }
 
@@ -160,34 +159,11 @@ void SpaceMgr::m_new(int nargs) {
 	g_lingo->push(g_lingo->_state->me);
 }
 
-void SpaceMgr::m_dispose(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_dispose", nargs);
-	g_lingo->dropStack(nargs);
-}
-
-void SpaceMgr::m_lastError(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_lastError", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
-
-void SpaceMgr::m_memUsed(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_memUsed", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
-
-void SpaceMgr::m_listData(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_listData", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(""));
-}
-
-void SpaceMgr::m_sortAll(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_sortAll", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
+XOBJSTUBNR(SpaceMgr::m_dispose)
+XOBJSTUB(SpaceMgr::m_lastError, 0)
+XOBJSTUB(SpaceMgr::m_memUsed, 0)
+XOBJSTUB(SpaceMgr::m_listData, "")
+XOBJSTUB(SpaceMgr::m_sortAll, 0)
 
 void SpaceMgr::m_checkForDups(int nargs) {
 	if (nargs != 1) {
@@ -225,10 +201,10 @@ void SpaceMgr::m_parseText(int nargs) {
 	SpaceMgrXObject *me = static_cast<SpaceMgrXObject *>(g_lingo->_state->me.u.obj);
 
 	Common::String result = *text.u.s;
-	Common::String curSpaceCollection;
-	Common::String curSpace;
-	Common::String curNode;
-	Common::String curView;
+	if (debugLevelSet(5)) {
+		debugC(5, kDebugXObj, "SpaceMgr::m_parseText:\n%s", formatStringForDump(result).c_str());
+	}
+
 	Common::StringTokenizer instructions = Common::StringTokenizer(result, "\r");
 
 	while (!instructions.empty()) {
@@ -236,61 +212,50 @@ void SpaceMgr::m_parseText(int nargs) {
 		Common::StringTokenizer instruction = Common::StringTokenizer(instructionBody, " ");
 		Common::String type = instruction.nextToken();
 		if (type == "SPACECOLLECTION") {
-			curSpaceCollection = instruction.nextToken();
-			curSpace = "";
-			curNode = "";
-			curView = "";
-			if (!(me->_spaceCollections.contains(curSpaceCollection) && me->_checkForDups)) {
-				me->_spaceCollections[curSpaceCollection] = SpaceCollection();
+			me->_curSpaceCollection = instruction.nextToken();
+			me->_curSpace = "";
+			me->_curNode = "";
+			me->_curView = "";
+			if (!(me->_spaceCollections.contains(me->_curSpaceCollection) && me->_checkForDups)) {
+				me->_spaceCollections.getOrCreateVal(me->_curSpaceCollection);
 			}
 		} else if (type == "SPACE") {
-			curSpace = instruction.nextToken();
-			curNode = "";
-			curView = "";
-			SpaceCollection &sc = me->_spaceCollections.getVal(curSpaceCollection);
-			if (!(sc.spaces.contains(curSpaceCollection) && me->_checkForDups)) {
-				sc.spaces[curSpace] = Space();
+			me->_curSpace = instruction.nextToken();
+			me->_curNode = "";
+			me->_curView = "";
+			SpaceCollection &sc = me->_spaceCollections.getVal(me->_curSpaceCollection);
+			if (!(sc.spaces.contains(me->_curSpaceCollection) && me->_checkForDups)) {
+				sc.spaces.getOrCreateVal(me->_curSpace);
 			}
 		} else if (type == "NODE") {
-			curNode = instruction.nextToken();
-			curView = "";
-			SpaceCollection &sc = me->_spaceCollections.getVal(curSpaceCollection);
-			Space &s = sc.spaces.getVal(curSpace);
-			if (!(s.nodes.contains(curNode) && me->_checkForDups)) {
-				s.nodes[curNode] = Node();
+			me->_curNode = instruction.nextToken();
+			me->_curView = "";
+			SpaceCollection &sc = me->_spaceCollections.getVal(me->_curSpaceCollection);
+			Space &s = sc.spaces.getVal(me->_curSpace);
+			if (!(s.nodes.contains(me->_curNode) && me->_checkForDups)) {
+				s.nodes.getOrCreateVal(me->_curNode);
 			}
 		} else if (type == "VIEW") {
-			curView = instruction.nextToken();
-			SpaceCollection &sc = me->_spaceCollections.getVal(curSpaceCollection);
-			Space &s = sc.spaces.getVal(curSpace);
-			Node &n = s.nodes.getVal(curNode);
-			if (!(n.views.contains(curView) && me->_checkForDups)) {
-				n.views[curView] = View();
-				n.views[curView].payload = instruction.nextToken();
+			me->_curView = instruction.nextToken();
+			SpaceCollection &sc = me->_spaceCollections.getVal(me->_curSpaceCollection);
+			Space &s = sc.spaces.getVal(me->_curSpace);
+			Node &n = s.nodes.getVal(me->_curNode);
+			if (!(n.views.contains(me->_curView) && me->_checkForDups)) {
+				n.views.getOrCreateVal(me->_curView).payload = instruction.nextToken();
 			}
 		} else if (type == "LLINK") {
 			Common::String target = instruction.nextToken();
 			Common::String payload = instruction.nextToken();
-			SpaceCollection &sc = me->_spaceCollections.getVal(curSpaceCollection);
-			Space &s = sc.spaces.getVal(curSpace);
-			Node &n = s.nodes.getVal(curNode);
-			View &v = n.views.getVal(curView);
+			SpaceCollection &sc = me->_spaceCollections.getVal(me->_curSpaceCollection);
+			Space &s = sc.spaces.getVal(me->_curSpace);
+			Node &n = s.nodes.getVal(me->_curNode);
+			View &v = n.views.getVal(me->_curView);
 			if (!(v.llinks.contains(target) && me->_checkForDups)) {
-				v.llinks[target] = LLink();
-				v.llinks[target].payload = payload;
+				v.llinks.getOrCreateVal(target).payload = payload;
 			}
 		} else {
 			warning("SpaceMgr::m_parseText: Unhandled instruction %s", instructionBody.c_str());
 		}
-	}
-
-	if (debugLevelSet(5)) {
-		Common::String format = result;
-		for (int i = 0; i < (int)format.size(); i++) {
-			if (format[i] == '\r')
-				format.replace(i, 1, "\n");
-		}
-		debugC(5, kDebugXObj, "SpaceMgr::m_parseText: %s", format.c_str());
 	}
 
 	g_lingo->push(Datum(0));
@@ -323,12 +288,7 @@ void SpaceMgr::m_getCurData(int nargs) {
 	}
 
 	if (debugLevelSet(5)) {
-		Common::String format = result;
-		for (uint i = 0; i < format.size(); i++) {
-			if (format[i] == '\r')
-				format.replace(i, 1, "\n");
-		}
-		debugC(5, kDebugXObj, "SpaceMgr::m_getCurData: %s", format.c_str());
+		debugC(5, kDebugXObj, "SpaceMgr::m_getCurData: %s", formatStringForDump(result).c_str());
 	}
 
 	g_lingo->push(Datum(result));
@@ -366,11 +326,7 @@ void SpaceMgr::m_setCurData(int nargs) {
 	g_lingo->push(Datum(0));
 }
 
-void SpaceMgr::m_addSpaceCollection(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_addSpaceCollection", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
+XOBJSTUB(SpaceMgr::m_addSpaceCollection, 0)
 
 void SpaceMgr::m_removeSpaceCollection(int nargs) {
 	if (nargs != 1) {
@@ -445,17 +401,8 @@ void SpaceMgr::m_getSpaceCollection(int nargs) {
 	g_lingo->push(Datum(result));
 }
 
-void SpaceMgr::m_addSpace(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_addSpace", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
-
-void SpaceMgr::m_removeSpace(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_removeSpace", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
+XOBJSTUB(SpaceMgr::m_addSpace, 0)
+XOBJSTUB(SpaceMgr::m_removeSpace, 0)
 
 void SpaceMgr::m_setCurSpace(int nargs) {
 	if (nargs != 1) {
@@ -519,17 +466,8 @@ void SpaceMgr::m_getSpace(int nargs) {
 	g_lingo->push(Datum(result));
 }
 
-void SpaceMgr::m_addNode(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_addNode", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
-
-void SpaceMgr::m_removeNode(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_removeNode", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
+XOBJSTUB(SpaceMgr::m_addNode, 0)
+XOBJSTUB(SpaceMgr::m_removeNode, 0)
 
 void SpaceMgr::m_setCurNode(int nargs) {
 	if (nargs != 1) {
@@ -599,17 +537,8 @@ void SpaceMgr::m_getNode(int nargs) {
 	g_lingo->push(Datum(result));
 }
 
-void SpaceMgr::m_addView(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_addView", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
-
-void SpaceMgr::m_removeView(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_removeView", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
+XOBJSTUB(SpaceMgr::m_addView, 0)
+XOBJSTUB(SpaceMgr::m_removeView, 0)
 
 void SpaceMgr::m_setCurView(int nargs) {
 	if (nargs != 1) {
@@ -685,23 +614,9 @@ void SpaceMgr::m_getView(int nargs) {
 	g_lingo->push(Datum(result));
 }
 
-void SpaceMgr::m_addLocalLink(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_addLocalLink", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
-
-void SpaceMgr::m_removeLocalLink(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_removeLocalLink", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
-
-void SpaceMgr::m_removeLocalLinks(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_removeLocalLinks", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
+XOBJSTUB(SpaceMgr::m_addLocalLink, 0)
+XOBJSTUB(SpaceMgr::m_removeLocalLink, 0)
+XOBJSTUB(SpaceMgr::m_removeLocalLinks, 0)
 
 void SpaceMgr::m_getLocalLink(int nargs) {
 	if (nargs != 1) {
@@ -733,34 +648,10 @@ void SpaceMgr::m_getLocalLink(int nargs) {
 	g_lingo->push(Datum(result));
 }
 
-void SpaceMgr::m_getLocalLinks(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_getLocalLinks", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(""));
-}
-
-void SpaceMgr::m_addGlobalLink(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_addGlobalLink", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(""));
-}
-
-void SpaceMgr::m_removeGlobalLink(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_removeGlobalLink", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0));
-}
-
-void SpaceMgr::m_getGlobalLink(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_getGlobalLink", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(""));
-}
-
-void SpaceMgr::m_getGlobalLinks(int nargs) {
-	g_lingo->printSTUBWithArglist("SpaceMgr::m_getGlobalLinks", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(""));
-}
+XOBJSTUB(SpaceMgr::m_getLocalLinks, "")
+XOBJSTUB(SpaceMgr::m_addGlobalLink, "")
+XOBJSTUB(SpaceMgr::m_removeGlobalLink, 0)
+XOBJSTUB(SpaceMgr::m_getGlobalLink, "")
+XOBJSTUB(SpaceMgr::m_getGlobalLinks, "")
 
 } // End of namespace Director

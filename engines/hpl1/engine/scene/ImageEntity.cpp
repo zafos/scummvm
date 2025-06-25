@@ -35,8 +35,8 @@
 #include "hpl1/engine/math/Math.h"
 #include "hpl1/engine/resources/ImageEntityManager.h"
 #include "hpl1/engine/resources/Resources.h"
-#include "hpl1/engine/system/low_level_system.h"
 #include "hpl1/engine/system/String.h"
+#include "hpl1/engine/system/low_level_system.h"
 
 namespace hpl {
 
@@ -101,7 +101,7 @@ int cImageEntity::GetMaxFrameNum() {
 	if (mpAnimation == NULL)
 		return 0;
 
-	// One for the -1, one for the frame jump, and one becuase we start with 0.
+	// One for the -1, one for the frame jump, and one because we start with 0.
 	return (int)mpAnimation->mvFrameNums.size() - 3;
 }
 

@@ -20,7 +20,8 @@
  */
 
 #include "ultima/ultima8/gumps/desktop_gump.h"
-#include "ultima/ultima8/graphics/render_surface.h"
+#include "ultima/ultima8/gfx/render_surface.h"
+#include "ultima/ultima8/gfx/texture.h"
 #include "ultima/ultima8/kernel/mouse.h"
 #include "ultima/ultima8/gumps/target_gump.h"
 
@@ -47,44 +48,28 @@ void DesktopGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool scaled)
 }
 
 void DesktopGump::PaintChildren(RenderSurface *surf, int32 lerp_factor, bool scaled) {
-	// Iterate all children
-	Std::list<Gump *>::iterator it = _children.begin();
-	Std::list<Gump *>::iterator end = _children.end();
-
-	while (it != end) {
-		Gump *g = *it;
-
+	for (auto *g : _children) {
 		// Paint if not closing
 		if (!g->IsClosing()) {
 			// If background blanking on modal is enabled...
 			// Background is partially transparent
 			if (_fadedModal && dynamic_cast<ModalGump *>(g) &&
 			        !dynamic_cast<TargetGump *>(g) && !g->IsHidden())
-				surf->FillBlended(0x7F000000, _dims);
+				surf->fillBlended(TEX32_PACK_RGBA(0, 0, 0, 0x80), _dims);
 
 			g->Paint(surf, lerp_factor, scaled);
 		}
-
-		++it;
 	}
-}
-
-void DesktopGump::RenderSurfaceChanged(RenderSurface *surf) {
-	// Resize the desktop gump to match the RenderSurface
-	Rect new_dims;
-	surf->GetSurfaceDims(new_dims);
-	_dims.setWidth(new_dims.width());
-	_dims.setHeight(new_dims.height());
-
-	Gump::RenderSurfaceChanged();
 }
 
 void DesktopGump::RenderSurfaceChanged() {
 	// Resize the desktop gump to match the parent
-	Rect new_dims;
-	_parent->GetDims(new_dims);
-	_dims.setWidth(new_dims.width());
-	_dims.setHeight(new_dims.height());
+	if (_parent) {
+		Rect new_dims;
+		_parent->GetDims(new_dims);
+		_dims.setWidth(new_dims.width());
+		_dims.setHeight(new_dims.height());
+	}
 
 	Gump::RenderSurfaceChanged();
 }

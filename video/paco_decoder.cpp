@@ -37,7 +37,7 @@ namespace Video {
 enum frameTypes {
 	NOP = 0, // nop
 	// 1 - old initialisation data?
-	PALLETE = 2, // - new initialisation data (usually 0x30 0x00 0x00 ... meaning 8-bit with default QuickTime palette)
+	PALETTE = 2, // - new initialisation data (usually 0x30 0x00 0x00 ... meaning 8-bit with default QuickTime palette)
 	DELAY = 3, //  - delay information
 	AUDIO = 4, // - audio data (8-bit unsigned PCM)
 	// 5 - should not be present
@@ -77,6 +77,10 @@ bool PacoDecoder::loadStream(Common::SeekableReadStream *stream) {
 	uint16 height = stream->readUint16BE();
 	int16 frameRate = stream->readUint16BE();
 	frameRate = ABS(frameRate); // Negative framerate is indicative of audio, but not always
+	if (frameRate == 0) {
+		// 0 is equivalent to playing back at the fastest rate
+		frameRate = 60;
+	}
 	uint16 flags = stream->readUint16BE();
 	bool hasAudio = (flags & 0x100) == 0x100;
 
@@ -111,11 +115,11 @@ int PacoDecoder::getAudioSamplingRate() {
 	 * Search for the first audio packet and use it.
 	 */
 	const Common::Array<int> samplingRates = {5563, 7418, 11127, 22254};
-	int index;
+	int index = 0;
 
 	int64 startPos = _fileStream->pos();
 
-	while (true){
+	while (_fileStream->pos() < _fileStream->size()) {
 		int64 currentPos = _fileStream->pos();
 		int frameType = _fileStream->readByte();
 		int v = _fileStream->readByte();
@@ -167,18 +171,18 @@ const byte* PacoDecoder::getPalette(){
 
 const byte* PacoDecoder::PacoVideoTrack::getPalette() const {
 	_dirtyPalette = false;
-	return _palette;
+	return _palette.data();
 }
 
 PacoDecoder::PacoVideoTrack::PacoVideoTrack(
-	uint16 frameRate, uint16 frameCount, uint16 width, uint16 height) {
+	uint16 frameRate, uint16 frameCount, uint16 width, uint16 height) : _palette(256) {
 	_curFrame = 0;
 	_frameRate = frameRate;
 	_frameCount = frameCount;
 
 	_surface = new Graphics::Surface();
 	_surface->create(width, height, Graphics::PixelFormat::createFormatCLUT8());
-	_palette = const_cast<byte *>(quickTimeDefaultPalette256);
+	_palette.set(quickTimeDefaultPalette256, 0, 256);
 	_dirtyPalette = true;
 }
 
@@ -204,9 +208,12 @@ Graphics::PixelFormat PacoDecoder::PacoVideoTrack::getPixelFormat() const {
 }
 
 void PacoDecoder::readNextPacket() {
+	if (_curFrame >= _videoTrack->getFrameCount())
+		return;
+
 	uint32 nextFrame = _fileStream->pos() + _frameSizes[_curFrame];
 
-	debug(2, " frame %3d size %d @ %lX", _curFrame, _frameSizes[_curFrame], long(_fileStream->pos()));
+	debugC(2, kDebugLevelGVideo, " frame %3d size %d @ %lX", _curFrame, _frameSizes[_curFrame], long(_fileStream->pos()));
 
 	_curFrame++;
 
@@ -215,19 +222,26 @@ void PacoDecoder::readNextPacket() {
 		int frameType = _fileStream->readByte();
 		int v = _fileStream->readByte();
 		uint32 chunkSize =  (v << 16 ) | _fileStream->readUint16BE();
-		debug(2, "  slot type %d size %d @ %lX", frameType, chunkSize, long(_fileStream->pos() - 4));
+		debugC(2, kDebugLevelGVideo, "  slot type %d size %d @ %lX", frameType, chunkSize, long(_fileStream->pos() - 4));
 
 		switch (frameType) {
 		case AUDIO:
-			_audioTrack->queueSound(_fileStream, chunkSize - 4);
+			if (_audioTrack)
+				_audioTrack->queueSound(_fileStream, chunkSize - 4);
 			break;
 		case VIDEO:
-			_videoTrack->handleFrame(_fileStream, chunkSize - 4, _curFrame);
+			if (_videoTrack)
+				_videoTrack->handleFrame(_fileStream, chunkSize - 4, _curFrame);
 			break;
-		case PALLETE:
-			_videoTrack->handlePalette(_fileStream);
+		case PALETTE:
+			if (_videoTrack)
+				_videoTrack->handlePalette(_fileStream);
 			break;
 		case EOC:
+			if (_videoTrack)
+				_videoTrack->handleEOC();
+			break;
+		case NOP:
 			break;
 		default:
 			error("PacoDecoder::decodeFrame(): unknown main chunk type (type = 0x%02X)", frameType);
@@ -246,12 +260,14 @@ const Graphics::Surface *PacoDecoder::PacoVideoTrack::decodeNextFrame() {
 void PacoDecoder::PacoVideoTrack::handlePalette(Common::SeekableReadStream *fileStream) {
 	uint32 header = fileStream->readUint32BE();
 	if (header == 0x30000000) { // default quicktime palette
-		_palette = const_cast<byte *>(quickTimeDefaultPalette256);
+		_palette.set(quickTimeDefaultPalette256, 0, 256);
 	} else {
 		fileStream->readUint32BE(); // 4 bytes of 00
-		_palette = new byte[256 * 3]();
-		for (int i = 0; i < 256 * 3; i++){
-			_palette[i] = fileStream->readByte();
+		for (int i = 0; i < 256; i++){
+			byte r = fileStream->readByte();
+			byte g = fileStream->readByte();
+			byte b = fileStream->readByte();
+			_palette.set(i, r, g, b);
 		}
 	}
 	_dirtyPalette = true;
@@ -303,13 +319,13 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 	uint compr = fileStream->readByte();	    	// compression method and flags
 	fileStream->readByte();							// padding
 
-	debug(5, "    +%d,%d - %dx%d compr %X", x, y, bw, bh, compr);
+	debugC(5, kDebugLevelGVideo, "    +%d,%d - %dx%d compr %X", x, y, bw, bh, compr);
 
 	compr = compr & 0xF;
 
 	uint8 *fdata = new uint8[1048576];              // 0x100000 copied from original pacodec
 	fileStream->read(fdata, chunkSize - 10);       // remove header length
-	debug(5, "pos: %ld", long(fileStream->pos()));
+	debugC(5, kDebugLevelGVideo, "pos: %ld", long(fileStream->pos()));
 	int16 xpos = x, ypos = y, ypos2 = y;
 	byte *dst = (byte *)_surface->getPixels() + x + y * w;
 
@@ -320,13 +336,13 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 
 	while (ypos < y + bh) {
 		c = *src++;
-		debug(5, "debug info: ypos %d y %d bh %d src: %d", ypos, y, bh, c);
+		debugC(5, kDebugLevelGVideo, "debug info: ypos %d y %d bh %d src: %d", ypos, y, bh, c);
 
 		if (c == 0 ){ // long operation
 			int16 op = src[0] >> 4;
 			int16 len = ((src[0] & 0xF) << 8) | src[1];
 			src += 2;
-			debug(5, "    long operation: opcode: %d", op);
+			debugC(5, kDebugLevelGVideo, "    long operation: opcode: %d", op);
 			switch (op) {
 			case COPY:
 				while (len--)
@@ -373,15 +389,15 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 				break;
 			default:
 				PUTPIX(0xFF);
-				debug(5, "PacoDecoder::PacoVideoTrack::handleFrame: Long op: 0x0 op %d", op);
+				debugC(5, kDebugLevelGVideo, "PacoDecoder::PacoVideoTrack::handleFrame: Long op: 0x0 op %d", op);
 			}
 
 		} else if (c < 128) { // copy the same amount of pixels
-			debug(5, "    copy pixels: %d", c);
+			debugC(5, kDebugLevelGVideo, "    copy pixels: %d", c);
 			while (c--)
 				PUTPIX(*src++);
 		} else if (c < 254) { // repeat the following value 256 - op times
-			debug(5, "    copy pixels -op: %d", 256 - c);
+			debugC(5, kDebugLevelGVideo, "    copy pixels -op: %d", 256 - c);
 			c1 = *src++;
 			c = 256 - c;
 			while (c--)
@@ -394,7 +410,7 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 			if (!c) {                                   // compact RLE mode
 				unsigned mask = (src[0] << 8) | src[1];
 				src += 2;
-				debug(5, "debug info compact RLE: c: %d mask: %d", c, mask);
+				debugC(5, kDebugLevelGVideo, "debug info compact RLE: c: %d mask: %d", c, mask);
 
 				for (i = 0; i < 16; i++, mask >>= 1) {
 					if (mask & 1)
@@ -407,10 +423,10 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 					if (op == 0) {                      // low nibble....
 						op = len;
 						len = *src++;
-						debug(5, "debug info compact: op: %d", op);
+						debugC(5, kDebugLevelGVideo, "debug info compact: op: %d", op);
 						switch (op) {
 						case COPY:
-							debug(5, "debug info COPY: %d", len);
+							debugC(5, kDebugLevelGVideo, "debug info COPY: %d", len);
 							while (len--) {
 								c = *src++;
 								PUTPIX(clrs[c >> 4]);
@@ -421,13 +437,13 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 							}
 							break;
 						case RLE:
-							debug(5, "debug info RLE: %d", len);
+							debugC(5, kDebugLevelGVideo, "debug info RLE: %d", len);
 							c = *src++;
 							while (len--)
 								PUTPIX(clrs[c & 0xF]);
 							break;
 						case PRLE:
-							debug(5, "debug info PRLE: %d", len);
+							debugC(5, kDebugLevelGVideo, "debug info PRLE: %d", len);
 							c = *src++;
 							c1 = clrs[c >> 4];
 							c2 = clrs[c & 0xF];
@@ -437,7 +453,7 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 							}
 							break;
 						case QRLE:
-							debug(5, "debug info QRLE: %d", len);
+							debugC(5, kDebugLevelGVideo, "debug info QRLE: %d", len);
 							c = *src++;
 							c1 = clrs[c >> 4];
 							c2 = clrs[c & 0xF];
@@ -452,12 +468,12 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 							}
 							break;
 						case SKIP:
-							debug(5, "debug info SKIP: %d", len);
+							debugC(5, kDebugLevelGVideo, "debug info SKIP: %d", len);
 							while (len--)
 								SKIP();
 							break;
 						case ENDCURRENTLINE:
-							debug(5, "debug info ENDCURRENTLINE: %d", len);
+							debugC(5, "debug info ENDCURRENTLINE: %d", len);
 							xpos = x + bw;
 							ypos += len;
 							break;
@@ -465,7 +481,7 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 							warning("PacoDecoder::PacoVideoTrack::handleFrame: Compact RLE mode: 0x0 op %d", op);
 						}
 					} else if (op < 8) {                // copy 1-7 colors
-						debug(5, "debug info copy 1-7 colors: %d", len);
+						debugC(5, kDebugLevelGVideo, "debug info copy 1-7 colors: %d", len);
 						PUTPIX(clrs[len]);
 						op--;
 						while (op--) {
@@ -477,17 +493,17 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 							PUTPIX(clrs[c & 0xF]);
 						}
 					} else if (op < 14) {              // repeat color
-						debug(5, "debug info Repeat color: %d", len);
+						debugC(5, kDebugLevelGVideo, "debug info Repeat color: %d", len);
 						op = 16 - op;
 						while (op--)
 							PUTPIX(clrs[len]);
 					} else if (op < 15) {               // skip number of pixels in low nibbel
-						debug(5, "debug info Skip number of pixels: %d", len);
+						debugC(5, kDebugLevelGVideo, "debug info Skip number of pixels: %d", len);
 						while (len--)
 							SKIP();
 					} else {
 						if (len < 8) {                  // Pair run
-							debug(5, "debug info pair run: %d", len);
+							debugC(5, kDebugLevelGVideo, "debug info pair run: %d", len);
 							c = *src++;
 							c1 = clrs[c >> 4];
 							c2 = clrs[c & 0xF];
@@ -496,7 +512,7 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 								PUTPIX(c2);
 							}
 						} else {                        // Quad run
-							debug(5, "debug info quad run: %d", len);
+							debugC(5, kDebugLevelGVideo, "debug info quad run: %d", len);
 							len = 16 - len;
 							c = *src++;
 							c1 = clrs[c >> 4];
@@ -514,7 +530,7 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 					}
 				}
 			} else {
-				debug(5, "debug info SKIP: %d", c);
+				debugC(5, kDebugLevelGVideo, "debug info SKIP: %d", c);
 				while (c--)
 					SKIP();
 			}
@@ -524,7 +540,7 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 			// (but 256 - len times)
 			c = *src++;
 			if (c < 128) {                             // pair run
-				debug(5, "debug info PAIR RUN: %d", c);
+				debugC(5, kDebugLevelGVideo, "debug info PAIR RUN: %d", c);
 
 				c1 = *src++;
 				c2 = *src++;
@@ -533,7 +549,7 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 					PUTPIX(c2);
 				}
 			} else {                                    // quad run
-				debug(5, "debug info QUAD RUN: %d", c);
+				debugC(5, kDebugLevelGVideo, "debug info QUAD RUN: %d", c);
 				c = 256 - c;
 				c1 = *src++;
 				c2 = *src++;
@@ -547,9 +563,9 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 				}
 			}
 		}
-		if (xpos > x + bw) debug(5, "!!!");
+		if (xpos > x + bw) debugC(5, kDebugLevelGVideo, "!!!");
 		if (xpos >= x + bw) {
-			debug(5, "debug info ADJUST LINE");
+			debugC(5, kDebugLevelGVideo, "debug info ADJUST LINE");
 			xpos = x;
 			ypos++;
 			ADJUST_LINE;
@@ -563,10 +579,10 @@ void PacoDecoder::PacoVideoTrack::handleFrame(Common::SeekableReadStream *fileSt
 }
 
 void PacoDecoder::PacoVideoTrack::copyDirtyRectsToBuffer(uint8 *dst, uint pitch) {
-	for (Common::List<Common::Rect>::const_iterator it = _dirtyRects.begin(); it != _dirtyRects.end(); ++it) {
-		for (int y = (*it).top; y < (*it).bottom; ++y) {
-			const int x = (*it).left;
-			memcpy(dst + y * pitch + x, (byte *)_surface->getBasePtr(x, y), (*it).right - x);
+	for (const auto &dirtyRect : _dirtyRects) {
+		for (int y = dirtyRect.top; y < dirtyRect.bottom; ++y) {
+			const int x = dirtyRect.left;
+			memcpy(dst + y * pitch + x, (byte *)_surface->getBasePtr(x, y), dirtyRect.right - x);
 		}
 	}
 	clearDirtyRects();

@@ -24,7 +24,6 @@
 #include "engines/advancedDetector.h"
 #include "common/config-manager.h"
 #include "common/textconsole.h"
-#include "common/translation.h"
 
 #include "mohawk/detection.h"
 
@@ -69,18 +68,23 @@ static const PlainGameDescriptor mohawkGames[] = {
 	{"create", "The Story of Creation"},
 	{"daniel", "Daniel in the Lions' Den"},
 	{"harryhh","Harry and the Haunted House"},
+	{"noah", "Noah's Ark"},
 	{"stellaluna", "Stellaluna"},
 	{"sheila", "Sheila Rae, the Brave"},
 	{"rugratsps", "Rugrats Print Shop" },
 	{"drseussreading", "Dr. Seuss Reading Games"},
 	{"arthurreading", "Arthur's Reading Games"},
 	{"wsg", "Williams-Sonoma Guide to Good Cooking" },
+	{"mathsworkshop", "Maths Workshop" },
+	{"mathsworkshopdx", "Maths Workshop Deluxe" },
+	{"wricamact", "Write, Camera, Action!"},
+	{"amazingwriting", "The Amazing Writing Machine"},
 	{nullptr, nullptr}
 };
 
 #include "mohawk/detection_tables.h"
 
-static const char *directoryGlobs[] = {
+static const char *const directoryGlobs[] = {
 	"all",
 	"assets1",
 	"data",
@@ -90,9 +94,9 @@ static const char *directoryGlobs[] = {
 	nullptr
 };
 
-class MohawkMetaEngineDetection : public AdvancedMetaEngineDetection {
+class MohawkMetaEngineDetection : public AdvancedMetaEngineDetection<Mohawk::MohawkGameDescription> {
 public:
-	MohawkMetaEngineDetection() : AdvancedMetaEngineDetection(Mohawk::gameDescriptions, sizeof(Mohawk::MohawkGameDescription), mohawkGames) {
+	MohawkMetaEngineDetection() : AdvancedMetaEngineDetection(Mohawk::gameDescriptions, mohawkGames) {
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;
 	}

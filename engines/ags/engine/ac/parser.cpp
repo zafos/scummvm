@@ -239,19 +239,28 @@ int parse_sentence(const char *src_text, int *numwords, short *wordarray, short 
 					int continueSearching = 1;
 					while (continueSearching) {
 
-						const char *textStart = &text[1];
+						const char *textStart = ++text; // begin with next char
 
-						while ((text[0] == ',') || (Common::isAlnum((unsigned char)text[0]) != 0))
-							text++;
+						// find where the next word ends
+						while ((text[0] == ',') || is_valid_word_char(text[0])) {
+							// shift beginning of potential multi-word each time we see a comma
+							if (text[0] == ',')
+								textStart = ++text;
+							else
+								text++;
+						}
 
 						continueSearching = 0;
 
-						if (text[0] == ' ') {
+						if (text[0] == 0 || text[0] == ' ') {
 							Common::strcpy_s(thisword, textStart);
 							thisword[text - textStart] = 0;
 							// forward past any multi-word alternatives
-							if (FindMatchingMultiWordWord(thisword, &text) >= 0)
+							if (FindMatchingMultiWordWord(thisword, &text) >= 0) {
+								if (text[0] == 0)
+									break;
 								continueSearching = 1;
+							}
 						}
 					}
 
@@ -315,7 +324,7 @@ RuntimeScriptValue Sc_ParseText(const RuntimeScriptValue *params, int32_t param_
 
 // const char* ()
 RuntimeScriptValue Sc_Parser_SaidUnknownWord(const RuntimeScriptValue *params, int32_t param_count) {
-	API_CONST_SCALL_OBJ(const char, _GP(myScriptStringImpl), Parser_SaidUnknownWord);
+	API_SCALL_OBJ(const char, _GP(myScriptStringImpl), Parser_SaidUnknownWord);
 }
 
 // int  (char*checkwords)
@@ -325,10 +334,14 @@ RuntimeScriptValue Sc_Said(const RuntimeScriptValue *params, int32_t param_count
 
 
 void RegisterParserAPI() {
-	ccAddExternalStaticFunction("Parser::FindWordID^1", Sc_Parser_FindWordID);
-	ccAddExternalStaticFunction("Parser::ParseText^1", Sc_ParseText);
-	ccAddExternalStaticFunction("Parser::SaidUnknownWord^0", Sc_Parser_SaidUnknownWord);
-	ccAddExternalStaticFunction("Parser::Said^1", Sc_Said);
+	ScFnRegister parser_api[] = {
+		{"Parser::FindWordID^1", API_FN_PAIR(Parser_FindWordID)},
+		{"Parser::ParseText^1", API_FN_PAIR(ParseText)},
+		{"Parser::SaidUnknownWord^0", API_FN_PAIR(Parser_SaidUnknownWord)},
+		{"Parser::Said^1", API_FN_PAIR(Said)},
+	};
+
+	ccAddExternalFunctions361(parser_api);
 }
 
 } // namespace AGS3

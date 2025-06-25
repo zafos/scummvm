@@ -48,10 +48,10 @@
 #include "hpl1/engine/scene/Node2D.h"
 #include "hpl1/engine/scene/SoundSource.h"
 #include "hpl1/engine/scene/TileMap.h"
-#include "hpl1/engine/system/low_level_system.h"
 #include "hpl1/engine/system/MemoryManager.h"
 #include "hpl1/engine/system/Script.h"
 #include "hpl1/engine/system/String.h"
+#include "hpl1/engine/system/low_level_system.h"
 
 #include "hpl1/engine/graphics/Renderer2D.h"
 
@@ -410,8 +410,8 @@ bool cWorld2D::CreateFromFile(tString asFile) {
 							/*Maybe delete entity if no type found? */
 						}
 					} else {
-						hplDelete(pEntity);
 						Error("Couldn't load data for entity '%s'", pEntity->GetName().c_str());
+						hplDelete(pEntity);
 					}
 				} else {
 					error("No other Render mode for entity exist!!");

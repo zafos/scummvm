@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "gob/gob.h"
@@ -52,9 +58,9 @@ Common::String SaveLoad::replacePathSeparators(const char *path, char newSeparat
 	return result;
 }
 
-Common::List<Common::String> SaveLoad::getFilesMatchingPattern(const char *pattern) const {
+Common::List<Common::Path> SaveLoad::getFilesMatchingPattern(const Common::Path &pattern) const {
 	warning("SaveLoad::getFilesMatchingPattern not implemented");
-	return Common::List<Common::String>();
+	return Common::List<Common::Path>();
 }
 
 int32 SaveLoad::getSize(const char *fileName) {

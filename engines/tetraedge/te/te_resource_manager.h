@@ -45,54 +45,34 @@ public:
 
 	void addResource(const TeIntrusivePtr<TeResource> &resource);
 	void addResource(TeResource *resource);
-	bool exists(const Common::String &path);
+	bool exists(const Common::Path &path);
 	void removeResource(const TeIntrusivePtr<TeResource> &resource);
 	void removeResource(const TeResource *resource);
 
-	template<class T> TeIntrusivePtr<T> getResourceByName(const Common::String &path) {
+	template<class T> TeIntrusivePtr<T> getResourceByName(const Common::Path &path) {
 		for (TeIntrusivePtr<TeResource> &resource : this->_resources) {
 			if (resource->getAccessName() == path) {
 				return TeIntrusivePtr<T>(dynamic_cast<T *>(resource.get()));
 			}
 		}
-		debug("getResourceByName: didn't find resource %s", path.c_str());
+		debug("getResourceByName: didn't find resource %s", path.toString(Common::Path::kNativeSeparator).c_str());
 		return TeIntrusivePtr<T>();
 	}
 
-	template<class T> TeIntrusivePtr<T> getResource(const Common::FSNode &node) {
-		Common::String path = node.getPath();
+	template<class T>
+	TeIntrusivePtr<T> getResource(const TetraedgeFSNode &node) {
+		Common::Path path = node.getPath();
 		for (TeIntrusivePtr<TeResource> &resource : this->_resources) {
 			if (resource->getAccessName() == path) {
 				return TeIntrusivePtr<T>(dynamic_cast<T *>(resource.get()));
 			}
 		}
 
-		TeIntrusivePtr<T> retval;
-		retval = new T();
+		TeIntrusivePtr<T> retval = new T();
 
 		if (retval.get()) {
 			if (!node.isReadable())
-				warning("getResource: asked to fetch unreadable resource %s", node.getPath().c_str());
-			retval->load(node);
-			addResource(retval.get());
-		}
-		return retval;
-	}
-
-	template<class T> TeIntrusivePtr<T> getResourceOrMakeInstance(const Common::FSNode &node) {
-		Common::String path = node.getPath();
-		for (TeIntrusivePtr<TeResource> &resource : this->_resources) {
-			if (resource->getAccessName() == path) {
-				return TeIntrusivePtr<T>(dynamic_cast<T *>(resource.get()));
-			}
-		}
-
-		TeIntrusivePtr<T> retval;
-		retval = T::makeInstance();
-
-		if (retval.get()) {
-			if (!node.isReadable())
-				warning("getResourceOrMakeInstance: asked to fetch unreadable resource %s", node.getPath().c_str());
+				warning("getResource: asked to fetch unreadable resource %s", node.toString().c_str());
 			retval->load(node);
 			addResource(retval.get());
 		}

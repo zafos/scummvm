@@ -25,7 +25,8 @@
 
 /*
  * TGA decoder used in engines:
- *	- titanic
+ *  - gob
+ *  - titanic
  *  - wintermute
  *  - zvision
  */
@@ -33,6 +34,7 @@
 #ifndef IMAGE_TGA_H
 #define IMAGE_TGA_H
 
+#include "graphics/palette.h"
 #include "graphics/surface.h"
 #include "image/image_decoder.h"
 
@@ -66,11 +68,10 @@ class TGADecoder : public ImageDecoder {
 public:
 	TGADecoder();
 	virtual ~TGADecoder();
-	virtual void destroy();
-	virtual const Graphics::Surface *getSurface() const { return &_surface; }
-	virtual const byte *getPalette() const { return _colorMap; }
-	virtual uint16 getPaletteColorCount() const { return _colorMapLength; }
-	virtual bool loadStream(Common::SeekableReadStream &stream);
+	virtual void destroy() override;
+	const Graphics::Surface *getSurface() const override { return &_surface; }
+	const Graphics::Palette &getPalette() const override { return _colorMap; }
+	virtual bool loadStream(Common::SeekableReadStream &stream) override;
 private:
 	// Format-spec from:
 	//http://www.ludorg.net/amnesia/TGA_File_Format_Spec.html
@@ -85,7 +86,7 @@ private:
 
 	// Color-map:
 	bool _colorMapSize;
-	byte *_colorMap;
+	Graphics::Palette _colorMap;
 	int16 _colorMapOrigin;
 	int16 _colorMapLength;
 	byte _colorMapEntryLength;

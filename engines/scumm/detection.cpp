@@ -19,6 +19,8 @@
  *
  */
 
+#define FORBIDDEN_SYMBOL_EXCEPTION_printf
+
 #include "base/plugins.h"
 
 #include "engines/metaengine.h"
@@ -36,7 +38,7 @@
 #include "scumm/detection_tables.h"
 #include "scumm/file.h"
 #include "scumm/file_nes.h"
-#include "scumm/scumm.h"
+#include "scumm/scumm-md5.h"
 
 #pragma mark -
 #pragma mark --- Detection code ---
@@ -62,6 +64,7 @@ static const DebugChannelDef debugFlagList[] = {
 		{Scumm::DEBUG_INSANE, "INSANE", "Track INSANE"},
 		{Scumm::DEBUG_SMUSH, "SMUSH", "Track SMUSH"},
 		{Scumm::DEBUG_MOONBASE_AI, "MOONBASEAI", "Track Moonbase AI"},
+		{Scumm::DEBUG_NETWORK, "NETWORK", "Track Networking"},
 		DEBUG_CHANNEL_END
 };
 
@@ -82,21 +85,92 @@ public:
 
 	PlainGameList getSupportedGames() const override;
 	PlainGameDescriptor findGame(const char *gameid) const override;
+	Common::Error identifyGame(DetectedGame &game, const void **descriptor) override;
 	DetectedGames detectGames(const Common::FSList &fslist, uint32 /*skipADFlags*/, bool /*skipIncomplete*/) override;
 
 	uint getMD5Bytes() const override {
 		 return 1024 * 1024;
 	}
+	int getGameVariantCount() const override {
+		int entries = 0;
+		for (const GameSettings *g = gameVariantsTable; g->gameid; ++g)
+			++entries;
+		return entries;
+	}
 
-	Common::String parseAndCustomizeGuiOptions(const Common::String &optionsString, const Common::String &domain) const override;
+	void dumpDetectionEntries() const override final;
+
+	GameFilenamePattern matchGameFilenamePattern(const MD5Table *entry) const;
 };
 
 PlainGameList ScummMetaEngineDetection::getSupportedGames() const {
 	return PlainGameList(gameDescriptions);
 }
 
+GameFilenamePattern ScummMetaEngineDetection::matchGameFilenamePattern(const MD5Table *entry) const {
+	GameFilenamePattern bestMatch = GameFilenamePattern();
+
+	for (const GameFilenamePattern *gfp = gameFilenamesTable; gfp->gameid; ++gfp) {
+		if (!scumm_stricmp(gfp->gameid, entry->gameid)) {
+			if (gfp->platform == UNK || entry->platform == UNK || gfp->platform == entry->platform) {
+				bestMatch = *gfp;
+
+				if (gfp->language == UNK_LANG || entry->language == UNK_LANG || gfp->language == entry->language) {
+					if (!gfp->variant || !entry->variant || !scumm_stricmp(gfp->variant, entry->variant))
+						return *gfp;
+				}
+			}
+		}
+	}
+
+	return bestMatch;
+}
+
+ void ScummMetaEngineDetection::dumpDetectionEntries() const {
+#if 0
+	for (const MD5Table *entry = md5table; entry->gameid != 0; ++entry) {
+		PlainGameDescriptor pd = findGame(entry->gameid);
+		const char *title = pd.description;
+
+		printf("game (\n");
+		printf("\tname \"%s\"\n", escapeString(entry->gameid).c_str());
+		printf("\ttitle \"%s\"\n", escapeString(title).c_str());
+		printf("\textra \"%s\"\n", escapeString(entry->extra).c_str());
+		printf("\tlanguage \"%s\"\n", escapeString(getLanguageLocale(entry->language)).c_str());
+		printf("\tplatform \"%s\"\n", escapeString(getPlatformCode(entry->platform)).c_str());
+		printf("\tsourcefile \"%s\"\n", escapeString(getName()).c_str());
+		printf("\tengine \"%s\"\n", escapeString("SCUMM").c_str());
+
+		// Match the appropriate file name for the current game variant.
+		GameFilenamePattern gameEntry = matchGameFilenamePattern(entry);
+		Common::String fileName;
+
+		if (gameEntry.gameid) {
+			fileName = generateFilenameForDetection(gameEntry.pattern, gameEntry.genMethod, gameEntry.platform);
+		} else {
+			warning("dumpDetectionEntries(): no game entry found for '%s'", entry->gameid);
+			fileName = entry->gameid;
+		}
+
+		printf("\trom ( name \"%s\" size %lld md5-%d %s )\n",
+			escapeString(fileName.c_str()).c_str(),
+			static_cast<long long int>(entry->filesize),
+			getMD5Bytes(),
+			entry->md5);
+
+		printf(")\n\n"); // Closing for 'game ('
+	}
+#endif
+}
+
 PlainGameDescriptor ScummMetaEngineDetection::findGame(const char *gameid) const {
 	return Engines::findGameID(gameid, gameDescriptions, obsoleteGameIDsTable);
+}
+
+Common::Error ScummMetaEngineDetection::identifyGame(DetectedGame &game, const void **descriptor) {
+	*descriptor = nullptr;
+	game = DetectedGame(getName(), findGame(ConfMan.get("gameid").c_str()));
+	return game.gameId.empty() ? Common::kUnknownError : Common::kNoError;
 }
 
 static Common::String generatePreferredTarget(const DetectorResult &x) {
@@ -141,7 +215,7 @@ DetectedGames ScummMetaEngineDetection::detectGames(const Common::FSList &fslist
 		// Based on generateComplexID() in advancedDetector.cpp.
 		game.preferredTarget = generatePreferredTarget(*x);
 
-		game.setGUIOptions(x->game.guioptions + MidiDriver::musicType2GUIO(x->game.midi));
+		game.setGUIOptions(customizeGuiOptions(*x));
 		game.appendGUIOptions(getGameGUIOptionsDescriptionLanguage(x->language));
 
 		detectedGames.push_back(game);
@@ -173,53 +247,6 @@ const char *ScummMetaEngineDetection::getEngineName() const {
 const char *ScummMetaEngineDetection::getOriginalCopyright() const {
 	return "LucasArts SCUMM Games (C) LucasArts\n"
 	       "Humongous SCUMM Games (C) Humongous";
-}
-
-Common::String ScummMetaEngineDetection::parseAndCustomizeGuiOptions(const Common::String &optionsString, const Common::String &domain) const {
-	Common::String result = MetaEngineDetection::parseAndCustomizeGuiOptions(optionsString, domain);
-	const char *defaultRenderOption = nullptr;
-
-	const Common::Platform platform = Common::parsePlatform(ConfMan.get("platform", domain));
-	const Common::String extra = ConfMan.get("extra", domain);
-
-	// Add default rendermode option for target. We don't put the default mode into the
-	// detection tables, due to the amount of targets we have. It it more convenient to
-	// add the option here.
-	switch (platform) {
-	case Common::kPlatformAmiga:
-		defaultRenderOption = GUIO_RENDERAMIGA;
-		break;
-	case Common::kPlatformApple2GS:
-		defaultRenderOption = GUIO_RENDERAPPLE2GS;
-		break;
-	case Common::kPlatformMacintosh:
-		defaultRenderOption = GUIO_RENDERMACINTOSH;
-		break;
-	case Common::kPlatformFMTowns:
-		defaultRenderOption = GUIO_RENDERFMTOWNS;
-		break;
-	case Common::kPlatformAtariST:
-		defaultRenderOption = GUIO_RENDERATARIST;
-		break;
-	case Common::kPlatformDOS:
-		defaultRenderOption = (extra.equalsIgnoreCase("EGA") || extra.equalsIgnoreCase("V1") || extra.equalsIgnoreCase("V2")) ? GUIO_RENDEREGA : GUIO_RENDERVGA;
-		break;
-	case Common::kPlatformUnknown:
-		// For targets that don't specify the platform (often happens with SCUMM6+ games) we stick with default VGA.
-		defaultRenderOption = GUIO_RENDERVGA;
-		break;
-	default:
-		// Leave this as nullptr for platforms that don't have a specific render option (SegaCD, NES, ...).
-		// These targets will then have the full set of render mode options in the launcher options dialog. 
-		break;
-	}
-
-	// If the render option is already part of the string (specified in the
-	// detection tables) we don't add it again.
-	if (defaultRenderOption != nullptr && !result.contains(defaultRenderOption))
-		result += defaultRenderOption;
-
-	return result;
 }
 
 REGISTER_PLUGIN_STATIC(SCUMM_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, ScummMetaEngineDetection);

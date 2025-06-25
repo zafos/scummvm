@@ -230,7 +230,7 @@ void TeamChar::init() {
 }
 
 EfhEngine::EfhEngine(OSystem *syst, const ADGameDescription *gd) : Engine(syst), _gameDescription(gd) {
-	const Common::FSNode gameDataDir(ConfMan.get("path"));
+	const Common::FSNode gameDataDir(ConfMan.getPath("path"));
 
 	SearchMan.addSubDirectoryMatching(gameDataDir, "gendata");
 	SearchMan.addSubDirectoryMatching(gameDataDir, "images");
@@ -240,11 +240,12 @@ EfhEngine::EfhEngine(OSystem *syst, const ADGameDescription *gd) : Engine(syst),
 	_system = syst;
 	_rnd = nullptr;
 
-	_shouldQuit = false;
-	_eventMan = nullptr;
 	_lastTime = 0;
 	_platform = Common::kPlatformUnknown;
 	_mainSurface = nullptr;
+
+	for (int i = 0; i < 200; ++i)
+		_vgaLineBuffer[i] = nullptr;
 
 	_vgaGraphicsStruct1 = new EfhGraphicsStruct(_vgaLineBuffer, 0, 0, 320, 200);
 	_vgaGraphicsStruct2 = new EfhGraphicsStruct();
@@ -301,7 +302,8 @@ EfhEngine::EfhEngine(OSystem *syst, const ADGameDescription *gd) : Engine(syst),
 
 	for (int i = 0; i < 100; ++i) {
 		_imp1PtrArray[i] = nullptr;
-		_mapSpecialTiles[_techId][i].init();
+		for (int j = 0; j < 19; ++j)
+			_mapSpecialTiles[j][i].init();
 	}
 
 	for (int i = 0; i < 432; ++i)
@@ -323,9 +325,8 @@ EfhEngine::EfhEngine(OSystem *syst, const ADGameDescription *gd) : Engine(syst),
 
 	_teamChar[0]._id = 0;
 
-	for (int i = 0; i < 5; ++i) {
+	for (int i = 0; i < 5; ++i)
 		_teamMonster[i].init();
-	}
 
 	_teamSize = 1;
 	_word2C872 = 0;
@@ -352,9 +353,8 @@ EfhEngine::EfhEngine(OSystem *syst, const ADGameDescription *gd) : Engine(syst),
 	_menuDepth = 0;
 	_menuItemCounter = 0;
 
-	for (int i = 0; i < 15; ++i) {
+	for (int i = 0; i < 15; ++i)
 		_menuStatItemArr[i] = 0;
-	}
 
 	_messageToBePrinted = "";
 	for (int i = 0; i < 8; ++i)
@@ -401,6 +401,7 @@ EfhEngine::EfhEngine(OSystem *syst, const ADGameDescription *gd) : Engine(syst),
 		if (saveSlot >= 0 && saveSlot <= 999)
 			_loadSaveSlot = saveSlot;
 	}
+
 }
 
 } // End of namespace Efh

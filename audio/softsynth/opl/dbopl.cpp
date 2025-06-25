@@ -96,7 +96,7 @@ namespace DBOPL {
 #endif
 
 
-//How much to substract from the base value for the final attenuation
+//How much to subtract from the base value for the final attenuation
 static const Bit8u KslCreateTable[16] = {
 	//0 will always be be lower than 7 * 8
 	64, 32, 24, 19,
@@ -216,7 +216,7 @@ static inline Bits MakeVolume( Bitu wave, Bitu volume ) {
 #if 0
 	//Check if we overflow the 31 shift limit
 	if ( exp >= 32 ) {
-		LOG_MSG( "WTF %d %d", total, exp );
+		LOG_MSG( "Overflow %d %d", total, exp );
 	}
 #endif
 	return (sig >> exp);
@@ -1239,9 +1239,7 @@ void Chip::GenerateBlock2( Bitu total, Bit32s* output ) {
 	while ( total > 0 ) {
 		Bit32u samples = ForwardLFO( total );
 		memset(output, 0, sizeof(Bit32s) * samples);
-		int count = 0;
 		for( Channel* ch = chan; ch < chan + 9; ) {
-			count++;
 			ch = (ch->*(ch->synthHandler))( this, samples, output );
 		}
 		total -= samples;
@@ -1253,9 +1251,7 @@ void Chip::GenerateBlock3( Bitu total, Bit32s* output  ) {
 	while ( total > 0 ) {
 		Bit32u samples = ForwardLFO( total );
 		memset(output, 0, sizeof(Bit32s) * samples * 2);
-		int count = 0;
 		for( Channel* ch = chan; ch < chan + 18; ) {
-			count++;
 			ch = (ch->*(ch->synthHandler))( this, samples, output );
 		}
 		total -= samples;

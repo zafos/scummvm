@@ -264,7 +264,7 @@ public:
 	}
 
 	/**
-	 * Checks if the object is the only object refering
+	 * Checks if the object is the only object referring
 	 * to the assigned pointer. This should just be used for
 	 * debugging purposes.
 	 */
@@ -731,7 +731,6 @@ private:
 	PointerType           _pointer;
 	DisposeAfterUse::Flag _dispose;
 	SharedPtr<T>          _shared;
-	bool                  _isvalid;
 };
 
 
@@ -785,7 +784,7 @@ public:
 	void store(const T &value) const;
 
 private:
-	T *_ptr;
+	void *_ptr;
 };
 
 template<class T>

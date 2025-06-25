@@ -26,12 +26,13 @@
 #include "ultima/ultima8/kernel/delay_process.h"
 #include "ultima/ultima8/usecode/uc_machine.h"
 #include "ultima/ultima8/usecode/uc_list.h"
+#include "ultima/ultima8/usecode/uc_process.h"
 #include "ultima/ultima8/misc/direction_util.h"
 #include "ultima/ultima8/games/game_data.h"
 #include "ultima/ultima8/world/fire_type.h"
-#include "ultima/ultima8/graphics/anim_dat.h"
-#include "ultima/ultima8/graphics/main_shape_archive.h"
-#include "ultima/ultima8/graphics/shape.h"
+#include "ultima/ultima8/gfx/anim_dat.h"
+#include "ultima/ultima8/gfx/main_shape_archive.h"
+#include "ultima/ultima8/gfx/shape.h"
 #include "ultima/ultima8/world/actors/actor_anim_process.h"
 #include "ultima/ultima8/world/actors/animation_tracker.h"
 #include "ultima/ultima8/world/actors/anim_action.h"
@@ -88,10 +89,9 @@ uint16 Actor::assignObjId() {
 	if (_objId == 0xFFFF)
 		_objId = ObjectManager::get_instance()->assignActorObjId(this);
 
-	Std::list<Item *>::iterator iter;
-	for (iter = _contents.begin(); iter != _contents.end(); ++iter) {
-		(*iter)->assignObjId();
-		(*iter)->setParent(_objId);
+	for (auto *i : _contents) {
+		i->assignObjId();
+		i->setParent(_objId);
 	}
 
 	return _objId;
@@ -402,11 +402,11 @@ bool Actor::setEquip(Item *item, bool checkwghtvol) {
 
 	// now check 'equipment slots'
 	// we can have one item of each equipment type, plus one backpack
-	for (Std::list<Item *>::const_iterator iter = _contents.begin(); iter != _contents.end(); ++iter) {
-		if ((*iter)->getObjId() == item->getObjId()) continue;
+	for (const auto *i : _contents) {
+		if (i->getObjId() == item->getObjId()) continue;
 
-		uint32 cet = (*iter)->getShapeInfo()->_equipType;
-		bool cbackpack = ((*iter)->getShape() == BACKPACK_SHAPE);
+		uint32 cet = i->getShapeInfo()->_equipType;
+		bool cbackpack = (i->getShape() == BACKPACK_SHAPE);
 
 		// already have an item with the same equiptype
 		if (cet == equiptype || (cbackpack && backpack)) return false;
@@ -421,14 +421,13 @@ bool Actor::setEquip(Item *item, bool checkwghtvol) {
 }
 
 uint16 Actor::getEquip(uint32 type) const {
-	Std::list<Item *>::const_iterator iter;
-	for (iter = _contents.begin(); iter != _contents.end(); ++iter) {
-		uint32 cet = (*iter)->getShapeInfo()->_equipType;
-		bool cbackpack = ((*iter)->getShape() == BACKPACK_SHAPE);
+	for (const auto *i : _contents) {
+		uint32 cet = i->getShapeInfo()->_equipType;
+		bool cbackpack = (i->getShape() == BACKPACK_SHAPE);
 
-		if ((*iter)->hasFlags(FLG_EQUIPPED) &&
+		if (i->hasFlags(FLG_EQUIPPED) &&
 		        (cet == type || (cbackpack && type == 7))) { // !! constant
-			return (*iter)->getObjId();
+			return i->getObjId();
 		}
 	}
 
@@ -544,7 +543,7 @@ uint16 Actor::doAnim(Animation::Sequence anim, Direction dir, unsigned int steps
 	}
 
 #if 0
-	if (_objId == 1) {
+	if (_objId == kMainActorId) {
 		int32 x, y, z;
 		getLocation(x, y, z);
 		int32 actionno = AnimDat::getActionNumberForSequence(anim, this);
@@ -625,30 +624,21 @@ Animation::Result Actor::tryAnim(Animation::Sequence anim, Direction dir,
 		state->_direction = dir;
 	}
 
-
 	if (tracker.isUnsupported()) {
 		return Animation::END_OFF_LAND;
 	}
 
 	// isUnsupported only checks for AFF_ONGROUND, we need either
-	int32 end[3], dims[3];
-	getFootpadWorld(dims[0], dims[1], dims[2]);
-	tracker.getPosition(end[0], end[1], end[2]);
+	Box start = getWorldBox();
+	Point3 pt = tracker.getPosition();
+	Box target(pt.x, pt.y, pt.z, start._xd, start._yd, start._zd);
 
 	CurrentMap *cm = World::get_instance()->getCurrentMap();
+	PositionInfo info = cm->getPositionInfo(target, start, getShapeInfo()->_flags, _objId);
+	if (!info.supported)
+		return Animation::END_OFF_LAND;
 
-	UCList uclist(2);
-	LOOPSCRIPT(script, LS_TOKEN_TRUE); // we want all items
-	cm->surfaceSearch(&uclist, script, sizeof(script),
-	                  getObjId(), end, dims,
-	                  false, true, false);
-	for (uint32 i = 0; i < uclist.getSize(); i++) {
-		Item *item = getItem(uclist.getuint16(i));
-		if (item->getShapeInfo()->is_land())
-			return Animation::SUCCESS;
-	}
-
-	return Animation::END_OFF_LAND;
+	return Animation::SUCCESS;
 }
 
 DirectionMode Actor::animDirMode(Animation::Sequence anim) const {
@@ -994,11 +984,9 @@ void Actor::receiveHitCru(uint16 other, Direction dir, int damage, uint16 damage
 		// If the attacker is the controlled npc and this actor is not pathfinding
 		if (attacker && attacker == getControlledActor() &&
 			kernel->findProcess(_objId, PathfinderProcess::PATHFINDER_PROC_TYPE) != nullptr) {
-			int32 x, y, z;
-			int32 ox, oy, oz;
-			getLocation(x, y, z);
-			attacker->getLocation(ox, oy, oz);
-			int32 maxdiff = MAX(MAX(abs(x - ox), abs(y - oy)), abs(z - oz));
+			Point3 pt1 = getLocation();
+			Point3 pt2 = attacker->getLocation();
+			int32 maxdiff = MAX(MAX(abs(pt1.x - pt2.x), abs(pt1.y - pt2.y)), abs(pt1.z - pt2.z));
 			if (maxdiff < 641 && isOnScreen()) {
 				// TODO: implement the equivalent of this function.  For now, we always
 				// cancel pathfinding for the NPC.
@@ -1185,7 +1173,7 @@ void Actor::receiveHitU8(uint16 other, Direction dir, int damage, uint16 damage_
 		damage_type = hitter->getDamageType();
 	}
 
-	if (other == 1 && attacker && attacker->getLastAnim() != Animation::kick) {
+	if (other == kMainActorId && attacker && attacker->getLastAnim() != Animation::kick) {
 		// _strength for kicks is accumulated in AvatarMoverProcess
 		MainActor *av = getMainActor();
 		av->accumulateStr(damage / 4);
@@ -1203,7 +1191,7 @@ void Actor::receiveHitU8(uint16 other, Direction dir, int damage, uint16 damage_
 	}
 
 	Common::RandomSource &rs = Ultima8Engine::get_instance()->getRandomSource();
-	if (damage >= 4 && _objId == 1 && attacker) {
+	if (damage >= 4 && _objId == kMainActorId && hitter) {
 		// play blood sprite
 		int start = 0, end = 12;
 		if (dir > dir_east) {
@@ -1211,10 +1199,9 @@ void Actor::receiveHitU8(uint16 other, Direction dir, int damage, uint16 damage_
 			end = 25;
 		}
 
-		int32 xv, yv, zv;
-		getLocation(xv, yv, zv);
-		zv += rs.getRandomNumber(23);
-		Process *sp = new SpriteProcess(620, start, end, 1, 1, xv, yv, zv);
+		Point3 pt = getLocation();
+		pt.z += rs.getRandomNumber(23);
+		Process *sp = new SpriteProcess(620, start, end, 1, 1, pt.x, pt.y, pt.z);
 		Kernel::get_instance()->addProcess(sp);
 	}
 
@@ -1240,12 +1227,11 @@ void Actor::receiveHitU8(uint16 other, Direction dir, int damage, uint16 damage_
 	}
 
 	ProcId fallingprocid = 0;
-	if (_objId == 1 && damage > 0) {
+	if (_objId == kMainActorId && damage > 0) {
 		if ((damage_type & WeaponInfo::DMG_FALLING) && damage >= 6) {
 			// high falling damage knocks you down
 			doAnim(Animation::fallBackwards, dir_current);
-
-			// TODO: shake head after getting back up when not in combat
+			setActorFlag(ACT_STUNNED);
 			return;
 		}
 
@@ -1254,7 +1240,7 @@ void Actor::receiveHitU8(uint16 other, Direction dir, int damage, uint16 damage_
 	}
 
 	// if avatar was blocking; do a quick stopBlock/startBlock and play SFX
-	if (_objId == 1 && getLastAnim() == Animation::startBlock) {
+	if (_objId == kMainActorId && getLastAnim() == Animation::startBlock) {
 		ProcId anim1pid = doAnim(Animation::stopBlock, dir_current);
 		ProcId anim2pid = doAnim(Animation::startBlock, dir_current);
 
@@ -1276,8 +1262,8 @@ void Actor::receiveHitU8(uint16 other, Direction dir, int damage, uint16 damage_
 
 	// TODO: target needs to stumble/fall/call for help/...(?)
 
-	if (_objId != 1) {
-		ObjId target = 1;
+	if (_objId != kMainActorId) {
+		ObjId target = kMainActorId;
 		if (attacker)
 			target = attacker->getObjId();
 		if (!isInCombat())
@@ -1287,12 +1273,14 @@ void Actor::receiveHitU8(uint16 other, Direction dir, int damage, uint16 damage_
 		assert(cp);
 		cp->setTarget(target);
 
-		if (target == 1) {
+		if (target == kMainActorId) {
 			// call for help
 		}
 	}
 
-	if (damage && !fallingprocid) {
+	if (damage && !fallingprocid &&
+		getLastAnim() != Animation::die &&
+		getLastAnim() != Animation::fallBackwards) {
 		ProcId anim1pid = doAnim(Animation::stumbleBackwards, dir);
 		ProcId anim2pid;
 		if (isInCombat())
@@ -1328,8 +1316,28 @@ ProcId Actor::dieU8(uint16 damageType) {
 	Kernel::get_instance()->killProcesses(getObjId(), Kernel::PROC_TYPE_ALL, true);
 #endif
 
-	if (!animprocid)
+	if (!animprocid &&
+		getLastAnim() != Animation::die &&
+		getLastAnim() != Animation::fallBackwards) {
 		animprocid = doAnim(Animation::die, dir_current);
+	}
+
+	// Kill blue potion use process if running
+	if (_objId == kMainActorId) {
+		ProcessIter iter = Kernel::get_instance()->getProcessBeginIterator();
+		ProcessIter endproc = Kernel::get_instance()->getProcessEndIterator();
+		for (; iter != endproc; ++iter) {
+			UCProcess *p = dynamic_cast<UCProcess *>(*iter);
+			if (!p)
+				continue;
+			if (p->getClassId() != 766) // Potion
+				continue;
+			if (p->is_terminated())
+				continue;
+
+			p->fail();
+		}
+	}
 
 	MainActor *avatar = getMainActor();
 	// if hostile to avatar
@@ -1415,7 +1423,7 @@ ProcId Actor::dieCru(uint16 damageType, uint16 damagePts, Direction srcDir) {
 
     if (world->getControlledNPCNum() == _objId) {
 		TargetReticleProcess::get_instance()->avatarMoved();
-		if (_objId != 1) {
+		if (_objId != kMainActorId) {
 			world->setControlledNPCNum(0);
 		}
 	}
@@ -1444,7 +1452,7 @@ ProcId Actor::dieCru(uint16 damageType, uint16 damagePts, Direction srcDir) {
 				moveToEtherealVoid();
 				CurrentMap *cm = world->getCurrentMap();
 				/* 0x576 - flaming guy running around */
-				bool can_create_koresh = cm->isValidPosition(_x, _y, _z, 0x576, _objId);
+				bool can_create_koresh = cm->getPositionInfo(_x, _y, _z, 0x576, _objId).valid;
 				returnFromEtherealVoid();
 
 				if (can_create_koresh) {
@@ -1512,7 +1520,7 @@ ProcId Actor::dieCru(uint16 damageType, uint16 damagePts, Direction srcDir) {
 				setToStartOfAnim(Animation::fallBackwardsCru);
 			}
 		}
-	} else if (damageType == 7 && _objId == 1) {
+	} else if (damageType == 7 && _objId == kMainActorId) {
 		lastanim = doAnimAfter(Animation::electrocuted, dir_current, lastanim);
 	}
 
@@ -1738,7 +1746,7 @@ int Actor::calculateAttackDamage(uint16 other, int damage, uint16 damage_type) {
 		// TODO: give avatar an extra chance to hit monsters
 		//       with defense_type DMG_PIERCE
 
-		if (hit && other == 1) {
+		if (hit && other == kMainActorId) {
 			MainActor *av = getMainActor();
 			if (attackdex > defenddex)
 				av->accumulateDex(2 * (attackdex - defenddex));
@@ -2338,7 +2346,7 @@ uint32 Actor::I_setTarget(const uint8 *args, unsigned int /*argsize*/) {
 
 		cp->setTarget(target);
 	} else {
-		if (actor->isDead() || actor->getObjId() == 1)
+		if (actor->isDead() || actor->getObjId() == kMainActorId)
 			return 0;
 
 		actor->setActivityCru(5);
@@ -2543,7 +2551,7 @@ uint32 Actor::I_pathfindToPoint(const uint8 *args, unsigned int /*argsize*/) {
 	World_FromUsecodeXY(x, y);
 
 	return Kernel::get_instance()->addProcess(
-	           new PathfinderProcess(actor, x, y, z));
+	           new PathfinderProcess(actor, Point3(x, y, z)));
 }
 
 uint32 Actor::I_areEnemiesNear(const uint8 *args, unsigned int /*argsize*/) {
@@ -2635,9 +2643,8 @@ uint32 Actor::I_createActorCru(const uint8 *args, unsigned int /*argsize*/) {
 
 	newactor->setDir(static_cast<Direction>(dir * 2));
 
-	int32 x, y, z;
-	item->getLocation(x, y, z);
-	newactor->move(x, y, z);
+	Point3 pt = item->getLocation();
+	newactor->move(pt);
 
 	newactor->setDefaultActivity(0, other->getQuality() >> 8);
 	newactor->setDefaultActivity(1, item->getQuality() >> 8);
@@ -2673,7 +2680,7 @@ uint32 Actor::I_createActorCru(const uint8 *args, unsigned int /*argsize*/) {
 	}
 
 	newactor->setCombatTactic(0);
-	newactor->setHomePosition(x, y, z);
+	newactor->setHomePosition(pt.x, pt.y, pt.z);
 
 	/*
 	 TODO: once I know what this field is.. seems to never be used in game?

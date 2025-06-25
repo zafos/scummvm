@@ -50,6 +50,7 @@
 #include "common/events.h"
 #include "common/punycode.h"
 #include "common/system.h"
+#include "common/text-to-speech.h"
 
 #include "engines/engine.h"
 #include "engines/util.h"
@@ -67,7 +68,7 @@ namespace Wage {
 WageEngine::WageEngine(OSystem *syst, const ADGameDescription *desc) : Engine(syst), _gameDescription(desc) {
 	_rnd = new Common::RandomSource("wage");
 
-	_aim = -1;
+	_aim = Chr::CHEST;
 	_opponentAim = -1;
 	_temporarilyHidden = false;
 	_isGameOver = false;
@@ -102,7 +103,7 @@ WageEngine::~WageEngine() {
 
 bool WageEngine::pollEvent(Common::Event &event) {
 	return _eventMan->pollEvent(event);
-} 
+}
 
 Common::Error WageEngine::run() {
 	debug("WageEngine::init");
@@ -124,7 +125,7 @@ Common::Error WageEngine::run() {
 
 	// Your main event loop should be (invoked from) here.
 	_resManager = new Common::MacResManager();
-	if (!_resManager->open(Common::Path(getGameFile()).punycodeDecode().toString('/')))
+	if (!_resManager->open(Common::Path(getGameFile()).punycodeDecode()))
 		error("Could not open %s as a resource fork", getGameFile());
 
 	_world = new World(this);
@@ -147,6 +148,13 @@ Common::Error WageEngine::run() {
 
 	_gui->_consoleWindow->setTextWindowFont(_world->_player->_currentScene->getFont());
 
+	Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+	if (ttsMan) {
+		ttsMan->setLanguage(ConfMan.get("language"));
+		ttsMan->enable(ConfMan.getBool("tts_enabled"));
+		_gui->_wm->setTTSEnabled(ConfMan.getBool("tts_enabled"));
+	}
+
 	Common::String input("look");
 	processTurn(&input, NULL);
 	_temporarilyHidden = false;
@@ -154,12 +162,65 @@ Common::Error WageEngine::run() {
 	while (!_shouldQuit) {
 		processEvents();
 
-		_gui->draw();
+		if (_restartRequested)
+			restart();
+
+		if (_gui)
+			_gui->draw();
+
 		g_system->updateScreen();
 		g_system->delayMillis(50);
+
+		if (!_soundToPlay.empty()) {
+			playSound(_soundToPlay);
+			_soundToPlay.clear();
+		}
 	}
 
 	return Common::kNoError;
+}
+
+// Resetting required variables
+void WageEngine::resetState() {
+	_aim = Chr::CHEST;
+	_opponentAim = -1;
+	_temporarilyHidden = false;
+	_isGameOver = false;
+	_monster = nullptr;
+	_running = nullptr;
+	_lastScene = nullptr;
+	_loopCount = 0;
+	_turn = 0;
+	_commandWasQuick = false;
+	_shouldQuit = false;
+	_offer = nullptr;
+}
+
+void WageEngine::restart() {
+	if (_isGameOver)
+		resetState();
+	_restartRequested = false;
+	delete _gui;
+	delete _world;
+
+	_gui = nullptr;
+
+	_world = new World(this);
+
+	if (!_world->loadWorld(_resManager)) {
+		_shouldQuit = true;
+		return;
+	}
+
+	_shouldQuit = false;
+
+	_gui = new Gui(this);
+
+	_temporarilyHidden = true;
+	performInitialSetup();
+
+	Common::String input("look");
+	processTurn(&input, NULL);
 }
 
 void WageEngine::processEvents() {
@@ -180,6 +241,8 @@ void WageEngine::processEvents() {
 					_inputText = Common::convertFromU32String(_gui->_consoleWindow->getInput());
 					Common::String inp = _inputText + '\n';
 
+					sayText(_gui->_consoleWindow->getInput(), Common::TextToSpeechManager::INTERRUPT);
+
 					_gui->appendText(inp.c_str());
 
 					_gui->_consoleWindow->clearInput();
@@ -189,6 +252,7 @@ void WageEngine::processEvents() {
 
 					processTurn(&_inputText, NULL);
 					_gui->disableUndo();
+					_gui->enableRevert();
 					break;
 				}
 			default:
@@ -211,11 +275,26 @@ void WageEngine::setMenu(Common::String menu) {
 void WageEngine::appendText(const char *str) {
 	Common::String s(str);
 
-	s += '\n';
+	// HACK: Added here because sometimes empty strings would be passed, leading to extra newlines
+	if (!s.empty()){
+		s += '\n';
 
-	_gui->appendText(s.c_str());
+		_gui->appendText(s.c_str());
+		sayText(s, Common::TextToSpeechManager::QUEUE);
+	}
 
 	_inputText.clear();
+}
+
+void WageEngine::sayText(const Common::U32String &str, Common::TextToSpeechManager::Action action) const {
+	Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+	if (ttsMan && ConfMan.getBool("tts_enabled")) {
+		ttsMan->say(str, action);
+	}
+}
+
+void WageEngine::sayText(const Common::String &str, Common::TextToSpeechManager::Action action) const {
+	sayText(Common::U32String(str, Common::CodePage::kMacRoman), action);
 }
 
 void WageEngine::gameOver() {
@@ -227,6 +306,8 @@ void WageEngine::gameOver() {
 
 	Graphics::MacText gameOverMessage(*_world->_gameOverMessage, _gui->_wm, &font, Graphics::kColorBlack,
 									  Graphics::kColorWhite, 199, Graphics::kTextAlignCenter);
+
+	sayText(*_world->_gameOverMessage, Common::TextToSpeechManager::QUEUE);
 
 	Graphics::MacDialog gameOverDialog(&_gui->_screen, _gui->_wm,  199, &gameOverMessage, 199, &buttons, 0);
 
@@ -248,10 +329,12 @@ bool WageEngine::saveDialog() {
 	buttons.push_back(new Graphics::MacDialogButton("Yes", 112, 67, 68, 28));
 	buttons.push_back(new Graphics::MacDialogButton("Cancel", 205, 67, 68, 28));
 
-	Graphics::MacFont font; 
+	Graphics::MacFont font;
 
 	Graphics::MacText saveBeforeCloseMessage(*_world->_saveBeforeCloseMessage, _gui->_wm, &font, Graphics::kColorBlack,
 									  Graphics::kColorWhite, 291, Graphics::kTextAlignCenter);
+
+	sayText(*_world->_saveBeforeCloseMessage);
 
 	Graphics::MacDialog save(&_gui->_screen, _gui->_wm, 291, &saveBeforeCloseMessage, 291, &buttons, 1);
 
@@ -270,16 +353,20 @@ bool WageEngine::saveDialog() {
 }
 
 void WageEngine::aboutDialog() {
-	Graphics::MacDialogButtonArray buttons;
+	Common::U32String messageText(_world->_aboutMessage, Common::kMacRoman);
+	Common::U32String disclaimer("\n\n\n\nThis adventure was produced with World Builder\xAA\nthe adventure game creation system.\n\xA9 Copyright 1986 by William C. Appleton, All Right Reserved\nPublished by Silicon Beach Software, Inc.", Common::kMacRoman);
 
-	buttons.push_back(new Graphics::MacDialogButton("OK", 191, 167, 68, 28));
+	sayText(_world->_aboutMessage);
+	sayText(disclaimer, Common::TextToSpeechManager::QUEUE);
+	messageText += disclaimer;
 
-	Graphics::MacText aboutMessage(_world->_aboutMessage, _gui->_wm, _gui->_consoleWindow->getTextWindowFont(), Graphics::kColorBlack,
+	Graphics::MacFont font(Graphics::kMacFontGeneva, 9, 0);
+	Graphics::MacText aboutMessage(messageText, _gui->_wm, &font, Graphics::kColorBlack,
 											 Graphics::kColorWhite, 400, Graphics::kTextAlignCenter);
 
-	Common::U32String disclaimer("\n\n\n\nThis adventure was produced with World Builder\xAA\nthe adventure game creation system.\n© Copyright 1986 by William C. Appleton, All Right Reserved\nPublished by Silicon Beach Software, Inc.");
+	Graphics::MacDialogButtonArray buttons;
 
-	aboutMessage.appendText(disclaimer, 3, 9, 0, false);
+	buttons.push_back(new Graphics::MacDialogButton("OK", 191, aboutMessage.getTextHeight() + 30, 68, 28));
 
 	Graphics::MacDialog about(&_gui->_screen, _gui->_wm, 450, &aboutMessage, 400, &buttons, 0);
 
@@ -290,21 +377,28 @@ void WageEngine::aboutDialog() {
 }
 
 void WageEngine::saveGame() {
-	warning("STUB: saveGame()");
+	if (_defaultSaveSlot != -1 && _defaultSaveSlot != getAutosaveSlot())
+		saveGameState(_defaultSaveSlot, _defaultSaveDescritpion, false);
+	else
+		scummVMSaveLoadDialog(true);
 }
 
 void WageEngine::performInitialSetup() {
 	debug(5, "Resetting Objs: %d", _world->_orderedObjs.size());
-	for (uint i = 0; i < _world->_orderedObjs.size() - 1; i++)
-		_world->move(_world->_orderedObjs[i], _world->_storageScene, true);
+	if (_world->_orderedObjs.size() > 0) {
+		for (uint i = 0; i < _world->_orderedObjs.size() - 1; i++)
+			_world->move(_world->_orderedObjs[i], _world->_storageScene, true);
 
-	_world->move(_world->_orderedObjs[_world->_orderedObjs.size() - 1], _world->_storageScene);
+		_world->move(_world->_orderedObjs[_world->_orderedObjs.size() - 1], _world->_storageScene);
+	}
 
 	debug(5, "Resetting Chrs: %d", _world->_orderedChrs.size());
-	for (uint i = 0; i < _world->_orderedChrs.size() - 1; i++)
-		_world->move(_world->_orderedChrs[i], _world->_storageScene, true);
+	if (_world->_orderedChrs.size() > 0) {
+		for (uint i = 0; i < _world->_orderedChrs.size() - 1; i++)
+			_world->move(_world->_orderedChrs[i], _world->_storageScene, true);
 
-	_world->move(_world->_orderedChrs[_world->_orderedChrs.size() - 1], _world->_storageScene);
+		_world->move(_world->_orderedChrs[_world->_orderedChrs.size() - 1], _world->_storageScene);
+	}
 
 	debug(5, "Resetting Owners: %d", _world->_orderedObjs.size());
 	for (uint i = 0; i < _world->_orderedObjs.size(); i++) {
@@ -351,6 +445,8 @@ void WageEngine::performInitialSetup() {
 		_world->move(_world->_player, _world->getRandomScene());
 	}
 
+	sayText(_world->_player->_currentScene->_name);
+
 	// Set the console window's dimensions early here because
 	// flowText() that needs them gets called before they're set
 	_gui->_consoleWindow->setDimensions(*_world->_player->_currentScene->_textBounds);
@@ -362,7 +458,7 @@ void WageEngine::wearObjs(Chr* chr) {
 }
 
 void WageEngine::doClose() {
-	warning("STUB: doClose()");
+	// No op on ScummVM since we do not allow to load arbitrary games
 }
 
 Scene *WageEngine::getSceneByName(Common::String &location) {
@@ -479,11 +575,24 @@ void WageEngine::processTurnInternal(Common::String *textInput, Designed *clickI
 		_gui->clearOutput();
 		_gui->_consoleWindow->setTextWindowFont(_world->_player->_currentScene->getFont());
 		regen();
+		sayText(playerScene->_name, Common::TextToSpeechManager::QUEUE);
 		Common::String input("look");
 		processTurnInternal(&input, NULL);
 
 		if (_shouldQuit)
 			return;
+
+		// WORKAROUND: The original Java codebase did not have this check and
+		// called gameOver() only in onMove() method. However, this leads to a crash in
+		// Gui::redraw(), when _engine->_world->_player->_currentScene is equal to _world->_storageScene.
+		// The crash happens because storage scene's _designBounds member is NULL.
+		// Therefore, to fix this, we check and call gameOver() here if needed.
+		if (_world->_player->_currentScene == _world->_storageScene) {
+			if (!_isGameOver) {
+				_isGameOver = true;
+				gameOver();
+			}
+		}
 
 		redrawScene();
 		_temporarilyHidden = false;

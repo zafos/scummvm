@@ -30,18 +30,18 @@
 
 #include "hpl1/engine/system/SerializeClass.h"
 #include "hpl1/engine/system/SystemTypes.h"
-#include "hpl1/std/map.h"
-#include "hpl1/std/multimap.h"
+#include "common/stablemap.h"
+#include "common/multimap.h"
 
 class TiXmlElement;
 
-#define kSaveData_LoadFromBegin(aClass)  \
-	super::LoadFromSaveData(apSaveData); \
+#define kSaveData_LoadFromBegin(aClass)                                        \
+	super::LoadFromSaveData(apSaveData);                                       \
 	cSaveData_##aClass *pData = static_cast<cSaveData_##aClass *>(apSaveData); \
 	assert(pData != nullptr);
 
-#define kSaveData_SaveToBegin(aClass)  \
-	super::SaveToSaveData(apSaveData); \
+#define kSaveData_SaveToBegin(aClass)                                          \
+	super::SaveToSaveData(apSaveData);                                         \
 	cSaveData_##aClass *pData = static_cast<cSaveData_##aClass *>(apSaveData); \
 	assert(pData != nullptr);
 
@@ -172,7 +172,7 @@ private:
 
 //---------------------------------------------------------
 
-typedef Hpl1::Std::multimap<int, iSaveObject *> tSaveObjectMap;
+typedef Common::MultiMap<int, iSaveObject *> tSaveObjectMap;
 typedef tSaveObjectMap::iterator tSaveObjectMapIt;
 
 typedef cSTLMapIterator<iSaveObject *, tSaveObjectMap, tSaveObjectMapIt> cSaveObjectIterator;
@@ -203,7 +203,7 @@ private:
 
 //---------------------------------------------------------
 
-typedef Hpl1::Std::multimap<int, iSaveData *> tSaveDataMap;
+typedef Common::MultiMap<int, iSaveData *> tSaveDataMap;
 typedef tSaveDataMap::iterator tSaveDataMapIt;
 
 typedef cSTLMapIterator<iSaveData *, tSaveDataMap, tSaveDataMapIt> cSaveDataIterator;
@@ -234,6 +234,6 @@ private:
 
 //---------------------------------------------------------
 
-}     // namespace hpl
+} // namespace hpl
 
 #endif // HPL_SAVE_GAME_H

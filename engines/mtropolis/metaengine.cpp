@@ -24,7 +24,8 @@
 #include "engines/advancedDetector.h"
 
 #include "backends/keymapper/action.h"
-#include "backends/keymapper/keymap.h"
+#include "backends/keymapper/keymapper.h"
+#include "backends/keymapper/standard-actions.h"
 
 #include "graphics/managed_surface.h"
 #include "graphics/scaler.h"
@@ -125,7 +126,7 @@ Common::Platform MTropolisEngine::getPlatform() const {
 
 } // End of namespace MTropolis
 
-class MTropolisMetaEngine : public AdvancedMetaEngine {
+class MTropolisMetaEngine : public AdvancedMetaEngine<MTropolis::MTropolisGameDescription> {
 public:
 	const char *getName() const override {
 		return "mtropolis";
@@ -136,7 +137,7 @@ public:
 	}
 
 	bool hasFeature(MetaEngineFeature f) const override;
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	Common::Error createInstance(OSystem *syst, Engine **engine, const MTropolis::MTropolisGameDescription *desc) const override;
 
 	Common::Array<Common::Keymap *> initKeymaps(const char *target) const override;
 
@@ -147,7 +148,7 @@ bool MTropolisMetaEngine::hasFeature(MetaEngineFeature f) const {
 	return checkExtendedSaves(f);
 }
 
-Common::Error MTropolisMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
+Common::Error MTropolisMetaEngine::createInstance(OSystem *syst, Engine **engine, const MTropolis::MTropolisGameDescription *desc) const {
 	*engine = new MTropolis::MTropolisEngine(syst, reinterpret_cast<const MTropolis::MTropolisGameDescription *>(desc));
 	return Common::kNoError;
 }
@@ -155,8 +156,26 @@ Common::Error MTropolisMetaEngine::createInstance(OSystem *syst, Engine **engine
 
 Common::Array<Common::Keymap *> MTropolisMetaEngine::initKeymaps(const char *target) const {
 	Common::Keymap *keymap = new Common::Keymap(Common::Keymap::kKeymapTypeGame, "mtropolis", "mTropolis");
-
 	Common::Action *act;
+
+	act = new Common::Action(Common::kStandardActionLeftClick, _("Left click"));
+	act->setLeftClickEvent();
+	act->addDefaultInputMapping("MOUSE_LEFT");
+	act->addDefaultInputMapping("JOY_A");
+	keymap->addAction(act);
+
+	act = new Common::Action(Common::kStandardActionRightClick, _("Right click"));
+	act->setRightClickEvent();
+	act->addDefaultInputMapping("MOUSE_RIGHT");
+	act->addDefaultInputMapping("JOY_B");
+	keymap->addAction(act);
+
+	act = new Common::Action(Common::kStandardActionMiddleClick, _("Middle click"));
+	act->setMiddleClickEvent();
+	act->addDefaultInputMapping("MOUSE_MIDDLE");
+	act->addDefaultInputMapping("JOY_X");
+	keymap->addAction(act);
+
 	act = new Common::Action("DEBUG_TOGGLE_OVERLAY", _("Toggle debug overlay"));
 	act->setCustomEngineActionEvent(MTropolis::Actions::kDebugToggleOverlay);
 	act->addDefaultInputMapping("F10");

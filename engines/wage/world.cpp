@@ -95,7 +95,7 @@ World::~World() {
 		delete _orderedScenes[i];
 
 	for (uint i = 0; i < _patterns->size(); i++)
-		free(_patterns->operator[](i));
+		free(const_cast<byte *>(_patterns->operator[](i)));
 
 	delete _patterns;
 
@@ -160,11 +160,11 @@ bool World::loadWorld(Common::MacResManager *resMan) {
 		res->skip(3);
 		_aboutMessage = res->readPascalString();
 
-		if (!scumm_stricmp(resMan->getBaseFileName().toString().c_str(), "Scepters"))
+		if (!scumm_stricmp(_name.c_str(), "Scepters"))
 			res->skip(1); // ????
 
-		_soundLibrary1 = res->readPascalString();
-		_soundLibrary2 = res->readPascalString();
+		_soundLibrary1 = Common::Path(res->readPascalString());
+		_soundLibrary2 = Common::Path(res->readPascalString());
 
 		delete res;
 	}
@@ -336,7 +336,7 @@ bool World::loadWorld(Common::MacResManager *resMan) {
 
 			res->skip(8); // Skip 8 more bytes
 
-			debug(3, "Loading 29 patterns for Enhanced Scepters at %ld", res->pos());
+			debug(3, "Loading 29 patterns for Enhanced Scepters at %" PRId64, res->pos());
 
 			for (int i = 0; i < 29; i++) {
 				byte *pattern = (byte *)malloc(8);
@@ -390,10 +390,10 @@ void World::addSound(Sound *sound) {
 	_orderedSounds.push_back(sound);
 }
 
-void World::loadExternalSounds(Common::String fname) {
+void World::loadExternalSounds(const Common::Path &fname) {
 	Common::MacResManager resMan;
 	if (!resMan.open(fname)) {
-		warning("Cannot load sound file <%s>", fname.c_str());
+		warning("Cannot load sound file <%s>", fname.toString().c_str());
 		return;
 	}
 
@@ -438,7 +438,7 @@ void World::move(Obj *obj, Chr *chr) {
 		return;
 
 	Designed *from = obj->removeFromCharOrScene();
-	obj->_currentOwner = chr;
+	obj->setCurrentOwner(chr);
 	chr->_inventory.push_back(obj);
 
 	Common::sort(chr->_inventory.begin(), chr->_inventory.end(), invComparator);
@@ -460,7 +460,7 @@ void World::move(Obj *obj, Scene *scene, bool skipSort) {
 		return;
 
 	Designed *from = obj->removeFromCharOrScene();
-	obj->_currentScene = scene;
+	obj->setCurrentScene(scene);
 	scene->_objs.push_back(obj);
 
 	if (!skipSort)

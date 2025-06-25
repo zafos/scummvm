@@ -29,17 +29,26 @@ public:
 	BlitPictXObject(ObjectType objType);
 };
 
-namespace BlitPict {
+namespace BlitPictXObj {
 
-extern const char *xlibName;
-extern const char *fileNames[];
+extern const char *const xlibName;
+extern const XlibFileDesc fileNames[];
 
-void open(int type);
-void close(int type);
+void open(ObjectType type, const Common::Path &path);
+void close(ObjectType type);
 
 void m_new(int nargs);
+void m_dispose(int nargs);
+void m_name(int nargs);
+void m_status(int nargs);
+void m_error(int nargs);
+void m_lastError(int nargs);
+void m_init(int nargs);
+void m_copy(int nargs);
+void m_draw(int nargs);
+void m_sparkle(int nargs);
 
-} // End of namespace BlitPict
+} // End of namespace BlitPictXObj
 
 } // End of namespace Director
 

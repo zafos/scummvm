@@ -23,6 +23,7 @@
 #define MM_UTILS_STRINGS_DATA_H
 
 #include "common/hash-str.h"
+#include "common/path.h"
 
 namespace MM {
 
@@ -33,7 +34,7 @@ public:
 	/**
 	 * Loads the data
 	 */
-	bool load(const Common::String &filename);
+	bool load(const Common::Path &filename);
 };
 
 } // namespace MM

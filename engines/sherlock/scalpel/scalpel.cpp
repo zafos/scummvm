@@ -253,20 +253,19 @@ void ScalpelEngine::setupGraphics() {
 		initGraphics(320, 200);
 	} else {
 		// 3DO actually uses RGB555, but some platforms of ours only support RGB565, so we use that
+		// TODO: Support platforms without RGB565
 		const Graphics::PixelFormat pixelFormatRGB565 = Graphics::PixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0);
 
-		// First try for a 640x400 mode
-		g_system->beginGFXTransaction();
-			initCommonGFX();
-			g_system->initSize(640, 400, &pixelFormatRGB565);
-		OSystem::TransactionError gfxError = g_system->endGFXTransaction();
-
-		if (gfxError == OSystem::kTransactionSuccess) {
-			_isScreenDoubled = true;
-		} else {
+		Graphics::ModeWithFormatList modes = {
+			// First try for a 640x400 mode
+			Graphics::ModeWithFormat(640, 400, pixelFormatRGB565),
 			// System doesn't support it, so fall back on 320x200 mode
-			initGraphics(320, 200, &pixelFormatRGB565);
-		}
+			Graphics::ModeWithFormat(320, 200, pixelFormatRGB565),
+		};
+
+		int modeIdx = initGraphicsAny(modes);
+
+		_isScreenDoubled = (modeIdx == 0);
 	}
 }
 
@@ -357,11 +356,11 @@ void ScalpelEngine::showOpening() {
 }
 
 bool ScalpelEngine::showCityCutscene() {
-	byte greyPalette[PALETTE_SIZE];
-	byte palette[PALETTE_SIZE];
+	byte greyPalette[Graphics::PALETTE_SIZE];
+	byte palette[Graphics::PALETTE_SIZE];
 
 	// Demo fades from black into grey and then fades from grey into the scene
-	Common::fill(&greyPalette[0], &greyPalette[PALETTE_SIZE], 142);
+	Common::fill(&greyPalette[0], &greyPalette[Graphics::PALETTE_SIZE], 142);
 	_screen->fadeIn((const byte *)greyPalette, 3);
 
 	_music->loadSong("prolog1");
@@ -475,7 +474,7 @@ bool ScalpelEngine::showCityCutscene() {
 }
 
 bool ScalpelEngine::showAlleyCutscene() {
-	byte palette[PALETTE_SIZE];
+	byte palette[Graphics::PALETTE_SIZE];
 	_music->loadSong("prolog2");
 
 	_animation->_gfxLibraryFilename = "TITLE.LIB";
@@ -650,9 +649,9 @@ bool ScalpelEngine::scrollCredits() {
 
 		// Write the text appropriate for the next frame
 		if (idx < 400)
-			_screen->SHtransBlitFrom(creditsImages[0], Common::Point(10, 200 - idx), false, 0);
+			_screen->SHtransBlitFrom(creditsImages[0], Common::Point(10, 200 - idx), false);
 		if (idx > 200)
-			_screen->SHtransBlitFrom(creditsImages[1], Common::Point(10, 400 - idx), false, 0);
+			_screen->SHtransBlitFrom(creditsImages[1], Common::Point(10, 400 - idx), false);
 
 		// Don't show credit text on the top and bottom ten rows of the screen
 		_screen->SHblitFrom(_screen->_backBuffer1, Common::Point(0, 0), Common::Rect(0, 0, _screen->width(), 10));
@@ -992,7 +991,7 @@ void ScalpelEngine::loadInventory() {
 	inv.push_back(InventoryItem(586, "Pawn ticket", fixedText_PawnTicket, "_ITEM16A"));
 }
 
-void ScalpelEngine::showLBV(const Common::String &filename) {
+void ScalpelEngine::showLBV(const Common::Path &filename) {
 	Common::SeekableReadStream *stream = _res->load(filename, "title.lib");
 	ImageFile images(*stream);
 	delete stream;
@@ -1269,7 +1268,7 @@ void ScalpelEngine::showScummVMRestoreDialog() {
 	delete dialog;
 }
 
-bool ScalpelEngine::play3doMovie(const Common::String &filename, const Common::Point &pos, bool isPortrait) {
+bool ScalpelEngine::play3doMovie(const Common::Path &filename, const Common::Point &pos, bool isPortrait) {
 	Scalpel3DOScreen &screen = *(Scalpel3DOScreen *)_screen;
 	Video::ThreeDOMovieDecoder *videoDecoder = new Video::ThreeDOMovieDecoder();
 	Graphics::ManagedSurface tempSurface;
@@ -1279,7 +1278,8 @@ bool ScalpelEngine::play3doMovie(const Common::String &filename, const Common::P
 	bool frameShown = false;
 
 	if (!videoDecoder->loadFile(filename)) {
-		warning("Scalpel3DOMoviePlay: could not open '%s'", filename.c_str());
+		warning("Scalpel3DOMoviePlay: could not open '%s'", filename.toString().c_str());
+		delete videoDecoder;
 		return false;
 	}
 

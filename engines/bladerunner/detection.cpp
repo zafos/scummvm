@@ -28,12 +28,13 @@
 #include "common/system.h"
 #include "common/savefile.h"
 #include "common/serializer.h"
-#include "common/translation.h"
 
 #include "engines/advancedDetector.h"
 
 static const DebugChannelDef debugFlagList[] = {
 	{BladeRunner::kDebugScript, "Script", "Debug the scripts"},
+	{BladeRunner::kDebugSound, "Sound", "Debug the sound"},
+	{BladeRunner::kDebugAnimation, "Animation", "Debug the model animations"},
 	DEBUG_CHANNEL_END
 };
 
@@ -46,9 +47,13 @@ static const PlainGameDescriptor bladeRunnerGames[] = {
 	{nullptr, nullptr}
 };
 
+static const char *const directoryGlobs[] = {
+	"BASE",
+	nullptr
+};
 } // End of namespace BladeRunner
 
-class BladeRunnerMetaEngineDetection : public AdvancedMetaEngineDetection {
+class BladeRunnerMetaEngineDetection : public AdvancedMetaEngineDetection<ADGameDescription> {
 public:
 	BladeRunnerMetaEngineDetection();
 
@@ -61,7 +66,6 @@ public:
 BladeRunnerMetaEngineDetection::BladeRunnerMetaEngineDetection()
 	: AdvancedMetaEngineDetection(
 		BladeRunner::gameDescriptions,
-		sizeof(BladeRunner::gameDescriptions[0]),
 		BladeRunner::bladeRunnerGames) {
 		// Setting this, allows the demo files to be copied in the BladeRunner
 		// game data folder and be detected and subsequently launched without
@@ -72,6 +76,8 @@ BladeRunnerMetaEngineDetection::BladeRunnerMetaEngineDetection()
 		// and expects ScummVM to detect both, offer a choice on which to add,
 		// and finally launch the proper one depending on which was added.
 		_flags = kADFlagUseExtraAsHint;
+		_maxScanDepth = 2;
+		_directoryGlobs = BladeRunner::directoryGlobs;
 }
 
 const char *BladeRunnerMetaEngineDetection::getName() const {

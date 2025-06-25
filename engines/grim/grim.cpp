@@ -177,7 +177,7 @@ GrimEngine::GrimEngine(OSystem *syst, uint32 gameFlags, GrimGameType gameType, C
 	_blastTextDefaults.setFont(nullptr);
 	_blastTextDefaults.setJustify(TextObject::LJUSTIFY);
 
-	const Common::FSNode gameDataDir(ConfMan.get("path"));
+	const Common::FSNode gameDataDir(ConfMan.getPath("path"));
 	SearchMan.addSubDirectoryMatching(gameDataDir, "movies"); // Add 'movies' subdirectory for the demo
 	SearchMan.addSubDirectoryMatching(gameDataDir, "credits");
 	SearchMan.addSubDirectoryMatching(gameDataDir, "widescreen");
@@ -242,7 +242,8 @@ void GrimEngine::clearPools() {
 	PrimitiveObject::getPool().deleteObjects();
 	TextObject::getPool().deleteObjects();
 	Bitmap::getPool().deleteObjects();
-	Font::getPool().deleteObjects();
+	BitmapFont::getPool().deleteObjects();
+	FontTTF::getPool().deleteObjects();
 	ObjectState::getPool().deleteObjects();
 
 	_currSet = nullptr;
@@ -273,12 +274,23 @@ GfxBase *GrimEngine::createRenderer(int screenW, int screenH) {
 #endif
 			0;
 
+	// For Grim Fandango, Korean fan translation can only use OpenGL renderer
+	if (getGameType() == GType_GRIM && g_grim->getGameLanguage() == Common::KO_KOR) {
+		availableRendererTypes &= ~Graphics::kRendererTypeOpenGLShaders;
+		availableRendererTypes &= ~Graphics::kRendererTypeTinyGL;
+	}
+
 	// For Grim Fandango, OpenGL renderer without shaders is preferred if available
 	if (desiredRendererType == Graphics::kRendererTypeDefault &&
 		(availableRendererTypes & Graphics::kRendererTypeOpenGL) &&
 	    getGameType() == GType_GRIM) {
 		availableRendererTypes &= ~Graphics::kRendererTypeOpenGLShaders;
 	}
+
+	// Not supported yet.
+	if (getLanguage() == Common::Language::ZH_CHN || getLanguage() == Common::Language::ZH_TWN
+		|| getGameLanguage() == Common::Language::ZH_CHN || getGameLanguage() == Common::Language::ZH_TWN)
+		availableRendererTypes &= ~Graphics::kRendererTypeOpenGLShaders;
 
 	Graphics::RendererType matchingRendererType = Graphics::Renderer::getBestMatchingType(desiredRendererType, availableRendererTypes);
 
@@ -328,13 +340,13 @@ Common::Error GrimEngine::run() {
 	// Currently, this requires the data fork to be standalone
 	if (getGameType() == GType_MONKEY4) {
 		if (SearchMan.hasFile("Monkey Island 4 Installer")) {
-			Common::Archive *archive = Common::createStuffItArchive("Monkey Island 4 Installer");
+			Common::Archive *archive = Common::createStuffItArchive("Monkey Island 4 Installer", true);
 
 			if (archive)
 				SearchMan.add("Monkey Island 4 Installer", archive, 0, true);
 		}
 		if (SearchMan.hasFile("EFMI Installer")) {
-			Common::Archive *archive = Common::createStuffItArchive("EFMI Installer");
+			Common::Archive *archive = Common::createStuffItArchive("EFMI Installer", true);
 
 			if (archive)
 				SearchMan.add("EFMI Installer", archive, 0, true);
@@ -388,6 +400,23 @@ Common::Error GrimEngine::run() {
 		g_driver = createRenderer(1600, 900);
 	} else {
 		g_driver = createRenderer(640, 480);
+	}
+
+	if (getGameType() == GType_MONKEY4 && getGameLanguage() == Common::Language::ZH_TWN) {
+		_transcodeChineseToSimplified = ConfMan.hasKey("language") && (Common::parseLanguage(ConfMan.get("language")) == Common::Language::ZH_CHN);
+
+		if (_transcodeChineseToSimplified) {
+			FontTTF *f = new FontTTF();
+			f->loadTTFFromArchive("NotoSansSC-Regular.otf", 1200);
+			_overrideFont = f;
+		} else {
+			Common::File img, imgmap;
+			if (img.open("font.tga") && imgmap.open("map.bin")) {
+				BitmapFont *f = new BitmapFont();
+				f->loadTGA("font.tga", &imgmap, &img);
+				_overrideFont = f;
+			}
+		}
 	}
 
 	if (getGameType() == GType_MONKEY4 && SearchMan.hasFile("AMWI.m4b")) {
@@ -479,12 +508,12 @@ Common::KeymapArray GrimEngine::initKeymapsGrim(const char *target) {
 	act->addDefaultInputMapping("JOY_X");
 	engineKeyMap->addAction(act);
 
-	act = new Action("BUSE", _("Use/Talk"));
+	act = new Action("BUSE", _("Use / Talk"));
 	act->setKeyEvent(KeyState(KEYCODE_u, 'u'));
 	act->addDefaultInputMapping("JOY_A");
 	engineKeyMap->addAction(act);
 
-	act = new Action("PICK", _("Pick up/Put away"));
+	act = new Action("PICK", _("Pick up / Put away"));
 	act->setKeyEvent(KeyState(KEYCODE_p, 'p'));
 	act->addDefaultInputMapping("JOY_B");
 	engineKeyMap->addAction(act);
@@ -500,6 +529,7 @@ Common::KeymapArray GrimEngine::initKeymapsGrim(const char *target) {
 	act->addDefaultInputMapping("JOY_A");
 	engineKeyMap->addAction(act);
 
+	// I18N: Skipping cutscene plaback
 	act = new Action(kStandardActionSkip, _("Skip"));
 	act->setKeyEvent(KeyState(KEYCODE_ESCAPE, ASCII_ESCAPE));
 	act->addDefaultInputMapping("ESCAPE");
@@ -550,37 +580,40 @@ Common::KeymapArray GrimEngine::initKeymapsEMI(const char *target) {
 	act->addDefaultInputMapping("JOY_RIGHT");
 	engineKeyMap->addAction(act);
 
-	act = new Action("COUP", _("Cycle Objects Up"));
+	// I18N: Cycle means rotate through
+	act = new Action("COUP", _("Cycle objects up"));
 	act->setKeyEvent(KeyState(KEYCODE_PAGEUP));
 	act->addDefaultInputMapping("JOY_LEFT_TRIGGER");
 	engineKeyMap->addAction(act);
 
-	act = new Action("CODW", _("Cycle Objects Down"));
+	// I18N: Cycle means rotate through
+	act = new Action("CODW", _("Cycle objects down"));
 	act->setKeyEvent(KeyState(KEYCODE_PAGEDOWN));
 	act->addDefaultInputMapping("JOY_RIGHT_TRIGGER");
 	engineKeyMap->addAction(act);
 
+	// I18N: Run is a movement type
 	act = new Action("BRUN", _("Run"));
 	act->setKeyEvent(KeyState(KEYCODE_LSHIFT));
 	act->addDefaultInputMapping("JOY_RIGHT_SHOULDER");
 	engineKeyMap->addAction(act);
 
-	act = new Action("QEXT", _("Quick Room Exit"));
+	act = new Action("QEXT", _("Quick room exit"));
 	act->setKeyEvent(KeyState(KEYCODE_o, 'o'));
 	act->addDefaultInputMapping("JOY_LEFT_SHOULDER");
 	engineKeyMap->addAction(act);
 
-	act = new Action("EXAM", _("Examine/Look"));
+	act = new Action("EXAM", _("Examine / Look"));
 	act->setKeyEvent(KeyState(KEYCODE_e, 'e'));
 	act->addDefaultInputMapping("JOY_X");
 	engineKeyMap->addAction(act);
 
-	act = new Action("BUSE", _("Use/Talk"));
+	act = new Action("BUSE", _("Use / Talk"));
 	act->setKeyEvent(KeyState(KEYCODE_u, 'u'));
 	act->addDefaultInputMapping("JOY_A");
 	engineKeyMap->addAction(act);
 
-	act = new Action("PICK", _("Pick up/Put away"));
+	act = new Action("PICK", _("Pick up / Put away"));
 	act->setKeyEvent(KeyState(KEYCODE_KP_PLUS, '+'));
 	act->addDefaultInputMapping("JOY_B");
 	engineKeyMap->addAction(act);
@@ -596,6 +629,7 @@ Common::KeymapArray GrimEngine::initKeymapsEMI(const char *target) {
 	act->addDefaultInputMapping("JOY_A");
 	engineKeyMap->addAction(act);
 
+	// I18N: Skipping cutscene playback
 	act = new Action(kStandardActionSkip, _("Skip"));
 	act->setKeyEvent(KeyState(KEYCODE_ESCAPE, ASCII_ESCAPE));
 	act->addDefaultInputMapping("ESCAPE");
@@ -632,9 +666,7 @@ void GrimEngine::playAspyrLogo() {
 		uint32 startTime = g_system->getMillis();
 
 		updateDisplayScene();
-		if (_doFlip) {
-			doFlip();
-		}
+		doFlip();
 		// Process events to allow the user to skip the logo.
 		Common::Event event;
 		while (g_system->getEventManager()->pollEvent(event)) {
@@ -751,7 +783,7 @@ void GrimEngine::handleDebugLoadResource() {
 		warning("Resource type not understood");
 	}
 	if (!resource)
-		warning("Requested resouce (%s) not found", buf);
+		warning("Requested resource (%s) not found", buf);
 }
 
 void GrimEngine::drawTextObjects() {
@@ -818,7 +850,7 @@ void GrimEngine::updateDisplayScene() {
 		if (g_movie->isPlaying()) {
 			_movieTime = g_movie->getMovieTime();
 			if (g_movie->isUpdateNeeded()) {
-				g_driver->prepareMovieFrame(g_movie->getDstSurface());
+				g_driver->prepareMovieFrame(g_movie->getDstSurface(), g_movie->getDstPalette());
 				g_movie->clearUpdateNeeded();
 			}
 			int frame = g_movie->getFrame();
@@ -887,7 +919,7 @@ void GrimEngine::drawNormalMode() {
 	if (g_movie->isPlaying() && _movieSetup == _currSet->getCurrSetup()->_name) {
 		_movieTime = g_movie->getMovieTime();
 		if (g_movie->isUpdateNeeded()) {
-			g_driver->prepareMovieFrame(g_movie->getDstSurface());
+			g_driver->prepareMovieFrame(g_movie->getDstSurface(), g_movie->getDstPalette());
 			g_movie->clearUpdateNeeded();
 		}
 		if (g_movie->getFrame() >= 0)
@@ -936,7 +968,11 @@ void GrimEngine::drawNormalMode() {
 
 void GrimEngine::doFlip() {
 	_frameCounter++;
-	if (!_doFlip) {
+	// When possible, flip the buffer
+	// This makes sure the screen is refreshed on a regular basis
+	// The image is properly resized if needed and backend overlays are displayed
+	if (!_doFlip || (_mode == PauseMode)) {
+		g_driver->flipBuffer(true);
 		return;
 	}
 
@@ -1039,7 +1075,7 @@ void GrimEngine::mainLoop() {
 						continue;
 					}
 
-					if (_mode != DrawMode && _mode != SmushMode && (event.kbd.ascii == 'q')) {
+					if (_mode != DrawMode && _mode != SmushMode && ((event.kbd.ascii == 'q') || (event.kbd.ascii == 'x' && (event.kbd.flags & Common::KBD_ALT)))) {
 						handleExit();
 						break;
 					} else if (_mode != DrawMode && (event.kbd.keycode == Common::KEYCODE_PAUSE)) {
@@ -1110,9 +1146,7 @@ void GrimEngine::mainLoop() {
 			updateDisplayScene();
 		}
 
-		if (_mode != PauseMode) {
-			doFlip();
-		}
+		doFlip();
 
 		// We do not want the scripts to update while a movie is playing in the PS2-version.
 		if (!(getGamePlatform() == Common::kPlatformPS2 && _mode == SmushMode)) {
@@ -1187,7 +1221,10 @@ void GrimEngine::savegameRestore() {
 	Bitmap::getPool().restoreObjects(_savedState);
 	Debug::debug(Debug::Engine, "Bitmaps restored successfully.");
 
-	Font::getPool().restoreObjects(_savedState);
+	BitmapFont::getPool().restoreObjects(_savedState);
+	if (_savedState->saveMinorVersion() >= 28) {
+		FontTTF::getPool().restoreObjects(_savedState);
+	}
 	Debug::debug(Debug::Engine, "Fonts restored successfully.");
 
 	ObjectState::getPool().restoreObjects(_savedState);
@@ -1231,6 +1268,16 @@ void GrimEngine::savegameRestore() {
 	lua_Restore(_savedState);
 	Debug::debug(Debug::Engine, "Lua restored successfully.");
 
+	if (getGameType() == GType_GRIM && !(getGameFlags() & ADGF_DEMO) &&
+		_savedState->saveMajorVersion() == 22 &&
+		_savedState->saveMinorVersion() >= 7 &&
+		_savedState->saveMinorVersion() <= 28) {
+		// Since ResidualVM 0.2.0, a ResidualVM/ScummVM specific patch was provided broken.
+		// We patch here the code to fix all saves containing this invalid code.
+		// cf. bug #13139 and #14987
+		lua_PatchGrimSave();
+	}
+
 	delete _savedState;
 
 	_justSaveLoaded = true;
@@ -1245,6 +1292,7 @@ void GrimEngine::savegameRestore() {
 	if (g_imuse)
 		g_imuse->pause(false);
 	g_movie->pause(false);
+
 	debug(2, "GrimEngine::savegameRestore() finished.");
 
 	_shortFrame = true;
@@ -1270,7 +1318,7 @@ void GrimEngine::restoreGRIM() {
 
 	//TextObject stuff
 	_sayLineDefaults.setFGColor(_savedState->readColor());
-	_sayLineDefaults.setFont(Font::getPool().getObject(_savedState->readLESint32()));
+	_sayLineDefaults.setFont(Font::load(_savedState));
 	_sayLineDefaults.setHeight(_savedState->readLESint32());
 	_sayLineDefaults.setJustify(_savedState->readLESint32());
 	_sayLineDefaults.setWidth(_savedState->readLESint32());
@@ -1359,7 +1407,8 @@ void GrimEngine::savegameSave() {
 	Bitmap::getPool().saveObjects(_savedState);
 	Debug::debug(Debug::Engine, "Bitmaps saved successfully.");
 
-	Font::getPool().saveObjects(_savedState);
+	BitmapFont::getPool().saveObjects(_savedState);
+	FontTTF::getPool().saveObjects(_savedState);
 	Debug::debug(Debug::Engine, "Fonts saved successfully.");
 
 	ObjectState::getPool().saveObjects(_savedState);
@@ -1428,7 +1477,7 @@ void GrimEngine::saveGRIM() {
 
 	//TextObject stuff
 	_savedState->writeColor(_sayLineDefaults.getFGColor());
-	_savedState->writeLESint32(_sayLineDefaults.getFont()->getId());
+	Font::save(_sayLineDefaults.getFont(), _savedState);
 	_savedState->writeLESint32(_sayLineDefaults.getHeight());
 	_savedState->writeLESint32(_sayLineDefaults.getJustify());
 	_savedState->writeLESint32(_sayLineDefaults.getWidth());
@@ -1641,19 +1690,6 @@ void GrimEngine::pauseEngineIntern(bool pause) {
 	}
 }
 
-
-Graphics::Surface *loadPNG(const Common::String &filename) {
-	Image::PNGDecoder d;
-	Common::SeekableReadStream *s = SearchMan.createReadStreamForMember(filename);
-	if (!s)
-		return nullptr;
-	d.loadStream(*s);
-	delete s;
-
-	Graphics::Surface *srf = d.getSurface()->convertTo(Graphics::PixelFormat(4, 8, 8, 8, 8, 0, 8, 16, 24));
-	return srf;
-}
-
 void GrimEngine::debugLua(const Common::String &str) {
 	lua_dostring(str.c_str());
 }
@@ -1695,6 +1731,10 @@ bool GrimEngine::isCutsceneEnabled(uint32 number) const {
 void GrimEngine::enableCutscene(uint32 number) {
 	assert (number < kNumCutscenes);
 	_cutsceneEnabled[number] = true;
+}
+
+Graphics::RendererType GrimEngine::getRendererType() {
+	return g_driver->type;
 }
 
 void GrimEngine::setSaveMetaData(const char *meta1, int meta2, const char *meta3) {

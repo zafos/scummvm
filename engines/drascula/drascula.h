@@ -34,6 +34,7 @@
 #include "common/savefile.h"
 #include "common/system.h"
 #include "common/util.h"
+#include "common/text-to-speech.h"
 
 #include "engines/savestate.h"
 
@@ -54,7 +55,7 @@
  */
 namespace Drascula {
 
-#define DRASCULA_DAT_VER 6
+#define DRASCULA_DAT_VER 7
 #define DATAALIGNMENT 4
 
 enum Languages {
@@ -257,9 +258,9 @@ public:
 
 	void enableFallback(bool val) { _fallBack = val; }
 
-	void registerArchive(const Common::String &filename, int priority);
+	void registerArchive(const Common::Path &filename, int priority);
 
-	Common::SeekableReadStream *open(const Common::String &filename);
+	Common::SeekableReadStream *open(const Common::Path &filename);
 
 private:
 	bool _fallBack;
@@ -325,9 +326,9 @@ public:
 	void syncSoundSettings() override;
 
 	Common::Error loadGameState(int slot) override;
-	bool canLoadGameStateCurrently() override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
 	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
-	bool canSaveGameStateCurrently() override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	Common::RandomSource *_rnd;
 	const DrasculaGameDescription *_gameDescription;
@@ -464,6 +465,7 @@ public:
 	int _color;
 	int musicStopped;
 	int _mouseX, _mouseY, _leftMouseButton, _rightMouseButton;
+	bool _leftMouseButtonHeld;
 
 	Common::KeyState _keyBuffer[KEYBUFSIZE];
 	int _keyBufferHead;
@@ -728,6 +730,8 @@ public:
 	void update_62();
 	void update_62_pre();
 	void update_102();
+	
+	void sayText(const Common::String &text, Common::TextToSpeechManager::Action action);
 
 private:
 	int _lang;
@@ -775,6 +779,8 @@ private:
 	RoomTalkAction *_roomActions;
 	TalkSequenceCommand *_talkSequences;
 	Common::String _saveNames[10];
+	Common::String _previousSaid;
+	Common::CodePage _ttsTextEncoding;
 
 	char **loadTexts(Common::File &in);
 	void freeTexts(char **ptr);

@@ -19,7 +19,12 @@
  *
  */
 
+#include "engines/advancedDetector.h"
+#include "engines/mm/detection.h"
+
 namespace MM {
+
+#define GUIO_XEEN GUIO4(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR, GAMEOPTION_SHOW_HP_SP_BARS, GAMEOPTION_COPY_PROTECTION)
 
 static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 #ifdef ENABLE_MM1
@@ -31,7 +36,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			AD_ENTRY1s("wallpix.dta", "86a7ef03fd5bf434d83012b07fa92680", 123059),
 			Common::EN_ANY,
 			Common::kPlatformDOS,
-			ADGF_UNSTABLE,
+			ADGF_NO_FLAGS,
 			GUIO0()
 		},
 		GType_MightAndMagic1,
@@ -46,11 +51,28 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			AD_ENTRY1s("wallpix.dta", "86a7ef03fd5bf434d83012b07fa92680", 123059),
 			Common::EN_ANY,
 			Common::kPlatformDOS,
-			ADGF_UNSTABLE,
+			ADGF_NO_FLAGS,
 			GUIO0()
 		},
 		GType_MightAndMagic1,
 		GF_ENHANCED
+	},
+
+	{
+		// Might and Magic 1 (Gfx Pack)
+		// This isn't directly supported, because using it would allow playing
+		// the game without actually having the original game files
+		{
+			"mm1",
+			nullptr,
+			AD_ENTRY1s("wallpix.dta", "64af4dad1f86aedf307e8184a9f12ba9", 164220),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_NO_FLAGS,
+			GUIO0()
+		},
+		GType_MightAndMagic1,
+		GF_GFX_PACK
 	},
 #endif
 
@@ -65,7 +87,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_WorldOfXeen,
 		0
@@ -81,7 +103,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_WorldOfXeen,
 		0
@@ -101,7 +123,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::DE_DEU,
 			Common::kPlatformDOS,
 			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_WorldOfXeen,
 		0
@@ -117,7 +139,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::DE_DEU,
 			Common::kPlatformDOS,
 			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_WorldOfXeen,
 		0
@@ -133,7 +155,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_CD,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_WorldOfXeen,
 		0
@@ -150,7 +172,39 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::FR_FRA,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
+		},
+		GType_WorldOfXeen,
+		0
+	},
+
+	{
+		// World of Xeen, Spanish fan-translation
+		// https://bugs.scummvm.org/ticket/14976
+		{
+			"worldofxeen",
+			"CD",
+			AD_ENTRY2s("xeen.cc", "8ca98eba894b104e82963b0f4952e795", 13445166,
+					   "dark.cc", "9f319d7457e822f2484fa1daa26b2687", 11331280),
+			Common::ES_ESP,
+			Common::kPlatformDOS,
+			ADGF_CD,
+			GUIO_XEEN
+		},
+		GType_WorldOfXeen,
+		0
+	},
+
+	{
+		// World of Xeen (DOS non-interactive demo)
+		{
+			"worldofxeen",
+			"Non-Interactive Demo",
+			AD_ENTRY1s("demo.cc", "bcd6775323833dc8dd2d930c3b98da03", 4556916),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_UNSTABLE | ADGF_DEMO,
+			GUIO0()
 		},
 		GType_WorldOfXeen,
 		0
@@ -165,7 +219,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_Clouds,
 		0
@@ -180,7 +234,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::DE_DEU,
 			Common::kPlatformDOS,
 			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_Clouds,
 		0
@@ -195,7 +249,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::RU_RUS,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_Clouds,
 		0
@@ -207,10 +261,10 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			"cloudsofxeen",
 			nullptr,
 			AD_ENTRY1s("xeen.cc", "1fea0587fe139b13f4effa2b5791bd80", 13859999),
-			Common::ZH_ANY,
+			Common::ZH_TWN,
 			Common::kPlatformDOS,
 			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_Clouds,
 		0
@@ -226,7 +280,22 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::FR_FRA,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
+		},
+		GType_Clouds,
+		0
+	},
+
+	{
+		// Clouds of Xeen (DOS non-interactive demo)
+		{
+			"cloudsofxeen",
+			"Non-Interactive Demo",
+			AD_ENTRY1s("logobak.raw", "68425e43f4b0c74f5ff448d1f3c9855c", 64000),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_UNSTABLE | ADGF_DEMO,
+			GUIO0()
 		},
 		GType_Clouds,
 		0
@@ -241,7 +310,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_DarkSide,
 		0
@@ -256,7 +325,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::DE_DEU,
 			Common::kPlatformDOS,
 			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_DarkSide,
 		0
@@ -272,7 +341,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::DE_DEU,
 			Common::kPlatformDOS,
 			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_DarkSide,
 		0
@@ -284,10 +353,10 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			"darksideofxeen",
 			nullptr,
 			AD_ENTRY1s("dark.cc", "4dcbcdb0be885afebc2ab6c9e60c434e", 11137412),
-			Common::ZH_ANY,
+			Common::ZH_TWN,
 			Common::kPlatformDOS,
 			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_DarkSide,
 		0
@@ -303,7 +372,22 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::FR_FRA,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
+		},
+		GType_DarkSide,
+		0
+	},
+
+	{
+		// Darkside of Xeen (DOS non-interactive demo)
+		{
+			"darksideofxeen",
+			"Non-Interactive Demo",
+			AD_ENTRY1s("demo.cc", "2c320db380a479652a27a604c7c357b6", 5017135),
+			Common::EN_ANY,
+			Common::kPlatformDOS,
+			ADGF_UNSTABLE | ADGF_DEMO,
+			GUIO0()
 		},
 		GType_DarkSide,
 		0
@@ -318,7 +402,7 @@ static const MightAndMagicGameDescription GAME_DESCRIPTIONS[] = {
 			Common::EN_ANY,
 			Common::kPlatformDOS,
 			ADGF_NO_FLAGS,
-			GUIO2(GAMEOPTION_SHOW_ITEM_COSTS, GAMEOPTION_DURABLE_ARMOR)
+			GUIO_XEEN
 		},
 		GType_Swords,
 		0

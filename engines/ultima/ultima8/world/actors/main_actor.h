@@ -32,6 +32,7 @@ struct WeaponOverlayFrame;
 
 class MainActor : public Actor {
 	friend class Debugger;
+	friend class Ultima8Engine;
 public:
 	enum CruBatteryType {
 		NoBattery = 0,
@@ -46,7 +47,7 @@ public:
 	bool CanAddItem(Item *item, bool checkwghtvol = false) override;
 	bool addItem(Item *item, bool checkwghtvol = false) override;
 
-	//! Get the ShapeInfo object for this MainActor.  Overrided because it changes
+	//! Get the ShapeInfo object for this MainActor.  Overridden because it changes
 	//! when Crusader is kneeling.
 	const ShapeInfo *getShapeInfoFromGameInstance() const override;
 

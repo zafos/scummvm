@@ -38,6 +38,30 @@ void ZCodeMetaEngine::getSupportedGames(PlainGameList &games) {
 		games.push_back(*pd);
 }
 
+const GlkDetectionEntry* ZCodeMetaEngine::getDetectionEntries() {
+	static Common::Array<GlkDetectionEntry> entries;
+	for (const FrotzGameDescription *entry = FROTZ_GAMES; entry->_gameId; ++entry) {
+		GlkDetectionEntry detection = {
+			entry->_gameId,
+			entry->_extra,
+			entry->_md5,
+			entry->_filesize,
+			entry->_language,
+			Common::kPlatformUnknown
+		};
+		entries.push_back(detection);
+	}
+
+	entries.push_back({nullptr,
+					   nullptr,
+					   nullptr,
+					   0,
+					   Common::UNK_LANG,
+					   Common::kPlatformUnknown});
+
+	return entries.data();
+}
+
 GameDescriptor ZCodeMetaEngine::findGame(const char *gameId) {
 	for (const PlainGameDescriptor *pd = INFOCOM_GAME_LIST; pd->gameId; ++pd) {
 		if (!strcmp(gameId, pd->gameId)) {
@@ -54,8 +78,18 @@ GameDescriptor ZCodeMetaEngine::findGame(const char *gameId) {
 		}
 	}
 	for (const PlainGameDescriptor *pd = ZCODE_GAME_LIST; pd->gameId; ++pd) {
-		if (!strcmp(gameId, pd->gameId))
-			return *pd;
+		if (!strcmp(gameId, pd->gameId)) {
+			GameDescriptor gd = *pd;
+			/*
+			 * Tested against ScummVM 2.8.0git, following entries are confirmed not to be playable
+			 */
+			if (!strcmp(gameId, "bureaucrocy_zcode") ||
+				!strcmp(gameId, "scopa") ||
+				!strcmp(gameId, "sunburst"))
+				gd._supportLevel = kUnstableGame;
+
+			return gd;
+		}
 	}
 
 	return GameDescriptor::empty();

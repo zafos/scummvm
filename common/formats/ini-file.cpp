@@ -52,13 +52,15 @@ bool INIFile::isValidName(const String &name) const {
 
 INIFile::INIFile() {
 	_allowNonEnglishCharacters = false;
+	_suppressValuelessLineWarning = false;
+	_requireKeyValueDelimiter = false;
 }
 
 void INIFile::clear() {
 	_sections.clear();
 }
 
-bool INIFile::loadFromFile(const String &filename) {
+bool INIFile::loadFromFile(const Path &filename) {
 	File file;
 	if (file.open(filename))
 		return loadFromStream(file);
@@ -66,7 +68,7 @@ bool INIFile::loadFromFile(const String &filename) {
 		return false;
 }
 
-bool INIFile::loadFromFileOrDataFork(const String &filename) {
+bool INIFile::loadFromFileOrDataFork(const Path &filename) {
 	SeekableReadStream *file = Common::MacResManager::openFileOrDataFork(filename);
 	if (file)
 		return loadFromStream(*file);
@@ -89,6 +91,7 @@ bool INIFile::loadFromSaveFile(const String &filename) {
 }
 
 bool INIFile::loadFromStream(SeekableReadStream &stream) {
+	static const byte UTF8_BOM[] = {0xEF, 0xBB, 0xBF};
 	Section section;
 	KeyValue kv;
 	String comment;
@@ -103,6 +106,13 @@ bool INIFile::loadFromStream(SeekableReadStream &stream) {
 
 		// Read a line
 		String line = stream.readLine();
+
+		// Skip UTF-8 byte-order mark if added by a text editor.
+		if (lineno == 1 && memcmp(line.c_str(), UTF8_BOM, 3) == 0) {
+			line.erase(0, 3);
+		}
+
+		line.trim();
 
 		if (line.size() == 0) {
 			// Do nothing
@@ -134,10 +144,14 @@ bool INIFile::loadFromStream(SeekableReadStream &stream) {
 			while (*p && ((_allowNonEnglishCharacters && *p != ']') || isAlnum(*p) || *p == '-' || *p == '_' || *p == '.' || *p == ' ' || *p == ':'))
 				p++;
 
-			if (*p == '\0')
-				error("INIFile::loadFromStream: missing ] in line %d", lineno);
-			else if (*p != ']')
-				error("INIFile::loadFromStream: Invalid character '%c' occurred in section name in line %d", *p, lineno);
+			if (*p == '\0') {
+				warning("INIFile::loadFromStream: missing ] in line %d", lineno);
+				return false;
+			}
+			else if (*p != ']') {
+				warning("INIFile::loadFromStream: Invalid character '%c' occurred in section name in line %d", *p, lineno);
+				return false;
+			}
 
 			// Previous section is finished now, store it.
 			if (!section.name.empty())
@@ -155,29 +169,27 @@ bool INIFile::loadFromStream(SeekableReadStream &stream) {
 		} else {
 			// This line should be a line with a 'key=value' pair, or an empty one.
 
-			// Skip leading whitespaces
-			const char *t = line.c_str();
-			while (isSpace(*t))
-				t++;
-
-			// Skip empty lines / lines with only whitespace
-			if (*t == 0)
-				continue;
-
 			// If no section has been set, this config file is invalid!
 			if (section.name.empty()) {
-				error("INIFile::loadFromStream: Key/value pair found outside a section in line %d", lineno);
+				warning("INIFile::loadFromStream: Key/value pair found outside a section in line %d", lineno);
+				return false;
 			}
 
 			// Split string at '=' into 'key' and 'value'. First, find the "=" delimeter.
-			const char *p = strchr(t, '=');
+			const char *p = strchr(line.c_str(), '=');
 			if (!p) {
-				warning("Config file buggy: Junk found in line %d: '%s'", lineno, t);
-				kv.key = String(t);
+				if (!_suppressValuelessLineWarning)
+					warning("Config file buggy: Junk found in line %d: '%s'", lineno, line.c_str());
+
+				// there is no '=' on this line. skip if delimiter is required.
+				if (_requireKeyValueDelimiter)
+					continue;
+
+				kv.key = line;
 				kv.value.clear();
 			}  else {
 				// Extract the key/value pair
-				kv.key = String(t, p);
+				kv.key = String(line.c_str(), p);
 				kv.value = String(p + 1);
 			}
 
@@ -205,7 +217,7 @@ bool INIFile::loadFromStream(SeekableReadStream &stream) {
 	return (!stream.err() || stream.eos());
 }
 
-bool INIFile::saveToFile(const String &filename) {
+bool INIFile::saveToFile(const Path &filename) {
 	DumpFile file;
 	if (file.open(filename))
 		return saveToStream(file);
@@ -228,28 +240,28 @@ bool INIFile::saveToSaveFile(const String &filename) {
 }
 
 bool INIFile::saveToStream(WriteStream &stream) {
-	for (List<Section>::iterator i = _sections.begin(); i != _sections.end(); ++i) {
+	for (auto &curSection : _sections) {
 		// Write out the section comment, if any
-		if (! i->comment.empty()) {
-			stream.writeString(i->comment);
+		if (!curSection.comment.empty()) {
+			stream.writeString(curSection.comment);
 		}
 
 		// Write out the section name
 		stream.writeByte('[');
-		stream.writeString(i->name);
+		stream.writeString(curSection.name);
 		stream.writeByte(']');
 		stream.writeByte('\n');
 
 		// Write out the key/value pairs
-		for (List<KeyValue>::iterator kv = i->keys.begin(); kv != i->keys.end(); ++kv) {
+		for (auto &kv : curSection.keys) {
 			// Write out the comment, if any
-			if (! kv->comment.empty()) {
-				stream.writeString(kv->comment);
+			if (!kv.comment.empty()) {
+				stream.writeString(kv.comment);
 			}
 			// Write out the key/value pair
-			stream.writeString(kv->key);
+			stream.writeString(kv.key);
 			stream.writeByte('=');
-			stream.writeString(kv->value);
+			stream.writeString(kv.value);
 			stream.writeByte('\n');
 		}
 	}
@@ -419,18 +431,18 @@ const INIFile::SectionKeyList INIFile::getKeys(const String &section) const {
 }
 
 INIFile::Section *INIFile::getSection(const String &section) {
-	for (List<Section>::iterator i = _sections.begin(); i != _sections.end(); ++i) {
-		if (section.equalsIgnoreCase(i->name)) {
-			return &(*i);
+	for (auto &curSection : _sections) {
+		if (section.equalsIgnoreCase(curSection.name)) {
+			return &curSection;
 		}
 	}
 	return nullptr;
 }
 
 const INIFile::Section *INIFile::getSection(const String &section) const {
-	for (List<Section>::const_iterator i = _sections.begin(); i != _sections.end(); ++i) {
-		if (section.equalsIgnoreCase(i->name)) {
-			return &(*i);
+	for (const auto &curSection : _sections) {
+		if (section.equalsIgnoreCase(curSection.name)) {
+			return &curSection;
 		}
 	}
 	return nullptr;
@@ -441,18 +453,18 @@ bool INIFile::Section::hasKey(const String &key) const {
 }
 
 const INIFile::KeyValue* INIFile::Section::getKey(const String &key) const {
-	for (List<KeyValue>::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-		if (key.equalsIgnoreCase(i->key)) {
-			return &(*i);
+	for (const auto &curKey : keys) {
+		if (key.equalsIgnoreCase(curKey.key)) {
+			return &curKey;
 		}
 	}
 	return nullptr;
 }
 
 void INIFile::Section::setKey(const String &key, const String &value) {
-	for (List<KeyValue>::iterator i = keys.begin(); i != keys.end(); ++i) {
-		if (key.equalsIgnoreCase(i->key)) {
-			i->value = value;
+	for (auto &curKey : keys) {
+		if (key.equalsIgnoreCase(curKey.key)) {
+			curKey.value = value;
 			return;
 		}
 	}
@@ -474,6 +486,14 @@ void INIFile::Section::removeKey(const String &key) {
 
 void INIFile::allowNonEnglishCharacters() {
 	_allowNonEnglishCharacters = true;
+}
+
+void INIFile::suppressValuelessLineWarning() {
+	_suppressValuelessLineWarning = true;
+}
+
+void INIFile::requireKeyValueDelimiter() {
+	_requireKeyValueDelimiter = true;
 }
 
 } // End of namespace Common

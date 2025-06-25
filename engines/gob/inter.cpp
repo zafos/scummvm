@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/endian.h"
@@ -77,8 +83,8 @@ void Inter::executeOpcodeDraw(byte i) {
 }
 
 void Inter::executeOpcodeFunc(byte i, byte j, OpFuncParams &params) {
-	debugC(1, kDebugFuncOp, "opcodeFunc %d.%d [0x%X.0x%X] (%s)",
-			i, j, i, j, getDescOpcodeFunc(i, j));
+	debugC(1, kDebugFuncOp, "%s:%08d: opcodeFunc %d.%d [0x%X.0x%X] (%s)",
+		   _vm->_game->_curTotFile.c_str(), _vm->_game->_script->pos(), i, j, i, j, getDescOpcodeFunc(i, j));
 
 	int n = i * 16 + j;
 	if ((i <= 4) && (j <= 15) && _opcodesFunc[n].proc && _opcodesFunc[n].proc->isValid())
@@ -149,7 +155,7 @@ void Inter::renewTimeInVars() {
 
 	WRITE_VAR(5, 1900 + t.tm_year);
 	WRITE_VAR(6, t.tm_mon + 1);
-	WRITE_VAR(7, 0);
+	WRITE_VAR(7, (t.tm_wday + 6) % 7 + 1); // Monday = 1, ... Sunday = 7
 	WRITE_VAR(8, t.tm_mday);
 	WRITE_VAR(9, t.tm_hour);
 	WRITE_VAR(10, t.tm_min);
@@ -173,7 +179,11 @@ void Inter::storeKey(int16 key) {
 	WRITE_VAR(12, _vm->_util->getTimeKey() - _vm->_game->_startTimeKey);
 
 	storeMouse();
-	WRITE_VAR(1, _vm->_sound->blasterPlayingSound());
+	bool isSoundPlaying = _vm->_sound->blasterPlayingSound() ||
+						  (_vm->getGameType() == kGameTypeAdibou1 && // NOTE: may be needed by other games as well
+						   _vm->_vidPlayer->isSoundPlaying());
+
+	WRITE_VAR(1, isSoundPlaying);
 
 	if      (key == kKeyUp)
 		key =    kShortKeyUp;
@@ -391,19 +401,21 @@ void Inter::storeValue(uint32 value) {
 }
 
 void Inter::storeString(uint16 index, uint16 type, const char *value) {
-	uint32 maxLength = _vm->_global->_inter_animDataSize * 4 - 1;
+	uint32 maxLength = 0;
 	char  *str       = GET_VARO_STR(index);
 
 	switch (type) {
 	case TYPE_VAR_STR:
+		maxLength = _vm->_global->_inter_animDataSize * 4 - 1;
 		if (strlen(value) > maxLength)
-			warning("Inter_v7::storeString(): String too long");
+			warning("Inter::storeString(): String too long");
 
 		Common::strlcpy(str, value, maxLength);
 		break;
 
 	case TYPE_IMM_INT8:
 	case TYPE_VAR_INT8:
+		maxLength = 2048 - 1;
 		Common::strcpy_s(str, maxLength, value);
 		break;
 

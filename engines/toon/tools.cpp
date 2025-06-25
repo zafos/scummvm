@@ -17,6 +17,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, MojoTouch has
+ * exclusively licensed this code on March 23th, 2024, to be used in
+ * closed-source products.
+ * Therefore, any contributions (commits) to it will also be dual-licensed.
+ *
  */
 
 #include "common/debug.h"
@@ -65,6 +72,11 @@ uint32 decompressLZSS(byte *src, byte *dst, int dstsize) {
 			bitbuf >>= 1;
 		}
 	}
+
+	if (len == -1 && dstsize == 0) {
+		return (dstp - dst);
+	}
+
 	len += dstsize;
 	if (len < 0)
 		return 0;

@@ -230,7 +230,7 @@ int DraciEngine::init() {
 
 	// Basic archive test
 	debugC(2, kDraciGeneralDebugLevel, "Running archive tests...");
-	Common::String path("INIT.DFW");
+	Common::Path path("INIT.DFW");
 	BArchive ar(path);
 	const BAFile *f;
 	debugC(3, kDraciGeneralDebugLevel, "Number of file streams in archive: %d", ar.size());
@@ -267,7 +267,13 @@ void DraciEngine::handleEvents() {
 					_game->scheduleEnteringRoomUsingGate(_game->prevRoomNum(), 0);
 				}
 				break;
-			case Common::KEYCODE_ESCAPE: {
+			default:
+				break;
+			}
+			break;
+		case Common::EVENT_CUSTOM_ENGINE_ACTION_START:
+			switch (event.customType) {
+			case kActionEscape: {
 				if (_game->getLoopStatus() == kStatusInventory &&
 				   _game->getLoopSubstatus() == kOuterLoop) {
 					_game->inventoryDone();
@@ -299,22 +305,22 @@ void DraciEngine::handleEvents() {
 				}
 				break;
 			}
-			case Common::KEYCODE_m:
+			case kActionMap:
 				if (_game->getLoopStatus() == kStatusOrdinary) {
 					const int new_room = _game->getRoomNum() != _game->getMapRoom()
 						? _game->getMapRoom() : _game->getPreviousRoomNum();
 					_game->scheduleEnteringRoomUsingGate(new_room, 0);
 				}
 				break;
-			case Common::KEYCODE_w:
+			case kActionShowWalkMap:
 				// Show walking map toggle
 				_showWalkingMap = !_showWalkingMap;
 				_game->switchWalkingAnimations(_showWalkingMap);
 				break;
-			case Common::KEYCODE_q:
+			case kActionToggleWalkSpeed:
 				_game->setWantQuickHero(!_game->getWantQuickHero());
 				break;
-			case Common::KEYCODE_i:
+			case kActionInventory:
 				if (_game->getRoomNum() == _game->getMapRoom() ||
 				    _game->getLoopSubstatus() != kOuterLoop) {
 					break;
@@ -325,19 +331,19 @@ void DraciEngine::handleEvents() {
 					_game->inventoryInit();
 				}
 				break;
-			case Common::KEYCODE_F5:
+			case kActionOpenMainMenu:
 				if (event.kbd.hasFlags(0)) {
 					openMainMenuDialog();
 				}
 				break;
-			case Common::KEYCODE_COMMA:
-			case Common::KEYCODE_PERIOD:
-			case Common::KEYCODE_SLASH:
+			case kActionTogglePointerItem:
+			case kActionInvRotatePrevious:
+			case kActionInvRotateNext:
 				if ((_game->getLoopStatus() == kStatusOrdinary ||
 				    _game->getLoopStatus() == kStatusInventory) &&
 				   _game->getLoopSubstatus() == kOuterLoop &&
 				   _game->getRoomNum() != _game->getMapRoom()) {
-					_game->inventorySwitch(event.kbd.keycode);
+					_game->inventorySwitch(event.customType);
 				}
 				break;
 			default:
@@ -452,7 +458,7 @@ Common::Error DraciEngine::loadGameState(int slot) {
 	return loadSavegameData(slot, this);
 }
 
-bool DraciEngine::canLoadGameStateCurrently() {
+bool DraciEngine::canLoadGameStateCurrently(Common::U32String *msg) {
 	return (_game->getLoopStatus() == kStatusOrdinary) &&
 		(_game->getLoopSubstatus() == kOuterLoop);
 }
@@ -461,7 +467,7 @@ Common::Error DraciEngine::saveGameState(int slot, const Common::String &desc, b
 	return saveSavegameData(slot, desc, *this);
 }
 
-bool DraciEngine::canSaveGameStateCurrently() {
+bool DraciEngine::canSaveGameStateCurrently(Common::U32String *msg) {
 	return (_game->getLoopStatus() == kStatusOrdinary) &&
 		(_game->getLoopSubstatus() == kOuterLoop);
 }

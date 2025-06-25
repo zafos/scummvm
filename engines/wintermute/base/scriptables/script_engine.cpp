@@ -220,7 +220,7 @@ byte *ScEngine::getCompiledScript(const char *filename, uint32 *outSize, bool ig
 	}
 
 	// needs to be compiled?
-	if (FROM_LE_32(*(uint32 *)buffer) == SCRIPT_MAGIC) {
+	if (READ_LE_UINT32(buffer) == SCRIPT_MAGIC) {
 		compBuffer = buffer;
 		compSize = size;
 	} else {
@@ -414,7 +414,7 @@ bool ScEngine::tickUnbreakable() {
 //////////////////////////////////////////////////////////////////////////
 bool ScEngine::removeFinishedScripts() {
 	// remove finished scripts
-	for (uint32 i = 0; i < _scripts.size(); i++) {
+	for (int32 i = 0; i < (int32)_scripts.size(); i++) {
 		if (_scripts[i]->_state == SCRIPT_FINISHED || _scripts[i]->_state == SCRIPT_ERROR) {
 			if (!_scripts[i]->_thread && _scripts[i]->_owner) {
 				_scripts[i]->_owner->removeScript(_scripts[i]);
@@ -533,7 +533,7 @@ bool ScEngine::persist(BasePersistenceManager *persistMgr) {
 
 //////////////////////////////////////////////////////////////////////////
 void ScEngine::editorCleanup() {
-	for (uint32 i = 0; i < _scripts.size(); i++) {
+	for (int32 i = 0; i < (int32)_scripts.size(); i++) {
 		if (_scripts[i]->_owner == nullptr && (_scripts[i]->_state == SCRIPT_FINISHED || _scripts[i]->_state == SCRIPT_ERROR)) {
 			delete _scripts[i];
 			_scripts.remove_at(i);

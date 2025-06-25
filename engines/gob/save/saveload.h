@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #ifndef GOB_SAVE_SAVELOAD_H
@@ -57,7 +63,7 @@ public:
 	virtual SaveMode getSaveMode(const char *fileName) const;
 
 	/** Returns all files known by the saving system matching a pattern. */
-	virtual Common::List<Common::String> getFilesMatchingPattern(const char *pattern) const;
+	virtual Common::List<Common::Path> getFilesMatchingPattern(const Common::Path &pattern) const;
 
 	/** Returns the file's (virtual) size. */
 	int32 getSize(const char *fileName);
@@ -262,36 +268,10 @@ protected:
 	SaveFile *getSaveFile(const char *fileName);
 };
 
-/** Save/Load class for A.J.'s World of Discovery. */
-class SaveLoad_AJWorld : public SaveLoad {
-public:
-	SaveLoad_AJWorld(GobEngine *vm, const char *targetName);
-	~SaveLoad_AJWorld() override;
-
-	SaveMode getSaveMode(const char *fileName) const override;
-
-protected:
-	struct SaveFile {
-		const char *sourceName;
-		SaveMode mode;
-		SaveHandler *handler;
-		const char *description;
-	};
-
-	static SaveFile _saveFiles[];
-
-	TempSpriteHandler *_tempSpriteHandler;
-
-	SaveHandler *getHandler(const char *fileName) const override;
-	const char *getDescription(const char *fileName) const override;
-
-	const SaveFile *getSaveFile(const char *fileName) const;
-	SaveFile *getSaveFile(const char *fileName);
-};
-
 /** Save/Load class for Adibou 1 */
 class SaveLoad_Adibou1 : public SaveLoad {
 public:
+	static const int32 kAdibou1NbrOfDrawings = 8;
 	SaveLoad_Adibou1(GobEngine *vm, const char *targetName);
 	~SaveLoad_Adibou1() override;
 
@@ -305,9 +285,79 @@ protected:
 		const char *description;
 	};
 
+	class SpriteHandler : public TempSpriteHandler {
+	public:
+		SpriteHandler(GobEngine *vm, const Common::String &target, const Common::String &ext);
+		~SpriteHandler() override;
+
+		int32 getSize() override;
+		bool load(int16 dataVar, int32 size, int32 offset) override;
+		bool save(int16 dataVar, int32 size, int32 offset) override;
+
+	private:
+		class File : public SlotFileStatic {
+		public:
+			File(GobEngine *vm, const Common::String &base, const Common::String &ext);
+			~File() override;
+		};
+
+		File _file;
+	};
+
+
+	class DrawingWithThumbnailHandler : public TempSpriteHandler {
+	public:
+		DrawingWithThumbnailHandler(GobEngine *vm,
+								   const Common::String &target,
+								   const Common::String &ext);
+		~DrawingWithThumbnailHandler() override;
+
+		int32 getSize() override;
+		bool load(int16 dataVar, int32 size, int32 offset) override;
+		bool save(int16 dataVar, int32 size, int32 offset) override;
+
+	private:
+		class File : public SlotFileStatic {
+		public:
+			File(GobEngine *vm, const Common::String &base, const Common::String &ext);
+			~File() override;
+		};
+
+		File _file;
+		SaveWriter *_writer;
+		SaveReader *_reader;
+	};
+
+	class GameFileHandler : public SaveHandler {
+	public:
+		GameFileHandler(GobEngine *vm, const Common::String &target, const Common::String &ext);
+		~GameFileHandler() override;
+
+		int32 getSize() override;
+		bool load(int16 dataVar, int32 size, int32 offset) override;
+		bool save(int16 dataVar, int32 size, int32 offset) override;
+		bool deleteFile() override;
+
+	private:
+		// Save from raw pointer if ptrRaw != nullptr, else save from game variables
+		bool save(const byte *ptrRaw, int16 dataVar, int32 size, int32 offset);
+
+		class File : public SlotFileStatic {
+		public:
+			File(GobEngine *vm, const Common::String &base, const Common::String &ext);
+			~File() override;
+		};
+
+		File _file;
+	};
+
 	static SaveFile _saveFiles[];
 
-	FakeFileHandler *_bouHandler;
+	GameFileHandler *_bouHandler;
+	GameFileHandler *_constructionHandler;
+	SpriteHandler   *_drawingHandler;
+	TempSpriteHandler *_menuHandler;
+	DrawingWithThumbnailHandler *_drawingWithThumbnailHandler[kAdibou1NbrOfDrawings];
 
 	SaveHandler *getHandler(const char *fileName) const override;
 	const char *getDescription(const char *fileName) const override;
@@ -928,14 +978,14 @@ protected:
 class SaveLoad_v7: public SaveLoad {
 public:
 	static const uint32 kChildrenCount = 16;
-	static const uint32 kAdibou2NbrOfApplications = 5;
+	static const uint32 kAdibou2NbrOfApplications = 7;
 	static const uint32 kAdibou2NbrOfSavedDrawings = 12;
 	static const uint32 kAdibou2NbrOfConstructionGameFiles = 3;
 	SaveLoad_v7(GobEngine *vm, const char *targetName);
 	~SaveLoad_v7() override;
 
 	SaveMode getSaveMode(const char *fileName) const override;
-	Common::List<Common::String> getFilesMatchingPattern(const char *pattern) const override;
+	Common::List<Common::Path> getFilesMatchingPattern(const Common::Path &pattern) const override;
 
 protected:
 	struct SaveFile {
@@ -1055,6 +1105,10 @@ protected:
 	DrawingOnFloppyDiskHandler  *_adibou2DrawingThumbnailOnFloppyDiskHandler;
 	FakeFileHandler             *_adibou2TestDobHandler;
 	FakeFileHandler             *_adibou2ExerciseListHandler;
+	FakeFileHandler             *_adibou2RelanceHandler;
+	FakeFileHandler             *_adibou2MemHandler;
+	GameFileHandler             *_adibou2AppProgressExtHandler[kAdibou2NbrOfApplications - 4][kChildrenCount];
+	GameFileHandler             *_adibou2AppliIniHandler[kAdibou2NbrOfApplications];
 
 	FakeFileHandler             *_addy4BaseHandler[2];
 	FakeFileHandler             *_addy4GrundschuleHandler[11];

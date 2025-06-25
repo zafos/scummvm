@@ -35,13 +35,13 @@
 
 namespace DM {
 
-class DMMetaEngine : public AdvancedMetaEngine {
+class DMMetaEngine : public AdvancedMetaEngine<DMADGameDescription> {
 public:
 	const char *getName() const override {
 		return "dm";
 	}
 
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override {
+	Common::Error createInstance(OSystem *syst, Engine **engine, const DMADGameDescription *desc) const override {
 		*engine = new DM::DMEngine(syst, (const DMADGameDescription*)desc);
 		return Common::kNoError;
 	}
@@ -64,17 +64,16 @@ public:
 		Common::String pattern = target;
 		pattern += ".###";
 
-		Common::StringArray filenames;
-		filenames = saveFileMan->listSavefiles(pattern.c_str());
+		Common::StringArray filenames = saveFileMan->listSavefiles(pattern.c_str());
 
 		SaveStateList saveList;
 
-		for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
+		for (const auto &filename : filenames) {
 			// Obtain the last 3 digits of the filename, since they correspond to the save slot
-			int slotNum = atoi(file->c_str() + file->size() - 3);
+			int slotNum = atoi(filename.c_str() + filename.size() - 3);
 
 			if ((slotNum >= 0) && (slotNum <= 999)) {
-				Common::InSaveFile *in = saveFileMan->openForLoading(file->c_str());
+				Common::InSaveFile *in = saveFileMan->openForLoading(filename.c_str());
 				if (in) {
 					if (DM::readSaveGameHeader(in, &header))
 						saveList.push_back(SaveStateDescriptor(this, slotNum, header._descr.getDescription()));
@@ -108,7 +107,7 @@ public:
 		return SaveStateDescriptor();
 	}
 
-	void removeSaveState(const char *target, int slot) const override {}
+	bool removeSaveState(const char *target, int slot) const override { return false; }
 
 };
 

@@ -26,34 +26,34 @@
  *
  *************************************/
 /*
-  -- JITDraw3 External Factory. 16Feb93 PTM
-  JITDraw3
-  I      mNew                --Creates a new instance of the XObject
-  X      mDispose            --Disposes of XObject instance
-  S      mName               --Returns the XObject name (JITDraw3)
-  I      mCheckRegistration
-  I      mCheckIfCDROM
-  S      mUserName
-  S      mUserCompany
-  IS      mSetSignature
-  S      mGetSignature
-  S      mPreRegister
-  II     mBookMark1
-  II     mBookMark2
-  II     mBookMark3
-  II     mBookMark4
-  II     mBookMark5
-  II     mBookMark6
-  I              mAddDrawButton
-  I              mRemoveDrawButton
-  I              mGotoDraw
-  I              mLoadDraw
-  I              mIsDrawLoaded
-  ISS    mMsgOkCancel
-  ISS    mMsgOk
-  ISS    mMsgYesNo
-  I    mOrder
-*/
+ * -- JITDraw3 External Factory. 16Feb93 PTM
+ * JITDraw3
+ * I      mNew                --Creates a new instance of the XObject
+ * X      mDispose            --Disposes of XObject instance
+ * S      mName               --Returns the XObject name (JITDraw3)
+ * I      mCheckRegistration
+ * I      mCheckIfCDROM
+ * S      mUserName
+ * S      mUserCompany
+ * IS      mSetSignature
+ * S      mGetSignature
+ * S      mPreRegister
+ * II     mBookMark1
+ * II     mBookMark2
+ * II     mBookMark3
+ * II     mBookMark4
+ * II     mBookMark5
+ * II     mBookMark6
+ * I              mAddDrawButton
+ * I              mRemoveDrawButton
+ * I              mGotoDraw
+ * I              mLoadDraw
+ * I              mIsDrawLoaded
+ * ISS    mMsgOkCancel
+ * ISS    mMsgOk
+ * ISS    mMsgYesNo
+ * I    mOrder
+ */
 
 #include "common/system.h"
 #include "common/translation.h"
@@ -65,18 +65,19 @@
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/jitdraw3.h"
 
 
 namespace Director {
 
-const char *JITDraw3XObj::xlibName = "JITDraw3";
-const char *JITDraw3XObj::fileNames[] = {
-	"JITDraw3",
-	nullptr
+const char *const JITDraw3XObj::xlibName = "JITDraw3";
+const XlibFileDesc JITDraw3XObj::fileNames[] = {
+	{ "JITDraw3",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "New",				JITDraw3XObj::m_new,			  0, 0,	400 },	// D4
 	{ "Dispose",			JITDraw3XObj::m_dispose,		  0, 0,	400 },	// D4
 	{ "CheckIfCDROM",		JITDraw3XObj::m_checkifcdrom,	  0, 0,	400 },	// D4
@@ -89,7 +90,7 @@ static MethodProto xlibMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void JITDraw3XObj::open(int type) {
+void JITDraw3XObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		JITDraw3XObject::initMethods(xlibMethods);
 		JITDraw3XObject *xobj = new JITDraw3XObject(kXObj);
@@ -97,7 +98,7 @@ void JITDraw3XObj::open(int type) {
 	}
 }
 
-void JITDraw3XObj::close(int type) {
+void JITDraw3XObj::close(ObjectType type) {
 	if (type == kXObj) {
 		JITDraw3XObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -113,15 +114,8 @@ void JITDraw3XObj::m_new(int nargs) {
 	g_lingo->push(g_lingo->_state->me);
 }
 
-void JITDraw3XObj::m_dispose(int nargs) {
-	g_lingo->printSTUBWithArglist("JITDraw3XObj::m_dispose", nargs);
-	g_lingo->dropStack(nargs);
-}
-
-void JITDraw3XObj::m_checkifcdrom(int nargs) {
-	g_lingo->printSTUBWithArglist("JITDraw3XObj::m_checkifcdrom", nargs);
-	g_lingo->push(Datum(0));
-}
+XOBJSTUBNR(JITDraw3XObj::m_dispose)
+XOBJSTUB(JITDraw3XObj::m_checkifcdrom, 0)
 
 void JITDraw3XObj::m_msgokcancel(int nargs) {
 	Common::U32String caption = g_lingo->pop().asString();  // Title of the message box
@@ -147,20 +141,8 @@ void JITDraw3XObj::m_msgyesno(int nargs) {
 	g_lingo->push(Datum(result == GUI::kMessageOK ? 1 : 0));
 }
 
-void JITDraw3XObj::m_gotodraw(int nargs) {
-	g_lingo->printSTUBWithArglist("JITDraw3XObj::m_gotodraw", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(3));
-}
-
-void JITDraw3XObj::m_adddrawbutton(int nargs) {
-	g_lingo->printSTUBWithArglist("JITDraw3XObj::m_adddrawbutton", nargs);
-	g_lingo->dropStack(nargs);
-}
-
-void JITDraw3XObj::m_removedrawbutton(int nargs) {
-	g_lingo->printSTUBWithArglist("JITDraw3XObj::m_removedrawbutton", nargs);
-	g_lingo->dropStack(nargs);
-}
+XOBJSTUB(JITDraw3XObj::m_gotodraw, 3)
+XOBJSTUB(JITDraw3XObj::m_adddrawbutton, 0)
+XOBJSTUB(JITDraw3XObj::m_removedrawbutton, 0)
 
 } // End of namespace Director

@@ -251,7 +251,6 @@ public:
 	MESSAGE(Game);
 	MESSAGE(Header);
 	MESSAGE(Info);
-	MESSAGE(Value);
 	MESSAGE(DrawGraphic);
 	#undef MESSAGE
 };
@@ -269,6 +268,11 @@ protected:
 	 * Process an event
 	 */
 	void processEvent(Common::Event &ev);
+
+	/**
+	 * Returns true if the game should quit
+	 */
+	virtual bool shouldQuit() const = 0;
 
 	/**
 	 * Overrides events we want to only go to the focused view
@@ -315,6 +319,13 @@ public:
 	 * Pops a view from the view stack
 	 */
 	void popView();
+
+	/**
+	 * Redraws the views in order. This is used in rare cases
+	 * where a view draws outside it's defined area, and needs
+	 * to restore whether the background was before
+	 */
+	void redrawViews();
 
 	/**
 	 * Returns the currently focused view, if any

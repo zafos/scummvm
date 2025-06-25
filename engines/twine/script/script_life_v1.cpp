@@ -20,8 +20,66 @@
  */
 
 #include "twine/script/script_life_v1.h"
+#include "common/debug.h"
+#include "twine/twine.h"
+#include "twine/text.h"
+#include "twine/audio/music.h"
+#include "twine/scene/gamestate.h"
 
 namespace TwinE {
+
+/**
+ * Turn on bubbles while actors talk.
+ * @note Opcode @c 0x59
+ */
+int32 ScriptLifeV1::lBUBBLE_ON(TwinEEngine *engine, LifeScriptContext &ctx) {
+	debugC(3, kDebugLevels::kDebugScriptsLife, "LIFE::BUBBLE_ON()");
+	engine->_text->_showDialogueBubble = true;
+	return 0;
+}
+
+/**
+ * Turn off bubbles while actors talk.
+ * @note Opcode @c 0x5A
+ */
+int32 ScriptLifeV1::lBUBBLE_OFF(TwinEEngine *engine, LifeScriptContext &ctx) {
+	debugC(3, kDebugLevels::kDebugScriptsLife, "LIFE::BUBBLE_OFF()");
+	engine->_text->_showDialogueBubble = false;
+	return 0;
+}
+
+/**
+ * Play Midis (Parameter = Midis Index)
+ * @note Opcode @c 0x41
+ */
+int32 ScriptLifeV1::lPLAY_MIDI(TwinEEngine *engine, LifeScriptContext &ctx) {
+	const int32 midiIdx = ctx.stream.readByte();
+	engine->_music->playMusic(midiIdx);
+	debugC(3, kDebugLevels::kDebugScriptsLife, "LIFE::PLAY_MIDI(%i)", (int)midiIdx);
+	return 0;
+}
+
+/**
+ * Stop the current played midi.
+ * @note Opcode @c 0x63
+ */
+int32 ScriptLifeV1::lMIDI_OFF(TwinEEngine *engine, LifeScriptContext &ctx) {
+	debugC(3, kDebugLevels::kDebugScriptsLife, "LIFE::MIDI_OFF()");
+	engine->_music->stopMusicMidi();
+	return 0;
+}
+
+/**
+ * Set a new value for the game flag (Paramter = Game Flag Index, Parameter = Value)
+ * @note Opcode @c 0x24
+ */
+int32 ScriptLifeV1::lSET_FLAG_GAME(TwinEEngine *engine, LifeScriptContext &ctx) {
+	const uint8 flagIdx = ctx.stream.readByte();
+	const uint8 flagValue = ctx.stream.readByte();
+	debugC(3, kDebugLevels::kDebugScriptsLife, "LIFE::SET_FLAG_GAME(%i, %i)", (int)flagIdx, (int)flagValue);
+	engine->_gameState->setGameFlag(flagIdx, flagValue);
+	return 0;
+}
 
 static const ScriptLifeFunction function_map[] = {
 	{"END", ScriptLifeV1::lEND},

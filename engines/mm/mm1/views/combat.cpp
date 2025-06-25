@@ -94,6 +94,10 @@ bool Combat::msgGame(const GameMessage &msg) {
 
 		setMode(SPELL_RESULT);
 		return true;
+
+	} else if (msg._name == "DISABLE_ATTACKS") {
+		disableAttacks();
+		return true;
 	}
 
 	return false;
@@ -216,8 +220,8 @@ void Combat::timeout() {
 		combatDone();
 		break;
 	case SPELL_RESULT:
-		if (_spellResult._timeoutCallback)
-			_spellResult._timeoutCallback();
+		if (_spellResult._callback)
+			_spellResult._callback();
 		else
 			// Character is done
 			block();
@@ -257,8 +261,8 @@ bool Combat::msgKeypress(const KeypressMessage &msg) {
 		}
 	} else if (_mode == SPELL_RESULT && !isDelayActive()) {
 		// Displaying a spell result that required waiting for keypress
-		assert(_spellResult._timeoutCallback);
-		_spellResult._timeoutCallback();
+		assert(_spellResult._callback);
+		_spellResult._callback();
 
 	} else if (isDelayActive()) {
 		// In all other modes, if a delay is active, any keypress
@@ -273,8 +277,15 @@ bool Combat::msgAction(const ActionMessage &msg) {
 	if (endDelay())
 		return true;
 
+	if (_mode == SELECT_OPTION && _option != OPTION_NONE &&
+		msg._action == KEYBIND_ESCAPE) {
+		_option = OPTION_NONE;
+		combatLoop();
+		return true;
+	}
+
 	if (_mode != SELECT_OPTION || (_option != OPTION_NONE &&
-			_option != OPTION_EXCHANGE))
+		_option != OPTION_EXCHANGE))
 		return false;
 
 	switch (msg._action) {
@@ -330,12 +341,6 @@ bool Combat::msgAction(const ActionMessage &msg) {
 		break;
 	case KEYBIND_COMBAT_USE:
 		use();
-		break;
-	case KEYBIND_ESCAPE:
-		if (_mode == SELECT_OPTION) {
-			_option = OPTION_NONE;
-			combatLoop();
-		}
 		break;
 	default:
 		break;
@@ -836,8 +841,13 @@ void Combat::setOption(SelectedOption option) {
 }
 
 void Combat::displaySpellResult(const InfoMessage &msg) {
-	assert(msg._delaySeconds);
-	_spellResult = msg;
+	if (msg._delaySeconds) {
+		_spellResult = msg;
+	} else {
+		InfoMessage tmp = msg;
+		tmp._delaySeconds = 3;
+		_spellResult = tmp;
+	}
 
 	setMode(SPELL_RESULT);
 }

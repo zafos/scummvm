@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/str.h"
@@ -111,7 +117,7 @@ void Inter_v6::o6_playVmdOrMusic() {
 	if (_vm->isCurrentTot("avt005.tot") && file.equalsIgnoreCase("MXRAMPART"))
 		file = "PLCOFDR2";
 
-	if (file == "RIEN") {
+	if (file == "RIEN") { // (French word for "nothing")
 		_vm->_vidPlayer->closeAll();
 		return;
 	}
@@ -127,7 +133,7 @@ void Inter_v6::o6_playVmdOrMusic() {
 //		warning("Urban/Playtoons Stub: Video/Music command -6 (cache video)");
 		return;
 	} else if (props.lastFrame == -7) {
-//		warning("Urban/Playtoons Stub: Video/Music command -6 (flush cache)");
+//		warning("Urban/Playtoons Stub: Video/Music command -7 (flush cache)");
 		return;
 	} else if ((props.lastFrame == -8) || (props.lastFrame == -9)) {
 		if (!file.contains('.'))
@@ -171,7 +177,7 @@ void Inter_v6::o6_playVmdOrMusic() {
 	}
 
 	if (props.hasSound)
-		_vm->_vidPlayer->closeLiveSound();
+		_vm->_vidPlayer->closeLiveVideos();
 
 	if (props.startFrame >= 0)
 		_vm->_vidPlayer->play(slot, props);
@@ -259,7 +265,7 @@ void Inter_v6::o6_assign(OpFuncParams &params) {
 	uint16 dest = _vm->_game->_script->readVarIndex(&size, &destType);
 
 	if (size != 0) {
-		int16 src;
+		int32 src;
 
 		_vm->_game->_script->push();
 
@@ -300,18 +306,11 @@ void Inter_v6::o6_assign(OpFuncParams &params) {
 	// WORKAROUND for a bug in Adibou 2 scripts for cooking activity: bananas count is not updated correctly.
 	// The banana balance equation should be: "remaining bananas = previous remaining bananas - bananas used for cake"
 	// but scripts do instead "remaining bananas = previous remaining *cherries* - bananas used for cake" :p
-	if (_vm->getGameType() == kGameTypeAdibou2
-		&&
-		loopCount == 1
-		&&
-		_vm->_enableAdibou2FreeBananasWorkaround
-		&&
-		_vm->_game->_script->pos() == 18631 // same offset in all versions
-		&&
-		(dest == 40956 // bananas in v2.10, v2.11
-		 ||
-		 dest == 40916) // bananas in v2.12, v2.13
-		&&
+	if (_vm->getGameType() == kGameTypeAdibou2 &&
+		loopCount == 1 &&
+		_vm->_enableAdibou2FreeBananasWorkaround &&
+		_vm->_game->_script->pos() == 18631 && // same offset in all versions
+		(dest == 40956 || dest == 40916) && // bananas in v2.10, v2.11 / v2.12, v2.13
 		_vm->isCurrentTot("cuisine.tot")) {
 		uint16 bananasInCakesVar = (dest == 40956) ? 22820 : 22828;
 		WRITE_VAR_OFFSET(dest, VAR_OFFSET(dest) - VAR_OFFSET(bananasInCakesVar) /* bananas used for cake */);
@@ -319,8 +318,21 @@ void Inter_v6::o6_assign(OpFuncParams &params) {
 		return;
 	}
 
+	// WORKAROUND: Make the "bird table" animation in the hollow tree skippable with right click
+	if (_vm->getGameType() == kGameTypeAdibou2 &&
+		loopCount == 1 &&
+		(dest == 19104 || dest == 19400 || dest == 19404) && // animation "frame" in different versions
+		_vm->_game->_script->pos() > 9036 &&
+		_vm->_game->_script->pos() < 9478 &&
+		_vm->isCurrentTot("atelier.tot") &&
+		VAR(4) == kMouseButtonsRight) {
+		WRITE_VAR_OFFSET(dest, 200);
+		_vm->_game->_script->skipExpr(99);
+		return;
+	}
+
 	for (int i = 0; i < loopCount; i++) {
-		int16 result;
+		int32 result;
 		int16 srcType = _vm->_game->_script->evalExpr(&result);
 
 		switch (destType) {
@@ -346,9 +358,9 @@ void Inter_v6::o6_assign(OpFuncParams &params) {
 		case TYPE_VAR_STR:
 		case TYPE_ARRAY_STR:
 			if (srcType == TYPE_IMM_INT16)
-				WRITE_VARO_UINT8(dest, result);
+				WRITE_VARO_UINT8(dest + i * _vm->_global->_inter_animDataSize, result);
 			else
-				WRITE_VARO_STR(dest, _vm->_game->_script->getResultStr());
+				WRITE_VARO_STR(dest + i * _vm->_global->_inter_animDataSize, _vm->_game->_script->getResultStr());
 			break;
 
 		default:
@@ -357,16 +369,11 @@ void Inter_v6::o6_assign(OpFuncParams &params) {
 	}
 
 	// WORKAROUND for a bug in Adibou2 script of "pleasant/unpleasant" game
-	if (_vm->getGameType() == kGameTypeAdibou2
-		&&
-		loopCount == 1
-		&&
-		_vm->_game->_script->pos() == 6739
-		&&
-		dest == 508
-		&&
-		VAR_OFFSET(dest) == 0
-		&&
+	if (_vm->getGameType() == kGameTypeAdibou2 &&
+		loopCount == 1 &&
+		_vm->_game->_script->pos() == 6739 &&
+		dest == 508 &&
+		VAR_OFFSET(dest) == 0 &&
 		_vm->isCurrentTot("l6ex11.tot")) {
 		WRITE_VAR_OFFSET(dest, 1); // used as a loop index for an array initialized only from index 1, skip value 0
 	}
@@ -382,13 +389,13 @@ void Inter_v6::o6_removeHotspot(OpFuncParams &params) {
 
 	switch (id + 5) {
 	case 0:
-		_vm->_game->_hotspots->push(1);
+		_vm->_game->_hotspots->push(1, true);
 		break;
 	case 1:
 		_vm->_game->_hotspots->pop();
 		break;
 	case 2:
-		_vm->_game->_hotspots->push(2);
+		_vm->_game->_hotspots->push(2, true);
 		break;
 	case 3:
 		_vm->_game->_hotspots->removeState(stateType1);

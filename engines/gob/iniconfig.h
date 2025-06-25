@@ -17,20 +17,28 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #ifndef GOB_INICONFIG_H
 #define GOB_INICONFIG_H
 
-#include "common/str.h"
 #include "common/formats/ini-file.h"
 #include "common/hashmap.h"
+#include "common/str.h"
+
+#include "gob/gob.h"
 
 namespace Gob {
 
 class INIConfig {
 public:
-	INIConfig();
+	INIConfig(GobEngine *vm);
 	~INIConfig();
 
 	bool getValue(Common::String &result, const Common::String &file,
@@ -48,10 +56,12 @@ private:
 
 	typedef Common::HashMap<Common::String, Config, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> ConfigMap;
 
+	GobEngine *_vm;
 	ConfigMap _configs;
 
 	bool getConfig(const Common::String &file, Config &config);
 
+	bool readConfigFromDisk(const Common::String &file, Config &config);
 	bool openConfig(const Common::String &file, Config &config);
 	bool createConfig(const Common::String &file, Config &config);
 };

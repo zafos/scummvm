@@ -130,6 +130,7 @@ private:
 	Insane *_insane;
 	int32 _nbframes;
 	int16 _deltaPal[0x300];
+	int32 _shiftedDeltaPal[0x300];
 	byte _pal[0x300];
 	SmushFont *_sf[5];
 	StringResource *_strings;
@@ -238,9 +239,7 @@ private:
 	void handleAnimHeader(int32 subSize, Common::SeekableReadStream &);
 	void handleFrame(int32 frameSize, Common::SeekableReadStream &);
 	void handleNewPalette(int32 subSize, Common::SeekableReadStream &);
-#ifdef USE_ZLIB
 	void handleZlibFrameObject(int32 subSize, Common::SeekableReadStream &b);
-#endif
 	void handleFrameObject(int32 subSize, Common::SeekableReadStream &);
 	void handleSAUDChunk(uint8 *srcBuf, uint32 size, int groupId, int vol, int pan, int16 flags, int trkId, int index, int maxFrames);
 	void handleStore(int32 subSize, Common::SeekableReadStream &);

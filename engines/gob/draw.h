@@ -17,11 +17,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #ifndef GOB_DRAW_H
 #define GOB_DRAW_H
 
+#include "common/stack.h"
 #include "gob/video.h"
 
 namespace Common {
@@ -41,6 +48,7 @@ namespace Gob {
 #define RENDERFLAG_NOSUBTITLES       0x0400
 #define RENDERFLAG_FROMSPLIT         0x0800
 #define RENDERFLAG_DOUBLECOORDS      0x1000
+#define RENDERFLAG_DOUBLEVIDEO       0x2000
 
 class Draw {
 public:
@@ -119,6 +127,8 @@ public:
 	int16 _unusedPalette2[16];
 	Video::Color _vgaPalette[256];
 
+	Common::Stack<Video::Color *> _paletteStack;
+
 	// 0 (00b): No cursor
 	// 1 (01b): Cursor would be on _backSurface
 	// 2 (10b): Cursor would be on _frontSurface
@@ -156,7 +166,12 @@ public:
 	int16 _palLoadData1[4];
 	int16 _palLoadData2[4];
 
+	// Coordinates adjustment mode
+	// Some game were released for a higher resolution than the one they
+	// were originally designed for. adjustCoords() is used to adjust
+	//
 	int16 _needAdjust;
+
 	int16 _scrollOffsetY;
 	int16 _scrollOffsetX;
 
@@ -180,12 +195,10 @@ public:
 	void setPalette();
 	void clearPalette();
 
-	uint32 getColor(uint8 index) const;
-
 	void dirtiedRect(int16 surface, int16 left, int16 top, int16 right, int16 bottom);
 	void dirtiedRect(SurfacePtr surface, int16 left, int16 top, int16 right, int16 bottom);
 
-	void initSpriteSurf(int16 index, int16 width, int16 height, int16 flags);
+	void initSpriteSurf(int16 index, int16 width, int16 height, int16 flags, byte bpp = 0);
 	void freeSprite(int16 index);
 	void adjustCoords(char adjust, int16 *coord1, int16 *coord2);
 	void adjustCoords(char adjust, uint16 *coord1, uint16 *coord2) {

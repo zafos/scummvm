@@ -40,6 +40,8 @@ BaseMacWindow::BaseMacWindow(int id, bool editable, MacWindowManager *wm) :
 	_type = kWindowUnknown;
 
 	_visible = true;
+
+	_draggable = true;
 }
 
 void BaseMacWindow::setVisible(bool visible, bool silent) { _visible = visible; _wm->setFullRefresh(true); }
@@ -63,11 +65,13 @@ MacWindow::MacWindow(int id, bool scrollable, bool resizable, bool editable, Mac
 	_type = kWindowWindow;
 
 	_closeable = false;
+	_isTitleVisible = true;
 
 	_borderType = -1;
 	_borderWidth = kBorderWidth;
 
 	_macBorder.setWindow(this);
+	_macBorder.setWindowManager(wm);
 
 	_hasScrollBar = false;
 
@@ -79,7 +83,7 @@ void MacWindow::disableBorder() {
 }
 
 const Font *MacWindow::getTitleFont() {
-	return _wm->_fontMan->getFont(Graphics::MacFont(kMacFontChicago, 12));
+	return _wm->_fontMan->getFont(Graphics::MacFont(kMacFontSystem, 12));
 }
 
 void MacWindow::setActive(bool active) {
@@ -90,20 +94,29 @@ void MacWindow::setActive(bool active) {
 
 bool MacWindow::isActive() const { return _active; }
 
-void MacWindow::resize(int w, int h, bool inner) {
+void MacWindow::resize(int w, int h) {
 	if (_composeSurface->w == w && _composeSurface->h == h)
 		return;
 
-	if (inner) {
-		_innerDims.setWidth(w);
-		_innerDims.setHeight(h);
-		updateOuterDims();
-	} else {
-		_dims.setWidth(w);
-		_dims.setHeight(h);
-		updateInnerDims();
-	}
+	_dims.setWidth(w);
+	_dims.setHeight(h);
+	updateInnerDims();
 
+	rebuildSurface();
+}
+
+void MacWindow::resizeInner(int w, int h) {
+	if (_composeSurface->w == w && _composeSurface->h == h)
+		return;
+
+	_innerDims.setWidth(w);
+	_innerDims.setHeight(h);
+	updateOuterDims();
+
+	rebuildSurface();
+}
+
+void MacWindow::rebuildSurface() {
 	_composeSurface->free();
 	_composeSurface->create(_innerDims.width(), _innerDims.height(), _wm->_pixelformat);
 
@@ -133,6 +146,15 @@ void MacWindow::setDimensions(const Common::Rect &r) {
 	resize(r.width(), r.height());
 	_dims.moveTo(r.left, r.top);
 	updateInnerDims();
+
+	_contentIsDirty = true;
+	_wm->setFullRefresh(true);
+}
+
+void MacWindow::setInnerDimensions(const Common::Rect &r) {
+	resizeInner(r.width(), r.height());
+	_innerDims.moveTo(r.left, r.top);
+	updateOuterDims();
 
 	_contentIsDirty = true;
 	_wm->setFullRefresh(true);
@@ -181,7 +203,7 @@ uint32 MacWindow::getBorderFlags() const {
 	uint32 flags = 0;
 	if (_active)
 		flags |= kWindowBorderActive;
-	if (!_title.empty())
+	if (!_title.empty() && _borderType != 0x02 && _borderType != 0x03 && _borderType != 0x0a && _borderType != 0x0b)
 		flags |= kWindowBorderTitle;
 	if (_hasScrollBar)
 		flags |= kWindowBorderScrollbar;
@@ -220,6 +242,9 @@ void MacWindow::updateInnerDims() {
 		_innerDims = _dims;
 		_innerDims.grow(-kBorderWidth);
 	}
+	// Prevent negative dimensions
+	_innerDims.right = MAX(_innerDims.left, _innerDims.right);
+	_innerDims.bottom = MAX(_innerDims.top, _innerDims.bottom);
 }
 
 void MacWindow::updateOuterDims() {
@@ -241,6 +266,8 @@ void MacWindow::updateOuterDims() {
 }
 
 void MacWindow::drawBorder() {
+	resizeBorderSurface();
+
 	_borderIsDirty = false;
 
 	ManagedSurface *g = &_borderSurface;
@@ -264,17 +291,39 @@ void MacWindow::drawBorderFromSurface(ManagedSurface *g, uint32 flags) {
 		g->clear(_wm->_colorGreen);
 	}
 
-	_macBorder.blitBorderInto(*g, flags, _wm);
+	_macBorder.blitBorderInto(*g, flags);
 }
 
 void MacWindow::setTitle(const Common::String &title) {
+	if (!_isTitleVisible) {
+		// Title hidden right now, so don't propagate the change but just cache it up for later
+		_shadowedTitle = title;
+		return;
+	}
+
 	_title = title;
 	_borderIsDirty = true;
-	_macBorder.setTitle(title, _borderSurface.w, _wm);
+	_macBorder.setTitle(title, _borderSurface.w);
+}
+
+void MacWindow::setTitleVisible(bool visible) {
+	if (_isTitleVisible && !visible) {
+		_shadowedTitle = _title;
+		setTitle("");
+		_isTitleVisible = visible;
+	} else if (!_isTitleVisible && visible) {
+		_title = _shadowedTitle;
+		_isTitleVisible = visible;
+		setTitle(_title);
+	}
+}
+
+bool MacWindow::isTitleVisible() {
+	return _isTitleVisible;
 }
 
 void MacWindow::drawPattern() {
-	byte *pat = _wm->getPatterns()[_pattern - 1];
+	const byte *pat = _wm->getPatterns()[_pattern - 1];
 	for (int y = 0; y < _composeSurface->h; y++) {
 		for (int x = 0; x < _composeSurface->w; x++) {
 			if (_wm->_pixelformat.bytesPerPixel == 1) {
@@ -315,14 +364,17 @@ void MacWindow::loadBorder(Common::SeekableReadStream &file, uint32 flags, Borde
 	_macBorder.loadBorder(file, flags, offsets);
 }
 
-void MacWindow::setBorder(Graphics::TransparentSurface *surface, uint32 flags, BorderOffsets offsets) {
+void MacWindow::setBorder(Graphics::ManagedSurface *surface, uint32 flags, BorderOffsets offsets) {
 	_macBorder.setBorder(surface, flags, offsets);
 }
 
 void MacWindow::resizeBorderSurface() {
 	updateOuterDims();
-	_borderSurface.free();
-	_borderSurface.create(_dims.width(), _dims.height(), _wm->_pixelformat);
+
+	if (_borderSurface.w != _dims.width() || _borderSurface.h != _dims.height()) {
+		_borderSurface.free();
+		_borderSurface.create(_dims.width(), _dims.height(), _wm->_pixelformat);
+	}
 }
 
 void MacWindow::setCloseable(bool closeable) {
@@ -431,7 +483,7 @@ bool MacWindow::processEvent(Common::Event &event) {
 			_wm->_hoveredWidget = nullptr;
 		}
 
-		if (_beingDragged) {
+		if (_beingDragged && _draggable) {
 			_dims.translate(event.mouse.x - _draggedX, event.mouse.y - _draggedY);
 			updateInnerDims();
 
@@ -528,21 +580,8 @@ void MacWindow::setBorderType(int borderType) {
 	}
 }
 
-void MacWindow::loadWin95Border(const Common::String &filename, uint32 flags) {
-	Common::SeekableReadStream *stream = _wm->getFile(filename);
-	if (stream) {
-		Graphics::BorderOffsets offsets;
-		offsets.top = 1;
-		offsets.bottom = 1;
-		offsets.left = 1;
-		offsets.right = 17;
-		offsets.lowerScrollHeight = 15;
-		offsets.upperScrollHeight = 17;
-		offsets.titlePos = 0;
-		offsets.titleTop = 0;
-		loadBorder(*stream, flags, offsets);
-		delete stream;
-	}
+void MacWindow::loadInternalBorder(uint32 flags) {
+	_macBorder.loadInternalBorder(flags);
 }
 
 void MacWindow::addDirtyRect(const Common::Rect &r) {

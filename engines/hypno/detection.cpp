@@ -91,13 +91,33 @@ static const ADGameDescription gameDescriptions[] = {
 		GUIO1(GUIO_NOMIDI)
 	},
 	{
-		"sinistersix", // HE release
+		"sinistersix", // HE release (CD, Installed)
 		nullptr,
 		AD_ENTRY2s("SPIDER.EXE", "dbd912d6f6724c6d44775fc19cfa8ca0", 483359,
 				"MISSIONS.LIB", "585704e26094cbaf14fbee90798e8d5d", 119945),
 		Common::HE_ISR,
 		Common::kPlatformDOS,
 		ADGF_UNSTABLE,
+		GUIO1(GUIO_NOMIDI)
+	},
+	{
+		"sinistersix", // HE release (CD, Not Installed)
+		nullptr,
+		AD_ENTRY2s("DATA.Z", "5068f15089ac05556c2f3f37e06c4f32", 8921748,
+				"MISSIONS.LIB", "585704e26094cbaf14fbee90798e8d5d", 119945),
+		Common::HE_ISR,
+		Common::kPlatformDOS,
+		ADGF_UNSTABLE,
+		GUIO1(GUIO_NOMIDI)
+	},
+	{
+		"wetlands", // Wetlands Demo PC Spiel (October 1995)
+		"EarlyDemo",
+		AD_ENTRY2s("wetlands.exe", "edc5b0c0caf3d5b01d344cb555d9a085", 641411,
+			  "c61.mis", "11e384b3abe0f42995bb61566d877e45", 18497),
+		Common::EN_USA,
+		Common::kPlatformDOS,
+		ADGF_DEMO,
 		GUIO1(GUIO_NOMIDI)
 	},
 	{
@@ -239,7 +259,7 @@ static const ADGameDescription gameDescriptions[] = {
 					"setup.exe", "bac1d734f2606dbdd0816dfa7a5cf518", 160740),
 		Common::EN_USA,
 		Common::kPlatformDOS,
-		ADGF_TESTING,
+		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NOMIDI)
 	},
 	{
@@ -271,9 +291,9 @@ static const char *const directoryGlobs[] = {
 	nullptr
 };
 
-class HypnoMetaEngineDetection : public AdvancedMetaEngineDetection {
+class HypnoMetaEngineDetection : public AdvancedMetaEngineDetection<ADGameDescription> {
 public:
-	HypnoMetaEngineDetection() : AdvancedMetaEngineDetection(Hypno::gameDescriptions, sizeof(ADGameDescription), Hypno::hypnoGames) {
+	HypnoMetaEngineDetection() : AdvancedMetaEngineDetection(Hypno::gameDescriptions, Hypno::hypnoGames) {
 		_guiOptions = GUIO6(GUIO_NOMIDI, GAMEOPTION_ORIGINAL_CHEATS, GAMEOPTION_INFINITE_HEALTH, GAMEOPTION_INFINITE_AMMO, GAMEOPTION_UNLOCK_ALL_LEVELS, GAMEOPTION_RESTORED_CONTENT);
 		_maxScanDepth = 3;
 		_directoryGlobs = directoryGlobs;

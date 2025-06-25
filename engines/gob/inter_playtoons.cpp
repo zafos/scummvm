@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/endian.h"
@@ -208,6 +214,23 @@ void Inter_Playtoons::oPlaytoons_freeSprite(OpFuncParams &params) {
 		index = _vm->_game->_script->readInt16();
 	else
 		index = _vm->_game->_script->readValExpr();
+
+	if (index < 0 || index >= Draw::kSpriteCount) {
+		warning("oPlaytoons_freeSprite: invalid sprite index %d", index);
+		return;
+	}
+
+	if (_vm->getGameType() == kGameTypeAdibou2 &&
+			_vm->_util->getFrameRate() == 5 &&
+			_vm->isCurrentTot("BS_LAB50.TOT")) {
+		// WORKAROUND: In the "puzzle shapes" game of Adibou2/Sciences, the script
+		// sets the frame rate to 5Hz for a special animation but forgets to reset it
+		// afterward, making some videos laggy (e.g. Adibou help mode).
+		// The sound was not affected in the original engine (while it is laggy as well
+		// in ScummVM), making the bug more discrete.
+		_vm->_util->setFrameRate(12);
+	}
+
 	_vm->_draw->freeSprite(index);
 }
 
@@ -343,7 +366,7 @@ void Inter_Playtoons::oPlaytoons_loadMultObject() {
 }
 
 void Inter_Playtoons::oPlaytoons_getObjAnimSize() {
-	int16 objIndex;
+	int32 objIndex;
 	uint16 readVar[4];
 	uint16 types[4];
 	Mult::Mult_AnimData animData;
@@ -451,19 +474,24 @@ void Inter_Playtoons::oPlaytoons_openItk() {
 	_vm->_dataIO->openArchive(file, false);
 }
 
-Common::String Inter_Playtoons::getFile(const char *path, bool stripPath) {
+Common::String Inter_Playtoons::getFile(const char *path, bool stripPath, bool *isCd) {
 	const char *orig = path;
 
 	if      (!strncmp(path, "@:\\", 3))
 		path += 3;
 	else if (!strncmp(path, "<ME>", 4))
 		path += 4;
-	else if (!strncmp(path, "<CD>", 4))
+	else if (!strncmp(path, "<CD>", 4)) {
 		path += 4;
-	else if (!strncmp(path, "<STK>", 5))
+		if (isCd)
+			*isCd = true;
+	} else if (!strncmp(path, "<STK>", 5))
 		path += 5;
-	else if (!strncmp(path, "<ALLCD>", 7))
+	else if (!strncmp(path, "<ALLCD>", 7)) {
 		path += 7;
+		if (isCd)
+			*isCd = true;
+	}
 
 	if (stripPath) {
 		const char *backslash = strrchr(path, '\\');

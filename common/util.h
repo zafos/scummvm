@@ -24,6 +24,8 @@
 
 #include "common/scummsys.h"
 
+#include "common/type_traits.h"
+
 /**
  * @defgroup common_util Util
  * @ingroup common
@@ -131,6 +133,24 @@ class U32String;
  */
 
 /**
+ * A reimplementation of std::move.
+ */
+template<class T>
+constexpr remove_reference_t<T> &&move(T &&t) noexcept {
+  return static_cast<remove_reference_t<T> &&>(t);
+}
+
+template<class T>
+constexpr T&& forward(remove_reference_t<T> &&t) noexcept {
+	return static_cast<T &&>(t);
+}
+
+template<class T>
+constexpr T&& forward(remove_reference_t<T> &t) noexcept {
+	return static_cast<T &&>(t);
+}
+
+/**
  * Provides a way to store two heterogeneous objects as a single unit.
  */
 template<class T1, class T2>
@@ -140,80 +160,37 @@ struct Pair {
 
 	Pair() {
 	}
-	Pair(T1 first_, T2 second_) : first(first_), second(second_) {
+
+	Pair(const Pair &other) : first(other.first), second(other.second) {
+	}
+
+	Pair(Pair &&other) : first(Common::move(other.first)), second(Common::move(other.second)) {
+	}
+
+	Pair(const T1 &first_, const T2 &second_) : first(first_), second(second_) {
+	}
+
+	Pair(T1 &&first_, T2 &&second_) : first(Common::move(first_)), second(Common::move(second_)) {
+	}
+
+	Pair(T1 &&first_, const T2 &second_) : first(Common::move(first_)), second(second_) {
+	}
+
+	Pair(const T1 &first_, T2 &&second_) : first(first_), second(Common::move(second_)) {
+	}
+
+	Pair &operator=(const Pair &other) {
+		this->first = other.first;
+		this->second = other.second;
+		return *this;
+	}
+
+	Pair &operator=(Pair &&other) {
+		this->first = Common::move(other.first);
+		this->second = Common::move(other.second);
+		return *this;
 	}
 };
-
-/**
- * A set of templates which remove const and/or volatile specifiers.
- * Use the remove_*_t<T> variants.
- */
-template<class T> struct remove_cv {
-	typedef T type;
-};
-template<class T> struct remove_cv<const T> {
-	typedef T type;
-};
-template<class T> struct remove_cv<volatile T> {
-	typedef T type;
-};
-template<class T> struct remove_cv<const volatile T> {
-	typedef T type;
-};
-
-template<class T> struct remove_const {
-	typedef T type;
-};
-template<class T> struct remove_const<const T> {
-	typedef T type;
-};
-
-template<class T> struct remove_volatile {
-	typedef T type;
-};
-template<class T> struct remove_volatile<volatile T> {
-	typedef T type;
-};
-
-/**
- * A set of templates which removes the reference over types.
- * Use remove_reference_t<T> for this.
- */
-template<class T>
-struct remove_reference {
-	typedef T type;
-};
-template<class T>
-struct remove_reference<T &> {
-	typedef T type;
-};
-template<class T>
-struct remove_reference<T &&> {
-	typedef T type;
-};
-
-template<class T>
-using remove_cv_t        = typename remove_cv<T>::type;
-template<class T>
-using remove_const_t     = typename remove_const<T>::type;
-template<class T>
-using remove_volatile_t  = typename remove_volatile<T>::type;
-
-template<class T>
-using remove_reference_t = typename remove_reference<T>::type;
-
-/**
- * A reimplementation of std::move.
- */
-template<class T>
-constexpr remove_reference_t<T> &&move(T &&t) noexcept {
-  return static_cast<remove_reference_t<T> &&>(t);
-}
-
-template<class T>
-constexpr T&& forward(remove_reference_t<T> &t) noexcept {
-	return static_cast<T &&>(t);
-}
 
 /**
  * Print a hexdump of the data passed in. The number of bytes per line is

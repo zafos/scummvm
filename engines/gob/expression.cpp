@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/endian.h"
@@ -224,6 +230,41 @@ void Expression::printExpr_internal(char stopToken) {
 	num = 0;
 	while (true) {
 		operation = _vm->_game->_script->readByte();
+
+		while ((operation == 14) || (operation == 15)) {
+			if (operation == 14) {
+				// Add a direct offset
+				debugN(5, "#%d#", _vm->_game->_script->readUint16());
+				_vm->_game->_script->skip(2);
+
+				if (_vm->_game->_script->peekByte() == 97)
+					_vm->_game->_script->skip(1);
+			} else if (operation == 15) {
+				// Add an offset from an array
+				debugN(5, "#%d", _vm->_game->_script->readUint16());
+				_vm->_game->_script->skip(2);
+
+				dimCount = _vm->_game->_script->readByte();
+				for (int i = 0; i < dimCount; i++)
+					debugN(5, "[]");
+				_vm->_game->_script->skip(dimCount);
+
+				debugN(5, "->");
+
+				for (int i = 0; i < dimCount; i++) {
+					debugN(5, "{");
+					printExpr_internal(OP_END_MARKER);
+					debugN(5, "->");
+				}
+
+				debugN(5, "#");
+
+				if (_vm->_game->_script->peekByte() == 97)
+					_vm->_game->_script->skip(1);
+			}
+
+			operation = _vm->_game->_script->readByte();
+		}
 
 		if ((operation >= OP_ARRAY_INT8) && (operation <= OP_FUNC)) {
 			// operands

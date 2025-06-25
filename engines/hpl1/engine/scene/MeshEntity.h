@@ -37,9 +37,9 @@
 
 #include "hpl1/engine/scene/SubMeshEntity.h"
 
-#include "hpl1/engine/scene/AnimationState.h"
 #include "common/array.h"
-#include "hpl1/std/map.h"
+#include "hpl1/engine/scene/AnimationState.h"
+#include "common/stablemap.h"
 
 namespace hpl {
 
@@ -157,9 +157,9 @@ public:
 	cMesh *GetMesh() { return mpMesh; }
 
 	/**
-	 * Calculates the transform (and angles and postion if wanted) of a mesh based on the postion of the root bone.
+	 * Calculates the transform (and angles and position if wanted) of a mesh based on the position of the root bone.
 	 * This is useful when going from rag doll to mesh.
-	 * \param *apPostion Can be NULL, the postion
+	 * \param *apPostion Can be NULL, the position
 	 * \param *apAngles Can be NULL, the angles.
 	 */
 	cMatrixf CalculateTransformFromSkeleton(cVector3f *apPostion, cVector3f *apAngles);
@@ -282,6 +282,6 @@ private:
 
 //-----------------------------------------------------------------------
 
-}     // namespace hpl
+} // namespace hpl
 
 #endif // HPL_MESH_ENTITY_H

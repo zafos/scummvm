@@ -19,33 +19,39 @@
  *
  */
 
+/*************************************
+ *
+ * USED IN:
+ * Alice: An Interactive Museum
+ *
+ *************************************/
+
 /*
  * Widget External Factory
- * Used in: "Alice: An Interactive Museum"
  *
  * Widget
  * I      mNew                --Creates a new instance of the XObject
  * X      mDispose            --Disposes of XObject instance
  * S      mGetPro             --
  * I      mAskQuit            --
- *
  */
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/widgetxobj.h"
 
 namespace Director {
 
 
-const char *WidgetXObj::xlibName = "widget";
-const char *WidgetXObj::fileNames[] = {
-	"widget",
-	nullptr
+const char *const WidgetXObj::xlibName = "Widget";
+const XlibFileDesc WidgetXObj::fileNames[] = {
+	{ "widget",	nullptr },
+	{ nullptr,	nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",				WidgetXObj::m_new,			0, 0,	400 },	// D4
 	{ "Dispose",			WidgetXObj::m_dispose,		0, 0,	400 },	// D4
 	{ "GetPro",				WidgetXObj::m_getPro,		0, 0,	400 },	// D4
@@ -53,7 +59,7 @@ static MethodProto xlibMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void WidgetXObj::open(int type) {
+void WidgetXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		WidgetXObject::initMethods(xlibMethods);
 		WidgetXObject *xobj = new WidgetXObject(kXObj);
@@ -61,14 +67,14 @@ void WidgetXObj::open(int type) {
 	}
 }
 
-void WidgetXObj::close(int type) {
+void WidgetXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		WidgetXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
 	}
 }
 
-WidgetXObject::WidgetXObject(ObjectType ObjectType) :Object<WidgetXObject>("WidgetXObj") {
+WidgetXObject::WidgetXObject(ObjectType ObjectType) :Object<WidgetXObject>("Widget") {
 	_objType = ObjectType;
 }
 
@@ -86,9 +92,6 @@ void WidgetXObj::m_getPro(int nargs) {
 	g_lingo->push(Datum("D"));
 }
 
-void WidgetXObj::m_askQuit(int nargs) {
-	g_lingo->printSTUBWithArglist("WidgetXObj::m_askQuit", nargs);
-	g_lingo->dropStack(nargs);
-}
+XOBJSTUB(WidgetXObj::m_askQuit, 0)
 
 } // End of namespace Director

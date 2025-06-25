@@ -97,9 +97,13 @@ class XeenEngine : public MMEngine {
 	struct ExtendedOptions {
 		bool _showItemCosts;
 		bool _durableArmor;
+		bool _showHpSpBars;
 
-		ExtendedOptions() : _showItemCosts(false), _durableArmor(false) {
-		}
+		ExtendedOptions() :
+			_showItemCosts(false),
+			_durableArmor(false),
+			_showHpSpBars(false)
+		{}
 	};
 private:
 	/**
@@ -199,11 +203,6 @@ public:
 	uint32 getGameFeatures() const;
 
 	/**
-	 * Returns true if the game is the CD version
-	 */
-	bool getIsCD() const;
-
-	/**
 	 * Returns a random number
 	 */
 	int getRandomNumber(int maxNumber);
@@ -245,12 +244,12 @@ public:
 	/**
 	 * Returns true if a savegame can currently be loaded
 	 */
-	bool canLoadGameStateCurrently() override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	/**
 	* Returns true if the game can currently be saved
 	*/
-	bool canSaveGameStateCurrently() override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	/**
 	* Returns true if an autosave can be created

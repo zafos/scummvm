@@ -25,8 +25,8 @@
  * This file is part of HPL1 Engine.
  */
 
-#include "hpl1/engine/graphics/font_data.h"
 #include "hpl1/engine/impl/LowLevelGraphicsSDL.h"
+#include "hpl1/engine/graphics/font_data.h"
 
 #include "hpl1/engine/graphics/bitmap2D.h"
 #include "hpl1/engine/graphics/font_data.h"
@@ -37,13 +37,13 @@
 #include "hpl1/engine/system/low_level_system.h"
 
 #include "common/algorithm.h"
+#include "common/config-manager.h"
 #include "common/system.h"
 #include "engines/util.h"
 #include "hpl1/debug.h"
 #include "hpl1/engine/impl/OcclusionQueryOGL.h"
-#include "hpl1/opengl.h"
 #include "hpl1/graphics.h"
-
+#include "hpl1/opengl.h"
 
 #ifdef USE_OPENGL
 
@@ -96,11 +96,7 @@ cLowLevelGraphicsSDL::cLowLevelGraphicsSDL() {
 	mvVirtualSize.y = 600;
 	mfGammaCorrection = 1.0;
 	mpRenderTarget = nullptr;
-#ifdef SCUMM_BIG_ENDIAN
-	mpPixelFormat = Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0);
-#else
-	mpPixelFormat = Graphics::PixelFormat(4, 8, 8, 8, 8, 0, 8, 16, 24);
-#endif
+	mpPixelFormat = Graphics::PixelFormat::createFormatRGBA32();
 
 	Common::fill(mpCurrentTexture, mpCurrentTexture + MAX_TEXTUREUNITS, nullptr);
 
@@ -128,20 +124,35 @@ cLowLevelGraphicsSDL::~cLowLevelGraphicsSDL() {
 	hplFree(mpIndexArray);
 	for (int i = 0; i < MAX_TEXTUREUNITS; i++)
 		hplFree(mpTexCoordArray[i]);
+	hplDelete(_gammaCorrectionProgram);
+	hplDelete(_screenBuffer);
 }
 
 bool cLowLevelGraphicsSDL::Init(int alWidth, int alHeight, int alBpp, int abFullscreen,
 								int alMultisampling, const tString &asWindowCaption) {
-	mvScreenSize.x = alWidth;
-	mvScreenSize.y = alHeight;
+	if (abFullscreen) {
+		int viewportSize[4];
+		GL_CHECK(glGetIntegerv(GL_VIEWPORT, viewportSize));
+		mvScreenSize.x = viewportSize[2];
+		mvScreenSize.y = viewportSize[3];
+	} else {
+		mvScreenSize.x = alWidth;
+		mvScreenSize.y = alHeight;
+	}
 	mlBpp = alBpp;
-
 	mlMultisampling = alMultisampling;
-	initGraphics3d(alWidth, alHeight);
+	initGraphics3d(mvScreenSize.x, mvScreenSize.y);
 	SetupGL();
 	ShowCursor(false);
 	// CheckMultisampleCaps();
 	g_system->updateScreen();
+
+	_gammaCorrectionProgram = CreateGpuProgram("hpl1_gamma_correction", "hpl1_gamma_correction");
+	_screenBuffer = CreateTexture(cVector2l(
+									  (int)mvScreenSize.x, (int)mvScreenSize.y),
+								  32, cColor(0, 0, 0, 0), false,
+								  eTextureType_Normal, eTextureTarget_Rect);
+
 	return true;
 }
 
@@ -170,6 +181,7 @@ static void logOGLInfo(const cLowLevelGraphicsSDL &graphics) {
 }
 
 void cLowLevelGraphicsSDL::SetupGL() {
+	GL_CHECK(glViewport(0, 0, mvScreenSize.x, mvScreenSize.y));
 	// Inits GL stuff
 	// Set Shade model and clear color.
 	GL_CHECK(glShadeModel(GL_SMOOTH));
@@ -581,7 +593,32 @@ void cLowLevelGraphicsSDL::DrawRect(const cVector2f &avPos, const cVector2f &avS
 void cLowLevelGraphicsSDL::FlushRendering() {
 	GL_CHECK(glFlush());
 }
+
+void cLowLevelGraphicsSDL::applyGammaCorrection() {
+	if (!_gammaCorrectionProgram)
+		return;
+
+	SetBlendActive(false);
+
+	// Copy screen to texture
+	CopyContextToTexure(_screenBuffer, 0,
+						cVector2l((int)mvScreenSize.x, (int)mvScreenSize.y));
+
+	tVertexVec vVtx;
+	vVtx.push_back(cVertex(cVector3f(-1.0, 1.0, 0), cVector2f(0, mvScreenSize.y), cColor(0)));
+	vVtx.push_back(cVertex(cVector3f(1.0, 1.0, 0), cVector2f(mvScreenSize.x, mvScreenSize.y), cColor(0)));
+	vVtx.push_back(cVertex(cVector3f(1.0, -1.0, 0), cVector2f(mvScreenSize.x, 0), cColor(0)));
+	vVtx.push_back(cVertex(cVector3f(-1.0, -1.0, 0), cVector2f(0, 0), cColor(0)));
+
+	_gammaCorrectionProgram->Bind();
+	SetTexture(0, _screenBuffer);
+	_gammaCorrectionProgram->SetFloat("gamma", mfGammaCorrection);
+	DrawQuad(vVtx);
+	_gammaCorrectionProgram->UnBind();
+}
+
 void cLowLevelGraphicsSDL::SwapBuffers() {
+	applyGammaCorrection();
 	GL_CHECK(glFlush());
 	g_system->updateScreen();
 }
@@ -1320,6 +1357,7 @@ void cLowLevelGraphicsSDL::CopyContextToTexure(iTexture *apTex, const cVector2l 
 	// Log("ScreenOffset: %d %d (h: %d s: %d p: %d)\n",avPos.x,lScreenY,mvScreenSize.y,
 	//												avSize.y,avPos.y);
 
+	g_system->presentBuffer();
 	SetTexture(0, apTex);
 	GL_CHECK(glCopyTexSubImage2D(GetGLTextureTargetEnum(apTex->GetTarget()), 0,
 								 avTexOffset.x, lTexY, avPos.x, lScreenY, avSize.x, avSize.y));
@@ -1624,7 +1662,7 @@ GLenum cLowLevelGraphicsSDL::GetGLTextureFuncEnum(eTextureFunc type) {
 		return GL_REPLACE;
 	case eTextureFunc_Add:
 		return GL_ADD;
-	case eTextureFunc_Substract:
+	case eTextureFunc_Subtract:
 		return GL_SUBTRACT;
 	case eTextureFunc_AddSigned:
 		return GL_ADD_SIGNED;
@@ -1770,4 +1808,4 @@ void cLowLevelGraphicsSDL::SetMatrixMode(eMatrix type) {
 
 } // namespace hpl
 
-#endif //USE_OPENGL
+#endif // USE_OPENGL

@@ -98,10 +98,22 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 		}
 	},
 
+	{
+		GAMEOPTION_APPLE2E_CURSOR,
+		{
+			_s("Use checkered cursor"),
+			_s("Use the checkered cursor from later Apple II models"),
+			"apple2e_cursor",
+			false,
+			0,
+			0
+		}
+	},
+
 	AD_EXTRA_GUI_OPTIONS_TERMINATOR
 };
 
-Common::String getDiskImageName(const AdlGameDescription &adlDesc, byte volume) {
+Common::Path getDiskImageName(const AdlGameDescription &adlDesc, byte volume) {
 	const ADGameDescription &desc = adlDesc.desc;
 	for (uint i = 0; desc.filesDescriptions[i].fileName; ++i) {
 		const ADGameFileDescription &fDesc = desc.filesDescriptions[i];
@@ -109,8 +121,8 @@ Common::String getDiskImageName(const AdlGameDescription &adlDesc, byte volume) 
 		if (fDesc.fileType == volume) {
 			for (uint e = 0; e < ARRAYSIZE(diskImageExts); ++e) {
 				if (diskImageExts[e].platform == desc.platform) {
-					Common::String testFileName(fDesc.fileName);
-					testFileName += diskImageExts[e].extension;
+					Common::Path testFileName(fDesc.fileName);
+					testFileName.appendInPlace(diskImageExts[e].extension);
 					if (Common::File::exists(testFileName))
 						return testFileName;
 				}
@@ -139,7 +151,7 @@ Common::Platform getPlatform(const AdlGameDescription &adlDesc) {
 	return adlDesc.desc.platform;
 }
 
-class AdlMetaEngine : public AdvancedMetaEngine {
+class AdlMetaEngine : public AdvancedMetaEngine<AdlGameDescription> {
 public:
 	const char *getName() const override {
 		return "adl";
@@ -154,9 +166,9 @@ public:
 	int getAutosaveSlot() const override { return 15; }
 	int getMaximumSaveSlot() const override { return 15; }
 	SaveStateList listSaves(const char *target) const override;
-	void removeSaveState(const char *target, int slot) const override;
+	bool removeSaveState(const char *target, int slot) const override;
 
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const override;
+	Common::Error createInstance(OSystem *syst, Engine **engine, const AdlGameDescription *adlGd) const override;
 	Common::KeymapArray initKeymaps(const char *target) const override;
 };
 
@@ -273,9 +285,9 @@ SaveStateList AdlMetaEngine::listSaves(const char *target) const {
 	return saveList;
 }
 
-void AdlMetaEngine::removeSaveState(const char *target, int slot) const {
+bool AdlMetaEngine::removeSaveState(const char *target, int slot) const {
 	Common::String fileName = Common::String::format("%s.s%02d", target, slot);
-	g_system->getSavefileManager()->removeSavefile(fileName);
+	return g_system->getSavefileManager()->removeSavefile(fileName);
 }
 
 Engine *HiRes1Engine_create(OSystem *syst, const AdlGameDescription *gd);
@@ -286,9 +298,7 @@ Engine *HiRes4Engine_create(OSystem *syst, const AdlGameDescription *gd);
 Engine *HiRes5Engine_create(OSystem *syst, const AdlGameDescription *gd);
 Engine *HiRes6Engine_create(OSystem *syst, const AdlGameDescription *gd);
 
-Common::Error AdlMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const {
-	const AdlGameDescription *adlGd = (const AdlGameDescription *)gd;
-
+Common::Error AdlMetaEngine::createInstance(OSystem *syst, Engine **engine, const AdlGameDescription *adlGd) const {
 	switch (adlGd->gameType) {
 	case GAME_TYPE_HIRES1:
 		*engine = HiRes1Engine_create(syst, adlGd);

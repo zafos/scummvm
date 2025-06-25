@@ -19,7 +19,6 @@
  *
  */
 
-#include "common/translation.h"
 #include "engines/advancedDetector.h"
 
 #include "sherlock/detection.h"
@@ -41,10 +40,9 @@ static const DebugChannelDef debugFlagList[] = {
 
 #include "sherlock/detection_tables.h"
 
-class SherlockMetaEngineDetection : public AdvancedMetaEngineDetection {
+class SherlockMetaEngineDetection : public AdvancedMetaEngineDetection<Sherlock::SherlockGameDescription> {
 public:
-	SherlockMetaEngineDetection() : AdvancedMetaEngineDetection(Sherlock::gameDescriptions, sizeof(Sherlock::SherlockGameDescription),
-		sherlockGames) {}
+	SherlockMetaEngineDetection() : AdvancedMetaEngineDetection(Sherlock::gameDescriptions, sherlockGames) {}
 
 	const char *getName() const override {
 		return "sherlock";

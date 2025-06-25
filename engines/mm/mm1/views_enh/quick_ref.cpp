@@ -20,6 +20,7 @@
  */
 
 #include "mm/mm1/views_enh/quick_ref.h"
+#include "mm/mm1/views_enh/character_info.h"
 #include "mm/mm1/maps/maps.h"
 #include "mm/mm1/globals.h"
 
@@ -27,14 +28,14 @@ namespace MM {
 namespace MM1 {
 namespace ViewsEnh {
 
-#define COLUMN_NUM 15
-#define COLUMN_NAME 35
-#define COLUMN_CLASS 118
-#define COLUMN_LEVEL 162
-#define COLUMN_HP 180
-#define COLUMN_SP 216
-#define COLUMN_AC 250
-#define COLUMN_CONDITION 278
+#define COLUMN_NUM 5
+#define COLUMN_NAME 30
+#define COLUMN_CLASS 113
+#define COLUMN_LEVEL 157
+#define COLUMN_HP 175
+#define COLUMN_SP 211
+#define COLUMN_AC 245
+#define COLUMN_CONDITION 271
 
 QuickRef::QuickRef() : ScrollPopup("QuickRef") {
 	setBounds(Common::Rect(0, 0, 320, 146));
@@ -120,6 +121,11 @@ bool QuickRef::msgAction(const ActionMessage &msg) {
 	{
 		uint charNum = msg._action - KEYBIND_VIEW_PARTY1;
 		if (charNum < g_globals->_party.size()) {
+			// If the quickref was launched from a character view,
+			// close QuickRef so the replaceView below replaces it
+			if (dynamic_cast<CharacterInfo *>(g_events->priorView()) != nullptr)
+				close();
+
 			if (isInCombat()) {
 				g_globals->_currCharacter = g_globals->_combatParty[charNum];
 				replaceView("CharacterViewCombat");
@@ -139,6 +145,6 @@ bool QuickRef::isInCombat() const {
 	return g_events->isPresent("Combat");
 }
 
-} // namespace Views
+} // namespace ViewsEnh
 } // namespace MM1
 } // namespace MM

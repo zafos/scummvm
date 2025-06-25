@@ -20,10 +20,10 @@
  */
 
 #include "ultima/ultima8/gumps/gump.h"
-#include "ultima/ultima8/graphics/render_surface.h"
-#include "ultima/ultima8/graphics/shape.h"
-#include "ultima/ultima8/graphics/shape_frame.h"
-#include "ultima/ultima8/graphics/shape_archive.h"
+#include "ultima/ultima8/gfx/render_surface.h"
+#include "ultima/ultima8/gfx/shape.h"
+#include "ultima/ultima8/gfx/shape_frame.h"
+#include "ultima/ultima8/gfx/shape_archive.h"
 #include "ultima/ultima8/games/game_data.h"
 #include "ultima/ultima8/gumps/gump_notify_process.h"
 #include "ultima/ultima8/kernel/kernel.h"
@@ -57,12 +57,7 @@ Gump::~Gump() {
 	_focusChild = nullptr;
 
 	// Delete all children
-	Std::list<Gump *>::iterator it = _children.begin();
-	Std::list<Gump *>::iterator end = _children.end();
-
-	while (it != end) {
-		Gump *g = *it;
-		it = _children.erase(it);
+	for (auto *g : _children) {
 		delete g;
 	}
 }
@@ -205,8 +200,9 @@ bool Gump::GetMouseCursor(int32 mx, int32 my, Shape &shape, int32 &frame) {
 	{
 		Gump *g = *it;
 
-		// Not if closing
-		if (g->_flags & FLAG_CLOSING) continue;
+		// Not if closing or hidden
+		if (g->_flags & FLAG_CLOSING || g->IsHidden())
+			continue;
 
 		// It's got the point
 		if (g->PointOnGump(mx, my))
@@ -259,17 +255,10 @@ void Gump::PaintThis(RenderSurface *surf, int32 /*lerp_factor*/, bool /*scaled*/
 }
 
 void Gump::PaintChildren(RenderSurface *surf, int32 lerp_factor, bool scaled) {
-	// Iterate all children
-	Std::list<Gump *>::iterator it = _children.begin();
-	Std::list<Gump *>::iterator end = _children.end();
-
-	while (it != end) {
-		Gump *g = *it;
+	for (auto *g : _children) {
 		// Paint if not closing
 		if (!(g->_flags & FLAG_CLOSING))
 			g->Paint(surf, lerp_factor, scaled);
-
-		++it;
 	}
 }
 
@@ -501,8 +490,9 @@ uint16 Gump::TraceObjId(int32 mx, int32 my) {
 	for (it = _children.rbegin(); it != _children.rend(); ++it) {
 		Gump *g = *it;
 
-		// Not if closing
-		if (g->_flags & FLAG_CLOSING) continue;
+		// Not if closing or hidden
+		if (g->_flags & FLAG_CLOSING || g->IsHidden())
+			continue;
 
 		// It's got the point
 		if (g->PointOnGump(gx, gy)) objId_ = g->TraceObjId(gx, gy);
@@ -529,13 +519,7 @@ Gump *Gump::FindGump(const FindGumpPredicate predicate, bool recursive) {
 	if (predicate(this))
 		return this;
 
-	// Iterate all children
-	Std::list<Gump *>::iterator  it = _children.begin();
-	Std::list<Gump *>::iterator  end = _children.end();
-
-	for (; it != end; ++it) {
-		Gump *g = *it;
-
+	for (auto *g : _children) {
 		// Not if closing
 		if (g->_flags & FLAG_CLOSING)
 			continue;
@@ -548,20 +532,15 @@ Gump *Gump::FindGump(const FindGumpPredicate predicate, bool recursive) {
 		return nullptr;
 
 	// Recursive Iterate all children
-	it = _children.begin();
-	end = _children.end();
-
-	for (; it != end; ++it) {
-		Gump *g = (*it);
-
+	for (auto *g : _children) {
 		// Not if closing
 		if (g->_flags & FLAG_CLOSING)
 			continue;
 
-		g = g->FindGump(predicate, recursive);
+		Gump *match = g->FindGump(predicate, recursive);
 
-		if (g)
-			return g;
+		if (match)
+			return match;
 	}
 
 	return nullptr;
@@ -569,7 +548,7 @@ Gump *Gump::FindGump(const FindGumpPredicate predicate, bool recursive) {
 
 // Makes this gump the focus
 void Gump::MakeFocus() {
-	// By default we WONT do anything
+	// By default we WON'T do anything
 	if (_parent) {
 		if (_parent->_focusChild) _parent->_focusChild->OnFocus(false);
 		_parent->_focusChild = this;
@@ -609,7 +588,7 @@ void Gump::AddChild(Gump *gump, bool take_focus) {
 		// Why don't we check for FLAG_CLOSING here?
 		// Because we want to make sure that the sort order is always valid
 
-		// If we are same layer as focus and we wont take it, we will not be
+		// If we are same layer as focus and we won't take it, we will not be
 		// placed in front of it
 		if (!take_focus && other == _focusChild && other->_layer == gump->_layer)
 			break;
@@ -702,8 +681,9 @@ Gump *Gump::onMouseDown(int button, int32 mx, int32 my) {
 	for (it = _children.rbegin(); it != _children.rend(); ++it) {
 		Gump *g = *it;
 
-		// Not if closing
-		if (g->_flags & FLAG_CLOSING || g->IsHidden()) continue;
+		// Not if closing or hidden
+		if (g->_flags & FLAG_CLOSING || g->IsHidden())
+			continue;
 
 		// It's got the point
 		if (g->PointOnGump(mx, my)) handled = g->onMouseDown(button, mx, my);
@@ -725,8 +705,9 @@ Gump *Gump::onMouseMotion(int32 mx, int32 my) {
 	for (it = _children.rbegin(); it != _children.rend(); ++it) {
 		Gump *g = *it;
 
-		// Not if closing
-		if (g->_flags & FLAG_CLOSING || g->IsHidden()) continue;
+		// Not if closing or hidden
+		if (g->_flags & FLAG_CLOSING || g->IsHidden())
+			continue;
 
 		// It's got the point
 		if (g->PointOnGump(mx, my)) handled = g->onMouseMotion(mx, my);
@@ -764,6 +745,10 @@ bool Gump::OnTextInput(int unicode) {
 bool Gump::mustSave(bool toplevel) const {
 	// DONT_SAVE flag
 	if (_flags & FLAG_DONT_SAVE)
+		return false;
+
+	// don't save when ready for deletion
+	if (_flags & FLAG_CLOSE_AND_DEL)
 		return false;
 
 	if (toplevel) {
@@ -806,18 +791,19 @@ void Gump::saveData(Common::WriteStream *ws) {
 	ws->writeUint32LE(_processResult);
 
 	unsigned int childcount = 0;
-	Std::list<Gump *>::iterator it;
-	for (it = _children.begin(); it != _children.end(); ++it) {
-		if (!(*it)->mustSave(false)) continue;
+	for (auto *g : _children) {
+		if (!g->mustSave(false))
+			continue;
 		childcount++;
 	}
 
 	// write children:
 	ws->writeUint32LE(childcount);
-	for (it = _children.begin(); it != _children.end(); ++it) {
-		if (!(*it)->mustSave(false)) continue;
+	for (auto *g : _children) {
+		if (!g->mustSave(false))
+			continue;
 
-		ObjectManager::get_instance()->saveObject(ws, *it);
+		ObjectManager::get_instance()->saveObject(ws, g);
 	}
 }
 

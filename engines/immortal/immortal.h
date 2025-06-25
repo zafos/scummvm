@@ -22,16 +22,15 @@
 #ifndef IMMORTAL_H
 #define IMMORTAL_H
 
-// Audio is only handled in kernal, therefore it is only needed here
+// Audio is only handled in kernel, therefore it is only needed here
 #include "audio/mixer.h"
 
 // Immortal.h is the engine, so it needs the engine headers
 #include "engines/engine.h"
 #include "engines/savestate.h"
 
-// Theorectically, all graphics should be handled through driver, which is part of kernal, which is in immortal.h
+// Theorectically, all graphics should be handled through driver, which is part of kernel, which is in immortal.h
 #include "graphics/screen.h"
-#include "graphics/palette.h"
 #include "graphics/surface.h"
 
 // Detection is only needed by the main engine
@@ -57,7 +56,7 @@
 
 namespace Immortal {
 
-// Needed by kernal for input
+// Needed by kernel for input
 enum InputAction {
 	kActionNothing,
 	kActionKey,
@@ -80,13 +79,13 @@ enum InputDirection {
 	kDirectionRight
 };
 
-// Needed by kernal for text
+// Needed by kernel for text
 enum FadeType {
 	kTextFadeIn,
 	kTextDontFadeIn
 };
 
-// Needed by kernal for music
+// Needed by kernel for music
 enum Song {
 	kSongNothing,
 	kSongMaze,
@@ -167,6 +166,10 @@ struct Univ {
 	uint16  _num2Chrs  = 0;
 };
 
+struct Chr {
+	byte *_scanlines[32];
+};
+
 struct ImmortalGameDescription;
 
 // Forward declaration because we will need the Disk and Room classes
@@ -214,13 +217,13 @@ public:
 	const int    kScreenH__   = 128;                    // ???
 	const int    kViewPortW   = 256;
 	const int    kViewPortH   = 128;
-	const int    kScreenSize  = (kResH *kResV) * 2;     // The size of the screen buffer is (320x200) * 2 byte words
+	const int    kScreenSize  = (kResH * kResV) * 2;     // The size of the screen buffer is (320x200) * 2 byte words
 	const uint16 kScreenLeft  = 32;
 	const uint16 kScreenTop   = 20;
 	const uint8  kTextLeft    = 8;
 	const uint8  kTextTop     = 4;
 	const uint8  kGaugeX      = 0;
-	const uint8  kGaugeY      = -13;                    // ???
+	const uint8  kGaugeY      = static_cast<uint8>((-13) & 0xff);                    // ???
 	const uint16 kScreenBMW   = 160;                    // Screen BitMap Width?
 	const uint16 kChrW        = 64;
 	const uint16 kChrH        = 32;
@@ -251,16 +254,6 @@ public:
 	                                  0, 0, 0, 0, 0, 0,
 	                                  0, 0, 0, 0, 0, 0
 	                                 };
-
-	const uint16 kTBlisterCorners[60] = {7, 1, 1, 1, 1, 1, 5, 3, 1, 1, 1, 1, 1, 3, 5, 3, 5, 1, 1, 1,
-	                                     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 8, 8, 8, 8, 16, 16, 16, 16, 8,
-	                                     8, 8, 8, 16, 16, 16, 16, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
-	                                    };
-
-	const uint16 kTLogicalCorners[19] = {1, 1, 1, 1, 16, 8, 1, 8,
-	                                     16, 1, 1, 8, 1, 16, 8, 16,
-	                                     1, 16, 8
-	                                    };
 
 	// Disk offsets
 	const int kPaletteOffset    = 21205;                // This is the byte position of the palette data in the disk
@@ -350,7 +343,7 @@ public:
 	int _roomCellX       = 0;
 	int _roomCellY       = 0;
 	Room *_rooms[kMaxRooms];                            // Rooms within the level
-	Common::Array<SFlame> _allFlames[kMaxRooms];        // The level needs it's own set of flames so that the flames can be turned on/off permenantly. This is technically more like a hashmap in the source, but it could also be seen as a 2d array, just hashed together in the source
+	Common::Array<SFlame> _allFlames[kMaxRooms];        // The level needs it's own set of flames so that the flames can be turned on/off permanently. This is technically more like a hashmap in the source, but it could also be seen as a 2d array, just hashed together in the source
 
 	// Door members
 	Common::Array<Door> _doors;
@@ -390,7 +383,7 @@ public:
 	// Asset members
 	int _numSprites = 0;                                // This is more accurately actually the index within the sprite array, so _numSprites + 1 is the current number of sprites
 	DataSprite _dataSprites[kFont + 1];                 // All the sprite data, indexed by SpriteName
-	Sprite _sprites[kMaxSprites];                   // All the sprites shown on screen
+	Sprite _sprites[kMaxSprites];						// All the sprites shown on screen
 	Cycle _cycles[kMaxCycles];
 	Common::Array<Common::String> _strPtrs;             // Str should really be a char array, but inserting frame values will be stupid so it's just a string instead
 	Common::Array<Motive>  _motivePtrs;
@@ -401,15 +394,19 @@ public:
 	CArray2D<Motive>       _programPtrs;
 	Common::Array<ObjType> _objTypePtrs;
 
-	// Universe members in order of their original memory layout
-	uint16 *_logicalCNM;                                // As confusing as this is, we get Logical CNM from the .CNM file, and we get the CNM from the .UNV file
+	// Universe members
+	Univ   *_univ;                                      // Pointer to the struct that contains the universe properties
+	uint16 *_logicalCNM;                                // Draw-type data for the CNM (indexes into )
+	uint16 *_CNM;                                       // Stands for CHARACTER NUMBER MAP, but really it should be TILE NUMBER MAP, because it points to tiles, which are made of characters
+	byte   *_oldCBM;									// Stands for CHARACTER BIT MAP, but should probably be called like, TILE CHARACTER MAP, because it is the full gfx data for all tiles
+	Common::Array<Chr> _Draw;                           // In the source this contained the Linear Coded Chr Routines, but here it just contains the expanded pixel data
+	uint16 *_Solid;
+	uint16 *_Right;
+	uint16 *_Left;
+	Common::SeekableReadStream *_dataBuffer;            // This contains the uncompressed CNM + CBM
+
 	uint16 *_modCNM;
 	uint16 *_modLogicalCNM;
-	Univ   *_univ;                                      // Pointer to the struct that contains the universe properties
-	Common::SeekableReadStream *_dataBuffer;            // This contains the CNM and the CBM
-	uint16 *_CNM;                                       // Stands for CHARACTER NUMBER MAP
-	byte   *_CBM;                                       // Stands for CHARACTER BIT MAP (?)
-	byte   *_oldCBM;
 
 	uint16  _myCNM[(kViewPortCW + 1)][(kViewPortCH + 1)];
 	uint16  _myModCNM[(kViewPortCW + 1)][(kViewPortCH + 1)];
@@ -417,6 +414,8 @@ public:
 
 	// Screen members
 	byte *_screenBuff;                                  // The final buffer that will transfer to the screen
+	Graphics::Surface *_mainSurface;					// The ScummVM Surface
+
 	uint16  _columnX[kViewPortCW + 1];
 	uint16  _columnTop[kViewPortCW + 1];
 	uint16  _columnIndex[kViewPortCW + 1];              // Why the heck is this an entire array, when it's just an index that gets zeroed before it gets used anyway...
@@ -435,7 +434,6 @@ public:
 	uint16  _myUnivPointX  = 0;
 	uint16  _myUnivPointY  = 0;
 	int     _num2DrawItems = 0;
-	Graphics::Surface *_mainSurface;
 	GenericSprite _genSprites[6];
 
 	// Palette members
@@ -447,7 +445,7 @@ public:
 	uint16 _palWhite[16];
 	uint16 _palBlack[16];
 	uint16 _palDim[16];
-	byte _palRGB[48];                                   // Palette that ScummVM actually uses, which is an RGB conversion of the original
+	byte   _palRGB[48];                                 // Palette that ScummVM actually uses, which is an RGB conversion of the original
 
 
 	/*
@@ -456,7 +454,7 @@ public:
 	 */
 
 	/*
-	 * [Kernal.cpp] Functions from Kernal.gs and Driver.gs
+	 * [Kernel.cpp] Functions from Kernel.gs and Driver.gs
 	 */
 
 	// Screen
@@ -525,7 +523,7 @@ public:
 	void makeBlisters(int povX, int povY);              // Turns the unmodified CNM/CBM/LCNM etc into the modified ones to actually be used for drawing the game
 	void loadFont();                                    // Gets the font.spr file, and centers the sprite
 	void clearSprites();                                // Clears all sprites before drawing the current frame
-	void loadSprites();                                 // Loads all the sprite files and centers their sprites (in spritelist, but called from kernal)
+	void loadSprites();                                 // Loads all the sprite files and centers their sprites (in spritelist, but called from kernel)
 
 	// Input
 	void userIO();                                      // Get input
@@ -546,13 +544,13 @@ public:
 	 */
 
 	// Main
-	int mungeCBM();
-	void storeAddr();
-	void mungeSolid();
-	void mungeLRHC();
-	void mungeLLHC();
-	void mungeULHC();
-	void mungeURHC();
+	int mungeCBM(uint16 num2Chrs);
+	void storeAddr(uint16 *drawType, uint16 chr2, uint16 drawIndex);
+	void mungeSolid(int oldChr, uint16 &drawIndex);
+	void mungeLRHC(int oldChr, uint16 &drawIndex);
+	void mungeLLHC(int oldChr, uint16 &drawIndex);
+	void mungeULHC(int oldChr, uint16 &drawIndex);
+	void mungeURHC(int oldChr, uint16 &drawIndex);
 	void drawSolid(int chr, int x, int y);
 	void drawULHC(int chr, int x, int y);
 	void drawURHC(int chr, int x, int y);
@@ -685,14 +683,12 @@ public:
 	 */
 
 	// Main routines
-	Common::SeekableReadStream *unCompress(Common::File *src, int srcLen);
+	Common::SeekableReadStream *unCompress(Common::File *source, int lSource);
 
 	// Subroutines called by unCompress
-	void   setupDictionary(uint16 start[], uint16 ptk[], uint16 &findEmpty);
-	int    getInputCode(bool &carry, Common::File *src, int &srcLen, uint16 &evenOdd);
-	uint16 getMember(uint16 codeW, uint16 k, uint16 &findEmpty, uint16 start[], uint16 ptk[]);
-	void   appendList(uint16 codeW, uint16 k, uint16 &hash, uint16 &findEmpty, uint16 start[], uint16 ptk[], uint16 &tmp);
-
+	void setUpDictionary(uint16 *pCodes, uint16 *pTk, uint16 &findEmpty);
+	int inputCode(uint16 &outCode, int &lSource, Common::File *source, uint16 &evenOdd);
+	int member(uint16 &codeW, uint16 &k, uint16 *pCodes, uint16 *pTk, uint16 &findEmpty, uint16 &index);
 
 	/*
 	 * [door.cpp] Functions from Door.GS
@@ -748,10 +744,10 @@ public:
 		    (f == kSupportsReturnToLauncher);
 	};
 
-	bool canLoadGameStateCurrently() override {
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override {
 		return true;
 	}
-	bool canSaveGameStateCurrently() override {
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override {
 		return true;
 	}
 

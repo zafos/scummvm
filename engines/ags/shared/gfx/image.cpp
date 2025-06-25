@@ -45,16 +45,17 @@ BITMAP *decodeImageStream(Common::SeekableReadStream &stream, color *pal) {
 		const Graphics::Surface *src = decoder.getSurface();
 
 		// Copy the decoded surface
-		Surface *dest = new Surface(src->w, src->h, src->format);
+		int bpp = 8 * src->format.bytesPerPixel;
+		if (bpp == 24)
+			bpp = 32;
+		Surface *dest = (Surface *)create_bitmap_ex(bpp, src->w, src->h);
 		dest->blitFrom(*src);
 
 		// Copy the palette
-		const byte *palP = decoder.getPalette();
-		if (palP) {
-			for (int idx = 0; idx < 256; ++idx, palP += 3) {
-				pal[idx].r = palP[0];
-				pal[idx].g = palP[1];
-				pal[idx].b = palP[2];
+		const Graphics::Palette &palP = decoder.getPalette();
+		if (pal) {
+			for (uint idx = 0; idx < palP.size(); ++idx) {
+				palP.get(idx, pal[idx].r, pal[idx].g, pal[idx].b);
 				pal[idx].filler = 0xff;
 			}
 		}
@@ -132,16 +133,13 @@ BITMAP *load_bitmap(PACKFILE *pf, color *pal) {
 }
 
 int save_bitmap(Common::WriteStream &out, BITMAP *bmp, const RGB *pal) {
-#ifdef SCUMM_LITTLE_ENDIAN
-	const Graphics::PixelFormat requiredFormat_3byte(3, 8, 8, 8, 0, 16, 8, 0, 0);
-#else
-	const Graphics::PixelFormat requiredFormat_3byte(3, 8, 8, 8, 0, 0, 8, 16, 0);
-#endif
+	const Graphics::PixelFormat requiredFormat_3byte = Graphics::PixelFormat::createFormatBGR24();
 	Graphics::ManagedSurface surface(bmp->w, bmp->h, requiredFormat_3byte);
 
 	Graphics::ManagedSurface &src = bmp->getSurface();
 	if (bmp->format.bytesPerPixel == 1) {
-		Graphics::ManagedSurface temp = src;
+		Graphics::ManagedSurface temp;
+		temp.copyFrom(src);
 		if (pal) {
 			byte palette[256 * 3];
 			for (int c = 0, i = 0; c < 256; ++c, i += 3) {
@@ -153,14 +151,15 @@ int save_bitmap(Common::WriteStream &out, BITMAP *bmp, const RGB *pal) {
 		}
 
 		surface.rawBlitFrom(temp, Common::Rect(0, 0, src.w, src.h),
-			Common::Point(0, 0), temp.getPalette());
+			Common::Point(0, 0));
 	} else {
 		// Copy from the source surface without alpha transparency
-		Graphics::ManagedSurface temp = src;
+		Graphics::ManagedSurface temp;
+		temp.copyFrom(src);
 		temp.format.aLoss = 8;
 
 		surface.rawBlitFrom(temp, Common::Rect(0, 0, src.w, src.h),
-			Common::Point(0, 0), nullptr);
+			Common::Point(0, 0));
 	}
 
 	// Write out the bitmap

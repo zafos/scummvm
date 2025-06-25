@@ -958,9 +958,9 @@ void Game::inventoryReload() {
 	_currentItem = tempItem;
 }
 
-void Game::inventorySwitch(int keycode) {
-	switch (keycode) {
-	case Common::KEYCODE_SLASH:
+void Game::inventorySwitch(int action) {
+	switch (action) {
+	case kActionTogglePointerItem:
 		// Switch between holding an item and the ordinary mouse cursor.
 		if (!getCurrentItem()) {
 			if (getPreviousItemPosition() >= 0) {
@@ -972,12 +972,12 @@ void Game::inventorySwitch(int keycode) {
 			putItem(getCurrentItem(), getPreviousItemPosition());
 		}
 		break;
-	case Common::KEYCODE_COMMA:
-	case Common::KEYCODE_PERIOD:
+	case kActionInvRotatePrevious:
+	case kActionInvRotateNext:
 		// Iterate between the items in the inventory.
 		if (getCurrentItem()) {
 			assert(getPreviousItemPosition() >= 0);
-			int direction = keycode == Common::KEYCODE_PERIOD ? +1 : -1;
+			int direction = action == kActionInvRotateNext ? +1 : -1;
 			// Find the next available item.
 			int pos = getPreviousItemPosition() + direction;
 			while (true) {
@@ -1011,12 +1011,11 @@ void Game::inventorySwitch(int keycode) {
 void Game::dialogueMenu(int dialogueID) {
 	int oldLines, hit;
 
-	Common::String name;
-	name = dialoguePath + Common::String::format("%d.dfw", dialogueID + 1);
+	Common::Path name(Common::String::format("%s%d.dfw", dialoguePath, dialogueID + 1));
 	_dialogueArchive = new BArchive(name);
 
 	debugC(4, kDraciLogicDebugLevel, "Starting dialogue (ID: %d, Archive: %s)",
-	    dialogueID, name.c_str());
+	    dialogueID, name.toString().c_str());
 
 	_currentDialogue = dialogueID;
 	oldLines = 255;

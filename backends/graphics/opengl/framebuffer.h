@@ -26,6 +26,8 @@
 
 #include "math/matrix4.h"
 
+#include "common/rotationmode.h"
+
 namespace OpenGL {
 
 class Pipeline;
@@ -42,9 +44,15 @@ public:
 	enum BlendMode {
 		/**
 		 * Newly drawn pixels overwrite the existing contents of the framebuffer
-		 * without mixing with them
+		 * without mixing with them.
 		 */
 		kBlendModeDisabled,
+
+		/**
+		 * Newly drawn pixels overwrite the existing contents of the framebuffer
+		 * without mixing with them. Alpha channel is discarded.
+		 */
+		kBlendModeOpaque,
 
 		/**
 		 * Newly drawn pixels mix with the framebuffer based on their alpha value
@@ -56,7 +64,7 @@ public:
 		 * Newly drawn pixels mix with the framebuffer based on their alpha value
 		 * for transparency.
 		 *
-		 * Requires the image data being drawn to have its color values pre-multipled
+		 * Requires the image data being drawn to have its color values pre-multiplied
 		 * with the alpha value.
 		 */
 		kBlendModePremultipliedTransparency,
@@ -139,6 +147,11 @@ protected:
 
 public:
 	/**
+	 * Set the size of the target buffer.
+	 */
+	virtual bool setSize(uint width, uint height) = 0;
+
+	/**
 	 * Accessor to activate framebuffer for pipeline.
 	 */
 	void activate(Pipeline *pipeline);
@@ -170,16 +183,16 @@ private:
 class Backbuffer : public Framebuffer {
 public:
 	/**
-	 * Set the dimensions (a.k.a. size) of the back buffer.
+	 * Set the size of the back buffer.
 	 */
-	void setDimensions(uint width, uint height);
+	bool setSize(uint width, uint height) override;
 
 protected:
 	void activateInternal() override;
 };
 
 #if !USE_FORCED_GLES
-class GLTexture;
+class Texture;
 
 /**
  * Render to texture framebuffer implementation.
@@ -205,18 +218,18 @@ public:
 	/**
 	 * Set size of the texture target.
 	 */
-	bool setSize(uint width, uint height);
+	bool setSize(uint width, uint height) override;
 
 	/**
 	 * Query pointer to underlying GL texture.
 	 */
-	GLTexture *getTexture() const { return _texture; }
+	Texture *getTexture() const { return _texture; }
 
 protected:
 	void activateInternal() override;
 
 private:
-	GLTexture *_texture;
+	Texture *_texture;
 	GLuint _glFBO;
 	bool _needUpdate;
 };

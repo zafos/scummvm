@@ -99,7 +99,7 @@ bool ConfigElement::getBool(const Common::String &name) const {
 	return toupper(str[0]) == 'T' || str == "1";
 }
 
-int ConfigElement::getEnum(const Common::String &name, const char *enumValues[]) const {
+int ConfigElement::getEnum(const Common::String &name, const char *const enumValues[]) const {
 	Common::String str = (*_node)[name];
 	if (str.empty())
 		return 0;
@@ -116,9 +116,8 @@ Std::vector<ConfigElement> ConfigElement::getChildren() const {
 	const Common::Array<Shared::XMLNode *> &children = _node->children();
 	Std::vector<ConfigElement> result;
 
-	for (Common::Array<Shared::XMLNode *>::const_iterator it = children.begin();
-	        it != children.end(); ++it)
-		result.push_back(*it);
+	for (const auto &c : children)
+		result.push_back(c);
 
 	return result;
 }

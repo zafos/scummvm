@@ -519,7 +519,18 @@ void ClassicCostumeRenderer::proc3(ByleRLEData &compData) {
 					maskbit = revBitMask(compData.x & 7);
 					compData.destPtr += compData.scaleXStep;
 				}
-				_scaleIndexX += compData.scaleXStep;
+
+				// From MONKEY1 EGA disasm: we only increment by 1.
+				// This accurately produces the original wonky scaling
+				// for the floppy editions of Monkey Island 1.
+				// Also valid for all other v4 games (this code is
+				// also in the executable for LOOM CD).
+				if (_vm->_game.version == 4) {
+					_scaleIndexX++;
+				} else {
+					_scaleIndexX += compData.scaleXStep;
+				}
+
 				dst = compData.destPtr;
 				mask = compData.maskPtr + compData.x / 8;
 			}
@@ -765,7 +776,7 @@ void ClassicCostumeLoader::loadCostume(int id) {
 	// WORKAROUND bug #13433: Guybrush can give the stick to two dogs: the one
 	// guarding the jail, and the one in front of the mansion. But the palette
 	// for this costume is invalid in the second case on Amiga, causing a glitch.
-	if (_vm->_game.id == GID_MONKEY2 && _vm->_game.platform == Common::kPlatformAmiga && _vm->_currentRoom == 53 && id == 55 && _numColors == 16 && _vm->_enableEnhancements) {
+	if (_vm->_game.id == GID_MONKEY2 && _vm->_game.platform == Common::kPlatformAmiga && _vm->_currentRoom == 53 && id == 55 && _numColors == 16 && _vm->enhancementEnabled(kEnhMinorBugFixes)) {
 		// Note: handmade, trying to match the colors between rooms 53 and 29,
 		// and based on (similar) costume 1.
 		_palette = amigaMonkey2Costume55Room53;
@@ -937,7 +948,7 @@ byte ClassicCostumeRenderer::drawLimb(const Actor *a, int limb) {
 
 			bool mirror = _mirror;
 
-			if (_vm->_game.id == GID_TENTACLE && _vm->_currentRoom == 61 && a->_number == 1 && _loaded._id == 324 && _vm->_enableEnhancements) {
+			if (_vm->_game.id == GID_TENTACLE && _vm->_currentRoom == 61 && a->_number == 1 && _loaded._id == 324 && _vm->enhancementEnabled(kEnhMinorBugFixes)) {
 				if (limb == 0) {
 					_mirror = true;
 					xmoveCur--;
@@ -1162,7 +1173,7 @@ bool ClassicCostumeLoader::increaseAnim(Actor *a, int slot) {
 			if (_vm->_game.version >= 6) {
 				if (nc >= 0x71 && nc <= 0x78) {
 					uint sound = (_vm->_game.heversion == 60) ? 0x78 - nc : nc - 0x71;
-					_vm->_sound->addSoundToQueue2(a->_sound[sound]);
+					_vm->_sound->addSoundToQueue(a->_sound[sound]);
 					if (a->_cost.start[slot] != end)
 						continue;
 				}

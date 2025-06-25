@@ -33,32 +33,31 @@
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/darkenscreen.h"
 
 
 namespace Director {
 
-const char *DarkenScreen::xlibName = "darkenScreen";
-const char *DarkenScreen::fileNames[] = {
-	"darkenScreen",
-	0
+const char *const DarkenScreen::xlibName = "darkenScreen";
+const XlibFileDesc DarkenScreen::fileNames[] = {
+	{ "darkenScreen",	nullptr },
+	{ nullptr,			nullptr },
 };
 
-static BuiltinProto builtins[] = {
+static const BuiltinProto builtins[] = {
 	{ "darkenScreen", DarkenScreen::m_darkenscreen, 0, 0, 300, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
-void DarkenScreen::open(int type) {
+void DarkenScreen::open(ObjectType type, const Common::Path &path) {
 	g_lingo->initBuiltIns(builtins);
 }
 
-void DarkenScreen::close(int type) {
+void DarkenScreen::close(ObjectType type) {
 	g_lingo->cleanupBuiltIns(builtins);
 }
 
-void DarkenScreen::m_darkenscreen(int nargs) {
-    g_lingo->printSTUBWithArglist("DarkenScreen::m_darkenscreen", nargs);
-}
+XOBJSTUBNR(DarkenScreen::m_darkenscreen)
 
 } // End of namespace Director

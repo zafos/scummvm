@@ -32,6 +32,7 @@ namespace MM1 {
 
 #define INVENTORY_COUNT 6
 #define MAX_LEVEL 200
+#define NUM_PORTRAITS 12
 
 enum CharacterClass {
 	KNIGHT = 1, PALADIN = 2, ARCHER = 3, CLERIC = 4,
@@ -400,7 +401,7 @@ union Resistances {
 	Resistances();
 
 	/**
-	 * Handles save/loading resistences
+	 * Handles save/loading resistances
 	 */
 	void synchronize(Common::Serializer &s);
 
@@ -436,7 +437,8 @@ struct Character : public PrimaryAttributes {
 	Race _race = HUMAN;
 	CharacterClass _class = NONE;
 
-	AttributePair _age;
+	byte _age = 0;
+	int _ageDayCtr = 0;
 	AttributePair16 _sp;
 	AttributePair _spellLevel;
 	AttributePair _ac;
@@ -468,6 +470,16 @@ struct Character : public PrimaryAttributes {
 	bool _canAttack = false;
 	int _nonCombatSpell = -1;
 	int _combatSpell = -1;
+
+	/**
+	 * Get the selected combat/noncombat spell number
+	 */
+	int spellNumber() const;
+
+	/**
+	 * Sets the selected spell
+	 */
+	void setSpellNumber(int spellNum);
 
 	Character();
 
@@ -582,6 +594,13 @@ struct Character : public PrimaryAttributes {
 	 * Returns a string for a given condition
 	 */
 	static Common::String getConditionString(ConditionEnum cond);
+
+	/**
+	 * Returns true if the character has a fatal condition
+	 */
+	bool hasBadCondition() const {
+		return (_condition & BAD_CONDITION) != 0;
+	}
 };
 
 } // namespace MM1

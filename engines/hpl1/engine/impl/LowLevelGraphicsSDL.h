@@ -28,11 +28,11 @@
 #ifndef HPL_LOWLEVELGRAPHICS_SDL_H
 #define HPL_LOWLEVELGRAPHICS_SDL_H
 
-#include "hpl1/engine/graphics/LowLevelGraphics.h"
-#include "graphics/pixelformat.h"
-#include "hpl1/engine/math/MathTypes.h"
-#include "graphics/surface.h"
 #include "common/ptr.h"
+#include "graphics/pixelformat.h"
+#include "graphics/surface.h"
+#include "hpl1/engine/graphics/LowLevelGraphics.h"
+#include "hpl1/engine/math/MathTypes.h"
 #include "hpl1/opengl.h"
 
 #ifdef USE_OPENGL
@@ -235,14 +235,14 @@ private:
 	int mlBpp;
 
 	// Gamma
-	//uint16 mvStartGammaArray[3][256];
+	// uint16 mvStartGammaArray[3][256];
 	float mfGammaCorrection;
 
 	// Clipping
 	cPlanef mvClipPlanes[kMaxClipPlanes];
 
 	// SDL Variables
-	//SDL_Surface *mpScreen;
+	// SDL_Surface *mpScreen;
 	Graphics::PixelFormat mpPixelFormat;
 
 	// Vertex Array variables
@@ -271,11 +271,16 @@ private:
 	// Texture
 	iTexture *mpCurrentTexture[MAX_TEXTUREUNITS];
 
+	iTexture *_screenBuffer;
+	iGpuProgram *_gammaCorrectionProgram;
+
 	// CG Compiler Variables
-	//CGcontext mCG_Context;
+	// CGcontext mCG_Context;
 
 	// Multisample
 	void CheckMultisampleCaps();
+
+	void applyGammaCorrection();
 
 	// Batch helper
 	void SetUpBatchArrays();
@@ -306,7 +311,7 @@ private:
 	void SetVtxBatchStates(tVtxBatchFlag flags);
 };
 
-}     // namespace hpl
+} // namespace hpl
 
 #endif // USE_OPENGL
 #endif // HPL_LOWLEVELGRAPHICS_SDL_H

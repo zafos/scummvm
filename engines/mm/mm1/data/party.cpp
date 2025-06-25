@@ -144,8 +144,15 @@ void Party::synchronize(Common::Serializer &s) {
 	if (s.isLoading())
 		resize(partySize);
 
-	for (int i = 0; i < partySize; ++i)
-		(*this)[i].synchronize(s);
+	for (int i = 0; i < partySize; ++i) {
+		// Sync the common properties
+		Character &c = (*this)[i];
+		c.synchronize(s);
+
+		// Sync extra properties
+		s.syncAsSByte(c._combatSpell);
+		s.syncAsSByte(c._nonCombatSpell);
+	}
 
 	if (s.isLoading())
 		g_globals->_currCharacter = &front();
@@ -163,6 +170,15 @@ void Party::rearrange(const Common::Array<Character *> &party) {
 			}
 		}
 	}
+}
+
+int Party::indexOf(const Character *c) {
+	for (uint i = 0; i < size(); ++i) {
+		if (&(*this)[i] == c)
+			return i;
+	}
+
+	return -1;
 }
 
 } // namespace MM1

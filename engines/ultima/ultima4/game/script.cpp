@@ -129,11 +129,8 @@ Script::~Script() {
 	// Smart pointers anyone?
 
 	// Clean variables
-	Common::HashMap<Common::String, Script::Variable *>::iterator variableItem = _variables.begin();
-	Common::HashMap<Common::String, Script::Variable *>::iterator variablesEnd = _variables.end();
-	while (variableItem != variablesEnd) {
-		delete variableItem->_value;
-		++variableItem;
+	for (auto &item : _variables) {
+		delete item._value;
 	}
 }
 
@@ -160,7 +157,7 @@ bool Script::load(const Common::String &filename, const Common::String &baseId, 
 	 * Open and parse the .xml file
 	 */
 	Shared::XMLTree *doc = new Shared::XMLTree(
-		Common::String::format("data/conf/%s", filename.c_str()));
+		Common::Path(Common::String::format("data/conf/%s", filename.c_str())));
 	_vendorScriptDoc = root = doc->getTree();
 
 	if (!root->id().equalsIgnoreCase("scripts"))

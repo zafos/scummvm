@@ -51,6 +51,7 @@ ScummVM Team
     AGS:
        Paul Gilbert
        Thierry Crozat
+       Walter Agazzi                  - Maintenance, Game archival
        Chris Jones                    - Creator
        Alan Van Drake                 - AGS
        Benjamin Penney                - AGS
@@ -103,6 +104,16 @@ ScummVM Team
        Peter Bozso
        Arnaud Boutonne
 
+    awe:
+       Gregory Montoir
+       Paul Gilbert
+
+    Bagel:
+       Arnaud Boutonne
+       Daniel Albano
+       Eugene Sandulenko
+       Paul Gilbert
+
     BBVS:
        Benjamin Haisch
 
@@ -124,6 +135,10 @@ ScummVM Team
        Arnaud Boutonne
        Paul Gilbert
 
+    Chamber:
+       Retro-Junk;
+       Eugene Sandulenko
+
     Chewy:
        Paul Gilbert
        Eugene Sandulenko
@@ -140,6 +155,9 @@ ScummVM Team
     Composer:
        Alyssa Milburn
 
+    CRAB:
+       Kartik Agarwala
+
     CruisE:
        Paul Gilbert
        Vincent Hamm                   - (retired)
@@ -152,6 +170,14 @@ ScummVM Team
 
     Cryomni3D:
        Philippe Valembois
+
+    Darkseed:
+       Eric Fry
+
+    DGDS:
+       Matthew Duggan
+       Filippos Karapetis
+       Vasco Alexandre da Silva Costa
 
     Director:
        Eugene Sandulenko
@@ -190,6 +216,9 @@ ScummVM Team
        Vladimir Menshakov
        Willem Jan Palenstijn
 
+    Efh:
+       Arnaud Boutonne
+
     Freescape:
        Chris Allen                    - Sound engine programming
        Gustavo Grieco
@@ -213,6 +242,11 @@ ScummVM Team
        Simon Delamarre
        Sven Hesse
        Eugene Sandulenko
+
+    Got:
+       Paul Gilbert
+       Arnaud Boutonne
+       Coen Rampen
 
     Griffon:
        Eugene Sandulenko
@@ -265,6 +299,9 @@ ScummVM Team
        Benjamin Haisch
        Eric Fry
 
+    Immortal:
+       Michael Hayman
+
     Kingdom:
        Arnaud Boutonne
        Thomas Fach-Pedersen
@@ -284,6 +321,7 @@ ScummVM Team
        Eugene Sandulenko
 
     Lastexpress:
+       Andrea Boscarino               - Engine rewrite
        Matthew Hoops                  - (retired)
        Jordi Vilalta Prat
        Julien Templier
@@ -293,6 +331,10 @@ ScummVM Team
 
     Lure:
        Paul Gilbert
+
+    M4:
+       Paul Gilbert
+       Arnaud Boutonne
 
     MacVenture:
        Borja Lorente                  - GSoC student
@@ -306,9 +348,13 @@ ScummVM Team
        Paul Gilbert
        Filippos Karapetis
 
+    Media Station:
+       Nathanael Gentry
+
     MM (Xeen):
        Paul Gilbert
        Benoit Pierre
+       TheDrakeRaider                 - (M&M1 Gfx Mod)
        David Goldsmith                - (Xeen analysis)
        Matt Taylor                    - (Xeen analysis)
 
@@ -371,6 +417,10 @@ ScummVM Team
     Private:
        Gustavo Grieco
 
+    QDEngine:
+       Eugene Sandulenko
+       Kunal Tiwari
+
     Queen:
        David Eriksson                 - (retired)
        Gregory Montoir                - (retired)
@@ -416,6 +466,7 @@ ScummVM Team
        Ludvig Strigeus                - (retired)
 
     SCUMM HE:
+       Andrea Boscarino               - Digital audio, WIZ graphics system
        Jonathan Gray                  - (retired)
        Travis Howell
        Gregory Montoir                - (retired)
@@ -451,6 +502,7 @@ ScummVM Team
 
     Sword1:
        Fabio Battaglia                - PSX version support
+       Andrea Boscarino               - Palette fading, menus, audio
        Thierry Crozat                 - Mac version support
        Robert Goeffringmann           - (retired)
 
@@ -527,6 +579,9 @@ ScummVM Team
        Sebastien Viannay              - (retired)
        Martin Gerhardy
 
+    Thimbleweed Park:
+       Valéry Sablonnière
+
     Ultima:
        Paul Gilbert
        Matthew Duggan
@@ -550,6 +605,9 @@ ScummVM Team
        Ryan Nunn                      - (Pentagram)
        Willem Jan Palenstijn          - (Pentagram)
 
+    V-Cruise:
+       Eric Lasota
+
     Voyeur:
        Arnaud Boutonne
        Paul Gilbert
@@ -557,10 +615,15 @@ ScummVM Team
     WAGE:
        Eugene Sandulenko
 
+    Watchmaker:
+       Einar Johan Troan Somaen;
+
     Wintermute:
        Gunnar Birke                   - Wintermute 3D
+       Pawel Kolodziejski             - Wintermute 3D
        Einar Johan T. Somaaen
        Tobia Tesan
+       lolbot-iichan
 
     Z-Vision:
        Adrian Astley
@@ -569,6 +632,9 @@ ScummVM Team
 
   Backend Teams
   -------------
+    Atari:
+       Miro Kropacek
+
     Android:
        Andre Heider
        Angus Lees
@@ -584,9 +650,10 @@ ScummVM Team
        John Willis
 
     iPhone / iPad:
-       Oystein Eftevaag
+       Oystein Eftevaag               - (retired)
        Vincent Benony
        Thierry Crozat
+       Lars Sundstroem
 
     LinuxMoto:
        Lubomyr Lisen
@@ -654,6 +721,9 @@ ScummVM Team
 
     Raspberry Pi:
        Manuel Alfayate
+
+    Libretro:
+       Giovanni Cascione
 
   Other subsystems
   ----------------
@@ -762,8 +832,9 @@ Other contributions
 
     macOS:
        Max Horn                       - (retired)
-       Oystein Eftevaag
+       Oystein Eftevaag               - (retired)
        Thierry Crozat
+       dwa                            - Tiger/Leopard PPC
 
     Mandriva:
        Dominik Scherer                - (retired)
@@ -821,6 +892,7 @@ Other contributions
        Ben Castricum
 
     Finnish:
+       Linus Virtanen
        Toni Saarela
        Timo Mikkolainen
 
@@ -883,6 +955,7 @@ Other contributions
   Game Translations
   -----------------
     CGE:
+       Arnaud Boutonne                - Soltys English translation
        Dan Serban                     - Soltys English translation
        Victor Gonzalez                - Soltys Spanish translation
        Alejandro Gomez de la Munoza   - Soltys Spanish translation
@@ -897,6 +970,8 @@ Other contributions
        Thierry Crozat                 - Improve French translation
 
     Mortevielle:
+       Arnaud Boutonne                - First English translation, improve
+                                        German translation
        Hugo Labrande                  - Improve English translation
        Thierry Crozat                 - Improve English translation
 
@@ -921,6 +996,9 @@ Other contributions
 
   Icons pack
   ----------
+     Stefan Philippsen              - Primary contributor and coordination
+     Benjamin Funke
+     Daniel Albano
      David Calvert
      Eugene Sandulenko
      J Moretti
@@ -928,9 +1006,9 @@ Other contributions
      Lothar Serra Mari
      Oleg Ermakov
      Olly Dean
-     Stefan Philippsen
+     Walter Agazzi
+     beresk137
      Canuma
-     SupSuper
      Thunderforge
      neuromancer
      nightm4re94
@@ -1029,7 +1107,7 @@ Other contributions
      Hugues Valois                  - Game selection menu
      Jordi Vilalta                  - Numerous code and website clean-up
                                       patches
-     Petr Vyhnak                    - The DCL-INFLATE algorithm, many Win32
+     Petr Vyhnak                    - The DCL-IMPLODE algorithm, many Win32
                                       improvements
      Bas Zoetekouw                  - Man pages, debian package management,
                                       CVS maintenance
@@ -1216,4 +1294,7 @@ Special thanks to
 
    Fabrizio Lagorio from Trecision S.p.A., for finding and providing the
    source code of many of their games.
+
+   Ron Davis for releasing the sources and generously giving away the three
+   chapters of God of Thunder.
 

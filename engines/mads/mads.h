@@ -55,10 +55,26 @@ namespace MADS {
 #define DEBUG_INTERMEDIATE 2
 #define DEBUG_DETAILED 3
 
+enum MADSActions {
+	kActionNone,
+	kActionEscape,
+	kActionGameMenu,
+	kActionSave,
+	kActionRestore,
+	kActionScrollUp,
+	kActionScrollDown,
+	kActionStartGame,
+	kActionResumeGame,
+	kActionShowIntro,
+	kActionCredits,
+	kActionQuotes,
+	kActionRestartAnimation
+};
+
 enum MADSDebugChannels {
-	kDebugPath      = 1 << 0,
-	kDebugScripts	= 1 << 1,
-	kDebugGraphics	= 1 << 2
+	kDebugPath = 1,
+	kDebugScripts,
+	kDebugGraphics,
 };
 
 enum ScreenFade {
@@ -121,12 +137,12 @@ public:
 	/**
 	* Returns true if it is currently okay to restore a game
 	*/
-	bool canLoadGameStateCurrently() override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	/**
 	* Returns true if it is currently okay to save the game
 	*/
-	bool canSaveGameStateCurrently() override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	/**
 	 * Handles loading a game via the GMM

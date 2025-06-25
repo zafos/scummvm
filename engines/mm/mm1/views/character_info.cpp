@@ -21,7 +21,6 @@
 
 #include "mm/mm1/views/character_info.h"
 #include "mm/mm1/views/combat.h"
-#include "mm/mm1/game/spells_party.h"
 #include "mm/mm1/utils/strings.h"
 #include "mm/mm1/globals.h"
 #include "mm/mm1/sound.h"
@@ -46,6 +45,11 @@ void CharacterInfo::draw() {
 		writeString(0, 22, STRING["dialogs.character.legend2"]);
 		writeString(0, 23, STRING["dialogs.character.legend3"]);
 		writeString(0, 24, STRING["dialogs.character.legend4"]);
+		break;
+
+	case DISCARD:
+		writeString(0, 20, STRING["dialogs.character.discard"]);
+		escToGoBack(0);
 		break;
 
 	case EQUIP:
@@ -109,7 +113,7 @@ void CharacterInfo::draw() {
 void CharacterInfo::timeout() {
 	switch (_state) {
 	case USE:
-		if (dynamic_cast<Views::Combat *>(g_events->priorView()) != nullptr) {
+		if (g_events->isInCombat()) {
 			close();
 		} else {
 			_state = DISPLAY;
@@ -121,12 +125,23 @@ void CharacterInfo::timeout() {
 	}
 }
 
+bool CharacterInfo::msgFocus(const FocusMessage &msg) {
+	CharacterBase::msgFocus(msg);
+	_state = DISPLAY;
+	return true;
+}
+
 bool CharacterInfo::msgKeypress(const KeypressMessage &msg) {
 	switch (_state) {
 	case DISPLAY:
 		switch (msg.keycode) {
 		case Common::KEYCODE_c:
-			send("CastSpell", ValueMessage(0));
+			send("CastSpell", GameMessage("SPELL", 0));
+			break;
+		case Common::KEYCODE_d:
+			if (!g_globals->_currCharacter->_backpack.empty())
+				_state = DISCARD;
+			redraw();
 			break;
 		case Common::KEYCODE_e:
 			if (!g_globals->_currCharacter->_backpack.empty())
@@ -162,16 +177,25 @@ bool CharacterInfo::msgKeypress(const KeypressMessage &msg) {
 		 }
 		break;
 
+	case DISCARD:
+		if (msg.keycode >= Common::KEYCODE_a &&
+			msg.keycode <= Common::KEYCODE_f)
+			discardItem(msg.keycode - Common::KEYCODE_a);
+		redraw();
+		break;
+
 	case EQUIP:
 		if (msg.keycode >= Common::KEYCODE_a &&
 				msg.keycode <= Common::KEYCODE_f)
 			equipItem(msg.keycode - Common::KEYCODE_a);
+		redraw();
 		break;
 
 	case REMOVE:
 		if (msg.keycode >= Common::KEYCODE_1 &&
 			msg.keycode <= Common::KEYCODE_6)
 			removeItem(msg.keycode - Common::KEYCODE_1);
+		redraw();
 		break;
 
 	case SHARE:
@@ -240,7 +264,7 @@ bool CharacterInfo::msgKeypress(const KeypressMessage &msg) {
 			break;
 		}
 
-		if (dynamic_cast<Views::Combat *>(g_events->priorView()) != nullptr)
+		if (g_events->isInCombat())
 			combatUseItem(*inv, *invEntry, msg.keycode >= Common::KEYCODE_a);
 		else
 			nonCombatUseItem(*inv, *invEntry, msg.keycode >= Common::KEYCODE_a);
@@ -298,214 +322,38 @@ bool CharacterInfo::msgGame(const GameMessage &msg) {
 	return false;
 }
 
-void CharacterInfo::equipItem(uint index) {
-	Character &c = *g_globals->_currCharacter;
-	uint itemId = c._backpack[index]._id;
-	uint item14 = c._backpack[index]._charges;
-
-	int classBit = 0;
-	Common::String equipError;
-	_textPos.x = 0;
-
-	switch (c._class) {
-	case KNIGHT:
-		classBit = KNIGHT_BIT;
-		break;
-	case PALADIN:
-		classBit = PALADIN_BIT;
-		break;
-	case ARCHER:
-		classBit = ARCHER_BIT;
-		break;
-	case CLERIC:
-		classBit = CLERIC_BIT;
-		break;
-	case SORCERER:
-		classBit = SORCERER_BIT;
-		break;
-	case ROBBER:
-		classBit = ROBBER_BIT;
-		break;
-	default:
-		equipError = STRING["dialogs.character.wrong_class"];
-		break;
-	}
-
-	g_globals->_items.getItem(itemId);
-	const Item &item = g_globals->_currItem;
-
-	if (equipError.empty() && (item._disablements & classBit))
-		equipError = STRING["dialogs.character.wrong_class"];
-	if (equipError.empty()) {
-		int alignBit = 0;
-		switch (c._alignment) {
-		case GOOD:
-			alignBit = GOOD_BIT;
-			break;
-		case NEUTRAL:
-			alignBit = NEUTRAL_BIT;
-			break;
-		case EVIL:
-			alignBit = EVIL_BIT;
-			break;
-		default:
-			equipError = STRING["dialogs.character.wrong_alignment"];
-			break;
-		}
-
-		if ((item._disablements & alignBit) && alignBit != NEUTRAL_BIT)
-			equipError = STRING["dialogs.character.wrong_alignment"];
-	}
-
-	if (equipError.empty()) {
-		if (item._equipMode == IS_EQUIPPABLE) {
-			equipError = STRING["dialogs.character.not_equipped"];
-			_textPos.x = 10;
-		}
-	}
-
-	if (equipError.empty()) {
-		if (isWeapon(itemId)) {
-			if (c._equipped.hasWeapon() || c._equipped.hasTwoHanded())
-				equipError = STRING["dialogs.character.have_weapon"];
-		} else if (isMissile(itemId)) {
-			if (c._equipped.hasMissile()) {
-				equipError = STRING["dialogs.character.have_missile"];
-				_textPos.x = 3;
-			}
-		} else if (isTwoHanded(itemId)) {
-			if (c._equipped.hasShield()) {
-				equipError = STRING["dialogs.character.cannot_with_shield"];
-				_textPos.x = 7;
-			} else if (c._equipped.hasWeapon()) {
-				equipError = STRING["dialogs.character.have_weapon"];
-
-			}
-		} else if (isArmor(itemId)) {
-			if (c._equipped.hasArmor()) {
-				equipError = STRING["dialogs.character.have_armor"];
-				_textPos.x = 5;
-			}
-		} else if (isShield(itemId)) {
-			if (c._equipped.hasTwoHanded()) {
-				equipError = STRING["dialogs.character.cannot_two_handed"];
-				_textPos.x = 1;
-			}
-		} else if (itemId == 255) {
-			equipError = STRING["dialogs.character.not_equipped"];
-			_textPos.x = 10;
-		}
-	}
-
-	if (equipError.empty() && c._equipped.full()) {
-		equipError = STRING["dialogs.character.full"];
-		_textPos.x = 14;
-	}
-
-	if (equipError.empty()) {
-		// All checks passed, can equip item
-		c._backpack.removeAt(index);
-		uint freeIndex = c._equipped.add(itemId, item14);
-
-		if (item._equipMode != EQUIPMODE_0) {
-			if (item._equipMode == IS_EQUIPPABLE) {
-				equipError = STRING["dialogs.character.not_equipped"];
-				_textPos.x = 10;
-			} else if (item._equipMode == EQUIP_CURSED) {
-				c._equipped[freeIndex]._charges += item._val10;
-			}
-		}
-	}
-
-	if (equipError.empty()) {
-		switch (getItemCategory(itemId)) {
-		case ITEMCAT_WEAPON:
-		case ITEMCAT_TWO_HANDED:
-			c._physicalAttr._base = item._val16;
-			c._physicalAttr._current = item._val17;
-			break;
-		case ITEMCAT_MISSILE:
-			c._missileAttr._base = item._val16;
-			c._missileAttr._current = item._val17;
-			break;
-		case ITEMCAT_ARMOR:
-		case ITEMCAT_SHIELD:
-			c._ac._base += item._val17;
-			break;
-		default:
-			break;
-		}
-
-		c.updateResistances();
-		c.updateAttributes();
-		c.updateAC();
-
-	} else {
-		clearLines(20, 24);
-		_textPos.y = 21;
-		writeString(equipError);
-
-		Sound::sound(SOUND_2);
-		delaySeconds(3);
-	}
-
+void CharacterInfo::discardItem(uint index) {
+	Inventory &inv = g_globals->_currCharacter->_backpack;
+	if (index < inv.size())
+		inv.removeAt(index);
 	_state = DISPLAY;
 }
 
-void CharacterInfo::removeItem(uint index) {
-	Character &c = *g_globals->_currCharacter;
-	uint itemId = c._equipped[index]._id;
-	uint item14 = c._equipped[index]._charges;
-
-	Common::String removeError;
-
-	g_globals->_items.getItem(itemId);
-	const Item &item = g_globals->_currItem;
-	if (item._equipMode == EQUIP_CURSED) {
-		removeError = STRING["dialogs.character.cursed"];
-		_textPos.x = 13;
-	} else if (c._backpack.full()) {
-		removeError = STRING["dialogs.character.full"];
-		_textPos.x = 14;
-	}
-
+void CharacterInfo::equipItem(uint index) {
+	Common::String errMsg;
 	_state = DISPLAY;
 
-	if (!removeError.empty()) {
+	if (!EquipRemove::equipItem(index, _textPos, errMsg)) {
 		clearLines(20, 24);
 		_textPos.y = 21;
-		writeString(removeError);
+		writeString(errMsg);
 
 		Sound::sound(SOUND_2);
 		delaySeconds(3);
-		return;
 	}
+}
 
-	// Shift item to backpack
-	c._equipped.removeAt(index);
-	c._backpack.add(itemId, item14);
+void CharacterInfo::removeItem(uint index) {
+	Common::String errMsg;
+	_state = DISPLAY;
 
-	if (item._val10) {
-		// TODO: _equipMode is used as a character offset. Need to
-		// find an example that calls it so I know what area of
-		// the character updates are being done to
-		error("TODO: item flag in remove item");
-	}
+	if (!EquipRemove::removeItem(index, _textPos, errMsg)) {
+		clearLines(20, 24);
+		_textPos.y = 21;
+		writeString(errMsg);
 
-	switch (getItemCategory(itemId)) {
-	case ITEMCAT_WEAPON:
-	case ITEMCAT_TWO_HANDED:
-		c._physicalAttr.clear();
-		break;
-	case ITEMCAT_MISSILE:
-		c._missileAttr.clear();
-		break;
-	case ITEMCAT_ARMOR:
-	case ITEMCAT_SHIELD:
-		c._ac._base = MAX((int)c._ac._base - (int)item._val17, 0);
-		break;
-	default:
-		break;
+		Sound::sound(SOUND_2);
+		delaySeconds(3);
 	}
 }
 
@@ -558,112 +406,36 @@ void CharacterInfo::howMuchEntered(uint amount) {
 	redraw();
 }
 
+void CharacterInfo::abortFunc() {
+	CharacterInfo *view = (CharacterInfo *)g_events->focusedView();
+	view->howMuchAborted();
+}
+
+void CharacterInfo::enterFunc(const Common::String &text) {
+	CharacterInfo *view = (CharacterInfo *)g_events->focusedView();
+	view->howMuchEntered(atoi(text.c_str()));
+}
+
 void CharacterInfo::tradeHowMuch() {
 	clearLines(20, 24);
 	escToGoBack(0);
 	writeString(10, 20, STRING["dialogs.character.how_much"]);
 
-	_textEntry.display(20, 20, 5, true,
-		[]() {
-			CharacterInfo *view =
-				(CharacterInfo *)g_events->focusedView();
-			view->howMuchAborted();
-		},
-		[](const Common::String &text) {
-			CharacterInfo *view =
-				(CharacterInfo *)g_events->focusedView();
-			view->howMuchEntered(atoi(text.c_str()));
-		}
-	);
+	_textEntry.display(20, 20, 5, true, abortFunc, enterFunc);
 }
 
 void CharacterInfo::combatUseItem(Inventory &inv, Inventory::Entry &invEntry, bool isEquipped) {
-	Item *item = g_globals->_items.getItem(invEntry._id);
-	Common::String msg;
-
-	if (!item->_effectId) {
-		msg = STRING["dialogs.character.use_combat.no_special_power"];
-
-	} else if (item->_equipMode == IS_EQUIPPABLE || isEquipped) {
-		if (invEntry._charges) {
-			g_globals->_combatEffectCtr++;
-			inv.removeCharge(&invEntry);
-
-			if (item->_effectId == 0xff) {
-				setSpell(item->_spellId, 0, 0);
-				Game::SpellsParty::cast(_spellIndex, g_globals->_currCharacter);
-
-			} else {
-				// TODO: find out area of Character _effectId is used as an offset for
-				error("TODO: _effectId used as a character offset to increase attribute?");
-
-				if (g_globals->_combatEffectCtr)
-					(isEquipped ? &g_globals->_currCharacter->_equipped :
-						&g_globals->_currCharacter->_backpack)->removeCharge(&invEntry);
-
-				clearLines(20, 24);
-				writeString(14, 22, STRING["dialogs.character.use_combat.done"]);
-				Sound::sound(SOUND_2);
-				g_globals->_party.updateAC();
-				delaySeconds(2);
-				return;
-			}
-		} else {
-			msg = STRING["dialogs.character.use_combat.no_charges_left"];
-		}
-	} else {
-		msg = STRING["dialogs.character.use_combat.not_equipped"];
-	}
-
+	Common::String msg = Game::UseItem::combatUseItem(inv, invEntry, isEquipped);
 	clearLines(20, 24);
-	static_cast<Views::Combat *>(g_events->priorView())->disableAttacks();
-
 	writeString(8, 21, msg);
 	delaySeconds(3);
 }
 
 void CharacterInfo::nonCombatUseItem(Inventory &inv, Inventory::Entry &invEntry, bool isEquipped) {
-	Item *item = g_globals->_items.getItem(invEntry._id);
-	Common::String msg;
-
-	if (!item->_effectId) {
-		msg = STRING["dialogs.character.use_noncombat.no_special_power"];
-
-	} else if (item->_equipMode == IS_EQUIPPABLE || isEquipped) {
-		if (invEntry._charges) {
-			g_globals->_nonCombatEffectCtr++;
-			inv.removeCharge(&invEntry);
-
-			if (item->_effectId == 0xff) {
-				setSpell(item->_spellId, 0, 0);
-				Game::SpellsParty::cast(_spellIndex, g_globals->_currCharacter);
-
-			} else {
-				// TODO: find out area of Character _effectId is used as an offset for
-				error("TODO: _effectId used as a character offset to increase attribute?");
-
-				if (g_globals->_nonCombatEffectCtr)
-					(isEquipped ? &g_globals->_currCharacter->_equipped :
-						&g_globals->_currCharacter->_backpack)->removeCharge(&invEntry);
-
-				clearLines(20, 24);
-				writeString(14, 22, STRING["spells.done"]);
-				Sound::sound(SOUND_2);
-				g_globals->_party.updateAC();
-				delaySeconds(2);
-				return;
-			}
-		} else {
-			msg = STRING["dialogs.character.use_noncombat.no_charges_left"];
-		}
-	} else {
-		msg = STRING["dialogs.character.use_noncombat.not_equipped"];
-	}
+	Common::String msg = Game::UseItem::nonCombatUseItem(inv, invEntry, isEquipped);
 
 	clearLines(20, 24);
-	static_cast<Views::Combat *>(g_events->priorView())->disableAttacks();
-
-	writeString(9, 21, msg);
+	writeString(8, 21, msg);
 	delaySeconds(3);
 }
 

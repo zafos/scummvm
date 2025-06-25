@@ -29,9 +29,11 @@
 #include <stddef.h>
 #include <assert.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <math.h>
 #include <new>
+#include <limits>
 
 #ifndef RONIN_TIMER_ACCESS
 #define Timer ronin_Timer

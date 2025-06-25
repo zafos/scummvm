@@ -56,14 +56,17 @@ void XeenFont::setColors(uint index) {
 }
 
 int XeenFont::getCharWidth(uint32 chr) const {
-	assert(chr < 128);
-	return _widths[chr];
+	assert(chr < 256);
+	return _widths[chr & 0x7f];
 }
 
 void XeenFont::drawChar(Graphics::Surface *dst, uint32 chr, int x, int y, uint32 color) const {
-	assert(chr < 128);
+	assert(chr < 256);
 	if (chr == 'g' || chr == 'p' || chr == 'q' || chr == 'y')
 		++y;
+
+	bool isInverse = (chr >= 128);
+	chr &= 0x7f;
 
 	const uint16 *src = &_data[chr * FONT_HEIGHT];
 	for (int yCtr = 0; yCtr < FONT_HEIGHT; ++yCtr, ++src) {
@@ -75,10 +78,35 @@ void XeenFont::drawChar(Graphics::Surface *dst, uint32 chr, int x, int y, uint32
 
 		for (int xCtr = 0; xCtr < _widths[chr];
 				++xCtr, ++dest, srcVal >>= 2) {
-			if ((srcVal & 3) && (x + xCtr) >= 0 && (x + xCtr) < dst->w)
-				*dest = _colors[srcVal & 3];
+			if ((x + xCtr) >= 0 && (x + xCtr) < dst->w) {
+				if (isInverse)
+					*dest = (srcVal & 3) ? 2 : 0;
+				else if (srcVal & 3)
+					*dest = _colors[srcVal & 3];
+			}
 		}
 	}
+}
+
+int XeenFont::getStringWidth(const Common::String &str) const {
+	// Handle not counting character highlighting sequences
+	// as part of the string width
+	static const char *const CONTROL_CHARS = "\x01\x02";
+	size_t p = str.findFirstOf(CONTROL_CHARS);
+	if (p == Common::String::npos)
+		return Graphics::Font::getStringWidth(str);
+
+	size_t totalWidth = 0;
+	Common::String strCopy = str;
+	do {
+		totalWidth += Graphics::Font::getStringWidth(
+			Common::String(strCopy.c_str(), strCopy.c_str() + p));
+		strCopy = Common::String(strCopy.c_str() + p + 3);
+		p = strCopy.findFirstOf(CONTROL_CHARS);
+	} while (p != Common::String::npos);
+
+	totalWidth += Graphics::Font::getStringWidth(strCopy);
+	return totalWidth;
 }
 
 } // namespace MM

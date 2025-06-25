@@ -29,10 +29,12 @@
 #include "tetraedge/game/credits.h"
 #include "tetraedge/game/global_bonus_menu.h"
 #include "tetraedge/game/main_menu.h"
+#include "tetraedge/game/options_menu.h"
 #include "tetraedge/game/loc_file.h"
 #include "tetraedge/game/owner_error_menu.h"
 #include "tetraedge/game/splash_screens.h"
 #include "tetraedge/game/in_game_scene.h"
+#include "tetraedge/game/upsell_screen.h"
 
 #include "tetraedge/te/te_visual_fade.h"
 #include "tetraedge/te/te_music.h"
@@ -61,18 +63,13 @@ public:
 	void showLoadingIcon(bool show);
 	void saveCorrupted(const Common::String &fname);
 
-	void drawBack();
-	void drawFront();
 	void performRender();
-	//void preloadTextrue(); does nothing..
+	//void preloadTextrue(); does nothing
 
 	void fade();
 	void blackFade();
 	void captureFade();
 	bool isFading();
-	bool onBlackFadeAnimationFinished();
-	bool onMainWindowSizeChanged();
-	bool onMousePositionChanged(const Common::Point &p);
 
 	bool isLockCursor();
 	bool isLockPad();
@@ -86,13 +83,13 @@ public:
 
 	Common::String getHelpText(const Common::String &key);
 
-	const char *inAppUnlockFullVersionID();
-
 	BonusMenu &bonusMenu() { return _bonusMenu; }
 	GlobalBonusMenu &globalBonusMenu() { return _globalBonusMenu; }
 	MainMenu &mainMenu() { return _mainMenu; }
+	OptionsMenu &optionsMenu() { return _optionsMenu; }
 	TeMusic &music() { return _music; }
 	Credits &credits() { return _credits; }
+	UpsellScreen &upsellScreen() { return _upsellScreen; }
 	TeVisualFade &visualFade() { return _visFade; }
 	TeSpriteLayout &appSpriteLayout() { return _appSpriteLayout; }
 	TeSpriteLayout &mouseCursorLayout() { return _mouseCursorLayout; }
@@ -109,13 +106,27 @@ public:
 	const Common::String &firstWarpPath() { return _firstWarpPath; }
 	const Common::String &firstZone() { return _firstZone; }
 	const Common::String &firstScene() { return _firstScene; }
+	const Common::Path &defaultCursor() { return _defaultCursor; }
 	TeLayout &frontLayout() { return _frontLayout; };
 	TeLayout &frontOrientationLayout() { return _frontOrientationLayout; }
 	TeLayout &backLayout() { return _backLayout; }
 	LocFile &loc() { return _loc; }
 	bool ratioStretched() const { return _ratioStretched; }
+	bool compassLook() const { return _compassLook; }
+	bool inverseLook() const { return _inverseLook; }
+	bool permanentHelp() const { return _permanentHelp; }
+	bool musicOn() const { return _musicOn; }
 
 private:
+	void drawBack();
+	void drawFront();
+
+	const char *inAppUnlockFullVersionID();
+
+	bool onBlackFadeAnimationFinished();
+	bool onMainWindowSizeChanged();
+	bool onMousePositionChanged(const Common::Point &p);
+
 	bool _finishedGame;
 	bool _finishedFremium;
 
@@ -140,6 +151,7 @@ private:
 	Common::String _firstWarpPath;
 	Common::String _firstZone;
 	Common::String _firstScene;
+	Common::Path _defaultCursor;
 
 	Common::Array<Common::String> _unrecalAnims;
 
@@ -152,9 +164,11 @@ private:
 	GlobalBonusMenu _globalBonusMenu;
 	BonusMenu _bonusMenu;
 	MainMenu _mainMenu;
+	OptionsMenu _optionsMenu;
 	Credits _credits;
 	OwnerErrorMenu _ownerErrorMenu;
 	SplashScreens _splashScreens;
+	UpsellScreen _upsellScreen;
 
 	TeIntrusivePtr<TeFont3> _fontComic;
 	TeIntrusivePtr<TeFont3> _fontArgh;
@@ -168,6 +182,10 @@ private:
 	bool _tutoActivated;
 	bool _drawShadows;
 	bool _ratioStretched;
+	bool _compassLook;
+	bool _inverseLook;
+	bool _permanentHelp;
+	bool _musicOn;
 
 	int _difficulty;
 

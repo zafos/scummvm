@@ -58,6 +58,9 @@ ListWidget::ListWidget(Dialog *boss, const Common::String &name, const Common::U
 	// The item is selected, thus _bgcolor is used to draw the caret and _textcolorhi to erase it
 	_caretInverse = true;
 
+	// Disable text selection
+	_disableSelection = true;
+
 	// FIXME: This flag should come from widget definition
 	_editable = true;
 
@@ -75,8 +78,8 @@ ListWidget::ListWidget(Dialog *boss, const Common::String &name, const Common::U
 	_topPadding = _bottomPadding = 0;
 }
 
-ListWidget::ListWidget(Dialog *boss, int x, int y, int w, int h, const Common::U32String &tooltip, uint32 cmd)
-	: EditableWidget(boss, x, y, w, h, tooltip), _cmd(cmd) {
+ListWidget::ListWidget(Dialog *boss, int x, int y, int w, int h, bool scale, const Common::U32String &tooltip, uint32 cmd)
+	: EditableWidget(boss, x, y, w, h, scale, tooltip), _cmd(cmd) {
 
 	_entriesPerPage = 0;
 	_scrollBarWidth = 0;
@@ -97,6 +100,9 @@ ListWidget::ListWidget(Dialog *boss, int x, int y, int w, int h, const Common::U
 	// The item is selected, thus _bgcolor is used to draw the caret and _textcolorhi to erase it
 	_caretInverse = true;
 
+	// Disable text selection
+	_disableSelection = true;
+
 	// FIXME: This flag should come from widget definition
 	_editable = true;
 
@@ -114,6 +120,10 @@ ListWidget::ListWidget(Dialog *boss, int x, int y, int w, int h, const Common::U
 	_topPadding = _bottomPadding = 0;
 
 	_scrollBarWidth = 0;
+}
+
+ListWidget::ListWidget(Dialog *boss, int x, int y, int w, int h, const Common::U32String &tooltip, uint32 cmd)
+	: ListWidget(boss, x, y, w, h, false, tooltip, cmd) {
 }
 
 void ListWidget::copyListData(const Common::U32StringArray &list) {
@@ -173,8 +183,11 @@ void ListWidget::setSelected(int item) {
 		// Notify clients that the selection changed.
 		sendCommand(kListSelectionChangedCmd, _selectedItem);
 
-		_currentPos = _selectedItem - _entriesPerPage / 2;
-		scrollToCurrent();
+		if (!isItemVisible(_selectedItem)) {
+			// scroll selected item to center if possible
+			_currentPos = _selectedItem - _entriesPerPage / 2;
+			scrollToCurrent();
+		}
 		markAsDirty();
 	}
 }
@@ -252,11 +265,15 @@ void ListWidget::handleMouseDown(int x, int y, int button, int clickCount) {
 		sendCommand(kListSelectionChangedCmd, _selectedItem);
 	}
 
+	// Notify clients if an item was clicked
+	if (newSelectedItem >= 0) {
+		sendCommand(kListItemSingleClickedCmd, _selectedItem);
+	}
+
 	// TODO: Determine where inside the string the user clicked and place the
 	// caret accordingly.
 	// See _editScrollOffset and EditTextWidget::handleMouseDown.
 	markAsDirty();
-
 }
 
 void ListWidget::handleMouseUp(int x, int y, int button, int clickCount) {
@@ -301,8 +318,7 @@ void ListWidget::handleMouseLeft(int button) {
 int ListWidget::findItem(int x, int y) const {
 	if (y < _topPadding) return -1;
 	int item = (y - _topPadding) / kLineHeight + _currentPos;
-	if (item >= _currentPos && item < _currentPos + _entriesPerPage &&
-		item < (int)_list.size())
+	if (isItemVisible(item) && item < (int)_list.size())
 		return item;
 	else
 		return -1;
@@ -348,8 +364,8 @@ bool ListWidget::handleKeyDown(Common::KeyState state) {
 			int newSelectedItem = 0;
 			int bestMatch = 0;
 			bool stop;
-			for (Common::U32StringArray::const_iterator i = _list.begin(); i != _list.end(); ++i) {
-				const int match = matchingCharsIgnoringCase(stripGUIformatting(*i).encode().c_str(), _quickSelectStr.c_str(), stop, _dictionarySelect);
+			for (const auto &entry : _list) {
+				const int match = matchingCharsIgnoringCase(stripGUIformatting(entry).encode().c_str(), _quickSelectStr.c_str(), stop, _dictionarySelect);
 				if (match > bestMatch || stop) {
 					_selectedItem = newSelectedItem;
 					bestMatch = match;
@@ -396,11 +412,7 @@ bool ListWidget::handleKeyDown(Common::KeyState state) {
 		case Common::KEYCODE_BACKSPACE:
 		case Common::KEYCODE_DELETE:
 			if (_selectedItem >= 0) {
-				if (_editable) {
-					// Ignore delete and backspace when the list item is editable
-				} else {
-					sendCommand(kListItemRemovalRequestCmd, _selectedItem);
-				}
+				sendCommand(kListItemRemovalRequestCmd, _selectedItem);
 			}
 			break;
 
@@ -549,6 +561,9 @@ void ListWidget::drawWidget() {
 		if (_selectedItem == pos)
 			inverted = _inversion;
 
+		// Get state for drawing the item text
+		ThemeEngine::WidgetStateInfo itemState = getItemState(pos);
+
 		Common::Rect r(getEditRect());
 		int pad = _leftPadding;
 		int rtlPad = (_x + r.left + _leftPadding) - (_x + _hlLeftPadding);
@@ -557,7 +572,7 @@ void ListWidget::drawWidget() {
 		if (_numberingMode != kListNumberingOff && g_gui.useRTL() == false) {
 			buffer = Common::String::format("%2d. ", (pos + _numberingMode));
 			g_gui.theme()->drawText(Common::Rect(_x + _hlLeftPadding, y, _x + r.left + _leftPadding, y + fontHeight),
-									buffer, _state, _drawAlign, inverted, _leftPadding, true);
+									buffer, itemState, _drawAlign, inverted, _leftPadding, true);
 			pad = 0;
 		}
 
@@ -583,7 +598,7 @@ void ListWidget::drawWidget() {
 			buffer = _list[pos];
 		}
 
-		drawFormattedText(r1, buffer, _state, _drawAlign, inverted, pad, true, color);
+		drawFormattedText(r1, buffer, itemState, _drawAlign, inverted, pad, true, color);
 
 		// If in numbering mode & using RTL layout in GUI, we print a number suffix after drawing the text
 		if (_numberingMode != kListNumberingOff && g_gui.useRTL()) {
@@ -594,8 +609,12 @@ void ListWidget::drawWidget() {
 			r2.left = r1.right;
 			r2.right = r1.right + rtlPad;
 
-			g_gui.theme()->drawText(r2, buffer, _state, _drawAlign, inverted, _leftPadding, true);
+			g_gui.theme()->drawText(r2, buffer, itemState, _drawAlign, inverted, _leftPadding, true);
 		}
+	}
+
+	if (_editMode) {
+		EditableWidget::drawWidget();
 	}
 }
 
@@ -672,6 +691,7 @@ void ListWidget::startEditMode() {
 		_editColor = ThemeEngine::kFontColorNormal;
 		markAsDirty();
 		g_system->setFeatureState(OSystem::kFeatureVirtualKeyboard, true);
+		sendCommand(kListItemEditModeStartedCmd, _selectedItem);
 	}
 }
 
@@ -689,8 +709,6 @@ void ListWidget::abortEditMode() {
 	// undo any changes made
 	assert(_selectedItem >= 0);
 	_editMode = false;
-	//drawCaret(true);
-	//markAsDirty();
 	g_system->setFeatureState(OSystem::kFeatureVirtualKeyboard, false);
 }
 
@@ -829,7 +847,7 @@ ThemeEngine::FontColor ListWidget::getThemeColor(const Common::U32String &color)
 
 Common::U32String ListWidget::stripGUIformatting(const Common::U32String &str) {
 	Common::U32String stripped;
-	const uint32 *s = str.u32_str();
+	const Common::u32char_type_t *s = str.c_str();
 
 	while (*s) {
 		if (*s != '\001') { // normal symbol
@@ -862,7 +880,7 @@ Common::U32String ListWidget::stripGUIformatting(const Common::U32String &str) {
 
 Common::U32String ListWidget::escapeString(const Common::U32String &str) {
 	Common::U32String escaped;
-	const uint32 *s = str.u32_str();
+	const Common::u32char_type_t *s = str.c_str();
 
 	while (*s) {
 		if (*s == '\001')
@@ -877,7 +895,7 @@ void ListWidget::drawFormattedText(const Common::Rect &r, const Common::U32Strin
 				Graphics::TextAlign align, ThemeEngine::TextInversionState inverted, int deltax, bool useEllipsis,
 				ThemeEngine::FontColor color) {
 	Common::U32String chunk;
-	const uint32 *s = str.u32_str();
+	const Common::u32char_type_t *s = str.c_str();
 	ThemeEngine::FontStyle curfont = ThemeEngine::kFontStyleBold;
 	ThemeEngine::FontColor curcolor = ThemeEngine::kFontColorNormal;
 	Common::U32String tmp;

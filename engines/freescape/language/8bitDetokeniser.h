@@ -27,20 +27,31 @@
 namespace Freescape {
 
 enum {
-	k8bitVariableShield = 63,
+	k8bitGameBitTravelRock = 30
+};
+
+enum {
+	k8bitVariableCrawling = 30,
+	k8bitVariableSpiritsDestroyed = 28,
 	k8bitVariableEnergy = 62,
 	k8bitVariableScore = 61,
 	k8bitVariableShieldDrillerTank = 60,
 	k8bitVariableEnergyDrillerTank = 59,
 	k8bitVariableShieldDrillerJet = 58,
-	k8bitVariableEnergyDrillerJet = 57
+	k8bitVariableEnergyDrillerJet = 57,
+	k8bitMaxVariable = 64
 };
 
-extern uint8 k8bitMaxVariable;
-extern uint8 k8bitMaxShield;
-extern uint8 k8bitMaxEnergy;
+enum {
+	kConditionalShot = 1 << 0,
+	kConditionalTimeout = 1 << 1,
+	kConditionalCollided = 1 << 2,
+	kConditionalActivated = 1 << 3,
+};
 
-Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition, FCLInstructionVector &instructions);
+extern uint8 k8bitVariableShield;
+
+Common::String detokenise8bitCondition(Common::Array<uint16> &tokenisedCondition, FCLInstructionVector &instructions, bool enableActivated);
 
 } // End of namespace Freescape
 

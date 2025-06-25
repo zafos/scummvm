@@ -17,16 +17,40 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "engines/advancedDetector.h"
 
+#include "common/translation.h"
+
+#include "gob/gameidtotype.h"
 #include "gob/gob.h"
 
 // For struct GOBGameDescription.
 #include "gob/detection/detection.h"
 
-class GobMetaEngine : public AdvancedMetaEngine {
+static const ADExtraGuiOptionsMap optionsList[] = {
+	{
+		GAMEOPTION_COPY_PROTECTION,
+                {
+                        _s("Enable copy protection"),
+                        _s("Enable any copy protection that would otherwise be bypassed by default."),
+                        "copy_protection",
+                        false,
+                        0,
+                        0
+                },
+        },
+	AD_EXTRA_GUI_OPTIONS_TERMINATOR
+};
+
+class GobMetaEngine : public AdvancedMetaEngine<Gob::GOBGameDescription> {
 public:
 	const char *getName() const override {
 		return "gob";
@@ -34,7 +58,11 @@ public:
 
 	bool hasFeature(MetaEngineFeature f) const override;
 
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	Common::Error createInstance(OSystem *syst, Engine **engine, const Gob::GOBGameDescription *desc) const override;
+
+	const ADExtraGuiOptionsMap *getAdvancedExtraGuiOptions() const override {
+		return optionsList;
+	}
 };
 
 bool GobMetaEngine::hasFeature(MetaEngineFeature f) const {
@@ -46,8 +74,7 @@ bool Gob::GobEngine::hasFeature(EngineFeature f) const {
 		(f == kSupportsReturnToLauncher);
 }
 
-Common::Error GobMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	const Gob::GOBGameDescription *gd = (const Gob::GOBGameDescription *)desc;
+Common::Error GobMetaEngine::createInstance(OSystem *syst, Engine **engine, const Gob::GOBGameDescription *gd) const {
 	*engine = new Gob::GobEngine(syst);
 	((Gob::GobEngine *)*engine)->initGame(gd);
 	return Common::kNoError;
@@ -62,6 +89,18 @@ Common::Error GobMetaEngine::createInstance(OSystem *syst, Engine **engine, cons
 
 namespace Gob {
 
+GameType GobEngine::getGameType(const char *gameId) const {
+	const GameIdToType *gameInfo = gameIdToType;
+
+	while (gameInfo->gameId != nullptr) {
+		if (!strcmp(gameId, gameInfo->gameId))
+			return gameInfo->gameType;
+		gameInfo++;
+	}
+
+	error("Unknown game ID: %s", gameId);
+}
+
 void GobEngine::initGame(const GOBGameDescription *gd) {
 	if (gd->startTotBase == nullptr)
 		_startTot = "intro.tot";
@@ -75,12 +114,14 @@ void GobEngine::initGame(const GOBGameDescription *gd) {
 
 	_demoIndex = gd->demoIndex;
 
-	_gameType = gd->gameType;
+	_gameType = getGameType(gd->desc.gameId);
 	_features = gd->features;
 	_language = gd->desc.language;
 	_platform = gd->desc.platform;
+	_extra = gd->desc.extra;
 
 	_enableAdibou2FreeBananasWorkaround = gd->desc.flags & GF_ENABLE_ADIBOU2_FREE_BANANAS_WORKAROUND;
+	_enableAdibou2FlowersInfiniteLoopWorkaround = gd->desc.flags & GF_ENABLE_ADIBOU2_FLOWERS_INFINITE_LOOP_WORKAROUND;
 }
 
 } // End of namespace Gob

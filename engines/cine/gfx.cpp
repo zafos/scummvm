@@ -108,12 +108,14 @@ static const byte cursorPalette[] = {
 	0xff, 0xff, 0xff, 0xff
 };
 
-void plotPoint(int x, int y, int color, void *data) {
-	byte *output = (byte *)data;
-	if (x >= 0 && x < 320 && y >= 0 && y < 200) {
-		output[y * 320 + x] = (byte)color;
+class FWPrimitives : public Graphics::Primitives {
+	void drawPoint(int x, int y, uint32 color, void *data) override {
+		byte *output = (byte *)data;
+		if (x >= 0 && x < 320 && y >= 0 && y < 200) {
+			output[y * 320 + x] = (byte)color;
+		}
 	}
-}
+};
 
 /**
  * Initialize renderer
@@ -1650,7 +1652,7 @@ void OSRenderer::renderOverlay(const Common::List<overlay>::iterator &it) {
 		width = obj->frame;
 		height = obj->costume;
 		// Using Bresenham's algorithm, looks good enough for visual purposes in Operation Stealth
-		Graphics::drawLine(obj->x, obj->y, width, height, color, plotPoint, _backBuffer);
+		FWPrimitives().drawLine(obj->x, obj->y, width, height, color, _backBuffer);
 		break;
 
 	// something else
@@ -2230,7 +2232,6 @@ void drawSpriteRaw2(const byte *spritePtr, byte transColor, int16 width, int16 h
 void maskBgOverlay(int targetBgIdx, const byte *bgPtr, const byte *maskPtr, int16 width, int16 height,
 				   byte *page, int16 x, int16 y) {
 	int16 i, j, tmpWidth, tmpHeight;
-	Common::List<BGIncrust>::iterator it;
 	const byte *backup = maskPtr;
 
 	// background pass
@@ -2257,25 +2258,25 @@ void maskBgOverlay(int targetBgIdx, const byte *bgPtr, const byte *maskPtr, int1
 	maskPtr = backup;
 
 	// incrust pass
-	for (it = g_cine->_bgIncrustList.begin(); it != g_cine->_bgIncrustList.end(); ++it) {
+	for (auto &incrust : g_cine->_bgIncrustList) {
 		// HACK: Remove drawing of red corners around doors in rat maze in Operation Stealth
 		// by skipping drawing of possible collision table data to non-collision table page.
-		if (hacksEnabled && it->bgIdx == kCollisionPageBgIdxAlias && targetBgIdx != kCollisionPageBgIdxAlias) {
+		if (hacksEnabled && incrust.bgIdx == kCollisionPageBgIdxAlias && targetBgIdx != kCollisionPageBgIdxAlias) {
 			continue;
 		}
 
-		tmpWidth = g_cine->_animDataTable[it->frame]._realWidth;
-		tmpHeight = g_cine->_animDataTable[it->frame]._height;
+		tmpWidth = g_cine->_animDataTable[incrust.frame]._realWidth;
+		tmpHeight = g_cine->_animDataTable[incrust.frame]._height;
 		byte *mask = (byte *)malloc(tmpWidth * tmpHeight);
 
-		if (it->param == 0) {
-			generateMask(g_cine->_animDataTable[it->frame].data(), mask, tmpWidth * tmpHeight, it->part);
-			gfxUpdateIncrustMask(mask, it->x, it->y, tmpWidth, tmpHeight, maskPtr, x, y, width, height);
-			gfxDrawMaskedSprite(g_cine->_animDataTable[it->frame].data(), mask, tmpWidth, tmpHeight, page, it->x, it->y);
+		if (incrust.param == 0) {
+			generateMask(g_cine->_animDataTable[incrust.frame].data(), mask, tmpWidth * tmpHeight, incrust.part);
+			gfxUpdateIncrustMask(mask, incrust.x, incrust.y, tmpWidth, tmpHeight, maskPtr, x, y, width, height);
+			gfxDrawMaskedSprite(g_cine->_animDataTable[incrust.frame].data(), mask, tmpWidth, tmpHeight, page, incrust.x, incrust.y);
 		} else {
-			memcpy(mask, g_cine->_animDataTable[it->frame].data(), tmpWidth * tmpHeight);
-			gfxUpdateIncrustMask(mask, it->x, it->y, tmpWidth, tmpHeight, maskPtr, x, y, width, height);
-			gfxFillSprite(mask, tmpWidth, tmpHeight, page, it->x, it->y);
+			memcpy(mask, g_cine->_animDataTable[incrust.frame].data(), tmpWidth * tmpHeight);
+			gfxUpdateIncrustMask(mask, incrust.x, incrust.y, tmpWidth, tmpHeight, maskPtr, x, y, width, height);
+			gfxFillSprite(mask, tmpWidth, tmpHeight, page, incrust.x, incrust.y);
 		}
 
 		free(mask);

@@ -40,20 +40,22 @@ public:
 private:
 	AgiEngine *_vm;
 
-	// Dictionary
-	// 158 = 255 - 'a' ; that's allows us to support extended character set, and does no harm for regular English games
-	Common::Array<WordEntry *> _dictionaryWords[158];
+	// Dictionary of words in WORDS.TOK or WORDS.TOK.EXTENDED.
+	// key:   first character of the word
+	// value: words in the order they appear
+	Common::HashMap<byte, Common::Array<WordEntry>> _dictionary;
 
 	WordEntry _egoWords[MAX_WORDS];
 	uint16  _egoWordCount;
 
 public:
-	uint16 getEgoWordCount();
-	const char *getEgoWord(int16 wordNr);
-	uint16 getEgoWordId(int16 wordNr);
+	uint16 getEgoWordCount() const;
+	const char *getEgoWord(int16 wordNr) const;
+	uint16 getEgoWordId(int16 wordNr) const;
 
-	int  loadDictionary_v1(Common::File &f);
+	int  loadDictionary_v1(Common::SeekableReadStream &stream);
 	int  loadDictionary(const char *fname);
+	int  loadDictionary(Common::SeekableReadStream &stream);
 	// used for fan made translations requiring extended char set
 	int  loadExtendedDictionary(const char *fname);
 	void unloadDictionary();
@@ -63,7 +65,10 @@ public:
 
 private:
 	void  cleanUpInput(const char *userInput, Common::String &cleanInput);
-	int16 findWordInDictionary(const Common::String &userInput, uint16 userInputLen, uint16 userInputPos, uint16 &foundWordLen);
+	int16 findWordInDictionary(const Common::String &userInputLowercase, uint16 userInputLen, uint16 userInputPos, uint16 &foundWordLen);
+
+	bool handleSpeedCommands(const Common::String &userInputLowercase);
+	static void convertRussianUserInput(Common::String &userInputLowercase);
 };
 
 } // End of namespace Agi

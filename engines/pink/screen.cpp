@@ -21,7 +21,7 @@
 
 #include "graphics/macgui/macfontmanager.h"
 #include "graphics/macgui/mactext.h"
-#include "graphics/palette.h"
+#include "graphics/paletteman.h"
 #include "graphics/fonts/ttf.h"
 
 #include "pink/pink.h"
@@ -102,14 +102,14 @@ Screen::Screen(PinkEngine *vm)
 
 	_wm->setScreen(&_surface);
 	_wm->setMenuHotzone(Common::Rect(0, 0, 640, 23));
-	_wm->setMenuDelay(250000);
+	_wm->setMenuDelay(250);
 	_wm->setEngineRedrawCallback(this, redrawCallback);
 
 	_textFont = nullptr;
 	_textFontCleanup = true;
 #ifdef USE_FREETYPE2
 	if (vm->getLanguage() == Common::HE_ISR) {
-		_textFont = _wm->_fontMan->getFont(Graphics::MacFont(Graphics::kMacFontChicago, 12, Graphics::kMacFontRegular));
+		_textFont = _wm->_fontMan->getFont(Graphics::MacFont(Graphics::kMacFontSystem, 12, Graphics::kMacFontRegular));
 		_textFontCleanup = false;
 	} else {
 		_textFont = Graphics::loadTTFFontFromArchive("system.ttf", 16);
@@ -231,6 +231,10 @@ void Screen::pause(bool pause_) {
 	for (uint i = 0; i < _sprites.size() ; ++i) {
 		_sprites[i]->pause(pause_);
 	}
+}
+
+bool Screen::isMenuActive() {
+	return _wm != nullptr && _wm->isMenuActive();
 }
 
 void Screen::saveStage() {

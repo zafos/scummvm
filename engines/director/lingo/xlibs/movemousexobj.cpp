@@ -26,58 +26,62 @@
 #include "director/lingo/lingo-object.h"
 #include "director/lingo/xlibs/movemousexobj.h"
 
+/*************************************
+ *
+ * USED IN:
+ * MediaBook Sampler CD/XObject Studio
+ *
+ *************************************/
+
+/*
+ * MoveMouse 0.1 - (c) Andrew Green 1993 for Mac
+ */
+
+
 namespace Director {
 
-// MoveMouse 0.1 - (c) Andrew Green 1993 for Mac
-
-const char *MoveMouseXObj::xlibName = "MoveMouse";
-const char *MoveMouseXObj::fileNames[] = {
-	"MoveMouse",
-	"MoveMouse.XObj",
-	"MOVEWIN",
-	nullptr
+const char *const MoveMouseXObj::xlibName = "MoveMouse";
+const XlibFileDesc MoveMouseXObj::fileNames[] = {
+	{ "MoveMouse",		nullptr },
+	{ "MoveMouse.XObj",	nullptr },
+	{ "MOVEWIN",		nullptr },
+	{ nullptr,			nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",					MoveMouseXObj::m_new,			 0, 0,	400 },	// D4
 	{ "setMouseLoc",			MoveMouseXObj::m_setMouseLoc,	 2, 2,	400 },	// D4
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-MoveMouseXObject::MoveMouseXObject(ObjectType ObjectType) :Object<MoveMouseXObject>("MoveMouseXObj") {
+MoveMouseXObject::MoveMouseXObject(ObjectType ObjectType) :Object<MoveMouseXObject>("MoveMouse") {
 	_objType = ObjectType;
 }
 
-void MoveMouseXObj::open(int type) {
+void MoveMouseXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		MoveMouseXObject::initMethods(xlibMethods);
 		MoveMouseXObject *xobj = new MoveMouseXObject(kXObj);
 		g_lingo->exposeXObject(xlibName, xobj);
-	} else if (type == kXtraObj) {
-		// TODO - Implement Xtra
 	}
 }
 
-void MoveMouseXObj::close(int type) {
+void MoveMouseXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		MoveMouseXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
-	} else if (type == kXtraObj) {
-		// TODO - Implement Xtra
 	}
 }
 
 void MoveMouseXObj::m_new(int nargs) {
-	if (nargs != 0) {
-		warning("MoveMouse::m_new: expected 0 arguments");
-		g_lingo->dropStack(nargs);
-	}
+	g_lingo->printSTUBWithArglist("MoveMouseXObj::m_new", nargs);
+	g_lingo->dropStack(nargs);
 	g_lingo->push(g_lingo->_state->me);
 }
 
 void MoveMouseXObj::m_setMouseLoc(int nargs) {
 	if (nargs != 2) {
-		warning("MoveMouse::m_setMouseLoc: expected 2 arguments");
+		warning("MoveMouseXObj::m_setMouseLoc: expected 2 arguments");
 		g_lingo->dropStack(nargs);
 		return;
 	}

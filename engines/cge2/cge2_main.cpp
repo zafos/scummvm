@@ -42,16 +42,14 @@ System::System(CGE2Engine *vm) : Sprite(vm), _vm(vm) {
 	tick();
 }
 
-void System::touch(uint16 mask, V2D pos, Common::KeyCode keyCode) {
-	if (mask & kEventKeyb) {
-		if (keyCode == Common::KEYCODE_ESCAPE) {
-			// The original was calling keyClick()
-			// The sound is uselessly annoying and noisy, so it has been removed
-			_vm->killText();
-			if (_vm->_gamePhase == kPhaseIntro) {
-				_vm->_commandHandler->addCommand(kCmdClear, -1, 0, nullptr);
-				return;
-			}
+void System::touch(uint16 mask, V2D pos) {
+	if (mask & kEventEsc) {
+		// The original was calling keyClick()
+		// The sound is uselessly annoying and noisy, so it has been removed
+		_vm->killText();
+		if (_vm->_gamePhase == kPhaseIntro) {
+			_vm->_commandHandler->addCommand(kCmdClear, -1, 0, nullptr);
+			return;
 		}
 	} else {
 		if (_vm->_gamePhase != kPhaseInGame)
@@ -130,9 +128,9 @@ char *CGE2Engine::tail(char *s) {
 	return s;
 }
 
-int CGE2Engine::takeEnum(const char **tab, const char *text) {
+int CGE2Engine::takeEnum(const char *const *tab, const char *text) {
 	if (text) {
-		for (const char **e = tab; *e; e++) {
+		for (const char *const *e = tab; *e; e++) {
 			if (scumm_stricmp(text, *e) == 0)
 				return e - tab;
 		}
@@ -316,7 +314,6 @@ void CGE2Engine::loadScript(const char *fname, bool onlyToolbar) {
 		return;
 
 	bool ok = true;
-	int lcnt = 0;
 
 	char tmpStr[kLineMax + 1];
 	Common::String line;
@@ -325,7 +322,6 @@ void CGE2Engine::loadScript(const char *fname, bool onlyToolbar) {
 		if (line.empty())
 			continue;
 
-		lcnt++;
 		Common::strlcpy(tmpStr, line.c_str(), sizeof(tmpStr));
 
 		ok = false; // not OK if break
@@ -846,7 +842,7 @@ void CGE2Engine::switchHero(int sex) {
 		_commandHandler->addCommand(kCmdSeq, -1, 1, face);
 }
 
-void Sprite::touch(uint16 mask, V2D pos, Common::KeyCode keyCode) {
+void Sprite::touch(uint16 mask, V2D pos) {
 	if ((mask & kEventAttn) != 0)
 		return;
 

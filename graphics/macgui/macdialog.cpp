@@ -78,6 +78,7 @@ MacDialog::MacDialog(ManagedSurface *screen, MacWindowManager *wm, int width, Ma
 	_bbox.bottom = (_screen->h + height) / 2;
 
 	_pressedButton = -1;
+	_mouseOverButton = -1;
 
 	_mouseOverPressedButton = false;
 
@@ -95,12 +96,14 @@ MacDialog::~MacDialog() {
 }
 
 const Graphics::Font *MacDialog::getDialogFont() {
-	return _wm->_fontMan->getFont(Graphics::MacFont(Graphics::kMacFontChicago, 12));
+	return _wm->_fontMan->getFont(Graphics::MacFont(Graphics::kMacFontSystem, 12));
 }
 
 void MacDialog::paint() {
+	Primitives &primitives = _wm->getDrawPrimitives();
+
 	MacPlotData pd(_screen, nullptr, &_wm->getPatterns(), 1, 0, 0, 1, _wm->_colorBlack, false);
-	drawFilledRect1(_bbox, kColorWhite, _wm->getDrawPixel(), &pd);
+	primitives.drawFilledRect1(_bbox, kColorWhite, &pd);
 	_mactext->drawToPoint(_screen, Common::Point(_bbox.left + (_bbox.width() - _maxTextWidth)/2, _bbox.top + 16));
 	static int boxOutline[] = {1, 0, 0, 1, 1};
 	drawOutline(_bbox, boxOutline, ARRAYSIZE(boxOutline));
@@ -121,7 +124,7 @@ void MacDialog::paint() {
 			Common::Rect bb(button->bounds.left + 5, button->bounds.top + 5,
 							button->bounds.right - 5, button->bounds.bottom - 5);
 
-			drawFilledRect1(bb, kColorBlack, _wm->getDrawPixel(), &pd);
+			primitives.drawFilledRect1(bb, kColorBlack, &pd);
 
 			color = kColorWhite;
 		}
@@ -141,11 +144,13 @@ void MacDialog::paint() {
 }
 
 void MacDialog::drawOutline(Common::Rect &bounds, int *spec, int speclen) {
+	Primitives &primitives = _wm->getDrawPrimitives();
+
 	MacPlotData pd(_screen, nullptr, &_wm->getPatterns(), 1, 0, 0, 1, _wm->_colorBlack, false);	
 	for (int i = 0; i < speclen; i++)
 		if (spec[i] != 0) {
 			Common::Rect r(bounds.left + i, bounds.top + i, bounds.right - i, bounds.bottom - i);
-			drawRect1(r, kColorBlack, _wm->getDrawPixel(), &pd);
+			primitives.drawRect1(r, kColorBlack, &pd);
 		}
 }
 
@@ -216,15 +221,22 @@ int MacDialog::matchButton(int x, int y) {
 }
 
 void MacDialog::mouseMove(int x, int y) {
-	if (_pressedButton != -1) {
-		int match = matchButton(x, y);
+	int match = matchButton(x, y);
 
+	if (_pressedButton != -1) {
 		if (_mouseOverPressedButton && match != _pressedButton) {
 			_mouseOverPressedButton = false;
 			_needsRedraw = true;
 		} else if (!_mouseOverPressedButton && match == _pressedButton) {
 			_mouseOverPressedButton = true;
 			_needsRedraw = true;
+		}
+	}
+
+	if (_mouseOverButton != match) {
+		_mouseOverButton = match;
+		if (match != -1) {
+			_wm->sayText(_buttons->operator[](match)->text);
 		}
 	}
 }
@@ -251,4 +263,4 @@ int MacDialog::mouseRaise(int x, int y) {
 	return res;
 }
 
-} // End of namespace Wage
+} // End of namespace Graphics

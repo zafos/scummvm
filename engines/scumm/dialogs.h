@@ -67,7 +67,7 @@ protected:
 
 /**
  * A dialog which displays an arbitrary message to the user and returns
- * ther users reply as its result value. More specifically, it returns
+ * the users reply as its result value. More specifically, it returns
  * the ASCII code of the key used to close the dialog (0 if a mouse
  * click closed the dialog).
  */
@@ -151,11 +151,11 @@ protected:
 		kDisplayDelay = 1500
 	};
 	Common::U32String _label;
-	const int _min, _max;
-	const uint16 _incKey, _decKey;
-	int _percentBarWidth;
-	int _value;
-	uint32 _timer;
+	const int _min = 0, _max = 0;
+	const uint16 _incKey = 0, _decKey = 0;
+	int _percentBarWidth = 0;
+	int _value = 0;
+	uint32 _timer = 0;
 };
 
 /**
@@ -222,12 +222,55 @@ private:
 class ScummOptionsContainerWidget : public GUI::OptionsContainerWidget {
 public:
 	ScummOptionsContainerWidget(GuiObject *boss, const Common::String &name, const Common::String &dialogLayout, const Common::String &domain) :
-		OptionsContainerWidget(boss, name, dialogLayout, false, domain) {
+		OptionsContainerWidget(boss, name, dialogLayout, domain) {
 	}
 
-	GUI::CheckboxWidget *createEnhancementsCheckbox(GuiObject *boss, const Common::String &name);
+	enum {
+		kEnhancementGroup1Cmd = 'ENH1',
+		kEnhancementGroup2Cmd = 'ENH2',
+		kEnhancementGroup3Cmd = 'ENH3',
+		kEnhancementGroup4Cmd = 'ENH4'
+	};
+
+	void load() override;
+	bool save() override;
+
+protected:
+	void createEnhancementsWidget(GuiObject *boss, const Common::String &name);
+	GUI::ThemeEval &addEnhancementsLayout(GUI::ThemeEval &layouts) const;
 	GUI::CheckboxWidget *createOriginalGUICheckbox(GuiObject *boss, const Common::String &name);
+	GUI::CheckboxWidget *createGammaCorrectionCheckbox(GuiObject *boss, const Common::String &name);
+	GUI::CheckboxWidget *createSegaShadowModeCheckbox(GuiObject *boss, const Common::String &name);
+	GUI::CheckboxWidget *createCopyProtectionCheckbox(GuiObject *boss, const Common::String &name);
 	void updateAdjustmentSlider(GUI::SliderWidget *slider, GUI::StaticTextWidget *value);
+
+	Common::Array<GUI::CheckboxWidget *> _enhancementsCheckboxes;
+};
+
+/**
+ * Options widget for SCUMM games in general.
+ */
+class ScummGameOptionsWidget : public ScummOptionsContainerWidget {
+public:
+	ScummGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain, const ExtraGuiOptions &options);
+	~ScummGameOptionsWidget() override {};
+
+	void load() override;
+	bool save() override;
+
+private:
+	enum {
+		kSmoothScrollCmd = 'SMSC'
+	};
+
+	GUI::CheckboxWidget *_smoothScrollCheckbox = nullptr;
+	GUI::CheckboxWidget *_semiSmoothScrollCheckbox = nullptr;
+
+	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
+	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
+
+	ExtraGuiOptions _options;
+	Common::Array<GUI::CheckboxWidget *> _checkboxes;
 };
 
 /**
@@ -249,13 +292,39 @@ private:
 	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
-	GUI::CheckboxWidget *_enableEnhancementsCheckbox;
-	GUI::CheckboxWidget *_enableOriginalGUICheckbox;
+	GUI::CheckboxWidget *_enableOriginalGUICheckbox = nullptr;
+	GUI::CheckboxWidget *_enableCopyProtectionCheckbox = nullptr;
 
-	GUI::SliderWidget *_overtureTicksSlider;
-	GUI::StaticTextWidget *_overtureTicksValue;
+	GUI::SliderWidget *_overtureTicksSlider = nullptr;
+	GUI::StaticTextWidget *_overtureTicksValue = nullptr;
 
 	void updateOvertureTicksValue();
+};
+
+/**
+* Options widget for various Macintosh games.
+*/
+class MacGameOptionsWidget : public ScummOptionsContainerWidget {
+public:
+	MacGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain, int gameId, const Common::String &extra);
+	~MacGameOptionsWidget() override {};
+
+	void load() override;
+	bool save() override;
+private:
+	enum {
+		kQualitySliderUpdate = 'QUAL'
+	};
+	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
+	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
+	void updateQualitySlider();
+
+	GUI::CheckboxWidget *_enableOriginalGUICheckbox = nullptr;
+	GUI::CheckboxWidget *_enableGammaCorrectionCheckbox = nullptr;
+	GUI::CheckboxWidget *_enableCopyProtectionCheckbox = nullptr;
+	GUI::SliderWidget *_sndQualitySlider = nullptr;
+	GUI::StaticTextWidget *_sndQualityValue = nullptr;
+	int _quality = 0;
 };
 
 /**
@@ -277,11 +346,10 @@ private:
 	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
-	GUI::CheckboxWidget *_enableEnhancementsCheckbox;
-	GUI::CheckboxWidget *_enableOriginalGUICheckbox;
+	GUI::CheckboxWidget *_enableOriginalGUICheckbox = nullptr;
 
-	GUI::SliderWidget *_playbackAdjustmentSlider;
-	GUI::StaticTextWidget *_playbackAdjustmentValue;
+	GUI::SliderWidget *_playbackAdjustmentSlider = nullptr;
+	GUI::StaticTextWidget *_playbackAdjustmentValue = nullptr;
 
 	void updatePlaybackAdjustmentValue();
 };
@@ -306,17 +374,63 @@ private:
 	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
 	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
 
-	GUI::CheckboxWidget *_enableEnhancementsCheckbox;
-	GUI::CheckboxWidget *_enableOriginalGUICheckbox;
+	GUI::CheckboxWidget *_enableOriginalGUICheckbox = nullptr;
+	GUI::CheckboxWidget *_enableSegaShadowModeCheckbox = nullptr;
 
-	GUI::SliderWidget *_introAdjustmentSlider;
-	GUI::StaticTextWidget *_introAdjustmentValue;
-	GUI::SliderWidget *_outlookAdjustmentSlider;
-	GUI::StaticTextWidget *_outlookAdjustmentValue;
+	GUI::SliderWidget *_introAdjustmentSlider = nullptr;
+	GUI::StaticTextWidget *_introAdjustmentValue = nullptr;
+	GUI::SliderWidget *_outlookAdjustmentSlider = nullptr;
+	GUI::StaticTextWidget *_outlookAdjustmentValue = nullptr;
 
 	void updateIntroAdjustmentValue();
 	void updateOutlookAdjustmentValue();
 };
+
+#ifdef USE_ENET
+/**
+ * Options widget for network supported HE games
+ * (Football 1999/2002, Baseball 2001 and
+ * Moonbase Commander).
+ */
+class HENetworkGameOptionsWidget : public ScummOptionsContainerWidget {
+public:
+	HENetworkGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain, const Common::String &&gameid);
+	~HENetworkGameOptionsWidget() override {};
+
+	void load() override;
+	bool save() override;
+
+private:
+	enum {
+		kEnableSessionCmd = 'ENBS',
+		kResetServersCmd = 'CLRS',
+	};
+
+	Common::String _gameid;
+
+	void defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const override;
+	void handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) override;
+
+	GUI::CheckboxWidget *_audioOverride = nullptr;
+
+	GUI::CheckboxWidget *_enableSessionServer = nullptr;
+
+	GUI::EditTextWidget *_sessionServerAddr = nullptr;
+	GUI::ButtonWidget *_serverResetButton = nullptr;
+
+	GUI::CheckboxWidget *_enableLANBroadcast = nullptr;
+
+	GUI::CheckboxWidget *_generateRandomMaps = nullptr;
+
+	GUI::EditTextWidget *_lobbyServerAddr = nullptr;
+
+#ifdef USE_LIBCURL
+	GUI::CheckboxWidget *_enableCompetitiveMods = nullptr;
+#endif
+
+	GUI::StaticTextWidget *_networkVersion = nullptr;
+};
+#endif
 
 } // End of namespace Scumm
 

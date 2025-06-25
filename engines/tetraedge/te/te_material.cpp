@@ -60,7 +60,7 @@ Common::String TeMaterial::dump() const {
 			  _specularColor.dump().c_str(),
 			  _emissionColor.dump().c_str(),
 			  (int)_mode,
-			 _texture ? _texture->getAccessName().c_str() : "None",
+			 _texture ? _texture->getAccessName().toString('/').c_str() : "None",
 			  _shininess, _enableLights ? "on" : "off");
 }
 
@@ -83,14 +83,13 @@ TeMaterial &TeMaterial::operator=(const TeMaterial &other) {
 	_enableLights = other._enableLights;
 	_shininess = other._shininess;
 	_mode = other._mode;
-	_enableLights = other._enableLights;
 	_isShadowTexture = other._isShadowTexture;
 
 	return *this;
 }
 
 /*static*/
-void TeMaterial::deserialize(Common::SeekableReadStream &stream, TeMaterial &material, const Common::String &texPath) {
+void TeMaterial::deserialize(Common::SeekableReadStream &stream, TeMaterial &material, const Common::Path &texPath) {
 	const Common::String nameStr = Te3DObject2::deserializeString(stream);
 
 	TeModel::loadAlign(stream);
@@ -98,10 +97,10 @@ void TeMaterial::deserialize(Common::SeekableReadStream &stream, TeMaterial &mat
 
 	if (nameStr.size()) {
 		TeCore *core = g_engine->getCore();
-		Common::FSNode texNode = core->findFile(Common::Path(texPath).join(nameStr));
-		material._texture = Te3DTexture::load2(texNode, false);
+		TetraedgeFSNode matPath = core->findFile(Common::Path(texPath).join(nameStr));
+		material._texture = Te3DTexture::load2(matPath, false);
 		if (!material._texture)
-			warning("failed to load texture %s (texpath %s)", nameStr.c_str(), texPath.c_str());
+			warning("failed to load texture %s (texpath %s)", nameStr.c_str(), matPath.toString().c_str());
 	}
 
 	material._ambientColor.deserialize(stream);
@@ -119,7 +118,7 @@ void TeMaterial::deserialize(Common::SeekableReadStream &stream, TeMaterial &mat
 	Te3DTexture *tex = material._texture.get();
 	Common::String texName;
 	if (tex) {
-		texName = tex->getAccessName();
+		texName = tex->getAccessName().toString('/');
 		// "Remove extension" twice for some reason..
 		size_t offset = texName.rfind('.');
 		if (offset != Common::String::npos) {

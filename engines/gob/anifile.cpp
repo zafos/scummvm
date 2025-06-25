@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/stream.h"
@@ -158,17 +164,17 @@ void ANIFile::loadAnimation(Animation &animation, FrameArray &frames,
 		area.left  = area.top    =  0x7FFF;
 		area.right = area.bottom = -0x7FFF;
 
-		for (ChunkList::const_iterator c = frame.begin(); c != frame.end(); ++c) {
+		for (const auto &c : frame) {
 			uint16 cL, cT, cR, cB;
 
-			if (!getCoordinates(c->layer, c->part, cL, cT, cR, cB))
+			if (!getCoordinates(c.layer, c.part, cL, cT, cR, cB))
 				continue;
 
 			const uint16 width  = cR - cL + 1;
 			const uint16 height = cB - cT + 1;
 
-			const uint16 l = c->x;
-			const uint16 t = c->y;
+			const uint16 l = c.x;
+			const uint16 t = c.y;
 			const uint16 r = l + width  - 1;
 			const uint16 b = t + height - 1;
 

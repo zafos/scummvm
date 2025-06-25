@@ -94,7 +94,7 @@ bool EfhEngine::handleFight(int16 monsterId) {
 
 	drawCombatScreen(0, false, true);
 
-	for (bool mainLoopCond = false; !mainLoopCond;) {
+	for (bool mainLoopCond = false; !mainLoopCond && !shouldQuit();) {
 		if (isTPK()) {
 			resetTeamMonsterIdArray();
 			_ongoingFightFl = false;
@@ -345,15 +345,17 @@ void EfhEngine::handleFight_lastAction_A(int16 teamCharId) {
 						addReactionText(kEfhReactionCriesOut);
 					} else if (_mapMonsters[_techId][_teamMonster[groupId]._id]._hitPoints[ctrMobsterId] < hitPointsBefore / 4) {
 						addReactionText(kEfhReactionFalters);
+					// The original checked /2 before /3, making the code in /3 unreachable.
+					// This check has been fixed so that it behaves as originally expected.
+					} else if (_mapMonsters[_techId][_teamMonster[groupId]._id]._hitPoints[ctrMobsterId] < hitPointsBefore / 3) {
+						addReactionText(kEfhReactionScreams);
 					} else if (_mapMonsters[_techId][_teamMonster[groupId]._id]._hitPoints[ctrMobsterId] < hitPointsBefore / 2) {
 						addReactionText(kEfhReactionWinces);
-					} else if (_mapMonsters[_techId][_teamMonster[groupId]._id]._hitPoints[ctrMobsterId] < hitPointsBefore / 3) {
-						// CHECKME: Doesn't make any sense to check /3 after /2... I don't get it. Looks like an original bug
-						addReactionText(kEfhReactionScreams);
 					} else if (hitPointsBefore / 8 >= originalDamage) {
 						addReactionText(kEfhReactionChortles);
-					} else if (originalDamage == 0 && getRandom(100) < 35) {
-						// CHECKME: "originalDamage == 0" is always false as it's checked beforehand. Looks like another original bug
+					} else if (getRandom(100) < 35) {
+						// Note : The original has a bug as it was doing an (always false) check "originalDamage == 0".
+						// This check has been removed so that it behaves as originally expected.
 						addReactionText(kEfhReactionLaughs);
 					}
 				}
@@ -593,8 +595,9 @@ void EfhEngine::handleFight_MobstersAttack(int groupId) {
 							addReactionText(kEfhReactionScreams);
 						} else if (_npcBuf[_teamChar[targetId]._id]._maxHP / 8 >= originalDamage) {
 							addReactionText(kEfhReactionChortles);
-						} else if (originalDamage == 0 && getRandom(100) < 35) {
-							// CHECKME: "originalDamage == 0" is always false as it's checked beforehand. Looks like another original bug
+						} else if (getRandom(100) < 35) {
+							// Note : The original had a bug as it was doing an (always false) check "originalDamage == 0".
+							// This check has been removed so that it behaves as originally expected
 							addReactionText(kEfhReactionLaughs);
 						}
 					}
@@ -750,8 +753,8 @@ void EfhEngine::getDeathTypeDescription(int16 victimId, int16 attackerId) {
 			else
 				deathType = _items[exclusiveItemId]._attackType + 1;
 		}
-	// The check "attackerId > 5" is a safeguard for a Coverity "OVERRUN" ticket, not present in the original
-	} else if (attackerId > 5 || _teamMonster[attackerId]._id == -1) {
+	// The check "attackerId >= 5" is a safeguard for a Coverity "OVERRUN" ticket, not present in the original
+	} else if (attackerId >= 5 || _teamMonster[attackerId]._id == -1) {
 		deathType = 0;
 	} else {
 		int16 itemId = _mapMonsters[_techId][_teamMonster[attackerId]._id]._weaponItemId;
@@ -1019,7 +1022,7 @@ int16 EfhEngine::determineTeamTarget(int16 charId, int16 unkFied18Val, bool chec
 				getLastCharAfterAnimCount(_guessAnimationAmount);
 			}
 		}
-	} while (retVal == -1);
+	} while (retVal == -1 && !shouldQuit());
 
 	if (retVal == 27)
 		retVal = -1;
@@ -1119,13 +1122,13 @@ bool EfhEngine::getTeamAttackRoundPlans() {
 			} break;
 			case Common::KEYCODE_t: // Terrain
 				redrawScreenForced();
-				getInputBlocking();
+				waitForKey();
 				drawCombatScreen(_teamChar[charId]._id, false, true);
 				break;
 			default:
 				break;
 			}
-		} while (_teamChar[charId]._lastAction == 0);
+		} while (_teamChar[charId]._lastAction == 0 && !shouldQuit());
 	}
 
 	return retVal;
@@ -1659,7 +1662,7 @@ int16 EfhEngine::selectMonsterGroup() {
 
 	int16 retVal = -1;
 
-	while (retVal == -1) {
+	while (retVal == -1 && !shouldQuit()) {
 		Common::KeyCode input = handleAndMapInput(true);
 		switch (input) {
 		case Common::KEYCODE_ESCAPE:

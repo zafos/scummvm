@@ -37,8 +37,7 @@ public:
 
 	virtual bool onParentWorldColorChanged() override;
 
-	bool load(const Common::String &path);
-	bool load(const Common::FSNode &node);
+	bool load(const Common::Path &path);
 	bool load(TeImage &img);
 	bool load(TeIntrusivePtr<Te3DTexture> &texture);
 

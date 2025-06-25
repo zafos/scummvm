@@ -43,19 +43,19 @@ Common::Language PrinceEngine::getLanguage() const {
 
 } // End of namespace Prince
 
-class PrinceMetaEngine : public AdvancedMetaEngine {
+class PrinceMetaEngine : public AdvancedMetaEngine<Prince::PrinceGameDescription> {
 public:
 	const char *getName() const override {
 		return "prince";
 	}
 
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	Common::Error createInstance(OSystem *syst, Engine **engine, const Prince::PrinceGameDescription *desc) const override;
 	bool hasFeature(MetaEngineFeature f) const override;
 
 	int getMaximumSaveSlot() const override { return 99; }
 	SaveStateList listSaves(const char *target) const override;
 	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
-	void removeSaveState(const char *target, int slot) const override;
+	bool removeSaveState(const char *target, int slot) const override;
 };
 
 bool PrinceMetaEngine::hasFeature(MetaEngineFeature f) const {
@@ -86,13 +86,13 @@ SaveStateList PrinceMetaEngine::listSaves(const char *target) const {
 	filenames = saveFileMan->listSavefiles(pattern);
 
 	SaveStateList saveList;
-	for (Common::StringArray::const_iterator filename = filenames.begin(); filename != filenames.end(); filename++) {
+	for (const auto &filename : filenames) {
 		// Obtain the last 3 digits of the filename, since they correspond to the save slot
-		int slotNum = atoi(filename->c_str() + filename->size() - 3);
+		int slotNum = atoi(filename.c_str() + filename.size() - 3);
 
 		if (slotNum >= 0 && slotNum <= 99) {
 
-			Common::InSaveFile *file = saveFileMan->openForLoading(*filename);
+			Common::InSaveFile *file = saveFileMan->openForLoading(filename);
 			if (file) {
 				Prince::SavegameHeader header;
 
@@ -153,13 +153,13 @@ SaveStateDescriptor PrinceMetaEngine::querySaveMetaInfos(const char *target, int
 	return SaveStateDescriptor();
 }
 
-void PrinceMetaEngine::removeSaveState(const char *target, int slot) const {
+bool PrinceMetaEngine::removeSaveState(const char *target, int slot) const {
 	Common::String fileName = Common::String::format("%s.%03d", target, slot);
-	g_system->getSavefileManager()->removeSavefile(fileName);
+	return g_system->getSavefileManager()->removeSavefile(fileName);
 }
 
-Common::Error PrinceMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	*engine = new Prince::PrinceEngine(syst, (const Prince::PrinceGameDescription *)desc);
+Common::Error PrinceMetaEngine::createInstance(OSystem *syst, Engine **engine, const Prince::PrinceGameDescription *desc) const {
+	*engine = new Prince::PrinceEngine(syst,desc);
 	return Common::kNoError;
 }
 

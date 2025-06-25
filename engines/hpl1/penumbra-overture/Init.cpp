@@ -25,6 +25,7 @@
  * This file is part of Penumbra Overture.
  */
 
+#include "hpl1/penumbra-overture/Init.h"
 #include "hpl1/engine/graphics/Material.h"
 #include "hpl1/penumbra-overture/ButtonHandler.h"
 #include "hpl1/penumbra-overture/GameArea.h"
@@ -42,7 +43,6 @@
 #include "hpl1/penumbra-overture/GameScripts.h"
 #include "hpl1/penumbra-overture/GameStickArea.h"
 #include "hpl1/penumbra-overture/GameSwingDoor.h"
-#include "hpl1/penumbra-overture/Init.h"
 #include "hpl1/penumbra-overture/MapHandler.h"
 #include "hpl1/penumbra-overture/Player.h"
 
@@ -158,6 +158,8 @@ bool cInit::Init(tString saveToLoad) {
 	mpConfig = new cConfigFile(_W(""));
 	mpGameConfig = new cConfigFile(_W("config/game.cfg"));
 	mpGameConfig->Load();
+
+	_firstStart = getBoolConfig("first-start", true);
 
 	mvScreenSize.x = getIntConfig("screen-width", 800);
 	mvScreenSize.y = getIntConfig("screen-height", 600);
@@ -524,6 +526,8 @@ void cInit::Exit() {
 	ConfMan.setInt("texture_size_level", mpGame->GetResources()->GetMaterialManager()->GetTextureSizeLevel());
 	ConfMan.setInt("texture_filter", mpGame->GetResources()->GetMaterialManager()->GetTextureFilter());
 	// mpConfig->SetFloat("Graphics", "TextureAnisotropy", mpGame->GetResources()->GetMaterialManager()->GetTextureAnisotropy());
+
+	ConfMan.setBool("first-start", false);
 
 	ConfMan.setInt("gamma", mpGame->GetGraphics()->GetLowLevel()->GetGammaCorrection() * 1000.f);
 

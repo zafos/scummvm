@@ -25,32 +25,34 @@
  * Yearn2Learn: The Flintstones Coloring Book
  *
  *************************************/
-/* v0.2, ©1992 Clark Brady, 317/839-0442 - YASIX - Yet Another System Information XFCN */
+
+/*
+ * v0.2, ©1992 Clark Brady, 317/839-0442 - YASIX - Yet Another System Information XFCN
+ */
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
 #include "director/lingo/xlibs/yasix.h"
 
-
 namespace Director {
 
-const char *Yasix::xlibName = "YASIX";
-const char *Yasix::fileNames[] = {
-	"YASIX",
-	0
+const char *const Yasix::xlibName = "YASIX";
+const XlibFileDesc Yasix::fileNames[] = {
+	{ "YASIX", nullptr },
+	{ nullptr, nullptr },
 };
 
-static BuiltinProto builtins[] = {
+static const BuiltinProto builtins[] = {
 	{ "YASIX", Yasix::m_yasix, 0, 0, 300, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
-void Yasix::open(int type) {
+void Yasix::open(ObjectType type, const Common::Path &path) {
 	g_lingo->initBuiltIns(builtins);
 }
 
-void Yasix::close(int type) {
+void Yasix::close(ObjectType type) {
 	g_lingo->cleanupBuiltIns(builtins);
 }
 

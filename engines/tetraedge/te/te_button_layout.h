@@ -27,6 +27,8 @@
 #include "tetraedge/te/te_signal.h"
 #include "tetraedge/te/te_timer.h"
 
+#include "common/path.h"
+
 namespace Common {
 struct Point;
 }
@@ -78,7 +80,7 @@ public:
 	void setClickPassThrough(bool val) {
 		_clickPassThrough = val;
 	}
-	void setValidationSound(const Common::String &val) {
+	void setValidationSound(const Common::Path &val) {
 		_validationSound = val;
 	}
 	void setValidationSoundVolume(float val) {
@@ -97,6 +99,9 @@ public:
 	TeLayout *downLayout() { return _downLayout; }
 	void setIgnoreMouseEvents(bool val) { _ignoreMouseEvents = val; }
 
+	// From TeSpriteButton, a direct way to load the images.
+	void load(const Common::Path &upImg, const Common::Path &downImg, const Common::Path &overImg);
+
 private:
 	static bool _mousePositionChangedCatched;
 	static TeTimer *getDoubleValidationProtectionTimer();
@@ -104,10 +109,11 @@ private:
 
 	bool _doubleValidationProtectionEnabled;
 	bool _ignoreMouseEvents;
+	bool _ownedLayouts;
 
-	State _currentState;
 	bool _clickPassThrough;
-	Common::String _validationSound;
+	State _currentState;
+	Common::Path _validationSound;
 	float _validationSoundVolume;
 
 	Common::Array<uint> _intArr;

@@ -124,6 +124,8 @@ public:
 
 	const Common::Array<TeVector3f32> freeMoveZoneVerticies() const { return _freeMoveZoneVerticies; }
 
+	static void setCollisionSlide(bool val) { _collisionSlide = val; }
+
 private:
 	TeVector2s32 aStarResolution() const;
 
@@ -135,6 +137,7 @@ private:
 	Common::Array<uint> _pickMesh;
 	Common::Array<TeVector3f32> _transformedVerticies;
 	Common::Array<uint> _borders;
+	Common::Array<TeVector2f32> _projectedPoints;
 
 	TeVector2f32 _gridSquareSize;
 	TeVector2f32 _gridTopLeft;
@@ -162,6 +165,8 @@ private:
 	TeTimer _updateTimer;
 
 	Common::Path _aszGridPath;
+
+	static bool _collisionSlide;
 };
 
 } // end namespace Tetraedge

@@ -105,7 +105,7 @@ void dgCollisionSphere::Init(dgFloat32 radius, dgMemoryAllocator *allocator) {
 
 		polyhedra.BeginFace();
 		for (dgInt32 j = 0; j < count; j += 3) {
-#ifdef _DEBUG
+#if 0 && defined(_DEBUG) // NEWTON_ASSERT is disabled so this whole calculation is useless
 			dgEdge *const edge = polyhedra.AddFace(indexList[j], indexList[j + 1],
 			                                       indexList[j + 2]);
 			NEWTON_ASSERT(edge);
@@ -320,7 +320,7 @@ dgVector dgCollisionPoint::SupportVertexSimd(const dgVector &dir) const {
 }
 
 dgFloat32 dgCollisionSphere::RayCast(const dgVector &p0, const dgVector &p1, dgContactPoint &contactOut, OnRayPrecastAction preFilter, const dgBody *const body, void *const userData) const {
-	if (PREFILTER_RAYCAST(preFilter, body, this, userData)) {
+	if (PREFILTER_RAYCAST(preFilter, reinterpret_cast<const NewtonBody *>(body), reinterpret_cast<const NewtonCollision *>(this), userData)) {
 		return dgFloat32(1.2f);
 	}
 

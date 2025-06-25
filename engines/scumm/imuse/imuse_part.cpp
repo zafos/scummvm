@@ -64,6 +64,7 @@ Part::Part() {
 	_percussion = 0;
 	_bank = 0;
 	_unassigned_instrument = false;
+	_se = nullptr;
 }
 
 void Part::saveLoadWithSerializer(Common::Serializer &ser) {
@@ -104,16 +105,14 @@ void Part::saveLoadWithSerializer(Common::Serializer &ser) {
 	ser.syncAsByte(_chorus, VER(8));
 	ser.syncAsByte(_percussion, VER(8));
 	ser.syncAsByte(_bank, VER(8));
+	ser.syncAsByte(_polyphony, VER(116));
+	ser.syncAsByte(_volControlSensitivity, VER(116));
 }
 
 void Part::set_detune(int8 detune) {
-	// Sam&Max does not have detune, so we just ignore this here. We still get
-	// this called, since Sam&Max uses the same controller for a different
-	// purpose.
-	if (_se->_newSystem)
-		return;
-
-	_detune_eff = clamp((_detune = detune) + _player->getDetune(), -128, 127);
+	// Sam&Max does not have detune except for the parameter faders, so the argument
+	// here will always be 0 and the only relevant part will be the detune from the player.
+	_detune_eff = _se->_newSystem ? _player->getDetune() : clamp((_detune = detune) + _player->getDetune(), -128, 127);
 	sendDetune();
 }
 
@@ -124,6 +123,13 @@ void Part::pitchBend(int16 value) {
 
 void Part::volume(byte value) {
 	_vol = value;
+	sendVolume(0);
+}
+
+void Part::volControlSensitivity(byte value) {
+	if (value > 127)
+		return;
+	_volControlSensitivity = value;
 	sendVolume(0);
 }
 
@@ -188,6 +194,13 @@ void Part::fix_after_load() {
 	set_detune(_detune);
 	set_pri(_pri);
 	set_pan(_pan);
+
+	if (!_se->_dynamicChanAllocation && !_mc && !_percussion) {
+		_mc = _se->allocateChannel(_player->getMidiDriver(), _pri_eff);
+		if (!_mc)
+			_se->suspendPart(this);
+	}
+
 	sendAll();
 }
 
@@ -203,8 +216,16 @@ void Part::pitchBendFactor(byte value) {
 void Part::set_onoff(bool on) {
 	if (_on != on) {
 		_on = on;
-		if (!on)
-			off();
+		if (!on) {
+			if (!_se->_dynamicChanAllocation) {
+				if (_mc) {
+					_mc->sustain(false);
+					_mc->allNotesOff();
+				}
+			} else {
+				off();
+			}
+		}
 		if (!_percussion)
 			_player->_se->reallocateMidiChannels(_player->getMidiDriver());
 	}
@@ -322,13 +343,16 @@ void Part::uninit() {
 		return;
 	off();
 	_player->removePart(this);
+	_se->removeSuspendedPart(this);
 	_player = nullptr;
 }
 
 void Part::off() {
 	if (_mc) {
+		_mc->sustain(false);
 		_mc->allNotesOff();
-		_mc->release();
+		if (!_se->reassignChannelAndResumePart(_mc))
+			_mc->release();
 		_mc = nullptr;
 	}
 }
@@ -367,21 +391,16 @@ void Part::sendAll() {
 }
 
 void Part::sendPitchBend() {
-	if (!_mc)
-		return;
-
 	if (_se->_newSystem && !_pitchbend_factor) {
 		sendVolumeFade();
 		return;
 	}
 
-	_mc->pitchBend(_pitchbend);
+	if (_mc)
+		_mc->pitchBend(_pitchbend);
 }
 
 void Part::sendVolume(int8 fadeModifier) {
-	if (!_mc)
-		return;
-
 	uint16 vol = (_vol + fadeModifier + 1) * _player->getEffectiveVolume();
 
 	if (_se->_newSystem)
@@ -414,26 +433,20 @@ void Part::sendDetune() {
 
 void Part::programChange(byte value) {
 	_bank = 0;
-	_instrument.program(value, _player->isMT32());
+	_instrument.program(value, 0, _player->isMT32());
 	if (clearToTransmit())
 		_instrument.send(_mc);
 }
 
 void Part::set_instrument(uint b) {
 	_bank = (byte)(b >> 8);
-	if (_bank)
-		error("Non-zero instrument bank selection. Please report this");
-	// HACK: Horrible hack to allow tracing of program change source.
-	// The Mac m68k versions of MI2 and Indy4 use a different program "bank"
-	// when it gets program change events through the iMuse SysEx handler.
-	// We emulate this by introducing a special instrument, which sets
-	// the instrument via sysEx_customInstrument. This seems to be
-	// exclusively used for special sound effects like the "spit" sound.
-	if (g_scumm->isMacM68kIMuse()) {
-		_instrument.macSfx(b);
-	} else {
-		_instrument.program((byte)b, _player->isMT32());
-	}
+
+	// Indy4 and Monkey2 Macintosh versions always use the second bank for sound effects here.
+	if (_se->_soundType == MDT_MACINTOSH && (_se->_game_id == GID_MONKEY2 || _se->_game_id == GID_INDY4))
+		_bank = 1;
+
+	_instrument.program((byte)b, _bank, _player->isMT32());
+
 	if (clearToTransmit())
 		_instrument.send(_mc);
 }

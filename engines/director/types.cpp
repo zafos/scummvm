@@ -25,12 +25,15 @@
 
 namespace Director {
 
-const char *scriptTypes[] = {
+const char *const scriptTypes[] = {
 	"ScoreScript",
 	"CastScript",
 	"MovieScript",
 	"EventScript",
-	"TestScript"
+	"TestScript",
+	"ScriptType5",
+	"ScriptType6",
+	"ParentScript",
 };
 
 const char *scriptType2str(ScriptType scr) {
@@ -45,7 +48,7 @@ const char *scriptType2str(ScriptType scr) {
 	return scriptTypes[scr];
 }
 
-const char *castTypes[] = {
+const char *const castTypes[] = {
 	"empty",
 	"bitmap",
 	"filmLoop",
@@ -58,21 +61,23 @@ const char *castTypes[] = {
 	"movie",
 	"digitalVideo",
 	"script",
-	"RTE",
+	"richText",
+	"???",
+	"transition",
 };
 
 const char *castType2str(CastType type) {
 	if (type == kCastTypeAny)
 		return "any";
 
-	if (type <= kCastRTE)
+	if (type <= kCastTransition)
 		return castTypes[type];
 
 	warning("BUILDBOT: Unknown castType: %d", type);
 	return "<unknown>";
 }
 
-const char *spriteType[] = {
+const char *const spriteType[] = {
 	"Inactive",
 	"Bitmap",
 	"Rectangle",
@@ -102,5 +107,91 @@ const char *spriteType2str(SpriteType type) {
 	return "<unknown>";
 }
 
+const char *const inkType[] = {
+	"Copy",
+	"Transparent",
+	"Reverse",
+	"Ghost",
+	"NotCopy",
+	"NotTrans",
+	"NotReverse",
+	"NotGhost",
+	"Matte",
+	"Mask",
+
+	"Blend", // 32
+	"AddPin",
+	"Add",
+	"SubPin",
+	"BackgndTrans",
+	"Light",
+	"Sub",
+	"Dark"
+};
+
+const char *inkType2str(InkType type) {
+	if (type <= kInkTypeMask)
+		return inkType[type];
+
+	if (type >= kInkTypeBlend && type <= kInkTypeDark)
+		return inkType[type - 32 + 10];
+
+	return "<unknown>";
+
+}
+
+const char *const symbolType[] = {
+	"VOIDSYM",
+	"OPCODE",
+	"CBLTIN",
+	"FBLTIN",
+	"HBLTIN",
+	"KBLTIN",
+	"FBLTIN_LIST",
+	"HBLTIN_LIST",
+	"HANDLER",
+};
+
+const char *symbolType2str(SymbolType type) {
+	if (type >= VOIDSYM && type <= HANDLER)
+		return symbolType[type];
+
+	warning("BUILDBOT: Unknown SymbolType: %d", type);
+	return "<unknown>";
+}
+
+#define defFlag(x) { x, #x }
+
+struct FlagsList {
+	int f;
+	const char *s;
+} static objFlagList[] = {
+	defFlag(kNoneObj),
+	defFlag(kFactoryObj),
+	defFlag(kXObj),
+	defFlag(kScriptObj),
+	defFlag(kXtraObj),
+	defFlag(kWindowObj),
+	defFlag(kCastMemberObj),
+};
+
+Common::String objectType2str(int fl) {
+	Common::String res;
+
+	for (int i = 0; i < ARRAYSIZE(objFlagList); i++) {
+		if (fl & objFlagList[i].f) {
+			if (!res.empty())
+				res += " | ";
+
+			res += objFlagList[i].s;
+			fl &= ~objFlagList[i].f;
+		}
+	}
+
+	if (fl)
+		res += Common::String::format(" | %x", fl);
+
+	return res;
+}
 
 } // End of namespace Director

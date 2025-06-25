@@ -79,7 +79,7 @@ bool MTropolisEngine::promptSave(ISaveWriter *writer, const Graphics::Surface *s
 	desc = dialog->getResultString();
 
 	if (desc.empty()) {
-		// create our own description for the saved game, the user didnt enter it
+		// create our own description for the saved game, the user didn't enter it
 		desc = dialog->createDefaultSaveDescription(slot);
 	}
 
@@ -252,7 +252,7 @@ bool MTropolisEngine::canSaveAutosaveCurrently() {
 	return canSaveGameStateCurrently();
 }
 
-bool MTropolisEngine::canSaveGameStateCurrently() {
+bool MTropolisEngine::canSaveGameStateCurrently(Common::U32String *msg) {
 	if (!_runtime->isIdle())
 		return false;
 

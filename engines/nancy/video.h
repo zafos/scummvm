@@ -36,20 +36,28 @@ struct Surface;
 namespace Nancy {
 
 class Decompressor;
+class VideoCacheLoader;
 
 class AVFDecoder : public Video::VideoDecoder {
+	friend class VideoCacheLoader;
 public:
+	enum CacheHint { kLoadForward, kLoadBidirectional };
+
+	AVFDecoder(CacheHint cacheHint = kLoadForward) : _cacheHint(cacheHint) {}
 	virtual ~AVFDecoder();
 
 	bool loadStream(Common::SeekableReadStream *stream) override;
 	const Graphics::Surface *decodeFrame(uint frameNr);
 	void addFrameTime(const uint16 timeToAdd);
+	bool atEnd() const;
 
 private:
+	CacheHint _cacheHint;
 	class AVFVideoTrack : public FixedRateVideoTrack {
 	friend class AVFDecoder;
+	friend class VideoCacheLoader;
 	public:
-		AVFVideoTrack(Common::SeekableReadStream *stream, uint32 chunkFileFormat);
+		AVFVideoTrack(Common::SeekableReadStream *stream, uint32 chunkFileFormat, CacheHint cacheHint);
 		virtual ~AVFVideoTrack();
 
 		uint16 getWidth() const override { return _width; }
@@ -86,11 +94,14 @@ private:
 		int _curFrame;
 		uint _frameCount;
 		uint32 _frameTime;
-		Graphics::Surface *_surface;
-		int _refFrame;
 		Common::Array<ChunkInfo> _chunkInfo;
 		Decompressor *_dec;
 		bool _reversed;
+		bool _compressed;
+
+		Common::SharedPtr<VideoCacheLoader> _loaderPtr;
+		Common::Array<Graphics::Surface> _frameCache;
+		CacheHint _cacheHint;
 	};
 };
 

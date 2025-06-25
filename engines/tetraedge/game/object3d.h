@@ -48,7 +48,7 @@ public:
 
 	bool loadModel(const Common::String &name);
 
-	static bool loadSettings(const Common::String &path);
+	static bool loadSettings(const Common::Path &path);
 	static void cleanup();
 
 	TeIntrusivePtr<TeModel> model() { return _modelPtr; }
@@ -61,7 +61,7 @@ public:
 	float _rotateTime;
 	TeTimer _rotateTimer;
 	TeQuaternion _rotateStart;
-	TeVector3f32 _rotateAmount;
+	TeVector3f32 _rotateAmount; // Rotate vector in degrees
 
 	float _translateTime;
 	TeTimer _translateTimer;
@@ -78,6 +78,7 @@ public:
 	TeVector3f32 _objTranslation;
 	TeQuaternion _objRotation;
 	TeVector3f32 _objScale;
+	TeMatrix4x4 _lastMatrix;
 
 	int _startFrame;
 	int _endFrame;

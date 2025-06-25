@@ -49,7 +49,7 @@
 
 #include "common/str.h"
 
-#include "ags/lib/std/vector.h"
+#include "common/std/vector.h"
 #include "ags/shared/core/platform.h"
 #include "ags/shared/core/types.h"
 
@@ -94,7 +94,7 @@ public:
 	// Tells if the string is either empty or has only whitespace characters
 	bool IsNullOrSpace() const;
 
-	// Those getters are for tests only, hence if AGS_PLATFORM_DEBUG
+	// Those getters are for tests only, hence if AGS_PLATFORM_TEST
 #if defined(AGS_PLATFORM_TEST) && AGS_PLATFORM_TEST
 	inline const char *GetBuffer() const {
 		return _buf;

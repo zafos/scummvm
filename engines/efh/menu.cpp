@@ -23,7 +23,7 @@
 
 namespace Efh {
 
-int16 EfhEngine::displayBoxWithText(Common::String str, int16 menuType, int16 displayOption, bool displayTeamWindowFl) {
+int16 EfhEngine::displayBoxWithText(const Common::String &str, int16 menuType, int16 displayOption, bool displayTeamWindowFl) {
 	debugC(3, kDebugEngine, "displayBoxWithText %s %d %d %s", str.c_str(), menuType, displayOption, displayTeamWindowFl ? "True" : "False");
 
 	int16 retVal = 0xFF;
@@ -122,7 +122,7 @@ bool EfhEngine::handleDeathMenu() {
 			displayFctFullScreen();
 	}
 
-	for (bool found = false; !found;) {
+	for (bool found = false; !found && !shouldQuit();) {
 		Common::KeyCode input = waitForKey();
 		switch (input) {
 		case Common::KEYCODE_l:
@@ -133,7 +133,7 @@ bool EfhEngine::handleDeathMenu() {
 			found = _saveAuthorized;
 			break;
 		case Common::KEYCODE_q:
-			_shouldQuit = true;
+			quitGame();
 			return true;
 			break;
 		case Common::KEYCODE_r:
@@ -344,10 +344,6 @@ void EfhEngine::displayCharacterSummary(int16 curMenuLine, int16 npcId) {
 					setTextPos(286, textPosY);
 					displayStringAtTextPos("Def");
 				}
-				// useless code removed.
-				// else {
-				//	var54 = _items[_npcBuf[npcId]._inventory[_menuStatItemArr[counter]]._ref]._defense;
-				// {
 			} else if (_items[itemId]._uses != 0x7F) {
 				int16 stat1 = _npcBuf[npcId]._inventory[_menuStatItemArr[counter]].getUsesLeft();
 				if (stat1 != 0x7F) {
@@ -481,7 +477,7 @@ void EfhEngine::displayWindowAndStatusMenu(int16 charId, int16 windowId, int16 m
 	}
 }
 
-int16 EfhEngine::displayStringInSmallWindowWithBorder(Common::String str, bool delayFl, int16 charId, int16 windowId, int16 menuId, int16 curMenuLine) {
+int16 EfhEngine::displayStringInSmallWindowWithBorder(const Common::String &str, bool delayFl, int16 charId, int16 windowId, int16 menuId, int16 curMenuLine) {
 	debugC(3, kDebugEngine, "displayStringInSmallWindowWithBorder %s %s %d %d %d %d", str.c_str(), delayFl ? "True" : "False", charId, windowId, menuId, curMenuLine);
 
 	int16 retVal = 0;
@@ -533,66 +529,62 @@ int16 EfhEngine::handleStatusMenu(int16 gameMode, int16 charId) {
 			windowId = kEfhMenuEquip;
 
 		do {
-			Common::KeyCode var19 = handleAndMapInput(false);
+			Common::KeyCode input = handleAndMapInput(false);
 			if (_menuDepth == 0) {
-				switch (var19) {
-				case Common::KEYCODE_ESCAPE:
-					windowId = kEfhMenuLeave;
-					var19 = Common::KEYCODE_RETURN;
-					break;
+				switch (input) {
 				case Common::KEYCODE_a:
 					windowId = kEfhMenuActive;
-					var19 = Common::KEYCODE_RETURN;
+					input = Common::KEYCODE_RETURN;
 					break;
 				case Common::KEYCODE_d:
 					windowId = kEfhMenuDrop;
-					var19 = Common::KEYCODE_RETURN;
+					input = Common::KEYCODE_RETURN;
 					break;
 				case Common::KEYCODE_e:
 					windowId = kEfhMenuEquip;
-					var19 = Common::KEYCODE_RETURN;
+					input = Common::KEYCODE_RETURN;
 					break;
 				case Common::KEYCODE_g:
 					windowId = kEfhMenuGive;
-					var19 = Common::KEYCODE_RETURN;
+					input = Common::KEYCODE_RETURN;
 					break;
 				case Common::KEYCODE_i:
 					windowId = kEfhMenuInfo;
-					var19 = Common::KEYCODE_RETURN;
+					input = Common::KEYCODE_RETURN;
 					break;
+				case Common::KEYCODE_ESCAPE:
 				case Common::KEYCODE_l:
 					windowId = kEfhMenuLeave;
-					var19 = Common::KEYCODE_RETURN;
+					input = Common::KEYCODE_RETURN;
 					break;
 				case Common::KEYCODE_p:
 					windowId = kEfhMenuPassive;
-					var19 = Common::KEYCODE_RETURN;
+					input = Common::KEYCODE_RETURN;
 					break;
 				case Common::KEYCODE_t:
 					windowId = kEfhMenuTrade;
-					var19 = Common::KEYCODE_RETURN;
+					input = Common::KEYCODE_RETURN;
 					break;
 				case Common::KEYCODE_u:
 					windowId = kEfhMenuUse;
-					var19 = Common::KEYCODE_RETURN;
+					input = Common::KEYCODE_RETURN;
 					break;
-				// case 0xFB: Joystick button 2
 				default:
-					//	warning("handleStatusMenu - unhandled keys (or joystick event?) 0xBA, 0xBB, 0xBC");
+					debugC(9, kDebugEngine, "handleStatusMenu - unhandled keys");
 					break;
 				}
 			} else if (_menuDepth == 1) {
 				// in the sub-menus, only a list of selectable items is displayed
-				if (var19 >= Common::KEYCODE_a && var19 <= Common::KEYCODE_z) {
-					int16 var8 = var19 - Common::KEYCODE_a;
+				if (input >= Common::KEYCODE_a && input <= Common::KEYCODE_z) {
+					int16 var8 = input - Common::KEYCODE_a;
 					if (var8 < _menuItemCounter) {
 						curMenuLine = var8;
-						var19 = Common::KEYCODE_RETURN;
+						input = Common::KEYCODE_RETURN;
 					}
 				}
 			}
 
-			switch (var19) {
+			switch (input) {
 			case Common::KEYCODE_RETURN:
 				// case 0xFA: Joystick button 1
 				if (_menuDepth == 0) {
@@ -665,7 +657,7 @@ int16 EfhEngine::handleStatusMenu(int16 gameMode, int16 charId) {
 
 			prepareStatusMenu(windowId, menuId, curMenuLine, charId, true);
 
-		} while (!selectionDoneFl); // Loop until a menu entry is confirmed by the user by pressing the enter key
+		} while (!selectionDoneFl && !shouldQuit()); // Loop until a menu entry is confirmed by the user by pressing the enter key
 
 		bool validationFl = true;
 
@@ -771,7 +763,7 @@ int16 EfhEngine::handleStatusMenu(int16 gameMode, int16 charId) {
 						}
 						givenFl = false;
 					}
-				} while (!givenFl && !var2 && destCharId != 0x1B);
+				} while (!givenFl && !var2 && destCharId != 0x1B && !shouldQuit());
 
 				if (givenFl) {
 					removeObject(charId, objectId);

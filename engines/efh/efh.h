@@ -58,12 +58,12 @@ namespace Efh {
 static const uint8 kSavegameVersion = 1;
 #define EFH_SAVE_HEADER MKTAG('E', 'F', 'H', 'S')
 
-enum AccessDebugChannels {
-	kDebugEngine = 1 << 0,
-	kDebugUtils = 1 << 1,
-	kDebugGraphics = 1 << 2,
-	kDebugScript = 1 << 3,
-	kDebugFight = 1 << 4
+enum EfhDebugChannels {
+	kDebugEngine = 1,
+	kDebugUtils,
+	kDebugGraphics,
+	kDebugScript,
+	kDebugFight,
 };
 
 class EfhGraphicsStruct {
@@ -257,12 +257,29 @@ struct TeamMonster {
 	void init();
 };
 
+enum EFHAction {
+	kActionNone,
+	kActionExit,
+	kActionSave,
+	kActionLoad,
+	kActionMoveUp,
+	kActionMoveDown,
+	kActionMoveLeft,
+	kActionMoveRight,
+	kActionMoveUpLeft,
+	kActionMoveUpRight,
+	kActionMoveDownLeft,
+	kActionMoveDownRight,
+	kActionCharacter1Status,
+	kActionCharacter2Status,
+	kActionCharacter3Status
+};
+
 class EfhEngine : public Engine {
 public:
 	EfhEngine(OSystem *syst, const ADGameDescription *gd);
 	~EfhEngine() override;
 
-	OSystem *_system;
 	Graphics::Surface *_mainSurface;
 	Common::RandomSource *_rnd;
 
@@ -278,15 +295,12 @@ public:
 
 	// savegames.cpp
 	Common::String getSavegameFilename(int slot);
-	bool canLoadGameStateCurrently() override;
-	bool canSaveGameStateCurrently() override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
 	Common::Error loadGameState(int slot) override;
 	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
 
-	bool _shouldQuit;
-
 protected:
-	Common::EventManager *_eventMan;
 	int _lastTime;
 	// Engine APIs
 	Common::Error run() override;
@@ -295,12 +309,12 @@ private:
 	Common::Platform _platform;
 	int _loadSaveSlot;
 	bool _saveAuthorized;
+	Common::CustomEventType _customAction = kActionNone;
 
 	void initialize();
 	void playIntro();
 	void initEngine();
 	void initMapMonsters();
-	void loadMapArrays(int idx);
 	void saveAnimImageSetId();
 	int16 getEquipmentDefense(int16 charId);
 	uint16 getEquippedExclusiveType(int16 charId, int16 exclusiveType, bool flag);
@@ -311,8 +325,7 @@ private:
 	void loadEfhGame();
 	void copyCurrentPlaceToBuffer(int16 id);
 	uint8 getMapTileInfo(int16 mapPosX, int16 mapPosY);
-	void writeTechAndMapFiles();
-	uint16 getStringWidth(const char *buffer);
+	uint16 getStringWidth(const Common::String &str) const;
 	void setTextPos(int16 textPosX, int16 textPosY);
 	void drawGameScreenAndTempText(bool flag);
 	void drawMap(bool largeMapFl, int16 mapPosX, int16 mapPosY, int16 mapSize, bool drawHeroFl, bool drawMonstersFl);
@@ -328,10 +341,10 @@ private:
 	bool giveItemTo(int16 charId, int16 objectId, int16 fromCharId);
 	int16 chooseCharacterToReplace();
 	int16 handleCharacterJoining();
-	void drawText(uint8 *impPtr, int16 posX, int16 posY, int16 maxX, int16 maxY, bool flag);
+	void drawText(uint8 *srcPtr, int16 posX, int16 posY, int16 maxX, int16 maxY, bool flag);
 	void displayMiddleLeftTempText(uint8 *impArray, bool flag);
 	void transitionMap(int16 centerX, int16 centerY);
-	void setSpecialTechZone(int16 unkId, int16 arg1, int16 arg2);
+	void setSpecialTechZone(int16 unkId, int16 centerX, int16 centerY);
 	int16 findMapSpecialTileIndex(int16 posX, int16 posY);
 	bool isPosOutOfMap(int16 mapPosX, int16 mapPosY);
 	void goSouth();
@@ -342,10 +355,12 @@ private:
 	void goSouthEast();
 	void goNorthWest();
 	void goSouthWest();
+	void showCharacterStatus(uint8 character);
 	void handleNewRoundEffects();
 	void resetGame();
 	void computeMapAnimation();
 	void handleAnimations();
+	void handleEvents();
 	int8 checkMonsterMoveCollisionAndTileTexture(int16 monsterId);
 	bool moveMonsterAwayFromTeam(int16 monsterId);
 	bool moveMonsterTowardsTeam(int16 monsterId);
@@ -415,10 +430,10 @@ private:
 	void handleDamageOnArmor(int16 charId, int16 damage);
 
 	// Files
-	int32 readFileToBuffer(Common::String &filename, uint8 *destBuffer);
+	int32 readFileToBuffer(const Common::Path &filename, uint8 *destBuffer);
 	void readAnimInfo();
 	void findMapFile(int16 mapId);
-	void rImageFile(Common::String filename, uint8 *targetBuffer, uint8 **subFilesArray, uint8 *packedBuffer);
+	void rImageFile(const Common::Path &filename, uint8 *targetBuffer, uint8 **subFilesArray, uint8 *packedBuffer);
 	void readItems();
 	void readImpFile(int16 id, bool techMapFl);
 	void loadNewPortrait();
@@ -444,9 +459,9 @@ private:
 	void drawColoredRect(int16 minX, int16 minY, int16 maxX, int16 maxY, int16 color);
 	void clearScreen(int16 color);
 	void displayRawDataAtPos(uint8 *imagePtr, int16 posX, int16 posY);
-	void drawString(const char *str, int16 startX, int16 startY, uint16 textColor);
-	void displayCenteredString(Common::String str, int16 minX, int16 maxX, int16 posY);
-	void displayMenuAnswerString(const char *str, int16 minX, int16 maxX, int16 posY);
+	void drawString(const Common::String &str, int16 startX, int16 startY, uint16 textColor);
+	void displayCenteredString(const Common::String &str, int16 minX, int16 maxX, int16 posY);
+	void displayMenuAnswerString(const Common::String &str, int16 minX, int16 maxX, int16 posY);
 	void drawMapWindow();
 	void displayGameScreen();
 	void drawUpperLeftBorders();
@@ -456,7 +471,7 @@ private:
 	void setTextColorWhite();
 	void setTextColorRed();
 	void setTextColorGrey();
-	void displayStringAtTextPos(Common::String message);
+	void displayStringAtTextPos(const Common::String &message);
 	void clearBottomTextZone(int16 color);
 	void clearBottomTextZone_2(int16 color);
 	void setNextCharacterPos();
@@ -465,7 +480,7 @@ private:
 	void displayColoredMenuBox(int16 minX, int16 minY, int16 maxX, int16 maxY, int16 color);
 
 	// Menu
-	int16 displayBoxWithText(Common::String str, int16 menuType, int16 displayOption, bool displayTeamWindowFl);
+	int16 displayBoxWithText(const Common::String &str, int16 menuType, int16 displayOption, bool displayTeamWindowFl);
 	bool handleDeathMenu();
 	void displayCombatMenu(int16 charId);
 	void displayMenuItemString(int16 menuBoxId, int16 thisBoxId, int16 minX, int16 maxX, int16 minY, const char *str);
@@ -476,7 +491,7 @@ private:
 	void displayStatusMenuActions(int16 menuId, int16 curMenuLine, int16 npcId);
 	void prepareStatusMenu(int16 windowId, int16 menuId, int16 curMenuLine, int16 charId, bool refreshFl);
 	void displayWindowAndStatusMenu(int16 charId, int16 windowId, int16 menuId, int16 curMenuLine);
-	int16 displayStringInSmallWindowWithBorder(Common::String str, bool delayFl, int16 charId, int16 windowId, int16 menuId, int16 curMenuLine);
+	int16 displayStringInSmallWindowWithBorder(const Common::String &str, bool delayFl, int16 charId, int16 windowId, int16 menuId, int16 curMenuLine);
 	int16 handleStatusMenu(int16 gameMode, int16 charId);
 	void unequipItem(int16 charId, int16 objectId, int16 windowId, int16 menuId, int16 curMenuLine);
 	void tryToggleEquipped(int16 charId, int16 objectId, int16 windowId, int16 menuId, int16 curMenuLine);
@@ -503,7 +518,6 @@ private:
 	void genericGenerateSound(int16 soundType, int16 repeatCount);
 
 	// Utils
-	void setDefaultNoteDuration();
 	void decryptImpFile(bool techMapFl);
 	void loadImageSet(int16 imageSetId, uint8 *buffer, uint8 **subFilesArray, uint8 *destBuffer);
 	uint32 uncompressBuffer(uint8 *compressedBuf, uint8 *destBuf);
@@ -511,13 +525,14 @@ private:
 	Common::KeyCode getLastCharAfterAnimCount(int16 delay);
 	Common::KeyCode getInput(int16 delay);
 	Common::KeyCode waitForKey();
-	Common::KeyCode mapInputCode(Common::KeyCode input);
 	Common::KeyCode handleAndMapInput(bool animFl);
-	Common::KeyCode getInputBlocking();
-	void setNumLock();
 	bool getValidationFromUser();
 	uint32 ROR(uint32 val, uint8 shiftVal);
 	Common::String getArticle(int pronoun);
+
+	// Actions
+	void handleActionSave();
+	void handleActionLoad();
 
 	uint8 _videoMode;
 	uint8 _bufferCharBM[128];

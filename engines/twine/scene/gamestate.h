@@ -22,9 +22,9 @@
 #ifndef TWINE_SCENE_GAMESTATE_H
 #define TWINE_SCENE_GAMESTATE_H
 
-#include "common/savefile.h"
 #include "common/scummsys.h"
 #include "twine/menu/menu.h"
+#include "twine/shared.h"
 
 namespace TwinE {
 
@@ -68,8 +68,7 @@ private:
 	 * 107: Set to 1 after Twinsen kills yellow groboclone in the Citadel Island Tavern (after the Tavern has
 	 * been closed down). Makes the Tavern open again and groboclone not appear any more.
 	 */
-	// TODO: why not NUM_GAME_FLAGS?
-	uint8 _gameStateFlags[256];
+	int16 _listFlagGame[NUM_GAME_FLAGS]; // ListVarGame
 	// only lba1 - lba2 uses 253 gameflag
 	int16 _gameChapter = 0;
 
@@ -78,7 +77,7 @@ public:
 
 	/**
 	 * LBA engine chapter
-	 *  0: Inprisoned
+	 *  0: Imprisoned
 	 *  1: Escape from the citadel
 	 *  2: Zoe got captured
 	 *  3: - looking for a young girl
@@ -108,7 +107,7 @@ public:
 	int16 _magicLevelIdx = 0;
 
 	/** Store the number of inventory keys */
-	int16 _inventoryNumKeys = 0;
+	int16 _nbLittleKeys = 0;
 	/** Store the number of inventory kashes */
 	int16 _goldPieces = 0;
 	int16 _zlitosPieces = 0;
@@ -122,7 +121,7 @@ public:
 	int16 _inventoryNumGas = 0;
 
 	/** Its using FunFrock Sabre */
-	bool _usingSabre = false;
+	bool _weapon = false;
 	bool _endGameItems = false;
 
 	/**
@@ -131,13 +130,23 @@ public:
 	 */
 	uint8 _inventoryFlags[NUM_INVENTORY_ITEMS];
 
-	uint8 _holomapFlags[NUM_LOCATIONS];
+	uint8 _holomapFlags[MAX_HOLO_POS_2];
 
 	char _sceneName[30] {};
 
-	TextId _gameChoices[10];  // inGameMenuData
-	int32 _numChoices = 0;   // numOfOptionsInChoice
-	TextId _choiceAnswer = TextId::kNone; // inGameMenuAnswer
+	TextId _gameListChoice[10];  // inGameMenuData
+	int32 _gameNbChoices = 0;   // numOfOptionsInChoice
+	TextId _gameChoice = TextId::kNone; // inGameMenuAnswer
+
+	void setDarts(int16 value) {
+		setGameFlag(InventoryItems::kiDart, value);
+	}
+
+	void addDart() {
+		int16 old = _listFlagGame[InventoryItems::kiDart];
+		++old;
+		setGameFlag(InventoryItems::kiDart, old);
+	}
 
 	inline bool inventoryDisabled() const {
 		return hasGameFlag(GAMEFLAG_INVENTORY_DISABLED) != 0;
@@ -166,14 +175,15 @@ public:
 
 	void clearGameFlags();
 
-	uint8 hasGameFlag(uint8 index) const;
+	int16 hasGameFlag(uint8 index) const;
 
-	void setGameFlag(uint8 index, uint8 value);
+	void setGameFlag(uint8 index, int16 value);
 
 	int16 setKeys(int16 value);
 	int16 setGas(int16 value);
 	int16 setLeafs(int16 value);
 	int16 setKashes(int16 value);
+	int16 setZlitos(int16 value);
 	int16 setMagicPoints(int16 val);
 	int16 setMaxMagicPoints();
 	int16 setLeafBoxes(int16 val);
@@ -199,7 +209,7 @@ public:
 	bool loadGame(Common::SeekableReadStream *file);
 	bool saveGame(Common::WriteStream *file);
 
-	void processGameChoices(TextId choiceIdx);
+	void gameAskChoice(TextId choiceIdx);
 
 	void processGameoverAnimation();
 };

@@ -157,7 +157,8 @@ class DirectorSound {
 
 private:
 	Window *_window;
-	Common::Array<SoundChannel> _channels;
+	Common::HashMap<int, SoundChannel *> _channels;
+	Common::HashMap<int, int> _volumes;
 	Audio::SoundHandle _scriptSound;
 	Audio::Mixer *_mixer;
 	Audio::PCSpeaker *_speaker;
@@ -184,18 +185,12 @@ public:
 	void playExternalSound(uint16 menu, uint16 submenu, uint8 soundChannel);
 	void playFPlaySound(const Common::Array<Common::String> &fplayList);
 	void playFPlaySound();
-	void setSoundLevel(int channel, uint8 soundLevel);
-	uint8 getSoundLevel(uint8 soundChannel);
 	void setSoundEnabled(bool enabled);
 	void systemBeep();
 	void changingMovie();
 
 	void loadSampleSounds(uint type);
 	void unloadSampleSounds();
-
-	void setLastPlayedSound(uint8 soundChannel, SoundID soundId, bool stopOnZero = true);
-	bool isLastPlayedSound(uint8 soundChannel, const SoundID &soundId);
-	bool shouldStopOnZero(uint8 soundChannel);
 
 	bool isChannelPuppet(uint8 soundChannel);
 	void setPuppetSound(SoundID soundId, uint8 soundChannel);
@@ -206,16 +201,22 @@ public:
 	Common::String getCurrentSound() { return _currentSoundName; }
 
 	void registerFade(uint8 soundChannel, bool fadeIn, int ticks);
-	bool fadeChannel(uint8 soundChannel);
+	bool fadeChannels();
 
 	bool isChannelActive(uint8 soundChannel);
+	uint8 getChannelVolume(uint8 soundChannel);
+	void setChannelVolume(int channel, uint8 volume);
 	void stopSound(uint8 soundChannel);
 	void stopSound();
+	void setChannelDefaultVolume(int soundChannel);
 
 private:
-	uint8 getChannelVolume(uint8 soundChannel);
-	void setSoundLevelInternal(uint8 soundChannel, uint8 soundLevel);
-	bool isChannelValid(uint8 soundChannel);
+	void setLastPlayedSound(uint8 soundChannel, SoundID soundId, bool stopOnZero = true);
+	bool isLastPlayedSound(uint8 soundChannel, const SoundID &soundId);
+	bool shouldStopOnZero(uint8 soundChannel);
+
+	void setChannelVolumeInternal(uint8 soundChannel, uint8 volume);
+	bool assertChannel(int soundChannel);
 	void cancelFade(uint8 soundChannel);
 };
 
@@ -225,6 +226,9 @@ public:
 	virtual ~AudioDecoder() {};
 public:
 	virtual Audio::AudioStream *getAudioStream(bool looping = false, bool forPuppet = false, DisposeAfterUse::Flag disposeAfterUse = DisposeAfterUse::YES) { return nullptr; }
+	virtual int getChannelCount() { return 0; }
+	virtual int getSampleRate() { return 0; }
+	virtual int getSampleSize() { return 0; }
 };
 
 class SNDDecoder : public AudioDecoder {
@@ -238,12 +242,18 @@ public:
 	bool processBufferCommand(Common::SeekableReadStreamEndian &stream);
 	Audio::AudioStream *getAudioStream(bool looping = false, bool forPuppet = false, DisposeAfterUse::Flag disposeAfterUse = DisposeAfterUse::YES) override;
 	bool hasLoopBounds();
+	void resetLoopBounds();
+	bool hasValidLoopBounds();
+	int getChannelCount() override { return _channels; }
+	int getSampleRate() override { return _rate; }
+	int getSampleSize() override { return _bits; }
 
 private:
 	byte *_data;
 	uint16 _channels;
 	uint32 _size;
 	uint16 _rate;
+	uint16 _bits;
 	byte _flags;
 	uint32 _loopStart;
 	uint32 _loopEnd;

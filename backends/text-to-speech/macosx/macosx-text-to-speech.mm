@@ -117,7 +117,12 @@ bool MacOSXTextToSpeechManager::startNextSpeech() {
 	if (_messageQueue.empty())
 		return false;
 
-	Common::String textToSpeak = _messageQueue.pop();
+	Common::String textToSpeak;
+	do {
+		textToSpeak = _messageQueue.pop();
+	} while (textToSpeak.empty() && !_messageQueue.empty());
+	if (textToSpeak.empty())
+		return false;
 
 	// Get current encoding
 	CFStringEncoding stringEncoding = kCFStringEncodingUTF8;
@@ -137,7 +142,7 @@ bool MacOSXTextToSpeechManager::stop() {
 		_currentSpeech.clear(); // so that it immediately reports that it is no longer speaking
 		// Stop as soon as possible
 		// Also tell the MacOSXTextToSpeechManagerDelegate to ignore the next finishedSpeaking as
-		// it has already been handled, but we might have started another speach by the time we
+		// it has already been handled, but we might have started another speech by the time we
 		// receive it, and we don't want to stop that one.
 		[synthesizerDelegate ignoreNextFinishedSpeaking:YES];
 		[synthesizer stopSpeakingAtBoundary:NSSpeechImmediateBoundary];

@@ -71,6 +71,8 @@ public:
 	void makeInvisible() { _flags = _flags | 0x40; }
 	void makeVisible() { _flags = _flags & ~0x40; }
 	bool isInitiallyInvisible() { return _flags & 0x80; }
+	void makeInitiallyInvisible() { _flags = _flags | 0x80; }
+	void makeInitiallyVisible() { _flags = _flags & ~0x80; }
 	bool isDestroyed() { return _flags & 0x20; }
 	void destroy() { _flags = _flags | 0x20; }
 	void restore() { _flags = _flags & ~0x20; }
@@ -79,13 +81,14 @@ public:
 	virtual ~Object() {}
 	virtual Object *duplicate() = 0;
 
-	virtual void draw(Freescape::Renderer *gfx) = 0;
+	virtual void draw(Freescape::Renderer *gfx, float offset = 0.0) = 0;
 
 	uint16 _flags;
 	ObjectType _type;
 	uint16 _objectID;
 	Math::Vector3d _origin, _size, _rotation;
 	Math::AABB _boundingBox;
+	Object *_partOfGroup = nullptr;
 };
 
 } // End of namespace Freescape

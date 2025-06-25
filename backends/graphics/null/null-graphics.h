@@ -32,6 +32,7 @@ public:
 	void setFeatureState(OSystem::Feature f, bool enable) override {}
 	bool getFeatureState(OSystem::Feature f) const override { return false; }
 
+#ifdef USE_RGB_COLOR
 	Graphics::PixelFormat getScreenFormat() const override {
 		return _format;
 	}
@@ -46,6 +47,7 @@ public:
 		list.push_back(Graphics::PixelFormat::createFormatCLUT8());
 		return list;
 	}
+#endif
 
 	void initSize(uint width, uint height, const Graphics::PixelFormat *format = NULL) override {
 		_width = width;
@@ -66,6 +68,7 @@ public:
 	Graphics::Surface *lockScreen() override { return NULL; }
 	void unlockScreen() override {}
 	void fillScreen(uint32 col) override {}
+	void fillScreen(const Common::Rect &r, uint32 col) override {}
 	void updateScreen() override {}
 	void setShakePos(int shakeXOffset, int shakeYOffset) override {}
 	void setFocusRectangle(const Common::Rect& rect) override {}

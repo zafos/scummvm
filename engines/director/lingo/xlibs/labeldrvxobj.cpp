@@ -27,12 +27,12 @@
  *************************************/
 
 /*
-	-- LabelDrv XObject. Version 1.1 6/5/95 greg yachuk
-	LabelDrv
-	I      mNew          --Creates a new instance of the XObject
-	X      mDispose      --Disposes of XObject instance.
-	XSS    mSetRange     --Sets the drive letters to begin and end the search for the label. Default is C..Z.
-	SS     mGetDrive     --Return the drive letter where the specified label is mounted.
+ * -- LabelDrv XObject. Version 1.1 6/5/95 greg yachuk
+ * LabelDrv
+ * I      mNew          --Creates a new instance of the XObject
+ * X      mDispose      --Disposes of XObject instance.
+ * XSS    mSetRange     --Sets the drive letters to begin and end the search for the label. Default is C..Z.
+ * SS     mGetDrive     --Return the drive letter where the specified label is mounted.
 */
 
 #include "director/director.h"
@@ -42,20 +42,20 @@
 
 namespace Director {
 
-const char *LabelDrvXObj::xlibName = "LabelDrv";
-const char *LabelDrvXObj::fileNames[] = {
-	"LabelDrv",
-	nullptr
+const char *const LabelDrvXObj::xlibName = "LabelDrv";
+const XlibFileDesc LabelDrvXObj::fileNames[] = {
+	{ "LabelDrv",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",				LabelDrvXObj::m_new,		 0, 0,	400 },	// D4
 	{ "SetRange",			LabelDrvXObj::m_setRange,	 2, 2,  400 },	// D4
 	{ "GetDrive",			LabelDrvXObj::m_getDrive,	 1, 1,  400 },	// D4
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void LabelDrvXObj::open(int type) {
+void LabelDrvXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		LabelDrvXObject::initMethods(xlibMethods);
 		LabelDrvXObject *xobj = new LabelDrvXObject(kXObj);
@@ -63,7 +63,7 @@ void LabelDrvXObj::open(int type) {
 	}
 }
 
-void LabelDrvXObj::close(int type) {
+void LabelDrvXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		LabelDrvXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -77,7 +77,6 @@ LabelDrvXObject::LabelDrvXObject(ObjectType ObjectType) :Object<LabelDrvXObject>
 void LabelDrvXObj::m_new(int nargs) {
 	LabelDrvXObject *me = static_cast<LabelDrvXObject *>(g_lingo->_state->me.u.obj);
 
-	Common::Rect rect;
 	me->_range = "C";
 
 	g_lingo->push(g_lingo->_state->me);

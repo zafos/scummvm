@@ -38,7 +38,7 @@
 
 namespace Tetraedge {
 
-static const char *LAST_SAVE_CONF = "lastSaveSlot";
+static const char *LAST_SAVE_CONF = "last_save_slot";
 
 MainMenu::MainMenu() : _entered(false), _confirmingTuto(false) {
 	_newGameConfirm.onButtonYesSignal().add(this, &MainMenu::onNewGameConfirmed);
@@ -50,6 +50,14 @@ MainMenu::MainMenu() : _entered(false), _confirmingTuto(false) {
 
 void MainMenu::enter() {
 	Application *app = g_engine->getApplication();
+
+	if (g_engine->gameType() == TetraedgeEngine::kSyberia2) {
+		app->backLayout().setRatioMode(TeILayout::RATIO_MODE_LETTERBOX);
+		app->backLayout().setRatio(1.333333f);
+		app->frontLayout().setRatioMode(TeILayout::RATIO_MODE_LETTERBOX);
+		app->frontLayout().setRatio(1.333333f);
+	}
+
 	TeSpriteLayout &appSpriteLayout = app->appSpriteLayout();
 	appSpriteLayout.setVisible(true);
 	if (!appSpriteLayout._tiledSurfacePtr->_frameAnim._runTimer.running()) {
@@ -60,19 +68,33 @@ void MainMenu::enter() {
 	app->captureFade();
 
 	_entered = true;
-	load("menus/mainMenu/mainMenu.lua");
+	const char *luaFile = g_engine->gameIsAmerzone() ? "GUI/MainMenu.lua" : "menus/mainMenu/mainMenu.lua";
+	load(luaFile);
 
 	TeLayout *menuLayout = layoutChecked("menu");
 	appSpriteLayout.addChild(menuLayout);
 
+	//
+	// WORKAROUND: This is set to PanScan ratio 1.0, but with our code
+	// but that shrinks it down to pillarboxed.  Force back to full size.
+	//
+	
+	TeLayout *background;
+	if (layout("background"))
+		background = layoutChecked("background");
+	else
+		background = dynamic_cast<TeLayout *>(menuLayout->child(0));
+	assert(background);
+	background->setRatioMode(TeILayout::RATIO_MODE_NONE);
+
 	app->mouseCursorLayout().setVisible(true);
-	app->mouseCursorLayout().load("pictures/cursor.png");
+	app->mouseCursorLayout().load(app->defaultCursor());
 
 	TeMusic &music = app->music();
 	if (music.isPlaying()) {
 		// TODO: something here??
 	}
-	music.load(value("musicPath").toString());
+	music.load(Common::Path(value("musicPath").toString()));
 	music.play();
 	music.volume(1.0f);
 
@@ -105,6 +127,11 @@ void MainMenu::enter() {
 	// TODO: confirmation (menus/confirm/confirmNotSound.lua)
 	// if TeSoundManager is not valid.
 
+	// Hide the Facebook button since we don't support it anyway..
+	TeButtonLayout *fbButton = buttonLayout("facebookButton");
+	if (fbButton)
+		fbButton->setVisible(false);
+
 	_confirmingTuto = false;
 	TeLayout *panel = layout("panel");
 
@@ -126,7 +153,7 @@ void MainMenu::enter() {
 
 	// Skip the menu if we are loading.
 	Game *game = g_engine->getGame();
-	if (game->hasLoadName() || ConfMan.get("skip_mainmenu") == "true") {
+	if (game->hasLoadName() || ConfMan.getBool("skip_mainmenu")) {
 		onNewGameConfirmed();
 	}
 }
@@ -184,12 +211,9 @@ void MainMenu::tryDisableButton(const Common::String &btnName) {
 
 bool MainMenu::onContinueGameButtonValidated() {
 	Application *app = g_engine->getApplication();
-	const Common::String lastSave = ConfMan.get(LAST_SAVE_CONF);
-	if (!lastSave.empty()) {
-		int saveSlot = lastSave.asUint64();
-		g_engine->loadGameState(saveSlot);
-		return false;
-	}
+	int lastSave = ConfMan.hasKey(LAST_SAVE_CONF) ? ConfMan.getInt(LAST_SAVE_CONF) : -1;
+	if (lastSave >= 0)
+		g_engine->loadGameState(lastSave);
 
 	tryDisableButton("newGameButton");
 	tryDisableButton("continueGameButton");
@@ -205,6 +229,21 @@ bool MainMenu::onContinueGameButtonValidated() {
 	leave();
 	app->startGame(false, 1);
 	app->fade();
+
+	if (g_engine->gameType() == TetraedgeEngine::kSyberia2) {
+		// TODO: This should probably happen on direct game load too,
+		// as it bypasses this code path which always gets called in
+		// the original?
+		if (app->ratioStretched()) {
+			app->backLayout().setRatioMode(TeILayout::RATIO_MODE_NONE);
+			app->frontLayout().setRatioMode(TeILayout::RATIO_MODE_NONE);
+		} else {
+			app->backLayout().setRatioMode(TeILayout::RATIO_MODE_LETTERBOX);
+			app->backLayout().setRatio(1.333333f);
+			app->frontLayout().setRatioMode(TeILayout::RATIO_MODE_LETTERBOX);
+			app->frontLayout().setRatio(1.333333f);
+		}
+	}
 	return false;
 }
 
@@ -248,7 +287,7 @@ bool MainMenu::onNewGameButtonValidated() {
 	// with "menus/confirm/confirmNewGame.lua"
 	// because only one save is allowed.  We just clear last
 	// save slot number and go ahead and start.
-	ConfMan.set(LAST_SAVE_CONF, "");
+	ConfMan.setInt(LAST_SAVE_CONF, -1);
 	onNewGameConfirmed();
 	return false;
 }
@@ -256,13 +295,24 @@ bool MainMenu::onNewGameButtonValidated() {
 bool MainMenu::onNewGameConfirmed() {
 	// Note: Original game deletes saves here.  Don't do that..
 	_confirmingTuto = true;
-	_tutoConfirm.enter("menus/confirm/confirmTuto.lua", "");
+	if (!g_engine->gameIsAmerzone())
+		_tutoConfirm.enter("menus/confirm/confirmTuto.lua", "");
+	else
+		_tutoConfirm.enter("GUI/ConfirmNewGame.lua", "");
 	onContinueGameButtonValidated();
 	return false;
 }
 
 bool MainMenu::onOptionsButtonValidated() {
-	g_engine->openConfigDialog();
+	if (ConfMan.getBool("use_scummvm_options")) {
+		g_engine->openConfigDialog();
+	} else {
+		Application *app = g_engine->getApplication();
+		app->captureFade();
+		leave();
+		app->optionsMenu().enter();
+		app->fade();
+	}
 	return true;
 }
 
@@ -282,8 +332,7 @@ bool MainMenu::onUnlockGameButtonValidated() {
 }
 
 void MainMenu::refresh() {
-	// TODO: get a real value
-	bool haveSave = false;
+	bool haveSave = ConfMan.hasKey(LAST_SAVE_CONF);
 	TeButtonLayout *continueGameButton = buttonLayout("continueGameButton");
 	if (continueGameButton) {
 		continueGameButton->setEnable(haveSave);
@@ -291,7 +340,7 @@ void MainMenu::refresh() {
 }
 
 void MainMenu::setCenterButtonsVisibility(bool visible) {
-	bool haveSave = false;
+	bool haveSave = ConfMan.hasKey(LAST_SAVE_CONF);
 
 	TeButtonLayout *continuegameunlockButton = buttonLayout("continuegameunlockButton");
 	if (continuegameunlockButton) {

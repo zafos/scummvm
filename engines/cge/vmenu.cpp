@@ -66,7 +66,6 @@ Vmenu::Vmenu(CGEEngine *vm, Choice *list, int x, int y)
 	Choice *cp;
 
 	_addr = this;
-	delete[] _vmgt;
 	_items = 0;
 	for (cp = list; cp->_text; cp++)
 		_items++;
@@ -88,11 +87,11 @@ Vmenu::~Vmenu() {
 
 #define CALL_MEMBER_FN(object,ptrToMember)  ((object).*(ptrToMember))
 
-void Vmenu::touch(uint16 mask, int x, int y, Common::KeyCode keyCode) {
+void Vmenu::touch(uint16 mask, int x, int y) {
 	if (!_items)
 		return;
 
-	Sprite::touch(mask, x, y, keyCode);
+	Sprite::touch(mask, x, y);
 
 	y -= kTextVMargin - 1;
 	int n = 0;

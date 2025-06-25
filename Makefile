@@ -33,11 +33,11 @@ ifeq "$(HAVE_GCC)" "1"
 	CXXFLAGS+= -Wno-long-long -Wno-multichar -Wno-unknown-pragmas -Wno-reorder
 	# Enable even more warnings...
 	CXXFLAGS+= -Wpointer-arith -Wcast-qual
-	CXXFLAGS+= -Wshadow -Wnon-virtual-dtor -Wwrite-strings
+	CXXFLAGS+= -Wnon-virtual-dtor -Wwrite-strings
 
 	# Currently we disable this gcc flag, since it will also warn in cases,
 	# where using GCC_PRINTF (means: __attribute__((format(printf, x, y))))
-	# is not possible, thus it would fail compiliation with -Werror without
+	# is not possible, thus it would fail compilation with -Werror without
 	# being helpful.
 	#CXXFLAGS+= -Wmissing-format-attribute
 
@@ -134,7 +134,7 @@ endif
 
 .PHONY: print-dists print-executables print-version print-distversion
 print-dists:
-	@echo $(DIST_FILES_DOCS) $(DIST_FILES_THEMES) $(DIST_FILES_NETWORKING) $(DIST_FILES_VKEYBD) $(DIST_FILES_ENGINEDATA) $(DIST_FILES_PLATFORM) $(srcdir)/doc
+	@echo $(DIST_FILES_DOCS) $(DIST_FILES_THEMES) $(DIST_FILES_NETWORKING) $(DIST_FILES_VKEYBD) $(DIST_FILES_ENGINEDATA) $(DIST_FILES_ENGINEDATA_BIG) $(DIST_FILES_SOUNDFONTS) $(DIST_FILES_PLATFORM) $(srcdir)/doc
 
 print-executables:
 	@echo $(if $(DIST_EXECUTABLES),$(DIST_EXECUTABLES),$(EXECUTABLE) $(PLUGINS))

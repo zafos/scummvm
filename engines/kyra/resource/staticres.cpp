@@ -38,7 +38,7 @@
 
 namespace Kyra {
 
-#define RESFILE_VERSION 120
+#define RESFILE_VERSION 123
 
 namespace {
 bool checkKyraDat(Common::SeekableReadStream *file) {
@@ -97,6 +97,8 @@ const IndexTable iLanguageTable[] = {
 	{ Common::ZH_CHN,  9 },
 	{ Common::ZH_TWN, 10 },
 	{ Common::KO_KOR, 11 },
+	{ Common::CS_CZE, 12 },
+	{ Common::PL_POL, 13 },
 	{ -1, -1 }
 };
 
@@ -140,7 +142,7 @@ bool StaticResource::loadStaticResourceFile() {
 		return true;
 
 	Common::ArchiveMemberList kyraDatFiles;
-	res->listFiles(staticDataFilename(), kyraDatFiles);
+	res->listFiles(Common::Path(staticDataFilename()), kyraDatFiles);
 
 	bool foundWorkingKyraDat = false;
 	for (Common::ArchiveMemberList::iterator i = kyraDatFiles.begin(); i != kyraDatFiles.end(); ++i) {
@@ -216,7 +218,7 @@ Common::SeekableReadStream *StaticResource::loadIdMap(Common::Language lang) {
 
 
 	// load the ID map for our game
-	const Common::String filenamePattern = Common::String::format("0%01X%01X%01X000%01X", game, platform, special, lng);
+	const Common::Path filenamePattern(Common::String::format("0%01X%01X%01X000%01X", game, platform, special, lng));
 	return _vm->resource()->createReadStream(filenamePattern);
 }
 
@@ -311,7 +313,7 @@ const uint16 *StaticResource::loadRawDataBe16(int id, int &entries) {
 bool StaticResource::setLanguage(Common::Language lang, int id) {
 	if (lang == Common::UNK_LANG)
 		lang = _vm->gameFlags().lang;
-	
+
 	unloadId(id);
 
 	// load the ID map for our game
@@ -366,7 +368,7 @@ bool StaticResource::prefetchId(int id) {
 	ResData data;
 	data.id = id;
 	data.type = dDesc->_value.type;
-	Common::SeekableReadStream *fileStream = _vm->resource()->createReadStream(Common::String::format("%08X", dDesc->_value.filename));
+	Common::SeekableReadStream *fileStream = _vm->resource()->createReadStream(Common::Path(Common::String::format("%08X", dDesc->_value.filename)));
 	if (!fileStream)
 		return false;
 
@@ -1453,6 +1455,7 @@ const char *const KyraEngine_HoF::_languageExtension[] = {
 	"ITA",      Italian and Spanish were never included
 	"SPA"*/
 	"JPN",
+	"POL"
 };
 
 const char *const KyraEngine_HoF::_scriptLangExt[] = {

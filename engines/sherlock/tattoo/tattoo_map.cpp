@@ -97,7 +97,7 @@ int TattooMap::show() {
 
 	// Load the palette
 	Common::SeekableReadStream *stream = res.load("map.pal");
-	stream->read(screen._cMap, PALETTE_SIZE);
+	stream->read(screen._cMap, Graphics::PALETTE_SIZE);
 	screen.translatePalette(screen._cMap);
 	delete stream;
 
@@ -367,7 +367,7 @@ void TattooMap::showCloseUp(int closeUpNum) {
 	events.hideCursor();
 
 	// Get the closeup images
-	Common::String fname = Common::String::format("res%02d.vgs", closeUpNum + 1);
+	Common::Path fname(Common::String::format("res%02d.vgs", closeUpNum + 1));
 	ImageFile pic(fname);
 
 	Point32 closeUp(_data[closeUpNum].x * 100, _data[closeUpNum].y * 100);
@@ -405,7 +405,7 @@ void TattooMap::showCloseUp(int closeUpNum) {
 			screen._currentScroll.y + closeUp.y / 100 - picSize.y / 2);
 
 		restoreArea(oldBounds);
-		screen._backBuffer1.SHtransBlitFrom(pic[0], pt, false, 0, scaleVal);
+		screen._backBuffer1.SHtransBlitFrom(pic[0], pt, false, scaleVal);
 
 		screen.slamRect(oldBounds);
 		screen.slamArea(pt.x, pt.y, picSize.x, picSize.y);

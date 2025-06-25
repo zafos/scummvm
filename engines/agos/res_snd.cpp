@@ -131,17 +131,19 @@ void AGOSEngine::skipSpeech() {
 	}
 }
 
-void AGOSEngine::loadMusic(uint16 music, bool forceSimon2Gm) {
+void AGOSEngine::loadMusic(uint16 music, bool forceSimon2GmData, bool useSimon2Remapping) {
 	stopMusic();
 
-	uint16 indexBase = forceSimon2Gm ? MUSIC_INDEX_BASE_SIMON2_GM : _musicIndexBase;
+	debug(1, "AGOSEngine::loadMusic(music=%d, forceSimon2GmData=%d, useSimon2Remapping=%d)", music, forceSimon2GmData, useSimon2Remapping);
+
+	uint16 indexBase = forceSimon2GmData ? MUSIC_INDEX_BASE_SIMON2_GM : _musicIndexBase;
 
 	_gameFile->seek(_gameOffsetsPtr[indexBase + music - 1], SEEK_SET);
 	_midi->load(_gameFile);
 
 	// Activate Simon 2 GM to MT-32 remapping if we force GM, otherwise
 	// deactivate it (in case it was previously activated).
-	_midi->setSimon2Remapping(forceSimon2Gm);
+	_midi->setSimon2Remapping(useSimon2Remapping);
 
 	_lastMusicPlayed = music;
 	_nextMusicToPlay = -1;
@@ -233,6 +235,8 @@ void AGOSEngine::playModule(uint16 music) {
 }
 
 void AGOSEngine_Simon2::playMusic(uint16 music, uint16 track) {
+	debug(1, "AGOSEngine_Simon2::loadMusic(music=%d, track=%d)", music, track);
+
 	if (_lastMusicPlayed == 10 && getPlatform() == Common::kPlatformDOS && _midi->usesMT32Data()) {
 		// WORKAROUND Simon 2 track 10 (played during the first intro scene)
 		// consist of 3 subtracks. Subtracks 2 and 3 are missing from the MT-32
@@ -240,12 +244,34 @@ void AGOSEngine_Simon2::playMusic(uint16 music, uint16 track) {
 		// and does not restart until the next scene.
 		// We fix this by loading the GM version of track 10 and remapping the
 		// instruments to MT-32.
+		// The 25th Anniversary Editions of the game attempted to fix this
+		// problem by replacing the track 10 MT-32 data with the track 10 GM
+		// data. For these versions, we can just load the MT-32 data. However,
+		// we now have to remap instruments for all subtracks.
 
-		// Reload track 10 and force GM for all subtracks but the first (this
-		// also activates the instrument remapping).
-		loadMusic(10, track > 0);
+		// Reload track 10 using GM data (if necessary) and activate instrument
+		// remapping.
+		bool track10Fix = getFeatures() & GF_MT32_TRACK10_FIX;
+		loadMusic(10, !track10Fix && track > 0, track10Fix || track > 0);
 	}
 
+#ifdef USE_VORBIS
+		Common::String trackName;
+
+		if (track)
+			Common::String::format("OGG/track%02d-%d", _lastMusicPlayed, track);
+		else
+			Common::String::format("OGG/track%02d", _lastMusicPlayed);
+
+		_digitalMusicStream = Audio::SeekableAudioStream::openStreamFile(trackName.c_str());
+		if (_digitalMusicStream) {
+			_mixer->playStream(Audio::Mixer::kMusicSoundType, &_digitalMusicHandle, _digitalMusicStream);
+
+			debug(1, "AGOSEngine_Simon2::playMusic(): Playing %s", trackName.c_str());
+
+			return;
+		}
+#endif
 	_midi->play(track);
 }
 
@@ -308,7 +334,7 @@ void AGOSEngine_Simon1::playMusic(uint16 music, uint16 track) {
 		_midi->play();
 	} else if (getPlatform() == Common::kPlatformAcorn) {
 		// Acorn floppy version.
-		
+
 		// TODO: Add support for Desktop Tracker format in Acorn disk version
 	}
 }
@@ -371,7 +397,7 @@ void AGOSEngine::playMusic(uint16 music, uint16 track) {
 				error("playMusic: Can't load music from 'MOD%d.PAK'", music);
 		} else {
 			Common::File *file = new Common::File();
-			if (!file->open(Common::String::format("MOD%d.MUS", music)))
+			if (!file->open(Common::Path(Common::String::format("MOD%d.MUS", music))))
 				error("playMusic: Can't load music from 'MOD%d.MUS'", music);
 			str = file;
 		}
@@ -388,6 +414,9 @@ void AGOSEngine::stopMusic() {
 		_midi->stop();
 	}
 	_mixer->stopHandle(_modHandle);
+	_mixer->stopHandle(_digitalMusicHandle);
+
+	debug(1, "AGOSEngine::stopMusic()");
 }
 
 static const byte elvira1_soundTable[100] = {
@@ -650,7 +679,7 @@ void AGOSEngine::loadMidiSfx() {
 	Common::File fxb_file;
 
 	Common::String filename = getGameType() == GType_ELVIRA2 ? "MYLIB.FXB" : "WAX.FXB";
-	fxb_file.open(filename);
+	fxb_file.open(Common::Path(filename));
 	if (!fxb_file.isOpen())
 		error("loadMidiSfx: Can't open sound effect bank '%s'", filename.c_str());
 

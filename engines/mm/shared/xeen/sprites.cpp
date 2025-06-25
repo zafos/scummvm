@@ -23,7 +23,7 @@
 #include "common/archive.h"
 #include "common/memstream.h"
 #include "common/textconsole.h"
-#include "graphics/palette.h"
+#include "graphics/paletteman.h"
 #include "mm/shared/xeen/sprites.h"
 #include "mm/mm.h"
 
@@ -45,7 +45,7 @@ SpriteResource::SpriteResource() {
 	_data = nullptr;
 }
 
-SpriteResource::SpriteResource(const Common::String &filename) {
+SpriteResource::SpriteResource(const Common::Path &filename) {
 	_data = nullptr;
 	load(filename);
 }
@@ -77,10 +77,10 @@ SpriteResource &SpriteResource::operator=(const SpriteResource &src) {
 	return *this;
 }
 
-void SpriteResource::load(const Common::String &filename) {
+void SpriteResource::load(const Common::Path &filename) {
 	_filename = filename;
 	Common::File f;
-	if (f.open(filename)) {
+	if (g_engine->getGameID() == GType_MightAndMagic1 && f.open(filename)) {
 		load(f);
 	} else {
 		File f2(filename);
@@ -114,12 +114,12 @@ void SpriteResource::clear() {
 }
 
 void SpriteResource::draw(XSurface &dest, int frame, const Common::Point &destPos,
-	uint flags, int scale) {
+		uint flags, int scale) const {
 	draw(dest, frame, destPos, Common::Rect(0, 0, dest.w, dest.h), flags, scale);
 }
 
 void SpriteResource::draw(XSurface &dest, int frame, const Common::Point &destPos,
-	const Common::Rect &bounds, uint flags, int scale) {
+	const Common::Rect &bounds, uint flags, int scale) const {
 	Common::Rect r = bounds;
 	if (flags & SPRFLAG_BOTTOM_CLIPPED)
 		r.clip(SCREEN_WIDTH, _clippedBottom);
@@ -158,11 +158,11 @@ void SpriteResource::draw(XSurface &dest, int frame, const Common::Point &destPo
 	delete drawer;
 }
 
-void SpriteResource::draw(XSurface &dest, int frame) {
+void SpriteResource::draw(XSurface &dest, int frame) const {
 	draw(dest, frame, Common::Point());
 }
 
-void SpriteResource::draw(Graphics::ManagedSurface *dest, int frame, const Common::Point &destPos) {
+void SpriteResource::draw(Graphics::ManagedSurface *dest, int frame, const Common::Point &destPos) const {
 	XSurface tmp;
 	tmp.w = dest->w;
 	tmp.h = dest->h;

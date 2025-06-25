@@ -74,8 +74,11 @@ void ScummEngine_v4::o4_ifState() {
 	// though you're not supposed to. However if you escape WITHOUT getting
 	// caught, you get 0 IQ points (supposed to get 25 IQ points)."
 	// This workaround is meant to address that.
-	if (_game.id == GID_INDY3 && a == 367 &&
-	    vm.slot[_currentScript].number == 363 && _currentRoom == 25) {
+	//
+	// See also the similar ScummEngine_v5::o5_startScript() workaround.
+	if (_game.id == GID_INDY3 && a == 367 && currentScriptSlotIs(363) &&
+	    _currentRoom == 25 && enhancementEnabled(kEnhMinorBugFixes)) {
+		// Buggy script compares it with '1'
 		b = 0;
 	}
 
@@ -178,11 +181,21 @@ void ScummEngine_v4::saveVars() {
 
 			if (a == STRINGID_IQ_EPISODE && b == STRINGID_IQ_EPISODE) {
 				if (_game.id == GID_INDY3) {
-					saveIQPoints();
+					// This will not be invoked by the Mac version. The other versions
+					// have a much more script-driven handling of the IQ points and do
+					// not clearly distinguish the strings for the episode and series IQ.
+					// The STRINGID_IQ_EPISODE will often actually handle the series IQ.
+					byte *ptr = getResourceAddress(rtString, STRINGID_IQ_EPISODE);
+					if (ptr) {
+						int size = getResourceSize(rtString, STRINGID_IQ_EPISODE);
+						if (size < 73)
+							warning("ScummEngine_v4::saveVars(): error writing iq points file");
+						else
+							saveIQPoints(ptr, 73);
+					}
 				}
 				break;
 			}
-			// FIXME: changing savegame-names not supported
 			break;
 		case 0x03: // open file
 			a = resStrLen(_scriptPointer);
@@ -226,9 +239,9 @@ void ScummEngine_v4::loadVars() {
 			if (a == STRINGID_IQ_SERIES && b == STRINGID_IQ_SERIES) {
 				// Zak256 loads the IQ script-slot but does not use it -> ignore it
 				if (_game.id == GID_INDY3) {
-					byte *ptr = getResourceAddress(rtString, STRINGID_IQ_SERIES);
+					byte *ptr = getResourceAddress(rtString, STRINGID_IQ_EPISODE);
 					if (ptr) {
-						int size = getResourceSize(rtString, STRINGID_IQ_SERIES);
+						int size = getResourceSize(rtString, STRINGID_IQ_EPISODE);
 						loadIQPoints(ptr, size);
 					}
 				}
@@ -290,7 +303,6 @@ void ScummEngine_v4::loadVars() {
  * directly is not possible. The other scripts depend on script-9.
  */
 void ScummEngine_v4::updateIQPoints() {
-	int seriesIQ;
 	// IQString[0..72] corresponds to each puzzle's IQ.
 	// IQString[73] indicates that the IQ-file was loaded successfully and is always 0 when
 	// the IQ is calculated, hence it will be ignored here.
@@ -299,13 +311,13 @@ void ScummEngine_v4::updateIQPoints() {
 	byte *episodeIQString;
 	int episodeIQStringSize;
 
-	// load string with IQ points given per puzzle in any savegame
+	// Load string with series IQ points.
 	// IMPORTANT: the resource string STRINGID_IQ_SERIES is only valid while
 	// the original save/load dialog is executed, so do not use it here.
 	memset(seriesIQString, 0, sizeof(seriesIQString));
 	loadIQPoints(seriesIQString, sizeof(seriesIQString));
 
-	// string with IQ points given per puzzle in current savegame
+	// Load string with IQ points given per puzzle from currently active game.
 	episodeIQString = getResourceAddress(rtString, STRINGID_IQ_EPISODE);
 	if (!episodeIQString)
 		return;
@@ -313,35 +325,61 @@ void ScummEngine_v4::updateIQPoints() {
 	if (episodeIQStringSize < NUM_PUZZLES)
 		return;
 
-	// merge episode and series IQ strings and calculate series IQ
-	seriesIQ = 0;
+	// Merge episode and series IQ strings and calculate total series and episode IQ.
+	int seriesIQ = 0;
+	int episodeIQ = 0;
 	// iterate over puzzles
 	for (int i = 0; i < NUM_PUZZLES; ++i) {
-		byte puzzleIQ = seriesIQString[i];
-		// if puzzle is solved copy points to episode string
-		if (puzzleIQ > 0)
-			episodeIQString[i] = puzzleIQ;
-		// add puzzle's IQ-points to series IQ
-		seriesIQ += episodeIQString[i];
+		if (episodeIQString[i] != 0 && episodeIQString[i] != 0x40) {
+			seriesIQString[i] = episodeIQString[i];
+			episodeIQ += episodeIQString[i];
+		}
+		if (seriesIQString[i] != 0 && seriesIQString[i] != 0x40) {
+			seriesIQ += seriesIQString[i];
+			if (_game.platform != Common::kPlatformMacintosh) {
+				// This might look very strange, but it is necessary to match the behavior
+				// of the non-Mac original interpreters that have a much more script-driven
+				// handling of the IQ points and do not clearly distinguish the strings for
+				// the episode and series IQ. The STRINGID_IQ_EPISODE string is supposed to
+				// contain series IQ data here.
+				episodeIQString[i] = seriesIQString[i];
+			}
+		}
 	}
-	_scummVars[245] = seriesIQ;
+
+	if (_game.platform == Common::kPlatformMacintosh)
+		VAR(244) = episodeIQ;
+	VAR(245) = seriesIQ;
 
 	// save series IQ string
-	saveIQPoints();
+	saveIQPoints(seriesIQString, sizeof(seriesIQString));
 }
 
-void ScummEngine_v4::saveIQPoints() {
-	// save Indy3 IQ-points
+void ScummEngine_v4::clearSeriesIQPoints() {
 	Common::OutSaveFile *file;
 	Common::String filename = _targetName + ".iq";
 
 	file = _saveFileMan->openForSaving(filename);
 	if (file != nullptr) {
-		byte *ptr = getResourceAddress(rtString, STRINGID_IQ_EPISODE);
-		if (ptr) {
-			int size = getResourceSize(rtString, STRINGID_IQ_EPISODE);
-			file->write(ptr, size);
-		}
+		int size = getResourceSize(rtString, STRINGID_IQ_EPISODE);
+
+		for (int i = 0; i < size; i++)
+			file->writeByte(0);
+
+		delete file;
+
+		updateIQPoints();
+	}
+}
+
+void ScummEngine_v4::saveIQPoints(const byte *ptr, int size) {
+	// save Indy3 IQ-points
+	Common::OutSaveFile *file;
+	Common::String filename = _targetName + ".iq";
+
+	file = _saveFileMan->openForSaving(filename);
+	if (file != nullptr && ptr != nullptr && size > 0) {
+		file->write(ptr, size);
 		delete file;
 	}
 }
@@ -353,12 +391,13 @@ void ScummEngine_v4::loadIQPoints(byte *ptr, int size) {
 
 	file = _saveFileMan->openForLoading(filename);
 	if (file != nullptr) {
-		byte *tmp = (byte *)malloc(size);
+		byte *tmp = new byte[size]();
 		int nread = file->read(tmp, size);
-		if (nread == size) {
-			memcpy(ptr, tmp, size);
-		}
-		free(tmp);
+		if (nread >= 73)
+			memcpy(ptr, tmp, nread);
+		else
+			warning("ScummEngine_v4::loadIQPoints(): read %d bytes, expected >= 73", nread);
+		delete[] tmp;
 		delete file;
 	}
 }
@@ -501,7 +540,7 @@ void ScummEngine_v4::o4_saveLoadGame() {
 			// to the game reaching towards a non-existent string, and crashing as a consequence.
 			result = 6;
 		} else
-			result = (_game.id == GID_LOOM && _game.platform == Common::kPlatformFMTowns) ? 8 : 7; // Save file does not exist
+			result = 7; // Save file does not exist
 		}
 
 		break;

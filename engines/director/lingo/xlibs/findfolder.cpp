@@ -25,61 +25,62 @@
  * Yearn2Learn: The Flintstones Coloring Book
  *
  *************************************/
+
 /*
-                                             FindFolder 1.1
-
-                                        by Frédéric RINALDI
-
-
-DESCRIPTION
-------------
-  FindFolder returns the full pathname of the active System folder or any of its reserved folders (System 7.0).
-
-
-SYNTAX
--------
-                        FindFolder([<folder descriptor>[,<create it>]])
-
-PARAMETERS
-------------
-   <folder descriptor> is a string describing the folder. It must be one of these values (only first char is checked) :
-          A[pple menu]
-          C[ontrol Panel]
-          D[esktop]
-          E[xtensions]
-          F[onts] (System 7.1 only)
-          P[references]
-          M[onitor printing]
-          N[etwork trash]
-          T[rash]
-          I[tems startup]
-          S[ystem]
-          Y : TemporarY items
-
-   Default value is "S".
-
-   <create it> is a boolean telling if the XFCN must create the folder if not found (only with System 7.0). Default is FALSE.
-
-   Both parameters are optional. Using "!", "?" or "=" as first parameter will return an online help (resp. copyright,  syntax and output).
-
-USING
------
-  The XFCN returns the full pathname of the requested folder, ending with colon.
-   Under System 6.0, only current System folder can be returned.
-
-ERRORS
--------
-If an error occurs, the XFCN can return :
-     "Error : Empty parameter"
-     "Error : Second param must be boolean"
-     "Error : Folder not found"
-     "Error : Found file instead of folder"
-
-HISTORY
--------
-1.1 :                                                                                          04/21/92
-• Added "font" param for System 7.1
-*/
+ *                                              FindFolder 1.1
+ *
+ *                                         by Frédéric RINALDI
+ *
+ *
+ * DESCRIPTION
+ * ------------
+ *   FindFolder returns the full pathname of the active System folder or any of its reserved folders (System 7.0).
+ *
+ *
+ * SYNTAX
+ * -------
+ *                         FindFolder([<folder descriptor>[,<create it>]])
+ *
+ * PARAMETERS
+ * ------------
+ *    <folder descriptor> is a string describing the folder. It must be one of these values (only first char is checked) :
+ *           A[pple menu]
+ *           C[ontrol Panel]
+ *           D[esktop]
+ *           E[xtensions]
+ *           F[onts] (System 7.1 only)
+ *           P[references]
+ *           M[onitor printing]
+ *           N[etwork trash]
+ *           T[rash]
+ *           I[tems startup]
+ *           S[ystem]
+ *           Y : TemporarY items
+ *
+ *    Default value is "S".
+ *
+ *    <create it> is a boolean telling if the XFCN must create the folder if not found (only with System 7.0). Default is FALSE.
+ *
+ *    Both parameters are optional. Using "!", "?" or "=" as first parameter will return an online help (resp. copyright,  syntax and output).
+ *
+ * USING
+ * -----
+ *   The XFCN returns the full pathname of the requested folder, ending with colon.
+ *    Under System 6.0, only current System folder can be returned.
+ *
+ * ERRORS
+ * -------
+ * If an error occurs, the XFCN can return :
+ *      "Error : Empty parameter"
+ *      "Error : Second param must be boolean"
+ *      "Error : Folder not found"
+ *      "Error : Found file instead of folder"
+ *
+ * HISTORY
+ * -------
+ * 1.1 :                                                                                          04/21/92
+ * • Added "font" param for System 7.1
+ */
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
@@ -89,22 +90,22 @@ HISTORY
 
 namespace Director {
 
-const char *FindFolder::xlibName = "FindFolder";
-const char *FindFolder::fileNames[] = {
-	"FindFolder",
-	0
+const char *const FindFolder::xlibName = "FindFolder";
+const XlibFileDesc FindFolder::fileNames[] = {
+	{ "FindFolder",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static BuiltinProto builtins[] = {
+static const BuiltinProto builtins[] = {
 	{ "FindFolder", FindFolder::m_findfolder, 0, 2, 300, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
-void FindFolder::open(int type) {
+void FindFolder::open(ObjectType type, const Common::Path &path) {
 	g_lingo->initBuiltIns(builtins);
 }
 
-void FindFolder::close(int type) {
+void FindFolder::close(ObjectType type) {
 	g_lingo->cleanupBuiltIns(builtins);
 }
 

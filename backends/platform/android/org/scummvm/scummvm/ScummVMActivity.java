@@ -5,27 +5,27 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.content.UriPermission;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.content.res.Resources;
 import android.graphics.Rect;
 import android.media.AudioManager;
+import android.net.ConnectivityManager;
 import android.net.Uri;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.ParcelFileDescriptor;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Process;
 import android.os.SystemClock;
 import android.provider.DocumentsContract;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -33,7 +33,6 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
-import android.view.PointerIcon;
 import android.view.SurfaceHolder;
 import android.view.View;
 import android.view.ViewGroup;
@@ -41,14 +40,15 @@ import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.FrameLayout;
+import android.widget.GridLayout;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
-import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -56,32 +56,27 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.Reader;
-import java.io.UnsupportedEncodingException;
-import java.util.HashMap;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.TreeSet;
 
-import static android.content.res.Configuration.HARDKEYBOARDHIDDEN_NO;
-import static android.content.res.Configuration.KEYBOARD_QWERTY;
-
 public class ScummVMActivity extends Activity implements OnKeyboardVisibilityListener {
-
 	/* Establish whether the hover events are available */
 	private static boolean _hoverAvailable;
 
 	private ClipboardManager _clipboardManager;
 
 	private Version _currentScummVMVersion;
+	private boolean _assetsUpdated;
 	private File _configScummvmFile;
+	private File _logScummvmFile;
 	private File _actualScummVMDataDir;
 	private File _possibleExternalScummVMDir;
-	private File _usingScummVMSavesDir;
 	boolean _externalPathAvailableForReadAccess;
-//	private File _usingLogFile;
 
 	// SAF related
 	public final static int REQUEST_SAF = 50000;
@@ -124,14 +119,22 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 	FrameLayout _videoLayout = null;
 
 	private EditableSurfaceView _main_surface = null;
+	private GridLayout _buttonLayout = null;
 	private ImageView _toggleTouchModeKeyboardBtnIcon = null;
 	private ImageView _openMenuBtnIcon = null;
+	private LedView _ioLed = null;
+	private int _layoutOrientation;
 
 	public View _screenKeyboard = null;
 	static boolean keyboardWithoutTextInputShown = false;
 
 //	boolean _isPaused = false;
 	private InputMethodManager _inputManager = null;
+
+	// Set to true in onDestroy
+	// This avoids that when C++ terminates we call finish() a second time
+	// This second finish causes termination when we are launched again
+	boolean _finishing = false;
 
 	private final int[][] TextInputKeyboardList =
 	{
@@ -149,12 +152,17 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		if (hwKeyboard) {
 			hideScreenKeyboard();
 		}
+
+		layoutButtonLayout(newConfig.orientation, false);
 	}
 
 	private boolean isHWKeyboardConnected() {
+		// This setting is not documented but that's what is used on Android since 2014
+		final String SHOW_IME_WITH_HARD_KEYBOARD = "show_ime_with_hard_keyboard";
 		final Configuration config = getResources().getConfiguration();
-		return config.keyboard == KEYBOARD_QWERTY
-			&& config.hardKeyboardHidden == HARDKEYBOARDHIDDEN_NO;
+		return config.keyboard == Configuration.KEYBOARD_QWERTY &&
+			config.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO &&
+			Settings.Secure.getInt(getContentResolver(), SHOW_IME_WITH_HARD_KEYBOARD, 0) == 0;
 	}
 
 	public boolean isKeyboardOverlayShown() {
@@ -176,7 +184,8 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 							//_inputManager.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
 							//_inputManager.showSoftInput(_main_surface, InputMethodManager.SHOW_FORCED);
 
-							_inputManager.toggleSoftInputFromWindow(_main_surface.getWindowToken(), InputMethodManager.SHOW_IMPLICIT, InputMethodManager.HIDE_IMPLICIT_ONLY);
+							// This is deprecated and we show the keyboard just below
+							//_inputManager.toggleSoftInputFromWindow(_main_surface.getWindowToken(), InputMethodManager.SHOW_IMPLICIT, InputMethodManager.HIDE_IMPLICIT_ONLY);
 							_inputManager.showSoftInput(_main_surface, InputMethodManager.SHOW_IMPLICIT);
 							getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
 						} else {
@@ -296,6 +305,12 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 									mEventPressTime = -1;
 									mKeyRepeatedCount = -1;
 								}
+
+								@Override
+								public void onConfigurationChanged(Configuration newConfig) {
+									// Reload keyboard to adapt to the new size
+									ChangeKeyboard();
+								}
 							}
 
 							final BuiltInKeyboardView builtinKeyboard = new BuiltInKeyboardView(ScummVMActivity.this, null);
@@ -402,7 +417,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 										KeyEvent.ACTION_UP,
 										key,
 										builtinKeyboard.mKeyRepeatedCount,
-										compiledMetaState);
+										compiledMetaState, 0, 0, KeyEvent.FLAG_SOFT_KEYBOARD);
 
 									_main_surface.dispatchKeyEvent(compiledKeyEvent);
 									builtinKeyboard.resetEventAndTimestamps();
@@ -466,7 +481,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 										KeyEvent.ACTION_DOWN,
 										key,
 										builtinKeyboard.mKeyRepeatedCount,
-										compiledMetaState);
+										compiledMetaState, 0, 0, KeyEvent.FLAG_SOFT_KEYBOARD);
 
 									_main_surface.dispatchKeyEvent(compiledKeyEvent);
 								}
@@ -480,6 +495,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 							_videoLayout.addView(_screenKeyboard, sKeyboardLayout);
 							_videoLayout.bringChildToFront(_screenKeyboard);
 						}
+						_scummvm.syncVirtkeyboardState(true);
 					}
 				});
 			} else {
@@ -495,24 +511,55 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 						// _inputManager.hideSoftInputFromWindow(_main_surface.getWindowToken(), 0);
 						_inputManager.hideSoftInputFromWindow(_main_surface.getWindowToken(), InputMethodManager.HIDE_IMPLICIT_ONLY);
 
-						DimSystemStatusBar.get().dim(_videoLayout);
-						//DimSystemStatusBar.get().dim(_main_surface);
+						CompatHelpers.HideSystemStatusBar.hide(getWindow());
 						//Log.d(ScummVM.LOG_TAG, "showScreenKeyboardWithoutTextInputField - captureMouse(true)");
 						_main_surface.captureMouse(true);
 						//_main_surface.showSystemMouseCursor(false);
+						_scummvm.syncVirtkeyboardState(false);
 					}
 				});
 			}
-			// TODO Do we need to inform native ScummVM code of keyboard shown state?
 //			_main_surface.nativeScreenKeyboardShown( keyboardWithoutTextInputShown ? 1 : 0 );
 		}
 	}
 
-	public void showScreenKeyboard() {
+	private void layoutButtonLayout(int orientation, boolean force) {
+		if (!force && orientation == _layoutOrientation) {
+			return;
+		}
+
+		_layoutOrientation = orientation;
+		if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+			GridLayout.LayoutParams params;
+			params = (GridLayout.LayoutParams)_openMenuBtnIcon.getLayoutParams();
+			params.rowSpec = GridLayout.spec(0);
+			params.columnSpec = GridLayout.spec(1);
+			params = (GridLayout.LayoutParams)_toggleTouchModeKeyboardBtnIcon.getLayoutParams();
+			params.rowSpec = GridLayout.spec(1);
+			params.columnSpec = GridLayout.spec(1);
+			params = (GridLayout.LayoutParams)_ioLed.getLayoutParams();
+			params.rowSpec = GridLayout.spec(0, 2, GridLayout.TOP);
+			params.columnSpec = GridLayout.spec(0, GridLayout.RIGHT);
+		} else {
+			GridLayout.LayoutParams params;
+			params = (GridLayout.LayoutParams)_openMenuBtnIcon.getLayoutParams();
+			params.rowSpec = GridLayout.spec(0);
+			params.columnSpec = GridLayout.spec(1);
+			params = (GridLayout.LayoutParams)_toggleTouchModeKeyboardBtnIcon.getLayoutParams();
+			params.rowSpec = GridLayout.spec(0);
+			params.columnSpec = GridLayout.spec(0);
+			params = (GridLayout.LayoutParams)_ioLed.getLayoutParams();
+			params.rowSpec = GridLayout.spec(1, GridLayout.TOP);
+			params.columnSpec = GridLayout.spec(0, 2, GridLayout.RIGHT);
+		}
+		_buttonLayout.requestLayout();
+	}
+
+	public void showScreenKeyboard(boolean force) {
 		final boolean bGlobalsCompatibilityHacksTextInputEmulatesHwKeyboard = true;
 		final int dGlobalsTextInputKeyboard = 1;
 
-		if (isHWKeyboardConnected()) {
+		if (!force && isHWKeyboardConnected()) {
 			return;
 		}
 
@@ -554,7 +601,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		if (isScreenKeyboardShown()) {
 			hideScreenKeyboard();
 		} else {
-			showScreenKeyboard();
+			showScreenKeyboard(true);
 		}
 	}
 
@@ -582,13 +629,13 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 			resId = R.drawable.ic_action_keyboard;
 		} else {
 			switch(touchMode) {
-			case ScummVMEventsBase.TOUCH_MODE_TOUCHPAD:
+			case ScummVMEvents.TOUCH_MODE_TOUCHPAD:
 				resId = R.drawable.ic_action_touchpad;
 				break;
-			case ScummVMEventsBase.TOUCH_MODE_MOUSE:
+			case ScummVMEvents.TOUCH_MODE_MOUSE:
 				resId = R.drawable.ic_action_mouse;
 				break;
-			case ScummVMEventsBase.TOUCH_MODE_GAMEPAD:
+			case ScummVMEvents.TOUCH_MODE_GAMEPAD:
 				resId = R.drawable.ic_action_gamepad;
 				break;
 			default:
@@ -635,7 +682,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		public void onClick(View v) {
 			runOnUiThread(new Runnable() {
 				public void run() {
-					_scummvm.pushEvent(ScummVMEventsBase.JE_MENU, 0, 0, 0, 0, 0, 0);
+					_scummvm.pushEvent(ScummVMEvents.JE_MENU, 0, 0, 0, 0, 0, 0);
 				}
 			});
 		}
@@ -649,11 +696,21 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 
 		@Override
 		protected void getDPI(float[] values) {
-			DisplayMetrics metrics = new DisplayMetrics();
-			getWindowManager().getDefaultDisplay().getMetrics(metrics);
+			Resources resources = getResources();
+
+			DisplayMetrics metrics = resources.getDisplayMetrics();
+			Configuration config = resources.getConfiguration();
 
 			values[0] = metrics.xdpi;
 			values[1] = metrics.ydpi;
+			// "On a medium-density screen, DisplayMetrics.density equals 1.0; on a high-density
+			//  screen it equals 1.5; on an extra-high-density screen, it equals 2.0; and on a
+			//  low-density screen, it equals 0.75. This figure is the factor by which you should
+			//  multiply the dp units in order to get the actual pixel count for the current screen."
+			//  In addition, take into account the fontScale setting set by the user.
+			//  We are not supposed to take this value directly because of non-linear scaling but
+			//  as we are doing our own rendering there is not much choice
+			values[2] = metrics.density * config.fontScale;
 		}
 
 		@Override
@@ -704,13 +761,8 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 
 		@Override
 		protected boolean isConnectionLimited() {
-			// The WIFI Service must be looked up on the Application Context or memory will leak on devices < Android N (According to Android Studio warning)
-			WifiManager wifiMgr = (WifiManager)getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-			if (wifiMgr != null && wifiMgr.isWifiEnabled()) {
-				WifiInfo wifiInfo = wifiMgr.getConnectionInfo();
-				return (wifiInfo == null || wifiInfo.getNetworkId() == -1); //WiFi is on, but it's not connected to any network
-			}
-			return true;
+			ConnectivityManager cm = (ConnectivityManager)getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+			return cm == null || cm.isActiveNetworkMetered();
 		}
 
 		@Override
@@ -728,7 +780,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 				public void run() {
 					//showKeyboard(enable);
 					if (enable) {
-						showScreenKeyboard();
+						showScreenKeyboard(false);
 					} else {
 						hideScreenKeyboard();
 					}
@@ -737,29 +789,12 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		}
 
 		@Override
-		protected void showKeyboardControl(final boolean enable) {
+		protected void showOnScreenControls(final int enableMask) {
 			runOnUiThread(new Runnable() {
 				public void run() {
-					showToggleKeyboardBtnIcon(enable);
+					showToggleOnScreenBtnIcons(enableMask);
 				}
 			});
-		}
-
-		@Override
-		protected Bitmap getBitmapResource(int resource) {
-			int id;
-			switch(resource) {
-				case 0: // TOUCH_ARROWS_BITMAP
-					id = R.drawable.touch_arrows;
-					break;
-				default:
-					return null;
-			}
-
-			BitmapFactory.Options opts = new BitmapFactory.Options();
-			opts.inScaled = false;
-
-			return BitmapFactory.decodeResource(getResources(), id, opts);
 		}
 
 		@Override
@@ -781,20 +816,67 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		}
 
 		@Override
+		protected void setOrientation(final int orientation) {
+			runOnUiThread(new Runnable() {
+				public void run() {
+					setRequestedOrientation(orientation);
+				}
+			});
+		}
+
+		@Override
+		protected String getScummVMBasePath() {
+			return _actualScummVMDataDir.getPath();
+		}
+
+		@Override
+		protected String getScummVMConfigPath() {
+			return _configScummvmFile.getPath();
+		}
+
+		@Override
+		protected String getScummVMLogPath() {
+			if (_logScummvmFile != null) {
+				return _logScummvmFile.getPath();
+			} else return "";
+		}
+
+		@Override
+		protected void setCurrentGame(String target) {
+			Uri data = null;
+			if (target != null) {
+				data = Uri.fromParts("scummvm", target, null);
+			}
+			Intent intent = new Intent(Intent.ACTION_MAIN, data,
+				ScummVMActivity.this, ScummVMActivity.class);
+			setIntent(intent);
+			Log.d(ScummVM.LOG_TAG, "Current activity Intent is: " + data);
+			if (target != null) {
+				ShortcutCreatorActivity.pushShortcut(ScummVMActivity.this, target, intent);
+			}
+		}
+
+		@Override
 		protected String[] getSysArchives() {
-			Log.d(ScummVM.LOG_TAG, "Adding to Search Archive: " + _actualScummVMDataDir.getPath());
-			if (_externalPathAvailableForReadAccess) {
+			File assetsDir = new File(_actualScummVMDataDir, "assets");
+			Log.d(ScummVM.LOG_TAG, "Adding to Search Archive: " + assetsDir.getPath());
+			if (_externalPathAvailableForReadAccess && _possibleExternalScummVMDir != null) {
 				Log.d(ScummVM.LOG_TAG, "Adding to Search Archive: " + _possibleExternalScummVMDir.getPath());
-				return new String[]{_actualScummVMDataDir.getPath(), _possibleExternalScummVMDir.getPath()};
-			} else return new String[]{_actualScummVMDataDir.getPath()};
+				return new String[]{assetsDir.getPath(), _possibleExternalScummVMDir.getPath()};
+			} else {
+				return new String[]{assetsDir.getPath()};
+			}
 		}
 
 		@Override
 		protected String[] getAllStorageLocations() {
 			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+			    && Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
 			    && (checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
 			        || checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED)
 			) {
+				// In Tiramisu (API 33) and above, READ and WRITE external storage permissions have no effect,
+				// and they are automatically denied -- onRequestPermissionsResult() will be called without user's input
 				requestPermissions(MY_PERMISSIONS_STR_LIST, MY_PERMISSION_ALL);
 			} else {
 				return ExternalStorage.getAllStorageLocations(getApplicationContext()).toArray(new String[0]);
@@ -815,9 +897,10 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		}
 
 		@Override
-		protected SAFFSTree getNewSAFTree(boolean folder, boolean write, String initialURI, String prompt) {
+		@RequiresApi(api = Build.VERSION_CODES.N)
+		protected SAFFSTree getNewSAFTree(boolean write, String initialURI, String prompt) {
 			Uri initialURI_ = Uri.parse(initialURI);
-			Uri uri = selectWithNativeUI(folder, write, initialURI_, prompt);
+			Uri uri = selectWithNativeUI(true, write, initialURI_, prompt, null, null);
 			if (uri == null) {
 				return null;
 			}
@@ -826,71 +909,107 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		}
 
 		@Override
+		@RequiresApi(api = Build.VERSION_CODES.N)
 		protected SAFFSTree[] getSAFTrees() {
 			return SAFFSTree.getTrees(ScummVMActivity.this);
 		}
 
 		@Override
+		@RequiresApi(api = Build.VERSION_CODES.N)
 		protected SAFFSTree findSAFTree(String name) {
 			return SAFFSTree.findTree(ScummVMActivity.this, name);
+		}
+
+		@Override
+		protected int exportBackup(String prompt) {
+			String filename = (new SimpleDateFormat("'ScummVM backup 'yyyyMMdd-HHmmss'.zip'")).format(new Date());
+			int ret;
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+				Uri uri = selectWithNativeUI(false, true, null, prompt, "application/zip", filename);
+				if (uri == null) {
+					return BackupManager.ERROR_CANCELLED;
+				}
+				ret = BackupManager.exportBackup(ScummVMActivity.this, uri);
+				getContentResolver().releasePersistableUriPermission(uri,
+					Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+			} else {
+				File path = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+						filename);
+				ret = BackupManager.exportBackup(ScummVMActivity.this, path);
+			}
+			return ret;
+		}
+
+		@Override
+		protected int importBackup(String prompt, String path) {
+			int ret;
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+				Uri uri = selectWithNativeUI(false, false, null, prompt, "application/zip", null);
+				if (uri == null) {
+					return BackupManager.ERROR_CANCELLED;
+				}
+				ret = BackupManager.importBackup(ScummVMActivity.this, uri);
+				getContentResolver().releasePersistableUriPermission(uri,
+					Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+			} else if (path != null) {
+				ret = BackupManager.importBackup(ScummVMActivity.this, new File(path));
+			} else {
+				return BackupManager.ERROR_CANCELLED;
+			}
+			if (ret != BackupManager.ERROR_INVALID_BACKUP) {
+				// Trigger a restart after letting the code return to display the status
+				// This is the same as runOnUiThread but allows to delay the restart
+				new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+					@Override
+					public void run() {
+						Intent restartIntent = Intent.makeRestartActivityTask(new ComponentName(ScummVMActivity.this, SplashActivity.class));
+						restartIntent.setPackage(getPackageName());
+
+						ScummVMActivity.this.startActivity(restartIntent);
+
+						// Kill us to make sure we start from a clean state
+						System.exit(0);
+					}
+				}, 500);
+			}
+			return ret;
 		}
 	}
 
 	private MyScummVM _scummvm;
-	private ScummVMEventsBase _events;
+	private ScummVMEvents _events;
 	private MouseHelper _mouseHelper;
 	private Thread _scummvm_thread;
 
-	@RequiresApi(api = Build.VERSION_CODES.KITKAT)
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
+//		Log.d(ScummVM.LOG_TAG, "onCreate: " + getIntent().getData());
+
 		super.onCreate(savedInstanceState);
+
+		setLogFile();
 
 		safSyncObject = new Object();
 
-		hideSystemUI();
-
-		_videoLayout = new FrameLayout(this);
-		SetLayerType.get().setLayerType(_videoLayout);
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-		setContentView(_videoLayout);
-		_videoLayout.setFocusable(true);
-		_videoLayout.setFocusableInTouchMode(true);
-		_videoLayout.requestFocus();
 
-		_main_surface = new EditableSurfaceView(this);
-		SetLayerType.get().setLayerType(_main_surface);
+		setContentView(R.layout.scummvm_activity);
+		_videoLayout = findViewById(R.id.video_layout);
+		_main_surface = findViewById(R.id.main_surface);
+		_buttonLayout = findViewById(R.id.button_layout);
+		_openMenuBtnIcon = findViewById(R.id.open_menu_button);
+		_toggleTouchModeKeyboardBtnIcon = findViewById(R.id.toggle_touch_button);
+		_ioLed = findViewById(R.id.io_led);
 
-		_videoLayout.addView(_main_surface, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+		// Hide by default all buttons, they will be shown when native code will start
+		showToggleOnScreenBtnIcons(0);
+		layoutButtonLayout(getResources().getConfiguration().orientation, true);
 
-		LinearLayout buttonLayout = new LinearLayout(this);
-		buttonLayout.setOrientation(LinearLayout.HORIZONTAL);
-		FrameLayout.LayoutParams buttonLayoutParams = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.END);
-		buttonLayoutParams.setMarginEnd(5);
-		buttonLayoutParams.topMargin = 5;
-		buttonLayoutParams.rightMargin = 5;
-		_videoLayout.addView(buttonLayout, buttonLayoutParams);
-		_videoLayout.bringChildToFront(buttonLayout);
-
-		_toggleTouchModeKeyboardBtnIcon = new ImageView(this);
-		buttonLayout.addView(_toggleTouchModeKeyboardBtnIcon, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT));
-		buttonLayout.bringChildToFront(_toggleTouchModeKeyboardBtnIcon);
-
-		_openMenuBtnIcon = new ImageView(this);
-		_openMenuBtnIcon.setImageResource(R.drawable.ic_action_menu);
-		buttonLayout.addView(_openMenuBtnIcon, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT));
-		buttonLayout.bringChildToFront(_openMenuBtnIcon);
-
-		_main_surface.setFocusable(true);
-		_main_surface.setFocusableInTouchMode(true);
 		_main_surface.requestFocus();
 
 		//Log.d(ScummVM.LOG_TAG, "onCreate - captureMouse(true)");
 		//_main_surface.captureMouse(true, true);
 		//_main_surface.showSystemMouseCursor(false);
-
-		// TODO is this redundant since we call hideSystemUI() ?
-		DimSystemStatusBar.get().dim(_videoLayout);
 
 		setVolumeControlStream(AudioManager.STREAM_MUSIC);
 
@@ -923,14 +1042,17 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		                                                        @Override
 		                                                        public void handle(int exitResult) {
 		                                                        	Log.d(ScummVM.LOG_TAG, "Via callback: ScummVM native terminated with code: " + exitResult);
-		                                                        	// call onDestroy()
-		                                                        	finish();
+		                                                        	// call onDestroy() only we we aren't already in it
+		                                                        	if (!_finishing) finish();
 		                                                        }
 		                                                    });
 
-		float[] dpiValues = new float[] { 0.0f, 0.0f };
+		// We need to register on root as something is eating the events between the surface and the root
+		CompatHelpers.SystemInsets.registerSystemInsetsListener(_main_surface.getRootView(), _scummvm);
+
+		float[] dpiValues = new float[] { 0.0f, 0.0f, 0.0f };
 		_scummvm.getDPI(dpiValues);
-		Log.d(ScummVM.LOG_TAG, "Current xdpi: " + dpiValues[0] + " and ydpi: " + dpiValues[1]);
+		Log.d(ScummVM.LOG_TAG, "Current xdpi: " + dpiValues[0] + ", ydpi: " + dpiValues[1] + " and density: " + dpiValues[2]);
 
 		// Currently in release builds version string does not contain the revision info
 		// but in debug builds (daily builds) this should be there (see base/internal_version_h)
@@ -942,57 +1064,67 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		if (!seekAndInitScummvmConfiguration()) {
 			Log.e(ScummVM.LOG_TAG, "Error while trying to find and/or initialize ScummVM configuration file!");
 			// in fact in all the cases where we return false, we also called finish()
-		} else {
-			// We should have a valid path to a configuration file here
-
-			// Start ScummVM
-//			Log.d(ScummVM.LOG_TAG, "CONFIG: " +  _configScummvmFile.getPath());
-//			Log.d(ScummVM.LOG_TAG, "PATH: " +  _actualScummVMDataDir.getPath());
-//			Log.d(ScummVM.LOG_TAG, "LOG: " +  _usingLogFile.getPath());
-//			Log.d(ScummVM.LOG_TAG, "SAVEPATH: " +  _usingScummVMSavesDir.getPath());
-
-			// TODO log file setting via "--logfile=" + _usingLogFile.getPath() causes crash
-			//      probably because this option is specific to SDL_BACKEND (see: base/commandLine.cpp)
-			_scummvm.setArgs(new String[]{
-				"ScummVM",
-				"--config=" + _configScummvmFile.getPath(),
-				"--path=" + _actualScummVMDataDir.getPath(),
-				"--savepath=" + _usingScummVMSavesDir.getPath()
-			});
-
-			Log.d(ScummVM.LOG_TAG, "Hover available: " + _hoverAvailable);
-			_mouseHelper = null;
-			if (_hoverAvailable) {
-				_mouseHelper = new MouseHelper(_scummvm);
-//				_mouseHelper.attach(_main_surface);
-			}
-
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1) {
-				_events = new ScummVMEventsModern(this, _scummvm, _mouseHelper);
-			} else {
-				_events = new ScummVMEventsBase(this, _scummvm, _mouseHelper);
-			}
-
-			setupTouchModeBtn(_events.getTouchMode());
-
-			// On screen button listener
-			//findViewById(R.id.show_keyboard).setOnClickListener(keyboardBtnOnClickListener);
-			_toggleTouchModeKeyboardBtnIcon.setOnClickListener(touchModeKeyboardBtnOnClickListener);
-			_toggleTouchModeKeyboardBtnIcon.setOnLongClickListener(touchModeKeyboardBtnOnLongClickListener);
-			_openMenuBtnIcon.setOnClickListener(menuBtnOnClickListener);
-
-			// Keyboard visibility listener - mainly to hide system UI if keyboard is shown and we return from Suspend to the Activity
-			setKeyboardVisibilityListener(this);
-
-			_main_surface.setOnKeyListener(_events);
-			_main_surface.setOnTouchListener(_events);
-			if (_mouseHelper != null) {
-				_main_surface.setOnHoverListener(_mouseHelper);
-			}
-
-			_scummvm_thread = new Thread(_scummvm, "ScummVM");
-			_scummvm_thread.start();
+			return;
 		}
+		_scummvm.setAssetsUpdated(_assetsUpdated);
+
+		// We should have a valid path to a configuration file here
+
+		// Start ScummVM
+		final Uri intentData = getIntent().getData();
+		String[] args;
+		if (intentData == null) {
+			args = new String[]{
+				"ScummVM"
+			};
+		} else {
+			args = new String[]{
+				"ScummVM",
+				intentData.getSchemeSpecificPart()
+			};
+		}
+		_scummvm.setArgs(args);
+
+		Log.d(ScummVM.LOG_TAG, "Hover available: " + _hoverAvailable);
+		_mouseHelper = null;
+		if (_hoverAvailable) {
+			_mouseHelper = new MouseHelper(_scummvm);
+			//_mouseHelper.attach(_main_surface);
+		}
+
+		_events = new ScummVMEvents(this, _scummvm, _mouseHelper);
+
+		setupTouchModeBtn(_events.getTouchMode());
+
+		// On screen button listener
+		//findViewById(R.id.show_keyboard).setOnClickListener(keyboardBtnOnClickListener);
+		_toggleTouchModeKeyboardBtnIcon.setOnClickListener(touchModeKeyboardBtnOnClickListener);
+		_toggleTouchModeKeyboardBtnIcon.setOnLongClickListener(touchModeKeyboardBtnOnLongClickListener);
+		_openMenuBtnIcon.setOnClickListener(menuBtnOnClickListener);
+
+		// Keyboard visibility listener - mainly to hide system UI if keyboard is shown and we return from Suspend to the Activity
+		setKeyboardVisibilityListener(this);
+
+		_main_surface.setOnKeyListener(_events);
+		_main_surface.setOnTouchListener(_events);
+		if (_mouseHelper != null) {
+			_main_surface.setOnHoverListener(_mouseHelper);
+		}
+
+		SAFFSTree.setIOBusyListener(new SAFFSTree.IOBusyListener() {
+			@Override
+			public void onIOBusy(float ratio) {
+				runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						_ioLed.blinkOnce();
+					}
+				});
+			}
+		});
+
+		_scummvm_thread = new Thread(null, _scummvm, "ScummVM", 8388608); // 8MB
+		_scummvm_thread.start();
 	}
 
 	@Override
@@ -1003,12 +1135,72 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 	}
 
 	@Override
+	protected void onNewIntent(Intent intent) {
+//		Log.d(ScummVM.LOG_TAG, "onNewIntent: " + intent.getData());
+
+		super.onNewIntent(intent);
+
+		Uri intentData = intent.getData();
+
+		// No specific game, we just continue
+		if (intentData == null) {
+			return;
+		}
+
+		// Same game requested, we continue too
+		if (intentData.equals(getIntent().getData())) {
+			return;
+		}
+
+		setIntent(intent);
+
+		if (_events == null) {
+			finish();
+			startActivity(intent);
+			return;
+		}
+
+		// Don't finish our activity on C++ end
+		_finishing = true;
+
+		_events.clearEventHandler();
+		_events.sendQuitEvent();
+
+		// Make sure the thread is actively polling for events
+		_scummvm.setPause(false);
+		try {
+			// 2s timeout
+			_scummvm_thread.join(2000);
+		} catch (InterruptedException e) {
+			Log.i(ScummVM.LOG_TAG, "Error while joining ScummVM thread", e);
+		}
+
+		// Our join failed: kill ourselves to not have two ScummVM running at the same time
+		if (_scummvm_thread.isAlive()) {
+			Process.killProcess(Process.myPid());
+		}
+
+		_finishing = false;
+
+		String[] args = new String[]{
+			"ScummVM",
+			intentData.getSchemeSpecificPart()
+		};
+		_scummvm.setArgs(args);
+
+		_scummvm_thread = new Thread(_scummvm, "ScummVM");
+		_scummvm_thread.start();
+	}
+
+	@Override
 	public void onResume() {
 //		Log.d(ScummVM.LOG_TAG, "onResume");
 
 //		_isPaused = false;
 
 		super.onResume();
+
+		CompatHelpers.HideSystemStatusBar.hide(getWindow());
 
 		if (_scummvm != null)
 			_scummvm.setPause(false);
@@ -1047,24 +1239,37 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 
 		super.onDestroy();
 
-		if (_events != null) {
-			_events.clearEventHandler();
-			_events.sendQuitEvent();
-
-			try {
-				// 1s timeout
-				_scummvm_thread.join(1000);
-			} catch (InterruptedException e) {
-				Log.i(ScummVM.LOG_TAG, "Error while joining ScummVM thread", e);
-			}
-
-			_scummvm = null;
-		}
+		SAFFSTree.setIOBusyListener(null);
 
 		if (isScreenKeyboardShown()) {
 			hideScreenKeyboard();
 		}
-		showToggleKeyboardBtnIcon(false);
+
+		if (_events != null) {
+			_finishing = true;
+
+			_events.clearEventHandler();
+			_events.sendQuitEvent();
+
+			// Make sure the thread is actively polling for events
+			_scummvm.setPause(false);
+			try {
+				// 2s timeout
+				_scummvm_thread.join(2000);
+			} catch (InterruptedException e) {
+				Log.i(ScummVM.LOG_TAG, "Error while joining ScummVM thread", e);
+			}
+
+			// Our join failed: kill ourselves to not have two ScummVM running at the same time
+			if (_scummvm_thread.isAlive()) {
+				Process.killProcess(Process.myPid());
+			}
+
+			_finishing = false;
+			_scummvm = null;
+		}
+
+		showToggleOnScreenBtnIcons(0);
 	}
 
 
@@ -1072,15 +1277,13 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 	public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
 		if (requestCode == MY_PERMISSION_ALL) {
 			int numOfReqPermsGranted = 0;
-			// If request is cancelled, the result arrays are empty.
-			if (grantResults.length > 0) {
-				for (int iterGrantResult: grantResults) {
-					if (iterGrantResult == PackageManager.PERMISSION_GRANTED) {
-						Log.i(ScummVM.LOG_TAG, permissions[0] + " permission was granted at Runtime");
-						++numOfReqPermsGranted;
-					} else {
-						Log.i(ScummVM.LOG_TAG, permissions[0] + " permission was denied at Runtime");
-					}
+			// If request is canceled, the result arrays are empty.
+			for (int i = 0; i < grantResults.length; ++i) {
+				if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+					Log.i(ScummVM.LOG_TAG, permissions[i] + " permission was granted at Runtime");
+					++numOfReqPermsGranted;
+				} else {
+					Log.i(ScummVM.LOG_TAG, permissions[i] + " permission was denied at Runtime");
 				}
 			}
 
@@ -1135,7 +1338,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 	public void onWindowFocusChanged(boolean hasFocus) {
 		super.onWindowFocusChanged(hasFocus);
 		if (hasFocus) {
-			hideSystemUI();
+			CompatHelpers.HideSystemStatusBar.hide(getWindow());
 		}
 //			showSystemMouseCursor(false);
 //		} else {
@@ -1143,28 +1346,32 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 //		}
 	}
 
-	// TODO setSystemUiVisibility is introduced in API 11 and deprecated in API 30 - When we move to API 30 we will have to replace this code
-	//	https://developer.android.com/training/system-ui/immersive.html#java
-	//
-	//  The code sample in the url below contains code to switch between immersive and default mode
-	//	https://github.com/android/user-interface-samples/tree/master/AdvancedImmersiveMode
-	//  We could do something similar by making it a Global UI option.
-	@TargetApi(Build.VERSION_CODES.KITKAT)
-	private void hideSystemUI() {
-		// Enables regular immersive mode.
-		// For "lean back" mode, remove SYSTEM_UI_FLAG_IMMERSIVE.
-		// Or for "sticky immersive," replace it with SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-		View decorView = getWindow().getDecorView();
-		decorView.setSystemUiVisibility(
-			View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-				// Set the content to appear under the system bars so that the
-				// content doesn't resize when the system bars hide and show.
-				| View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-				| View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-				| View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-				// Hide the nav bar and status bar
-				| View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-				| View.SYSTEM_UI_FLAG_FULLSCREEN);
+	private void setLogFile() {
+		// NOTE: our LOG file scummvm.log is created directly inside the ScummVM internal app path
+		_logScummvmFile = new File(getFilesDir(), "scummvm.log");
+		try {
+			if (_logScummvmFile.exists() || !_logScummvmFile.createNewFile()) {
+				Log.d(ScummVM.LOG_TAG, "ScummVM Log file already exists!");
+				Log.d(ScummVM.LOG_TAG, "Existing ScummVM Log: " + _logScummvmFile.getPath());
+			} else {
+				Log.d(ScummVM.LOG_TAG, "An empty ScummVM log file was created!");
+				Log.d(ScummVM.LOG_TAG, "New ScummVM log: " + _logScummvmFile.getPath());
+			}
+		} catch(Exception e) {
+			e.printStackTrace();
+			new AlertDialog.Builder(this)
+				.setTitle(R.string.no_log_file_title)
+				.setIcon(android.R.drawable.ic_dialog_alert)
+				.setMessage(R.string.no_log_file)
+				.setNegativeButton(R.string.quit,
+					new DialogInterface.OnClickListener() {
+						public void onClick(DialogInterface dialog, int which) {
+							finish();
+						}
+					})
+				.show();
+			return;
+		}
 	}
 
 //	// Shows the system bars by removing all the flags
@@ -1212,14 +1419,14 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 //	}
 
 	// Show or hide the semi-transparent onscreen controls
-	// Called by the override of showKeyboardControl()
-	private void showToggleKeyboardBtnIcon(boolean show) {
+	// Called by the override of showOnScreenControls()
+	private void showToggleOnScreenBtnIcons(int enableMask) {
 		if (_openMenuBtnIcon != null ) {
-			_openMenuBtnIcon.setVisibility(show ? View.VISIBLE : View.GONE);
+			_openMenuBtnIcon.setVisibility((enableMask & ScummVM.SHOW_ON_SCREEN_MENU) != 0 ? View.VISIBLE : View.GONE);
 		}
 
 		if (_toggleTouchModeKeyboardBtnIcon != null ) {
-			_toggleTouchModeKeyboardBtnIcon.setVisibility(show ? View.VISIBLE : View.GONE);
+			_toggleTouchModeKeyboardBtnIcon.setVisibility((enableMask & ScummVM.SHOW_ON_SCREEN_INPUT_MODE) != 0 ? View.VISIBLE : View.GONE);
 		}
 	}
 
@@ -1257,7 +1464,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 	@Override
 	public void onVisibilityChanged(boolean visible) {
 //		Toast.makeText(HomeActivity.this, visible ? "Keyboard is active" : "Keyboard is Inactive", Toast.LENGTH_SHORT).show();
-		hideSystemUI();
+		CompatHelpers.HideSystemStatusBar.hide(getWindow());
 	}
 
 	@SuppressWarnings("deprecation")
@@ -1268,7 +1475,6 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 	}
 
 	// Auxiliary function to overwrite a file (used for overwriting the scummvm.ini file with an existing other one)
-	@RequiresApi(api = Build.VERSION_CODES.KITKAT)
 	private static void copyFileUsingStream(File source, File dest) throws IOException {
 		try (InputStream is = new FileInputStream(source); OutputStream os = new FileOutputStream(dest)) {
 			copyStreamToStream(is, os);
@@ -1283,63 +1489,37 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		}
 	}
 
-	/**
-	 * Auxiliary function to read our ini configuration file
-	 * Code is from https://stackoverflow.com/a/41084504
-	 * returns The sections of the ini file as a Map of the header Strings to a Properties object (the key=value list of each section)
-	 */
-	@TargetApi(Build.VERSION_CODES.GINGERBREAD)
-	private static Map<String, Properties> parseINI(Reader reader) throws IOException {
-		final HashMap<String, Properties> result = new HashMap<>();
-		new Properties() {
+	private static boolean equalsStreamToStream(InputStream is1, InputStream is2) throws IOException {
+		byte[] buffer1 = new byte[1024];
+		byte[] buffer2 = new byte[1024];
+		int length1, length2;
 
-			private Properties section;
-
-			@Override
-			public Object put(Object key, Object value) {
-				String header = (key + " " + value).trim();
-				if (header.startsWith("[") && header.endsWith("]"))
-					return result.put(header.substring(1, header.length() - 1),
-						section = new Properties());
-				else
-					return section.put(key, value);
+		while (true) {
+			length1 = is1.read(buffer1);
+			length2 = is2.read(buffer2);
+			if (length1 != length2) {
+				return false;
 			}
-
-		}.load(reader);
-		return result;
+			if (length1 == -1) {
+				// Both streams are finished at the same point
+				return true;
+			}
+			if (!Arrays.equals(buffer1, buffer2)) {
+				return false;
+			}
+		}
 	}
 
-	@RequiresApi(api = Build.VERSION_CODES.KITKAT)
 	private static String getVersionInfoFromScummvmConfiguration(String fullIniFilePath) {
-		try (BufferedReader bufferedReader = new BufferedReader(new FileReader(fullIniFilePath))) {
-			Map<String, Properties> parsedIniMap = parseINI(bufferedReader);
-			if (!parsedIniMap.isEmpty()
-			    && parsedIniMap.containsKey("scummvm")
-			    && parsedIniMap.get("scummvm") != null) {
-				return parsedIniMap.get("scummvm").getProperty("versioninfo", "");
-			}
+		Map<String, Map<String, String>> parsedIniMap;
+		try (FileReader reader = new FileReader(fullIniFilePath)) {
+			parsedIniMap = INIParser.parse(reader);
 		} catch (IOException ignored) {
-		} catch (NullPointerException ignored) {
+			return null;
 		}
-		return "";
+		return INIParser.get(parsedIniMap, "scummvm", "versioninfo", null);
 	}
 
-	@RequiresApi(api = Build.VERSION_CODES.KITKAT)
-	private static String getSavepathInfoFromScummvmConfiguration(String fullIniFilePath) {
-		try (BufferedReader bufferedReader = new BufferedReader(new FileReader(fullIniFilePath))) {
-			Map<String, Properties> parsedIniMap = parseINI(bufferedReader);
-			if (!parsedIniMap.isEmpty()
-			    && parsedIniMap.containsKey("scummvm")
-			    && parsedIniMap.get("scummvm") != null) {
-				return parsedIniMap.get("scummvm").getProperty("savepath", "");
-			}
-		} catch (IOException ignored) {
-		} catch (NullPointerException ignored) {
-		}
-		return "";
-	}
-
-	@RequiresApi(api = Build.VERSION_CODES.KITKAT)
 	private boolean seekAndInitScummvmConfiguration() {
 
 		// https://developer.android.com/reference/android/content/Context#getExternalFilesDir(java.lang.String)
@@ -1382,10 +1562,14 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		_possibleExternalScummVMDir = getExternalFilesDir(null);
 		_externalPathAvailableForReadAccess = false;
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-			if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState(_possibleExternalScummVMDir))
-				|| Environment.MEDIA_UNKNOWN.equals(Environment.getExternalStorageState(_possibleExternalScummVMDir))
-				|| Environment.MEDIA_MOUNTED_READ_ONLY.equals(Environment.getExternalStorageState(_possibleExternalScummVMDir))
-			) {
+			if (   (_possibleExternalScummVMDir != null
+			         && (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState(_possibleExternalScummVMDir))
+			             || Environment.MEDIA_UNKNOWN.equals(Environment.getExternalStorageState(_possibleExternalScummVMDir))
+			             || Environment.MEDIA_MOUNTED_READ_ONLY.equals(Environment.getExternalStorageState(_possibleExternalScummVMDir))))
+			    || (_possibleExternalScummVMDir == null
+			         && (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())
+			             || Environment.MEDIA_UNKNOWN.equals(Environment.getExternalStorageState())
+			             || Environment.MEDIA_MOUNTED_READ_ONLY.equals(Environment.getExternalStorageState())))) {
 				_externalPathAvailableForReadAccess = true;
 			}
 		} else {
@@ -1400,21 +1584,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		//      to avoid issues with unavailable shared / external storage and to be (mostly) compatible with what the older versions did
 		// WARNING: The returned path may change over time if the calling app is moved to an adopted storage device, so only relative paths should be persisted.
 		_actualScummVMDataDir = getFilesDir();
-		// Checking for null only makes sense if we were using external storage
-//		if (_actualScummVMDataDir == null || !_actualScummVMDataDir.canRead()) {
-//			new AlertDialog.Builder(this)
-//				.setTitle(R.string.no_external_files_dir_access_title)
-//				.setIcon(android.R.drawable.ic_dialog_alert)
-//				.setMessage(R.string.no_external_files_dir_access)
-//				.setNegativeButton(R.string.quit,
-//					new DialogInterface.OnClickListener() {
-//						public void onClick(DialogInterface dialog, int which) {
-//							finish();
-//						}
-//					})
-//				.show();
-//			return false;
-//		}
+		// Checking for null _actualScummVMDataDir only makes sense if we were using external storage
 
 		Log.d(ScummVM.LOG_TAG, "Base ScummVM data folder is: " + _actualScummVMDataDir.getPath());
 		String smallNodeDesc;
@@ -1430,92 +1600,26 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 			}
 		}
 
-//		File internalScummVMLogsDir = new File(_actualScummVMDataDir, ".cache/scummvm/logs");
-//		if (!internalScummVMLogsDir.exists() && internalScummVMLogsDir.mkdirs()) {
-//			Log.d(ScummVM.LOG_TAG, "Created ScummVM Logs path: " + internalScummVMLogsDir.getPath());
-//		} else if (internalScummVMLogsDir.isDirectory()) {
-//			Log.d(ScummVM.LOG_TAG, "ScummVM Logs path already exists: " + internalScummVMLogsDir.getPath());
-//		} else {
-//			Log.e(ScummVM.LOG_TAG, "Could not create folder for ScummVM Logs path: " + internalScummVMLogsDir.getPath());
-//			new AlertDialog.Builder(this)
-//				.setTitle(R.string.no_log_file_title)
-//				.setIcon(android.R.drawable.ic_dialog_alert)
-//				.setMessage(R.string.no_log_file)
-//				.setNegativeButton(R.string.quit,
-//					new DialogInterface.OnClickListener() {
-//						public void onClick(DialogInterface dialog, int which) {
-//							finish();
-//						}
-//					})
-//				.show();
-//			return false;
-//		}
-//
-//		_usingLogFile = new File(internalScummVMLogsDir, "scummvm.log");
-//		try {
-//			if (_usingLogFile.exists() || !_usingLogFile.createNewFile()) {
-//				Log.d(ScummVM.LOG_TAG, "ScummVM Log file already exists!");
-//				Log.d(ScummVM.LOG_TAG, "Existing ScummVM Log: " + _usingLogFile.getPath());
-//			} else {
-//				Log.d(ScummVM.LOG_TAG, "An empty ScummVM log file was created!");
-//				Log.d(ScummVM.LOG_TAG, "New ScummVM Log: " + _usingLogFile.getPath());
-//			}
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//			new AlertDialog.Builder(this)
-//				.setTitle(R.string.no_log_file_title)
-//				.setIcon(android.R.drawable.ic_dialog_alert)
-//				.setMessage(R.string.no_log_file)
-//				.setNegativeButton(R.string.quit,
-//					new DialogInterface.OnClickListener() {
-//						public void onClick(DialogInterface dialog, int which) {
-//							finish();
-//						}
-//					})
-//				.show();
-//			return false;
-//		}
-
-		File internalScummVMConfigDir = new File(_actualScummVMDataDir, ".config/scummvm");
-		if (!internalScummVMConfigDir.exists() && internalScummVMConfigDir.mkdirs()) {
-			Log.d(ScummVM.LOG_TAG, "Created ScummVM Config path: " + internalScummVMConfigDir.getPath());
-		} else if (internalScummVMConfigDir.isDirectory()) {
-			Log.d(ScummVM.LOG_TAG, "ScummVM Config path already exists: " + internalScummVMConfigDir.getPath());
-		} else {
-			Log.e(ScummVM.LOG_TAG, "Could not create folder for ScummVM Config path: " + internalScummVMConfigDir.getPath());
-			new AlertDialog.Builder(this)
-				.setTitle(R.string.no_config_file_title)
-				.setIcon(android.R.drawable.ic_dialog_alert)
-				.setMessage(R.string.no_config_file)
-				.setNegativeButton(R.string.quit,
-					new DialogInterface.OnClickListener() {
-						public void onClick(DialogInterface dialog, int which) {
-							finish();
-						}
-					})
-				.show();
-			return false;
-		}
-
 		LinkedHashMap<String, File> candidateOldLocationsOfScummVMConfigMap = new LinkedHashMap<>();
-		// Note: The "missing" case below for: (scummvm.ini)) (SDL port - A) is checked above; it is the same path we store the config file for 2.3+
+		// Note: The "missing" case below for: (scummvm.ini)) (SDL port - A) is checked above;
+		// it is the same path we store the config file for 2.3+
 		// SDL port was officially on the Play Store for versions 1.9+ up until and including 2.0)
-		// Using LinkedHashMap because the order of searching is important
+		// Using LinkedHashMap because the order of searching is important.
 		// We want to re-use the more recent ScummVM old version too
 		// TODO try getDir too without a path? just "." ??
 		candidateOldLocationsOfScummVMConfigMap.put("(scummvm.ini) (SDL port - B)", new File(_actualScummVMDataDir, "../.config/scummvm/scummvm.ini"));
-		if (_externalPathAvailableForReadAccess) {
+		if (_externalPathAvailableForReadAccess && _possibleExternalScummVMDir != null) {
 			candidateOldLocationsOfScummVMConfigMap.put("(scummvm.ini) (SDL port - C)", new File(_possibleExternalScummVMDir, ".config/scummvm/scummvm.ini"));
 			candidateOldLocationsOfScummVMConfigMap.put("(scummvm.ini) (SDL port - D)", new File(_possibleExternalScummVMDir, "../.config/scummvm/scummvm.ini"));
 		}
 		candidateOldLocationsOfScummVMConfigMap.put("(scummvm.ini) (SDL port - E)", new File(Environment.getExternalStorageDirectory(), ".config/scummvm/scummvm.ini"));
 		candidateOldLocationsOfScummVMConfigMap.put("(scummvmrc) (version 1.8.1- or PlayStore 2.1.0) - Internal", new File(_actualScummVMDataDir, "scummvmrc"));
-		if (_externalPathAvailableForReadAccess) {
+		if (_externalPathAvailableForReadAccess && _possibleExternalScummVMDir != null) {
 			candidateOldLocationsOfScummVMConfigMap.put("(scummvmrc) (version 1.8.1- or PlayStore 2.1.0) - Ext Emu", new File(_possibleExternalScummVMDir, "scummvmrc"));
 		}
 		candidateOldLocationsOfScummVMConfigMap.put("(scummvmrc) (version 1.8.1- or PlayStore 2.1.0) - Ext SD", new File(Environment.getExternalStorageDirectory(), "scummvmrc"));
 		candidateOldLocationsOfScummVMConfigMap.put("(.scummvmrc) (POSIX conformance) - Internal", new File(_actualScummVMDataDir, ".scummvmrc"));
-		if (_externalPathAvailableForReadAccess) {
+		if (_externalPathAvailableForReadAccess && _possibleExternalScummVMDir != null) {
 			candidateOldLocationsOfScummVMConfigMap.put("(.scummvmrc) (POSIX conformance) - Ext Emu", new File(_possibleExternalScummVMDir, ".scummvmrc"));
 		}
 		candidateOldLocationsOfScummVMConfigMap.put("(.scummvmrc) (POSIX conformance) - Ext SD)", new File(Environment.getExternalStorageDirectory(), ".scummvmrc"));
@@ -1526,8 +1630,8 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		for (int incIndx = 0; incIndx + 1 < listOfAuxExtStoragePaths.length; incIndx += 2) {
 			// exclude identical matches for internal and emulated external app dir, since we take them into account below explicitly
 			if (listOfAuxExtStoragePaths[incIndx + 1].compareToIgnoreCase(_actualScummVMDataDir.getPath()) != 0
-				&& listOfAuxExtStoragePaths[incIndx + 1].compareToIgnoreCase(_possibleExternalScummVMDir.getPath()) != 0
-			) {
+			    && (_possibleExternalScummVMDir == null
+			         || listOfAuxExtStoragePaths[incIndx + 1].compareToIgnoreCase(_possibleExternalScummVMDir.getPath()) != 0)) {
 				//
 				// Possible for Config file locations on top of paths returned by getAllStorageLocationsNoPermissionRequest
 				//
@@ -1562,10 +1666,9 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		boolean existingConfigInScummVMDataDirReplacedOnce = false; // patch for 2.2.1 Beta1 purposes
 
 		// NOTE: our config file scummvm.ini is created directly inside the ScummVM internal app path
-		//       this is probably due to a mistake (?), since we do create a config path for it above
-		//       ( in File internalScummVMConfigDir , the sub-path ".config/scummvm")
-		//       However, this is harmless, so we can keep it this way.
-		//       Or we could change it in a future version.
+		//       It is more user friendly to keep it this way (rather than put it in a subpath ".config/scummvm",
+		//       since it can be directly browsable using the ScummVM's LAN server mode,
+		//       and looking in the root of the internal app folder.
 		//       Keep in mind that changing the scummvm.ini config file location would require at the very least:
 		//       - Moving the old scummvm.ini (if upgrading) to the new location and deleting it from the old one
 		//       - Updating the ScummVM documentation about the new location
@@ -1576,13 +1679,12 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 				Log.d(ScummVM.LOG_TAG, "ScummVM Config file already exists!");
 				Log.d(ScummVM.LOG_TAG, "Existing ScummVM INI: " + _configScummvmFile.getPath());
 				String existingVersionInfo = getVersionInfoFromScummvmConfiguration(_configScummvmFile.getPath());
-				if (!TextUtils.isEmpty(existingVersionInfo) && !TextUtils.isEmpty(existingVersionInfo.trim()) ) {
-					Log.d(ScummVM.LOG_TAG, "Existing ScummVM Version: " + existingVersionInfo.trim());
-					Version tmpOldVersionFound = new Version(existingVersionInfo.trim());
+				if (!TextUtils.isEmpty(existingVersionInfo) && !TextUtils.isEmpty(existingVersionInfo) ) {
+					Log.d(ScummVM.LOG_TAG, "Existing ScummVM Version: " + existingVersionInfo);
+					Version tmpOldVersionFound = new Version(existingVersionInfo);
 					if (tmpOldVersionFound.compareTo(maxOldVersionFound) > 0) {
 						maxOldVersionFound = tmpOldVersionFound;
 						existingVersionFoundInScummVMDataDir = tmpOldVersionFound;
-						//scummVMConfigHandled = false; // invalidate the handled flag
 					}
 				} else {
 					Log.d(ScummVM.LOG_TAG, "Could not find info on existing ScummVM version. Unsupported or corrupt file?");
@@ -1677,25 +1779,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 			Log.d(ScummVM.LOG_TAG, "No viable existing ScummVM config version found");
 		}
 
-		//
-		// TODO The assets cleanup upgrading system is not perfect but it will have to do
-		//      A more efficient way would be to compare hash (when we deem that an upgrade is happening, so we will also still have to compare versions)
-		// Note that isSideUpgrading is also true each time we re-launch the app
-		// Also even during a side-upgrade we cleanup any redundant files (no longer part of our assets)
-
-		// By first checking for isDirty() and then comparing the Version objects,
-		// we don't need to also compare the Version descriptions (full version text) for a match too,
-		// since, if the full versions text do not match, it's because at least one of them is dirty.
-		// TODO: This does mean that "pre" (or similar) versions (eg. 2.2.1pre) will always be considered non-side-upgrades
-		//        and will re-copy the assets upon each launch
-		//       This should have a slight performance impact (for launch time) for those intermediate version releases,
-		//       but it's better than the alternative (comparing MD5 hashes for all files), and it should go away with the next proper release.
-		//       This solution should cover "git" versions properly
-		//       (ie. developer builds, built with release configuration (eg 2.3.0git) or debug configuration (eg. 2.3.0git9272-gc71ac4748b))
-		boolean isSideUpgrading = (!_currentScummVMVersion.isDirty()
-		                           && !maxOldVersionFound.isDirty()
-		                           && maxOldVersionFound.compareTo(_currentScummVMVersion) == 0);
-		copyAssetsToInternalMemory(isSideUpgrading);
+		updateAssetsToInternalMemory();
 
 		//
 		// Set global savepath
@@ -1725,20 +1809,13 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 		//      or external storage not always being available (but then eg. a save file on the storage should be correctly shown as not available)
 		//      or maybe among Android OS versions the same external storage could be mounted to a (somewhat) different path?
 		//      However, it seems unavoidable when user has set paths explicitly (ie not using the defaults)
-		//      We always set the default save path as a launch parameter
 		//
 		// By default choose to store savegames on app's internal storage, which is always available
 		//
 		File defaultScummVMSavesPath = new File(_actualScummVMDataDir, "saves");
-		// By default use this as the saves path
-		_usingScummVMSavesDir = new File(defaultScummVMSavesPath.getPath());
 
 		if (defaultScummVMSavesPath.exists() && defaultScummVMSavesPath.isDirectory()) {
-			try {
-				Log.d(ScummVM.LOG_TAG, "ScummVM default saves path already exists: " + defaultScummVMSavesPath.getPath());
-			} catch (Exception e) {
-				Log.d(ScummVM.LOG_TAG, "ScummVM default saves path exception CAUGHT!");
-			}
+			Log.d(ScummVM.LOG_TAG, "ScummVM default saves path already exists: " + defaultScummVMSavesPath.getPath());
 		} else if (!defaultScummVMSavesPath.exists() && defaultScummVMSavesPath.mkdirs()) {
 			Log.d(ScummVM.LOG_TAG, "Created ScummVM default saves path: " + defaultScummVMSavesPath.getPath());
 		} else {
@@ -1811,7 +1888,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 					candidateOldLocationsOfScummVMSavesMap.put("A06", new File(_actualScummVMDataDir, "../.local/scummvm/saves"));
 					candidateOldLocationsOfScummVMSavesMap.put("A07", new File(_actualScummVMDataDir, "../saves"));
 					candidateOldLocationsOfScummVMSavesMap.put("A08", new File(_actualScummVMDataDir, "../scummvm/saves"));
-					if (_externalPathAvailableForReadAccess) {
+					if (_externalPathAvailableForReadAccess && _possibleExternalScummVMDir != null) {
 						// this is a popular one
 						candidateOldLocationsOfScummVMSavesMap.put("A09", new File(_possibleExternalScummVMDir, ".local/share/scummvm/saves"));
 						candidateOldLocationsOfScummVMSavesMap.put("A10", new File(_possibleExternalScummVMDir, ".local/scummvm/saves"));
@@ -1831,8 +1908,8 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 				for (int incIndx = 0; incIndx + 1 < listOfAuxExtStoragePaths.length; incIndx += 2) {
 					// exclude identical matches for internal and emulated external app dir, since we take them into account below explicitly
 					if (listOfAuxExtStoragePaths[incIndx + 1].compareToIgnoreCase(_actualScummVMDataDir.getPath()) != 0
-						&& listOfAuxExtStoragePaths[incIndx + 1].compareToIgnoreCase(_possibleExternalScummVMDir.getPath()) != 0
-					) {
+					    && (_possibleExternalScummVMDir == null
+					        || listOfAuxExtStoragePaths[incIndx + 1].compareToIgnoreCase(_possibleExternalScummVMDir.getPath()) != 0)) {
 						//
 						// Possible for Saves dirs locations on top of paths returned by getAllStorageLocationsNoPermissionRequest
 						//
@@ -1940,139 +2017,289 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 			}
 		}
 
-		File persistentGlobalSavePath = null;
-		if (_configScummvmFile.exists() && _configScummvmFile.isFile()) {
-			Log.d(ScummVM.LOG_TAG, "Looking into config file for save path: " + _configScummvmFile.getPath());
-			String persistentGlobalSavePathStr = getSavepathInfoFromScummvmConfiguration(_configScummvmFile.getPath());
-			if (!TextUtils.isEmpty(persistentGlobalSavePathStr) && !TextUtils.isEmpty(persistentGlobalSavePathStr.trim()) ) {
-				Log.d(ScummVM.LOG_TAG, "Found explicit save path: " + persistentGlobalSavePathStr);
-				persistentGlobalSavePath = new File(persistentGlobalSavePathStr);
-				if (persistentGlobalSavePath.exists() && persistentGlobalSavePath.isDirectory() && persistentGlobalSavePath.listFiles() != null) {
-					try {
-						Log.d(ScummVM.LOG_TAG, "ScummVM explicit saves path folder exists and it is list-able");
-					} catch (Exception e) {
-						persistentGlobalSavePath = null;
-						Log.e(ScummVM.LOG_TAG, "ScummVM explicit saves path exception CAUGHT!");
-					}
-				} else {
-					// We won't bother creating it, it's not in our scope to do that (and it would probably result in potential permission issues)
-					Log.e(ScummVM.LOG_TAG, "Could not access explicit save folder for ScummVM: " + persistentGlobalSavePath.getPath());
-					persistentGlobalSavePath = null;
-					// We should *not* quit or return here,
-					// TODO But, how do we override this explicit set path? Do we leave it to the user to reset it?
-					new AlertDialog.Builder(this)
-						.setTitle(R.string.no_save_path_title)
-						.setIcon(android.R.drawable.ic_dialog_alert)
-						.setMessage(R.string.bad_explicit_save_path_configured)
-						.setPositiveButton(R.string.ok,
-							new DialogInterface.OnClickListener() {
-								public void onClick(DialogInterface dialog, int which) {
+		// Also create the default directory for icons and shaders
+		File defaultScummVMIconsPath = new File(_actualScummVMDataDir, "icons");
 
-								}
-							})
-						.show();
-				}
-			} else {
-				Log.d(ScummVM.LOG_TAG, "Could not find explicit save path info in ScummVM's config file");
-			}
+		if (defaultScummVMIconsPath.exists() && defaultScummVMIconsPath.isDirectory()) {
+			Log.d(ScummVM.LOG_TAG, "ScummVM default icons/shaders path already exists: " + defaultScummVMIconsPath.getPath());
+		} else if (!defaultScummVMIconsPath.exists() && defaultScummVMIconsPath.mkdirs()) {
+			Log.d(ScummVM.LOG_TAG, "Created ScummVM default icons/shaders path: " + defaultScummVMIconsPath.getPath());
+		} else {
+			Log.e(ScummVM.LOG_TAG, "Could not create folder for ScummVM default icons/shaders path: " + defaultScummVMIconsPath.getPath());
+			new AlertDialog.Builder(this)
+				.setTitle(R.string.no_icons_path_title)
+				.setIcon(android.R.drawable.ic_dialog_alert)
+				.setMessage(R.string.no_icons_path_configured)
+				.setNegativeButton(R.string.quit,
+					new DialogInterface.OnClickListener() {
+						public void onClick(DialogInterface dialog, int which) {
+							finish();
+						}
+					})
+				.show();
+			return false;
 		}
-
-		if (persistentGlobalSavePath != null) {
-			// Use the persistent savepath
-			_usingScummVMSavesDir = new File(persistentGlobalSavePath.getPath());
-		}
-		Log.d(ScummVM.LOG_TAG, "Resulting save path is: " + _usingScummVMSavesDir.getPath());
-
 		return true;
 	}
 
-
-	private boolean containsStringEntry(@NonNull String[] stringItenary, String targetEntry) {
-		for (String sourceEntry : stringItenary) {
-			// Log.d(ScummVM.LOG_TAG, "Comparing filename: " + sourceEntry + " to filename: " + targetEntry);
-			if (sourceEntry.compareToIgnoreCase(targetEntry) == 0) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	// clear up any possibly deprecated assets (when upgrading to a new version)
-	// Don't remove the scummvm.ini file!
-	// Remove any files not in the filesItenary, even in a sideUpgrade
-	// Remove any files in the filesItenary only if not a sideUpgrade
-	private void internalAppFolderCleanup(String[] filesItenary, boolean sideUpgrade) {
-		if (_actualScummVMDataDir != null) {
-			File[] extfiles = _actualScummVMDataDir.listFiles();
-			if (extfiles != null) {
-				Log.d(ScummVM.LOG_TAG, "Cleaning up files in internal app space");
-				for (File extfile : extfiles) {
-					if (extfile.isFile()) {
-						if (extfile.getName().compareToIgnoreCase("scummvm.ini") != 0
-							&& (!containsStringEntry(filesItenary, extfile.getName())
-							|| !sideUpgrade)
-						) {
-							Log.d(ScummVM.LOG_TAG, "Deleting file:" + extfile.getName());
-							if (!extfile.delete()) {
-								Log.e(ScummVM.LOG_TAG, "Failed to delete file:" + extfile.getName());
-							}
-						}
-					}
+	// Deletes recursively a directory and its contents
+	private static void deleteDir(File dir) {
+		for (File child : dir.listFiles()) {
+			if (child.isDirectory()) {
+				deleteDir(child);
+			} else {
+				if (!child.delete()) {
+					Log.e(ScummVM.LOG_TAG, "Failed to delete file:" + child.getPath());
 				}
 			}
 		}
+		if (!dir.delete()) {
+			Log.e(ScummVM.LOG_TAG, "Failed to delete dir:" + dir.getPath());
+		}
+	}
+
+	// clear up all files in the root of the internal app directory
+	// Don't remove the scummvm.ini nor the scummvm.log file!
+	private static void internalAppFolderCleanup(File dataDir) {
+		// We check if we already did the cleanup before by using a known to exist file
+		// scummmodern.zip has always been there in the Android port
+		if (!(new File(dataDir, "scummmodern.zip")).exists()) {
+			// We already did the cleanup: nothing to do
+			return;
+		}
+
+		File[] extfiles = dataDir.listFiles();
+		if (extfiles == null) {
+			// This should not happen
+			return;
+		}
+
+		Log.d(ScummVM.LOG_TAG, "Cleaning up old files in " + dataDir.getPath());
+		for (File extfile : extfiles) {
+			if (extfile.isDirectory()) {
+				// We never extracted folders before
+				continue;
+			}
+			// Skip scummvm.ini, scummvm.log at root
+			String name = extfile.getName();
+			if ((name.compareToIgnoreCase("scummvm.ini") == 0) ||
+				(name.compareToIgnoreCase("scummvm.log") == 0)) {
+					continue;
+			}
+			Log.d(ScummVM.LOG_TAG, "Deleting file:" + extfile.getName());
+			if (!extfile.delete()) {
+				Log.e(ScummVM.LOG_TAG, "Failed to delete file:" + extfile.getName());
+			}
+		}
+	}
+
+	// clear up any possibly deprecated assets (when upgrading to a new version)
+	// Don't remove the scummvm.ini nor the scummvm.log file!
+	// Remove any files not in the assetsToExtract
+	// Returns true if the dataDir was a directory and false otherwise
+	private static boolean assetsFolderCleanup(File dataDir, String[] assetsToExtract) {
+		HashSet<String> filesToKeep = new HashSet<>(Arrays.asList(assetsToExtract));
+
+		File[] extfiles = dataDir.listFiles();
+		if (extfiles == null) {
+			// If we are here, this means dataDir is a file
+			return false;
+		}
+
+		Log.d(ScummVM.LOG_TAG, "Cleaning up files in " + dataDir.getPath());
+		for (File extfile : extfiles) {
+			String name = extfile.getName();
+
+			if (filesToKeep.contains(name)) {
+				continue;
+			}
+
+			if (extfile.isDirectory()) {
+				Log.d(ScummVM.LOG_TAG, "Deleting folder:" + extfile.getName());
+				deleteDir(extfile);
+			} else {
+				Log.d(ScummVM.LOG_TAG, "Deleting file:" + extfile.getName());
+				if (!extfile.delete()) {
+					Log.e(ScummVM.LOG_TAG, "Failed to delete file:" + extfile.getName());
+					// Ignore error, that will be a leftover
+				}
+			}
+		}
+		return true;
 	}
 
 	// code based on https://stackoverflow.com/a/4530294
 	// Note, the following assumptions are made (since they are true as of yet)
-	// - We don't need to copy (sub)folders
 	// - We copy all the files from our assets (not a subset of them)
 	// Otherwise we would probably need to create a specifically named zip file with the selection of files we'd need to extract to the internal memory
-	@RequiresApi(api = Build.VERSION_CODES.KITKAT)
-	private void copyAssetsToInternalMemory(boolean sideUpgrade) {
-		// sideUpgrade is set to true, if we upgrade to the same version -- just check for the files existence before copying
-		if (_actualScummVMDataDir != null) {
-			AssetManager assetManager = getAssets();
-			String[] files = null;
-			try {
-				files = assetManager.list("");
-			} catch (IOException e) {
-				Log.e(ScummVM.LOG_TAG, "Failed to get asset file list.", e);
+	// Returns true if the assetDir was a directory and false otherwise
+	private static boolean extractAssets(AssetManager assetManager, String assetDir, File dataDir) throws IOException {
+		String[] files = null;
+		try {
+			files = assetManager.list(assetDir);
+		} catch (IOException e) {
+			Log.e(ScummVM.LOG_TAG, "Failed to get asset file list.", e);
+			throw e;
+		}
+
+		if (files == null || files.length == 0) {
+			// The asset is a file: remove any directory with the same name
+			if (dataDir.isDirectory()) {
+				deleteDir(dataDir);
+			}
+			return false;
+		}
+
+		// Starting from here, assetDir is a directory
+
+		// Cleanup old files
+		if (!assetsFolderCleanup(dataDir, files)) {
+			// dataDir is a file but we need a folder
+			if (dataDir.exists()) {
+				if (!dataDir.delete()) {
+					Log.e(ScummVM.LOG_TAG, "Failed to delete file:" + dataDir.getName());
+					// There is no point on continuing this
+					throw new IOException("Failed to delete file:" + dataDir.getName());
+				}
+			}
+		}
+
+		if (!dataDir.exists()) {
+			if (!dataDir.mkdir()) {
+				Log.e(ScummVM.LOG_TAG, "Failed to create directory: " + dataDir.getPath());
+				// There is no point on continuing this
+				throw new IOException("Failed to create directory:" + dataDir.getName());
+			}
+		}
+
+		for (String filename : files) {
+			String assetPath = (assetDir.length() > 0 ? assetDir + File.separator : "") + filename;
+			File dataPath = new File(dataDir, filename);
+
+			if (extractAssets(assetManager, assetPath, dataPath)) {
+				// This was a directory: no data to extract
+				continue;
 			}
 
-			internalAppFolderCleanup(files, sideUpgrade);
-
-			if (files != null) {
-				for (String filename : files) {
-					InputStream in = null;
-					OutputStream out = null;
+			// This must be a file: extract it
+			InputStream in = null;
+			OutputStream out = null;
+			try {
+				Log.d(ScummVM.LOG_TAG, "Copying asset file: " + assetPath);
+				in = assetManager.open(assetPath);
+				out = new FileOutputStream(dataPath);
+				copyStreamToStream(in, out);
+			} catch (IOException e) {
+				Log.e(ScummVM.LOG_TAG, "Failed to copy asset file: " + assetPath);
+			} finally {
+				if (in != null) {
 					try {
-						in = assetManager.open(filename);
-						File outFile = new File(_actualScummVMDataDir, filename);
-						if (sideUpgrade && outFile.exists()) {
-							Log.d(ScummVM.LOG_TAG, "Side-upgrade. No need to update asset file: " + filename);
-						} else {
-							Log.d(ScummVM.LOG_TAG, "Copying asset file: " + filename);
-							out = new FileOutputStream(outFile);
-							copyStreamToStream(in, out);
-						}
+						in.close();
 					} catch (IOException e) {
-						Log.e(ScummVM.LOG_TAG, "Failed to copy asset file: " + filename);
-					} finally {
-						if (in != null) {
-							try {
-								in.close();
-							} catch (IOException e) {
-								// NOOP
-							}
-						}
-						if (out != null) {
-							try {
-								out.close();
-							} catch (IOException e) {
-								// NOOP
-							}
-						}
+						// NOOP
+					}
+				}
+				if (out != null) {
+					try {
+						out.close();
+					} catch (IOException e) {
+						// NOOP
+					}
+				}
+			}
+		}
+		return true;
+	}
+
+	private void updateAssetsToInternalMemory() {
+		if (_actualScummVMDataDir == null) {
+			return;
+		}
+
+		_assetsUpdated = true;
+
+		internalAppFolderCleanup(_actualScummVMDataDir);
+
+		AssetManager assetManager = getAssets();
+
+		// We need to compare MD5SUMS from our assets with what is on disk
+		File md5sumsPath = new File(_actualScummVMDataDir, "MD5SUMS");
+
+		Log.d(ScummVM.LOG_TAG, "Checking status of MD5SUMS");
+		// First: read MD5SUMS from our assets, we will need it
+		byte[] newSums = null;
+		{
+			InputStream newStreamAsset = null;
+			try {
+				newStreamAsset = assetManager.open("MD5SUMS");
+				ByteArrayOutputStream newStream = new ByteArrayOutputStream();
+				copyStreamToStream(newStreamAsset, newStream);
+				newSums = newStream.toByteArray();
+			} catch (IOException e) {
+				Log.e(ScummVM.LOG_TAG, "Failed to read MD5SUMS asset");
+			} finally {
+				if (newStreamAsset != null) {
+					try {
+						newStreamAsset.close();
+					} catch (IOException e) {
+						// NOOP
+					}
+				}
+				// Closing a ByteArrayOutputStream is useless
+			}
+		}
+
+		// Then: open the on disk file, check its size and if they match, compare the contents
+		if (newSums != null && newSums.length > 0) {
+			FileInputStream oldStream = null;
+			try {
+				oldStream = new FileInputStream(md5sumsPath);
+				if (oldStream.getChannel().size() == newSums.length &&
+					equalsStreamToStream(new ByteArrayInputStream(newSums), oldStream)) {
+					// The files are identical: nothing to do
+					Log.d(ScummVM.LOG_TAG, "MD5SUMS is already up to date");
+					_assetsUpdated = false;
+					return;
+				}
+			} catch (IOException e) {
+				Log.e(ScummVM.LOG_TAG, "Failed to read MD5SUMS file");
+			} finally {
+				if (oldStream != null) {
+					try {
+						oldStream.close();
+					} catch (IOException e) {
+						// NOOP
+					}
+				}
+			}
+		}
+
+		// Continue: with extracting the whole assets
+		try {
+			extractAssets(assetManager, "assets", new File(_actualScummVMDataDir, "assets"));
+			extractAssets(assetManager, "doc", new File(_actualScummVMDataDir, "doc"));
+		} catch (IOException e) {
+			Log.e(ScummVM.LOG_TAG, "An error happened while extracting the assets");
+			// Don't write the new MD5SUMS: we did not finish our work well
+			return;
+		}
+
+
+		// Finally: everything is now fresh, store the new sums
+		if (newSums != null) {
+			FileOutputStream newStream = null;
+			try {
+				newStream = new FileOutputStream(md5sumsPath);
+				newStream.write(newSums);
+			} catch (IOException e) {
+				Log.e(ScummVM.LOG_TAG, "Failed to write MD5SUMS file");
+				// If we fail to write MD5SUMS, we will try again at the next startup
+			} finally {
+				if (newStream != null) {
+					try {
+						newStream.close();
+					} catch (IOException e) {
+						// NOOP
 					}
 				}
 			}
@@ -2104,17 +2331,25 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 	// Furthermore, on Android 11 (API level 30) and higher, you cannot use the ACTION_OPEN_DOCUMENT_TREE intent action to request that the user select individual files from the following directories:
 	// - The Android/data/ directory and all subdirectories.
 	// - The Android/obb/ directory and all subdirectories.
-	public Uri selectWithNativeUI(boolean folder, boolean write, Uri initialURI, String prompt) {
+	@RequiresApi(api = Build.VERSION_CODES.N)
+	public Uri selectWithNativeUI(boolean folder, boolean write, Uri initialURI, String prompt, String mimeType, String fileName) {
 		// Choose a directory using the system's folder picker.
 		Intent intent;
 		if (folder) {
 			intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
 		} else {
-			intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+			if (write) {
+				intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+				if (fileName != null) {
+					intent.putExtra(Intent.EXTRA_TITLE, fileName);
+				}
+			} else {
+				intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+			}
 			intent.addCategory(Intent.CATEGORY_OPENABLE);
-			intent.setType("*/*");
+			intent.setType(mimeType);
 		}
-		if (initialURI != null) {
+		if (initialURI != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
 			intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialURI);
 		}
 		if (prompt != null) {
@@ -2166,80 +2401,7 @@ public class ScummVMActivity extends Activity implements OnKeyboardVisibilityLis
 	// End of SAF enabled code
 	// -------------------------------------------------------------------------------------------
 
-
 } // end of ScummVMActivity
-
-// *** HONEYCOMB / ICS FIX FOR FULLSCREEN MODE, by lmak ***
-// TODO DimSystemStatusBar may be redundant for us
-abstract class DimSystemStatusBar {
-
-	final boolean bGlobalsImmersiveMode = true;
-
-	public static DimSystemStatusBar get() {
-		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.HONEYCOMB) {
-			return DimSystemStatusBarHoneycomb.Holder.sInstance;
-		} else {
-			return DimSystemStatusBarDummy.Holder.sInstance;
-		}
-	}
-
-	public abstract void dim(final View view);
-
-	private static class DimSystemStatusBarHoneycomb extends DimSystemStatusBar {
-		private static class Holder {
-			private static final DimSystemStatusBarHoneycomb sInstance = new DimSystemStatusBarHoneycomb();
-		}
-
-		public void dim(final View view) {
-			if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT && bGlobalsImmersiveMode) {
-				// Immersive mode, I already hear curses when system bar reappears mid-game from the slightest swipe at the bottom of the screen
-				view.setSystemUiVisibility(android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | android.view.View.SYSTEM_UI_FLAG_FULLSCREEN);
-			} else {
-				view.setSystemUiVisibility(android.view.View.SYSTEM_UI_FLAG_LOW_PROFILE);
-			}
-		}
-	}
-
-	private static class DimSystemStatusBarDummy extends DimSystemStatusBar {
-		private static class Holder {
-			private static final DimSystemStatusBarDummy sInstance = new DimSystemStatusBarDummy();
-		}
-
-		public void dim(final View view) { }
-	}
-}
-
-abstract class SetLayerType {
-
-	public static SetLayerType get() {
-		if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.HONEYCOMB) {
-			return SetLayerTypeHoneycomb.Holder.sInstance;
-		} else {
-			return SetLayerTypeDummy.Holder.sInstance;
-		}
-	}
-
-	public abstract void setLayerType(final View view);
-
-	private static class SetLayerTypeHoneycomb extends SetLayerType {
-		private static class Holder {
-			private static final SetLayerTypeHoneycomb sInstance = new SetLayerTypeHoneycomb();
-		}
-
-		public void setLayerType(final View view) {
-			view.setLayerType(android.view.View.LAYER_TYPE_NONE, null);
-			//view.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
-		}
-	}
-
-	private static class SetLayerTypeDummy extends SetLayerType {
-		private static class Holder {
-			private static final SetLayerTypeDummy sInstance = new SetLayerTypeDummy();
-		}
-
-		public void setLayerType(final View view) { }
-	}
-}
 
 // Used to define the interface for a callback after ScummVM thread has finished
 interface MyScummVMDestroyedCallback {

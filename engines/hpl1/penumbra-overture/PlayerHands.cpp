@@ -251,7 +251,7 @@ void cPlayerHands::OnStart() {
 //-----------------------------------------------------------------------
 
 void cPlayerHands::Update(float afTimeStep) {
-	UpdatePrevPostions();
+	UpdatePrevPositions();
 
 	///////////////////////////////////
 	// Get the camera properties
@@ -495,7 +495,7 @@ void cPlayerHands::SetCurrentModel(int alNum, const tString &asName) {
 
 		iHudModel *pHandModel = it->second;
 
-		/*cWorld3D *pWorld = */mpInit->mpGame->GetScene()->GetWorld3D();
+		/*cWorld3D *pWorld = */ mpInit->mpGame->GetScene()->GetWorld3D();
 
 		if (mvCurrentHudModels[alNum]) {
 			if (mvCurrentHudModels[alNum] != pHandModel) {
@@ -589,7 +589,7 @@ void cPlayerHands::OnWorldLoad() {
 //////////////////////////////////////////////////////////////////////////
 
 //-----------------------------------------------------------------------
-void cPlayerHands::UpdatePrevPostions() {
+void cPlayerHands::UpdatePrevPositions() {
 	///////////////////////////////////
 	// Get current position
 	cCamera3D *pCam = mpInit->mpPlayer->GetCamera();
@@ -606,16 +606,16 @@ void cPlayerHands::UpdatePrevPostions() {
 		mlstRotations.pop_front();
 
 	///////////////////////////////////////
-	// Get the current camera postion and rotation
+	// Get the current camera position and rotation
 	cVector3f vRotation(0, 0, 0);
 	cVector3f vPosition(0, 0, 0);
 	float fRotNum = 0;
-	float fPosNum = 0;
+	//float fPosNum = 0;
 
-	//float fRotMulStart = 1.0f;
-	//float fRotMulEnd = 0.1f;
-	//float fSize = (float)mlstRotations.size();
-	//float fD = (fRotMulStart - fRotMulEnd) / fSize;
+	// float fRotMulStart = 1.0f;
+	// float fRotMulEnd = 0.1f;
+	// float fSize = (float)mlstRotations.size();
+	// float fD = (fRotMulStart - fRotMulEnd) / fSize;
 	float fMul = 1.0f; // fRotMulEnd;
 
 	for (tVector3fListIt it = mlstRotations.begin(); it != mlstRotations.end(); ++it) {
@@ -626,7 +626,7 @@ void cPlayerHands::UpdatePrevPostions() {
 
 	for (tVector3fListIt it = mlstPositions.begin(); it != mlstPositions.end(); ++it) {
 		vPosition += *it;
-		fPosNum++;
+		//fPosNum++;
 	}
 
 	mvSmoothCameraPos = vCamPosition; // vPosition / fPosNum;

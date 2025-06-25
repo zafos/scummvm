@@ -44,13 +44,14 @@ class SkyMetaEngine : public MetaEngine {
 
 	bool hasFeature(MetaEngineFeature f) const override;
 
-	Common::Error createInstance(OSystem *syst, Engine **engine) override;
+	Common::Error createInstance(OSystem *syst, Engine **engine,
+	                             const DetectedGame &gameDescriptor, const void *metaEngineDescriptor) override;
 
 	const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const override;
 
 	SaveStateList listSaves(const char *target) const override;
 	int getMaximumSaveSlot() const override;
-	void removeSaveState(const char *target, int slot) const override;
+	bool removeSaveState(const char *target, int slot) const override;
 	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
 
 	Common::KeymapArray initKeymaps(const char *target) const override;
@@ -127,12 +128,12 @@ Common::KeymapArray SkyMetaEngine::initKeymaps(const char *target) const {
 	act->addDefaultInputMapping("p");
 	shortcutsKeymap->addAction(act);
 
-	act = new Action("FAST", _("Toggle fast mode"));
+	act = new Action("FAST", _("Toggle fast mode on / off"));
 	act->setCustomEngineActionEvent(kSkyActionToggleFastMode);
 	act->addDefaultInputMapping("C+f");
 	shortcutsKeymap->addAction(act);
 
-	act = new Action("RFAST", _("Toggle really fast mode"));
+	act = new Action("RFAST", _("Toggle really fast mode on / off"));
 	act->setCustomEngineActionEvent(kSkyActionToggleReallyFastMode);
 	act->addDefaultInputMapping("C+g");
 	shortcutsKeymap->addAction(act);
@@ -144,7 +145,8 @@ Common::KeymapArray SkyMetaEngine::initKeymaps(const char *target) const {
 	return keymaps;
 }
 
-Common::Error SkyMetaEngine::createInstance(OSystem *syst, Engine **engine) {
+Common::Error SkyMetaEngine::createInstance(OSystem *syst, Engine **engine,
+	const DetectedGame &gameDescriptor, const void *metaEngineDescriptor) {
 	assert(engine);
 	*engine = new Sky::SkyEngine(syst);
 	return Common::kNoError;
@@ -225,7 +227,7 @@ SaveStateList SkyMetaEngine::listSaves(const char *target) const {
 
 int SkyMetaEngine::getMaximumSaveSlot() const { return MAX_SAVE_GAMES; }
 
-void SkyMetaEngine::removeSaveState(const char *target, int slot) const {
+bool SkyMetaEngine::removeSaveState(const char *target, int slot) const {
 	if (slot == 0)	{
 		// Do not delete the auto save
 		// Note: Setting the autosave slot as write protected (with setWriteProtectedFlag())
@@ -233,7 +235,7 @@ void SkyMetaEngine::removeSaveState(const char *target, int slot) const {
 		const Common::U32String message = _("WARNING: Deleting the autosave slot is not supported by this engine");
 		GUI::MessageDialog warn(message);
 		warn.runModal();
-		return;
+		return false;
 	}
 
 	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
@@ -277,6 +279,7 @@ void SkyMetaEngine::removeSaveState(const char *target, int slot) const {
 	}
 	if (ioFailed)
 		warning("Unable to store Savegame names to file SKY-VM.SAV. (%s)", saveFileMan->popErrorDesc().c_str());
+	return !ioFailed;
 }
 
 SaveStateDescriptor SkyMetaEngine::querySaveMetaInfos(const char *target, int slot) const {
@@ -386,13 +389,13 @@ Common::Error SkyEngine::saveGameState(int slot, const Common::String &desc, boo
 	return Common::kNoError;
 }
 
-bool SkyEngine::canLoadGameStateCurrently() {
+bool SkyEngine::canLoadGameStateCurrently(Common::U32String *msg) {
 	return _systemVars->pastIntro
 	    && _skyControl->loadSaveAllowed()
 	    && !_skyControl->isControlPanelOpen();
 }
 
-bool SkyEngine::canSaveGameStateCurrently() {
+bool SkyEngine::canSaveGameStateCurrently(Common::U32String *msg) {
 	return _systemVars->pastIntro
 	    && _skyControl->loadSaveAllowed()
 	    && !_skyControl->isControlPanelOpen();

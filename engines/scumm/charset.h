@@ -24,11 +24,14 @@
 
 #include "common/scummsys.h"
 #include "common/rect.h"
-#include "graphics/fonts/macfont.h"
 #include "graphics/sjis.h"
 #include "scumm/charset_v7.h"
 #include "scumm/scumm.h"
 #include "scumm/gfx.h"
+
+namespace Graphics {
+class Font;
+}
 
 namespace Scumm {
 
@@ -108,45 +111,45 @@ public:
 	virtual int getCharHeight(uint16 chr) const { return getFontHeight(); }
 	virtual int getCharWidth(uint16 chr) const = 0;
 
-	virtual void setColor(byte color) { _color = color; translateColor(); }
+	virtual void setColor(byte color, bool shadowModeSpecialFlag = false) { _color = color; translateColor(); }
+	virtual byte getColor() { return _color; }
 
 	void saveLoadWithSerializer(Common::Serializer &ser);
 };
 
 class CharsetRendererCommon : public CharsetRenderer {
-protected:
-	const byte *_fontPtr;
-	int _bytesPerPixel;
-	int _fontHeight;
-	int _numChars;
-
-	byte _shadowColor;
-	bool _enableShadow;
-
 public:
+	enum ShadowType {
+		kNoShadowType,
+		kNormalShadowType,
+		kHorizontalShadowType,
+		kOutlineShadowType
+	};
+
 	CharsetRendererCommon(ScummEngine *vm);
 
 	void setCurID(int32 id) override;
 
 	int getFontHeight() const override;
+
+protected:
+	const byte *_fontPtr;
+	int _bitsPerPixel;
+	int _fontHeight;
+	int _numChars;
+
+	byte _shadowColor;
+	ShadowType _shadowType;
 };
 
 class CharsetRendererPC : public CharsetRendererCommon {
-	enum ShadowType {
-		kNoShadowType,
-		kNormalShadowType,
-		kHorizontalShadowType
-	};
-
-	ShadowType _shadowType;
+public:
+	CharsetRendererPC(ScummEngine *vm) : CharsetRendererCommon(vm) { }
 
 protected:
-	virtual void enableShadow(bool enable);
+	virtual void setShadowMode(ShadowType mode);
 	virtual void drawBits1(Graphics::Surface &dest, int x, int y, const byte *src, int drawTop, int width, int height);
 	void drawBits1Kor(Graphics::Surface &dest, int x1, int y1, const byte *src, int drawTop, int width, int height);
-
-public:
-	CharsetRendererPC(ScummEngine *vm) : CharsetRendererCommon(vm), _shadowType(kNoShadowType) { }
 };
 
 class CharsetRendererClassic : public CharsetRendererPC {
@@ -156,6 +159,7 @@ protected:
 	virtual bool prepareDraw(uint16 chr);
 
 	int _width, _height, _origWidth, _origHeight;
+	int _cjkSpacing;
 	int _offsX, _offsY;
 	const byte *_charPtr;
 
@@ -163,7 +167,11 @@ protected:
 	VirtScreenNumber _drawScreen;
 
 public:
-	CharsetRendererClassic(ScummEngine *vm) : CharsetRendererPC(vm) {}
+	CharsetRendererClassic(ScummEngine *vm, int cjkSpacing) : CharsetRendererPC(vm), _width(0), _height(0), _origWidth(0), _origHeight(0),
+		_cjkSpacing(cjkSpacing), _offsX(0), _offsY(0), _charPtr(nullptr), _drawScreen(kMainVirtScreen) {}
+	CharsetRendererClassic(ScummEngine *vm) : CharsetRendererClassic(vm, vm->_game.id == GID_INDY4 &&
+									 (vm->_game.platform == Common::kPlatformMacintosh || vm->_game.platform == Common::kPlatformDOS) &&
+									 vm->_language == Common::JA_JPN ? -3 : 0) {}
 
 	void printChar(int chr, bool ignoreCharsetMask) override;
 	void drawChar(int chr, Graphics::Surface &s, int x, int y) override;
@@ -194,7 +202,7 @@ private:
 
 class CharsetRendererNES : public CharsetRendererCommon {
 protected:
-	byte *_trTable;
+	byte *_trTable = nullptr;
 
 	void drawBits1(Graphics::Surface &dest, int x, int y, const byte *src, int drawTop, int width, int height);
 
@@ -215,7 +223,7 @@ protected:
 	virtual int getDrawHeightIntern(uint16 chr);
 	virtual void setDrawCharIntern(uint16 chr) {}
 
-	const byte *_widthTable;
+	const byte *_widthTable = nullptr;
 
 public:
 	CharsetRendererV3(ScummEngine *vm) : CharsetRendererPC(vm) {}
@@ -223,7 +231,7 @@ public:
 	void printChar(int chr, bool ignoreCharsetMask) override;
 	void drawChar(int chr, Graphics::Surface &s, int x, int y) override;
 	void setCurID(int32 id) override;
-	void setColor(byte color) override;
+	void setColor(byte color, bool shadowModeSpecialFlag) override;
 	int getCharWidth(uint16 chr) const override;
 };
 
@@ -235,7 +243,7 @@ public:
 	int getFontHeight() const override;
 
 private:
-	void enableShadow(bool enable) override;
+	void setShadowMode(ShadowType mode) override;
 	void drawBits1(Graphics::Surface &dest, int x, int y, const byte *src, int drawTop, int width, int height) override;
 #ifndef DISABLE_TOWNS_DUAL_LAYER_MODE
 	int getDrawWidthIntern(uint16 chr) override;
@@ -259,7 +267,7 @@ private:
 public:
 	CharsetRendererPCE(ScummEngine *vm) : CharsetRendererV3(vm), _sjisCurChar(0) {}
 
-	void setColor(byte color) override;
+	void setColor(byte color, bool) override;
 };
 #endif
 
@@ -277,17 +285,13 @@ public:
 
 class CharsetRendererMac : public CharsetRendererCommon {
 protected:
-	Graphics::MacFONTFont _macFonts[2];
-	bool _useRealCharWidth;
+	const Graphics::Font *_font = nullptr;
 	bool _useCorrectFontSpacing;
 	bool _pad;
 	int _lastTop;
 
-
 	int getDrawWidthIntern(uint16 chr) const;
-
 	void printCharInternal(int chr, int color, bool shadow, int x, int y);
-	void printCharToTextBox(int chr, int color, int x, int y);
 
 	byte getTextColor();
 	byte getTextShadowColor();
@@ -295,7 +299,7 @@ protected:
 	Graphics::Surface *_glyphSurface;
 
 public:
-	CharsetRendererMac(ScummEngine *vm, const Common::String &fontFile);
+	CharsetRendererMac(ScummEngine *vm, const Common::Path &fontFile);
 	~CharsetRendererMac() override;
 
 	void setCurID(int32 id) override;
@@ -304,8 +308,7 @@ public:
 	int getFontHeight() const override;
 	int getCharWidth(uint16 chr) const override;
 	void printChar(int chr, bool ignoreCharsetMask) override;
-	void drawChar(int chr, Graphics::Surface &s, int x, int y) override;
-	void setColor(byte color) override;
+	void setColor(byte color, bool) override;
 };
 
 #ifdef ENABLE_SCUMM_7_8
@@ -324,7 +327,6 @@ public:
 	int setFont(int) override { return 0; }
 	bool newStyleWrapping() const override { return _newStyle; }
 private:
-	const int _spacing;
 	const bool _newStyle;
 	const int _direction;
 };

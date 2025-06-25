@@ -38,12 +38,18 @@
 
 namespace AGOS {
 
-void AGOSEngine::addTimeEvent(uint16 timeout, uint16 subroutine_id) {
+void AGOSEngine::addTimeEvent(int32 timeout, uint16 subroutine_id) {
 	TimeEvent *te = (TimeEvent *)malloc(sizeof(TimeEvent)), *first, *last = nullptr;
 	uint32 cur_time = getTime();
 
 	if (getGameId() == GID_DIMP) {
 		timeout /= 2;
+	}
+
+	if ((int32)(cur_time + timeout - _gameStoppedClock) < 0) {
+		// This basically fixes a signed/unsigned bug. See comment in AGOSEngine_Elvira2::loadGame().
+		warning("AGOSEngine::addTimeEvent(): Invalid timer encountered (probably from an older savegame) - applying workaround");
+		timeout = 0;
 	}
 
 	te->time = cur_time + timeout - _gameStoppedClock;
@@ -453,6 +459,33 @@ void AGOSEngine::delay(uint amount) {
 
 		while (_eventMan->pollEvent(event)) {
 			switch (event.type) {
+			case Common::EVENT_JOYBUTTON_DOWN:
+				_joyaction = event.joystick;
+				break;
+			case Common::EVENT_JOYBUTTON_UP:
+				_joyaction.axis = 0;
+				_joyaction.button = 0;
+				_joyaction.position = 0;
+				break;
+			case Common::EVENT_CUSTOM_ENGINE_ACTION_START:
+				_action = (AGOSAction)event.customType;
+				if (event.customType == kActionToggleFastMode) {
+					_fastMode = !_fastMode;
+				} else if (event.customType == kActionToggleFightMode && getGameId() == GID_WAXWORKS) {
+					HitArea *fightButton = findBox(117);
+
+					if (fightButton && !(fightButton->flags & kBFBoxDead)) {
+						_needHitAreaRecalc++;
+						_lastHitArea = fightButton;
+
+						// Switch between normal cursor (0) and fighting mode (3)
+						_mouseCursor = (_mouseCursor == 3) ? 0 : 3;
+					}
+				}
+				break;
+			case Common::EVENT_CUSTOM_ENGINE_ACTION_END:
+				_action = kActionNone;
+				break;
 			case Common::EVENT_KEYDOWN:
 				if (event.kbd.keycode >= Common::KEYCODE_0 && event.kbd.keycode <= Common::KEYCODE_9
 					&& (event.kbd.hasFlags(Common::KBD_ALT) ||
@@ -477,11 +510,8 @@ void AGOSEngine::delay(uint amount) {
 					}
 				} else if (event.kbd.hasFlags(Common::KBD_CTRL)) {
 					if (event.kbd.keycode == Common::KEYCODE_a) {
-						GUI::Dialog *_aboutDialog;
-						_aboutDialog = new GUI::AboutDialog();
-						_aboutDialog->runModal();
-					} else if (event.kbd.keycode == Common::KEYCODE_f) {
-						_fastMode = !_fastMode;
+						GUI::AboutDialog aboutDialog;
+						aboutDialog.runModal();
 					}
 				}
 

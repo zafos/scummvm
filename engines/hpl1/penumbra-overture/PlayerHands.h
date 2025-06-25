@@ -151,7 +151,7 @@ public:
 
 //------------------------------------------------
 
-typedef Hpl1::Std::map<tString, iHudModel *> tHudModelMap;
+typedef Common::StableMap<tString, iHudModel *> tHudModelMap;
 typedef tHudModelMap::iterator tHudModelMapIt;
 
 //------------------------------------------------
@@ -178,7 +178,7 @@ public:
 	iHudModel *GetCurrentModel(int alNum) { return mvCurrentHudModels[alNum]; }
 
 private:
-	void UpdatePrevPostions();
+	void UpdatePrevPositions();
 
 	cInit *mpInit;
 	cMeshManager *mpMeshManager;

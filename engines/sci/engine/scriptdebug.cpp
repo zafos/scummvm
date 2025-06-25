@@ -153,6 +153,11 @@ reg_t disassemble(EngineState *s, reg_t pos, const Object *obj, bool printBWTag,
 #endif
 
 	static const char *defaultSeparator = "\t\t; ";
+	
+	// Provide additional selector name context for push0, push1, push2 opcodes.
+	if (opcode >= op_push0 && opcode <= op_push2) {
+		debugN("\t%s%s", defaultSeparator, kernel->getSelectorName(opcode - op_push0).c_str());
+	}
 
 	i = 0;
 	while (g_sci->_opcode_formats[opcode][i]) {
@@ -256,6 +261,7 @@ reg_t disassemble(EngineState *s, reg_t pos, const Object *obj, bool printBWTag,
 					separator = ", ";
 				}
 
+				// Provide additional selector name context for pushi opcodes.
 				if (opcode == op_pushi && param_value < kernel->getSelectorNamesSize()) {
 					debugN("%s%s", separator, kernel->getSelectorName(param_value).c_str());
 				}
@@ -316,8 +322,12 @@ reg_t disassemble(EngineState *s, reg_t pos, const Object *obj, bool printBWTag,
 			} else {
 				if (getSciVersion() == SCI_VERSION_3)
 					debugN("\t(%s)", g_sci->getKernel()->getSelectorName(param_value).c_str());
-				else
-					debugN("\t(%s)", g_sci->getKernel()->getSelectorName(obj->propertyOffsetToId(s->_segMan, param_value)).c_str());
+				else {
+					int propertySelector = obj->propertyOffsetToId(s->_segMan, param_value);
+					if (propertySelector != -1) {
+						debugN("\t(%s)", g_sci->getKernel()->getSelectorName(propertySelector).c_str());
+					}
+				}
 			}
 		}
 	}
@@ -345,7 +355,6 @@ reg_t disassemble(EngineState *s, reg_t pos, const Object *obj, bool printBWTag,
 			int restmod = s->r_rest;
 			int stackframe = (scr[pos.getOffset() + 1] >> 1) + restmod;
 			reg_t *sb = s->xs->sp;
-			uint16 selector;
 			reg_t fun_ref;
 
 			while (stackframe > 0) {
@@ -358,7 +367,7 @@ reg_t disassemble(EngineState *s, reg_t pos, const Object *obj, bool printBWTag,
 				else if (opcode == op_self)
 					called_obj_addr = s->xs->objp;
 
-				selector = sb[- stackframe].getOffset();
+				uint16 selector = sb[- stackframe].getOffset();
 
 				name = s->_segMan->getObjectName(called_obj_addr);
 
@@ -617,7 +626,7 @@ void Kernel::dissectScript(int scriptNumber, Vocabulary *vocab) {
 	Resource *script = _resMan->findResource(ResourceId(kResourceTypeScript, scriptNumber), false);
 
 	if (!script) {
-		warning("dissectScript(): Script not found!\n");
+		warning("dissectScript(): Script not found");
 		return;
 	}
 
@@ -1119,7 +1128,7 @@ void logBacktrace() {
 		int paramc, totalparamc;
 
 		switch (call.type) {
-		case EXEC_STACK_TYPE_CALL: // Normal function
+		case EXEC_STACK_TYPE_CALL: // Script function
 			con->debugPrintf(" %x: script %d - ", i, s->_segMan->getScript(call.addr.pc.getSegment())->getScriptNumber());
 
 			if (call.debugSelector != -1) {

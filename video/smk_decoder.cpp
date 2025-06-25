@@ -17,6 +17,13 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, MojoTouch has
+ * non-exclusively licensed this code on March 23th, 2024, to be used in
+ * closed-source products.
+ * Therefore, any contributions (commits) to it will also be dual-licensed.
+ *
  */
 
 // Based on http://wiki.multimedia.cx/index.php?title=Smacker
@@ -444,7 +451,7 @@ bool SmackerDecoder::rewind() {
 	return true;
 }
 
-void SmackerDecoder::forceSeekToFrame(uint frame) {
+const Graphics::Surface *SmackerDecoder::forceSeekToFrame(uint frame) {
 	uint seekFrame;
 	if (frame >= 10)
 		seekFrame = MAX<uint>(frame - 10, 0);
@@ -452,13 +459,13 @@ void SmackerDecoder::forceSeekToFrame(uint frame) {
 		seekFrame = 0;
 
 	if (!isVideoLoaded())
-		return;
+		return nullptr;
 
 	if (seekFrame >= getFrameCount())
-		return;
+		return nullptr;
 
 	if (!rewind())
-		return;
+		return nullptr;
 
 	stopAudio();
 	SmackerVideoTrack *videoTrack = (SmackerVideoTrack *)getTrack(0);
@@ -477,14 +484,19 @@ void SmackerDecoder::forceSeekToFrame(uint frame) {
 	}
 
 	if (!_fileStream->seek(startPos + offset, SEEK_SET))
-		return;
+		return nullptr;
 
+	const Graphics::Surface *surface = nullptr;
 	while (getCurFrame() < (int)frame) {
-		decodeNextFrame();
+		surface = decodeNextFrame();
 	}
 
 	_lastTimeChange = videoTrack->getFrameTime(frame);
-	_startTime = g_system->getMillis() - (_lastTimeChange.msecs() / getRate()).toInt();
+	if (isPlaying()) {
+		_startTime = g_system->getMillis() - (_lastTimeChange.msecs() / getRate()).toInt();
+	}
+	resetPauseStartTime();
+	return surface;
 }
 
 void SmackerDecoder::readNextPacket() {
@@ -588,7 +600,7 @@ VideoDecoder::AudioTrack *SmackerDecoder::getAudioTrack(int index) {
 	return (AudioTrack *)track;
 }
 
-SmackerDecoder::SmackerVideoTrack::SmackerVideoTrack(uint32 width, uint32 height, uint32 frameCount, const Common::Rational &frameRate, uint32 flags, uint32 version) {
+SmackerDecoder::SmackerVideoTrack::SmackerVideoTrack(uint32 width, uint32 height, uint32 frameCount, const Common::Rational &frameRate, uint32 flags, uint32 version) : _palette(256) {
 	_surface = new Graphics::Surface();
 	_surface->create(width, height * ((flags & 6) ? 2 : 1), Graphics::PixelFormat::createFormatCLUT8());
 	_dirtyBlocks.set_size(width * height / 16);
@@ -599,7 +611,6 @@ SmackerDecoder::SmackerVideoTrack::SmackerVideoTrack(uint32 width, uint32 height
 	_curFrame = -1;
 	_dirtyPalette = false;
 	_MMapTree = _MClrTree = _FullTree = _TypeTree = 0;
-	memset(_palette, 0, 3 * 256);
 }
 
 SmackerDecoder::SmackerVideoTrack::~SmackerVideoTrack() {
@@ -788,10 +799,11 @@ void SmackerDecoder::SmackerVideoTrack::unpackPalette(Common::SeekableReadStream
 	stream->read(chunk, len);
 	byte *p = chunk;
 
-	byte oldPalette[3 * 256];
-	memcpy(oldPalette, _palette, 3 * 256);
+	const byte *oldPalette = _palette.data();
 
-	byte *pal = _palette;
+	byte newPalette[3 * 256];
+	_palette.grab(newPalette, 0, 256);
+	byte *pal = newPalette;
 
 	int sz = 0;
 	byte b0;
@@ -825,10 +837,10 @@ void SmackerDecoder::SmackerVideoTrack::unpackPalette(Common::SeekableReadStream
 			*pal++ = (b * 4 + b / 16);
 		}
 	}
-
 	stream->seek(startPos + len);
 	free(chunk);
 
+	_palette.set(newPalette, 0, 256);
 	_dirtyPalette = true;
 }
 

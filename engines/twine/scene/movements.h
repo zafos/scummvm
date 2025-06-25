@@ -29,7 +29,7 @@ namespace TwinE {
 
 class TwinEEngine;
 class ActorStruct;
-struct ActorMoveStruct;
+struct RealValue;
 
 class Movements {
 private:
@@ -104,17 +104,15 @@ private:
 	 */
 	void processSameXZAction(int actorIdx);
 
-	/**
-	 * @return A value of @c true means that the actor should e.g. start reading a sign or checking
-	 * a locker for loot or secrets
-	 */
-	bool processBehaviourExecution(int actorIdx);
+	void processBehaviourExecution(int actorIdx);
 	bool processAttackExecution(int actorIdx);
 	void processManualMovementExecution(int actorIdx);
 	void processManualRotationExecution(int actorIdx);
 
 	/**
-	 * This is true if the player hits the action button. E.g. in the second prison scene when you hide in the waste.
+	 * @return A value of @c true means that the actor should e.g. start reading a sign or checking
+	 * a locker for loot or secrets or talking to an npc - this can get triggered by the SpecialAction binding
+	 * in any behaviour mode
 	 */
 	bool _actionNormal = false;
 	void manualRealAngle(ActorStruct *actor);
@@ -122,12 +120,14 @@ private:
 public:
 	Movements(TwinEEngine *engine);
 
+	void setActionNormal(bool actionNormal);
+
 	void update();
 
 	/**
 	 * Hero executes the current action of the trigger zone
 	 */
-	bool shouldExecuteAction() const;
+	bool actionNormal() const;
 
 	bool _lastJoyFlag = false;
 
@@ -146,7 +146,7 @@ public:
 	 * @param stepAngle number of steps
 	 * @param movePtr time pointer to update
 	 */
-	void initRealAngle(int16 startAngle, int16 endAngle, int16 stepAngle, ActorMoveStruct *movePtr);
+	void initRealAngle(int16 startAngle, int16 endAngle, int16 stepAngle, RealValue *movePtr);
 
 	/**
 	 * Clear actors safe angle
@@ -161,7 +161,7 @@ public:
 	 * @param stepAngle number of steps
 	 * @param movePtr time pointer to update
 	 */
-	void setActorAngle(int16 startAngle, int16 endAngle, int16 stepAngle, ActorMoveStruct *movePtr);
+	void initRealValue(int16 startAngle, int16 endAngle, int16 stepAngle, RealValue *movePtr);
 
 	/**
 	 * Get actor angle
@@ -183,12 +183,16 @@ public:
 	 * @param duration Rotate speed
 	 * @param movePtr Pointer to process movements
 	 */
-	void initRealAngleConst(int32 start, int32 end, int32 duration, ActorMoveStruct *movePtr) const;
+	void initRealAngleConst(int32 start, int32 end, int32 duration, RealValue *movePtr) const;
 
 	void doDir(int32 actorIdx);
 };
 
-inline bool Movements::shouldExecuteAction() const {
+inline void Movements::setActionNormal(bool actionNormal) {
+	_actionNormal = actionNormal;
+}
+
+inline bool Movements::actionNormal() const {
 	return _actionNormal;
 }
 

@@ -25,6 +25,8 @@
 #include "backends/graphics/opengl/framebuffer.h"
 #include "backends/graphics/windowed.h"
 
+#include "base/plugins.h"
+
 #include "common/frac.h"
 #include "common/mutex.h"
 #include "common/ustr.h"
@@ -46,6 +48,9 @@ class Surface;
 class Pipeline;
 #if !USE_FORCED_GLES
 class LibRetroPipeline;
+#endif
+#if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
+class Renderer3D;
 #endif
 
 enum {
@@ -86,7 +91,7 @@ public:
 #endif
 
 #if !USE_FORCED_GLES
-	bool setShader(const Common::String &fileNode) override;
+	bool setShader(const Common::Path &fileNode) override;
 #endif
 
 	void beginGFXTransaction() override;
@@ -101,8 +106,10 @@ public:
 
 	void copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) override;
 	void fillScreen(uint32 col) override;
+	void fillScreen(const Common::Rect &r, uint32 col) override;
 
 	void updateScreen() override;
+	void presentBuffer() override;
 
 	Graphics::Surface *lockScreen() override;
 	void unlockScreen() override;
@@ -112,6 +119,8 @@ public:
 
 	int16 getOverlayWidth() const override;
 	int16 getOverlayHeight() const override;
+	void showOverlay(bool inGUI) override;
+	void hideOverlay() override;
 
 	Graphics::PixelFormat getOverlayFormat() const override;
 
@@ -133,7 +142,7 @@ protected:
 	void renderCursor();
 
 	/**
-	 * Whether an GLES or GLES2 context is active.
+	 * Whether a GLES or GLES2 context is active.
 	 */
 	bool isGLESContext() const { return OpenGLContext.type == kContextGLES || OpenGLContext.type == kContextGLES2; }
 
@@ -149,6 +158,7 @@ protected:
 	 */
 	void notifyContextCreate(
 			ContextType type,
+			Framebuffer *target,
 			const Graphics::PixelFormat &defaultFormat,
 			const Graphics::PixelFormat &defaultFormatAlpha);
 
@@ -192,12 +202,13 @@ protected:
 #endif
 		bool aspectRatioCorrection;
 		int graphicsMode;
+		uint flags;
 		bool filtering;
 
 		uint scalerIndex;
 		int scaleFactor;
 
-		Common::String shader;
+		Common::Path shader;
 
 		bool operator==(const VideoState &right) {
 			return gameWidth == right.gameWidth && gameHeight == right.gameHeight
@@ -266,12 +277,13 @@ protected:
 	 *
 	 * @parma requestedWidth  This is the requested actual game screen width.
 	 * @param requestedHeight This is the requested actual game screen height.
-	 * @param format          This is the requested pixel format of the virtual game screen.
+	 * @param resizable       This indicates that the window should not be resized because we can't handle it.
+	 * @param antialiasing    This is the requested antialiasing level.
 	 * @return true on success, false otherwise
 	 */
-	virtual bool loadVideoMode(uint requestedWidth, uint requestedHeight, const Graphics::PixelFormat &format) = 0;
+	virtual bool loadVideoMode(uint requestedWidth, uint requestedHeight, bool resizable, int antialiasing) = 0;
 
-	bool loadShader(const Common::String &fileName);
+	bool loadShader(const Common::Path &fileName);
 
 	/**
 	 * Refresh the screen contents.
@@ -284,7 +296,7 @@ protected:
 	 * @param filename The output filename.
 	 * @return true on success, false otherwise
 	 */
-	bool saveScreenshot(const Common::String &filename) const;
+	bool saveScreenshot(const Common::Path &filename) const;
 
 	// Do not hide the argument-less saveScreenshot from the base class
 	using WindowedGraphicsManager::saveScreenshot;
@@ -324,7 +336,7 @@ protected:
 	void recalculateDisplayAreas() override;
 	void handleResizeImpl(const int width, const int height) override;
 
-	void updateLinearFiltering();
+	void updateTextureSettings();
 
 	Pipeline *getPipeline() const { return _pipeline; }
 
@@ -339,14 +351,21 @@ protected:
 	Graphics::PixelFormat _defaultFormatAlpha;
 
 	/**
-	 * Render back buffer.
+	 * Render target.
 	 */
-	Backbuffer _backBuffer;
+	Framebuffer *_targetBuffer;
 
 	/**
 	 * The rendering surface for the virtual game screen.
 	 */
 	Surface *_gameScreen;
+
+#if defined(USE_OPENGL_GAME) || defined(USE_OPENGL_SHADERS)
+	/**
+	 * The rendering helper for 3D games.
+	 */
+	Renderer3D *_renderer3d;
+#endif
 
 	/**
 	 * The game palette if in CLUT8 mode.

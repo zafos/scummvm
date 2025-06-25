@@ -39,9 +39,11 @@ enum NumberingMode {
 
 /// Some special commands
 enum {
-	kListItemDoubleClickedCmd	= 'LIdb',	///< double click on item - 'data' will be item index
+	kListItemSingleClickedCmd	= 'LIsc',	///< single click on item (sent on mouse down) - 'data' will be item index
+	kListItemDoubleClickedCmd	= 'LIdc',	///< double click on item (sent on mouse up) - 'data' will be item index
 	kListItemActivatedCmd		= 'LIac',	///< item activated by return/enter - 'data' will be item index
 	kListItemRemovalRequestCmd	= 'LIrm',	///< request to remove the item with the delete/backspace keys - 'data' will be item index
+	kListItemEditModeStartedCmd = 'LIes',	///< edit mode started - 'data' will be item index
 	kListSelectionChangedCmd	= 'Lsch'	///< selection changed - 'data' will be item index
 };
 
@@ -96,9 +98,9 @@ protected:
 
 	FilterMatcher	_filterMatcher;
 	void			*_filterMatcherArg;
-
 public:
 	ListWidget(Dialog *boss, const Common::String &name, const Common::U32String &tooltip = Common::U32String(), uint32 cmd = 0);
+	ListWidget(Dialog *boss, int x, int y, int w, int h, bool scale, const Common::U32String &tooltip = Common::U32String(), uint32 cmd = 0);
 	ListWidget(Dialog *boss, int x, int y, int w, int h, const Common::U32String &tooltip = Common::U32String(), uint32 cmd = 0);
 
 	bool containsWidget(Widget *) const override;
@@ -119,6 +121,7 @@ public:
 	void scrollTo(int item);
 	void scrollToEnd();
 	int getCurrentScrollPos() const { return _currentPos; }
+	bool isItemVisible(int item) const { return _currentPos <= item && item < _currentPos + _entriesPerPage; }
 
 	void enableQuickSelect(bool enable) 		{ _quickSelect = enable; }
 	Common::String getQuickSelectString() const { return _quickSelectStr; }
@@ -174,6 +177,8 @@ protected:
 	void lostFocusWidget() override;
 	void checkBounds();
 	void scrollToCurrent();
+
+	virtual ThemeEngine::WidgetStateInfo getItemState(int item) const { return _state; }
 
 	void drawFormattedText(const Common::Rect &r, const Common::U32String &str, ThemeEngine::WidgetStateInfo state = ThemeEngine::kStateEnabled,
 					Graphics::TextAlign align = Graphics::kTextAlignCenter,

@@ -19,8 +19,8 @@
  *
  */
 
-#ifndef SCI_SOUNDCMD_H
-#define SCI_SOUNDCMD_H
+#ifndef SCI_SOUND_SOUNDCMD_H
+#define SCI_SOUND_SOUNDCMD_H
 
 #include "common/list.h"
 #include "audio/mididrv.h"	// for MusicType
@@ -81,6 +81,8 @@ public:
 	 */
 	void updateSci0Cues();
 
+	bool isDigitalSamplePlaying() const;
+
 	reg_t kDoSoundInit(EngineState *s, int argc, reg_t *argv);
 	reg_t kDoSoundPlay(EngineState *s, int argc, reg_t *argv);
 	reg_t kDoSoundMute(EngineState *s, int argc, reg_t *argv);
@@ -117,7 +119,7 @@ private:
 	void processInitSound(reg_t obj);
 	void processDisposeSound(reg_t obj);
 	void processUpdateCues(reg_t obj);
-	int getSoundResourceId(reg_t obj);
+	uint16 getSoundResourceId(reg_t obj);
 	
 	/**
 	 * Returns true if the sound is already playing and shouldn't be interrupted.
@@ -129,4 +131,4 @@ private:
 
 } // End of namespace Sci
 
-#endif // SCI_SOUNDCMD_H
+#endif // SCI_SOUND_SOUNDCMD_H

@@ -65,10 +65,11 @@ int tolua_isstring(lua_State *L, int lo, int def, tolua_Error *err);
 double tolua_tonumber(lua_State *L, int narg, double def);
 const char* tolua_tostring(lua_State *L, int narg, const char *def);
 void* tolua_tousertype(lua_State *L, int narg, void *def);
-int tolua_toboolean(lua_State *L, int narg, int def);
+bool tolua_toboolean(lua_State *L, int narg, bool def);
 
 void tolua_pushboolean(lua_State *L, bool val);
 void tolua_pushnumber(lua_State *L, double val);
+void tolua_pushstring(lua_State *L, const char *val);
 
 } // end namespace ToLua
 

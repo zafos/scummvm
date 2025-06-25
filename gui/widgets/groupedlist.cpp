@@ -23,6 +23,7 @@
 #include "common/frac.h"
 #include "common/tokenizer.h"
 #include "common/translation.h"
+#include "common/config-manager.h"
 
 #include "gui/widgets/groupedlist.h"
 #include "gui/widgets/scrollbar.h"
@@ -114,7 +115,6 @@ void GroupedListWidget::sortGroups() {
 
 	);
 
-	uint curListSize = 0;
 	for (uint i = 0; i != _groupHeaders.size(); ++i) {
 		Common::U32String header = _groupHeaders[i];
 		Common::U32String displayedHeader;
@@ -131,14 +131,12 @@ void GroupedListWidget::sortGroups() {
 			displayedHeader.toUppercase();
 
 			_list.push_back(_groupHeaderPrefix + displayedHeader + _groupHeaderSuffix);
-			++curListSize;
 		}
 
 		if (_groupExpanded[groupID]) {
 			for (int *k = _itemsInGroup[groupID].begin(); k != _itemsInGroup[groupID].end(); ++k) {
-				_list.push_back(Common::U32String(_groupsVisible ? "    " : "") + _dataList[*k].orig);
+				_list.push_back(_dataList[*k].orig);
 				_listIndex.push_back(*k);
-				++curListSize;
 			}
 		}
 	}
@@ -155,47 +153,74 @@ void GroupedListWidget::sortGroups() {
 	}
 }
 
-void GroupedListWidget::setSelected(int item) {
-	// HACK/FIXME: If our _listIndex has a non zero size,
-	// we will need to look up, whether the user selected
-	// item is present in that list
-	if (!_filter.empty()) {
-		int filteredItem = -1;
+void GroupedListWidget::loadClosedGroups(const Common::U32String &groupName) {
+	// Recalls what groups were closed from the config
+	if (ConfMan.hasKey("group_" + groupName, ConfMan.kApplicationDomain)) {
+		const Common::String &val = ConfMan.get("group_" + groupName, ConfMan.kApplicationDomain);
+		Common::StringTokenizer hiddenGroups(val);
 
-		for (uint i = 0; i < _listIndex.size(); ++i) {
-			if (_listIndex[i] == item) {
-				filteredItem = i;
-				break;
-			}
-		}
-
-		item = filteredItem;
-	}
-
-	assert(item >= -1 && item < (int)_list.size());
-
-	// We only have to do something if the widget is enabled and the selection actually changes
-	if (isEnabled() && (_selectedItem == -1 || _listIndex[_selectedItem] != item)) {
-		if (_editMode)
-			abortEditMode();
-
-		if (!_filter.empty()) {
-			_selectedItem = item;
-		} else {
-			_selectedItem = -1;
-			for (uint i = 0; i < _listIndex.size(); ++i) {
-				if (_listIndex[i] == item) {
-					_selectedItem = i;
+		for (Common::String tok = hiddenGroups.nextToken(); tok.size(); tok = hiddenGroups.nextToken()) {
+			// See if the hidden group is in our group headers still, if so, hide it
+			for (Common::U32StringArray::size_type i = 0; i < _groupHeaders.size(); ++i) {
+				if (_groupHeaders[i] == tok || (tok == "unnamed" && _groupHeaders[i].size() == 0)) {
+					_groupExpanded[i] = false;
 					break;
 				}
 			}
 		}
+		sortGroups();
+	}
+}
+
+void GroupedListWidget::saveClosedGroups(const Common::U32String &groupName) {
+	// Save the hidden groups to the config
+	Common::String hiddenGroups;
+	for (Common::U32StringArray::size_type i = 0; i < _groupHeaders.size(); ++i) {
+		if (!_groupExpanded[i]) {
+			if (_groupHeaders[i].size()) {
+				hiddenGroups += _groupHeaders[i];
+			} else {
+				hiddenGroups += "unnamed";
+			}
+			hiddenGroups += ' ';
+		}
+	}
+	ConfMan.set("group_" + groupName, hiddenGroups, ConfMan.kApplicationDomain);
+	ConfMan.flushToDisk();
+}
+
+int GroupedListWidget::findDataIndex(int data_index) const {
+	// The given index is an index in the _dataList.
+	// We want the index in the current _listIndex (which may be filtered and sorted) for this data.
+	// Sanity check to avoid iterating on the _listIndex if we know the given index is invalid.
+	if (data_index < -1 || data_index >= (int)_dataList.size())
+		return -1;
+	for (uint i = 0; i < _listIndex.size(); ++i) {
+		if (_listIndex[i] == data_index)
+			return i;
+	}
+	return -1;
+}
+
+void GroupedListWidget::setSelected(int item) {
+	if (item < -1 || item >= (int)_dataList.size())
+		return;
+
+	// We only have to do something if the widget is enabled and the selection actually changes
+	if (isEnabled() && (_selectedItem == -1 || _selectedItem >= (int)_list.size() || _listIndex[_selectedItem] != item)) {
+		if (_editMode)
+			abortEditMode();
+
+		_selectedItem = findDataIndex(item);
 
 		// Notify clients that the selection changed.
 		sendCommand(kListSelectionChangedCmd, _selectedItem);
 
-		_currentPos = _selectedItem - _entriesPerPage / 2;
-		scrollToCurrent();
+		if (_selectedItem != -1 && !isItemVisible(_selectedItem)) {
+			// scroll selected item to center if possible
+			_currentPos = _selectedItem - _entriesPerPage / 2;
+			scrollToCurrent();
+		}
 		markAsDirty();
 	}
 }
@@ -214,8 +239,14 @@ void GroupedListWidget::handleMouseDown(int x, int y, int button, int clickCount
 			sendCommand(kListSelectionChangedCmd, _selectedItem);
 		} else if (isGroupHeader(_listIndex[newSelectedItem])) {
 			int groupID = indexToGroupID(_listIndex[newSelectedItem]);
+			int oldSelection = getSelected();
 			_selectedItem = -1;
 			toggleGroup(groupID);
+			// Try to preserve the selection, but without scrolling
+			if (oldSelection != -1) {
+				_selectedItem = findDataIndex(oldSelection);
+				sendCommand(kListSelectionChangedCmd, _selectedItem);
+			}
 		}
 	}
 
@@ -259,6 +290,43 @@ void GroupedListWidget::handleCommand(CommandSender *sender, uint32 cmd, uint32 
 	}
 }
 
+int GroupedListWidget::getItemPos(int item) {
+	int pos = 0;
+
+	for (uint i = 0; i < _listIndex.size(); i++) {
+		if (_listIndex[i] == item) {
+			return pos;
+		} else if (_listIndex[i] >= 0) { // skip headers
+			pos++;
+		}
+	}
+
+	return -1;
+}
+
+int GroupedListWidget::getNewSel(int index) {   
+	// If the list is empty, return -1
+	if (_listIndex.size() == 1){
+		return -1;
+	}
+
+	// Find the index-th item in the list
+	for (uint i = 0; i < _listIndex.size(); i++) {
+		if (index == 0 && _listIndex[i] >= 0) {
+			return _listIndex[i];
+		} else if (_listIndex[i] >= 0) {
+			index--;
+		}
+	}
+
+	// If we are at the end of the list, return the last item.
+	if (index == 0) {
+		return _listIndex[_listIndex.size() - 1];
+	} else {
+		return -1;
+	}
+}
+
 void GroupedListWidget::toggleGroup(int groupID) {
 	_groupExpanded[groupID] = !_groupExpanded[groupID];
 	sortGroups();
@@ -296,6 +364,10 @@ void GroupedListWidget::drawWidget() {
 #endif
 			r.left += fontHeight + _leftPadding;
 			g_gui.theme()->drawFoldIndicator(Common::Rect(_x + _hlLeftPadding + _leftPadding, y, _x + fontHeight + _leftPadding, y + fontHeight), _groupExpanded[groupID]);
+			pad = 0;
+		} else if (_groupsVisible) {
+			r.left += fontHeight + _leftPadding;
+			r.right -= _rightPadding;
 			pad = 0;
 		}
 
@@ -356,6 +428,8 @@ void GroupedListWidget::setFilter(const Common::U32String &filter, bool redraw) 
 	if (_filter == filt) // Filter was not changed
 		return;
 
+	int selectedItem = getSelected();
+
 	_filter = filt;
 
 	if (_filter.empty()) {
@@ -393,6 +467,9 @@ void GroupedListWidget::setFilter(const Common::U32String &filter, bool redraw) 
 
 	_currentPos = 0;
 	_selectedItem = -1;
+	// Try to preserve the previous selection
+	if (selectedItem != -1)
+		setSelected(selectedItem);
 
 	if (redraw) {
 		scrollBarRecalc();

@@ -149,7 +149,7 @@ bool NSArchive::hasFile(const Common::Path &path) const {
 
 int NSArchive::listMembers(Common::ArchiveMemberList &list) const {
 	for (uint32 i = 0; i < _numFiles; i++) {
-		list.push_back(Common::SharedPtr<Common::GenericArchiveMember>(new Common::GenericArchiveMember(_archiveDir[i], this)));
+		list.push_back(Common::SharedPtr<Common::GenericArchiveMember>(new Common::GenericArchiveMember(Common::String(_archiveDir[i]), *this)));
 	}
 	return _numFiles;
 }
@@ -158,12 +158,13 @@ const Common::ArchiveMemberPtr NSArchive::getMember(const Common::Path &path) co
 	Common::String name = path.toString();
 	uint32 index = lookup(name.c_str());
 
-	const char *item = nullptr;
-	if (index < _numFiles) {
-		item = _archiveDir[index];
+	if (index >= _numFiles) {
+		return Common::ArchiveMemberPtr();
 	}
 
-	return Common::SharedPtr<Common::GenericArchiveMember>(new Common::GenericArchiveMember(item, this));
+	const char *item = _archiveDir[index];
+
+	return Common::SharedPtr<Common::GenericArchiveMember>(new Common::GenericArchiveMember(Common::String(item), *this));
 }
 
 
@@ -173,7 +174,7 @@ const Common::ArchiveMemberPtr NSArchive::getMember(const Common::Path &path) co
 #define LOWEST_ARCHIVE_PRIORITY		1
 
 Disk_ns::Disk_ns(Parallaction *vm) : _vm(vm) {
-	Common::FSDirectory *baseDir = new Common::FSDirectory(ConfMan.get("path"));
+	Common::FSDirectory *baseDir = new Common::FSDirectory(ConfMan.getPath("path"));
 	_sset.add("basedir", baseDir, HIGHEST_PRIORITY);
 }
 
@@ -194,7 +195,7 @@ Common::SeekableReadStream *Disk_ns::openFile(const char *filename) {
 
 
 void Disk_ns::addArchive(const Common::String& name, int priority) {
-	Common::SeekableReadStream *stream = _sset.createReadStreamForMember(name);
+	Common::SeekableReadStream *stream = _sset.createReadStreamForMember(Common::Path(name));
 	if (!stream)
 		error("Disk_ns::addArchive() couldn't find archive '%s'", name.c_str());
 
@@ -762,15 +763,11 @@ void AmigaDisk_ns::loadBackground(BackgroundInfo& info, const char *name) {
 	info.width = info.bg.w;
 	info.height = info.bg.h;
 
-	const byte *p = decoder.getPalette();
+	const Graphics::Palette &p = decoder.getPalette();
 	for (uint i = 0; i < 32; i++) {
-		byte r = *p >> 2;
-		p++;
-		byte g = *p >> 2;
-		p++;
-		byte b = *p >> 2;
-		p++;
-		info.palette.setEntry(i, r, g, b);
+		byte r, g, b;
+		p.get(i, r, g, b);
+		info.palette.setEntry(i, r >> 2, g >> 2, b >> 2);
 	}
 
 	const Common::Array<Image::IFFDecoder::PaletteRange> &paletteRanges = decoder.getPaletteRanges();
@@ -802,12 +799,10 @@ void AmigaDisk_ns::loadMask_internal(BackgroundInfo& info, const char *name) {
 	decoder.setPixelPacking(true); // pack 4 2bit pixels into 1 byte
 	decoder.loadStream(*s);
 
-	const byte *p = decoder.getPalette();
-	byte r, g, b;
+	const Graphics::Palette &p = decoder.getPalette();
 	for (uint i = 0; i < 4; i++) {
-		r = p[i*3];
-		g = p[i*3+1];
-		b = p[i*3+2];
+		byte r, g, b;
+		p.get(i, r, g, b);
 		info.layers[i] = (((r << 4) & 0xF00) | (g & 0xF0) | (b >> 4)) & 0xFF;
 	}
 

@@ -27,11 +27,15 @@
 namespace Tetraedge {
 
 enum TetraedgeDebugChannels {
-	kDebugGraphics = 1 << 0,
-	kDebugPath     = 1 << 1,
-	kDebugScan     = 1 << 2,
-	kDebugFilePath = 1 << 3,
-	kDebugScript   = 1 << 4
+	kDebugGraphics = 1,
+	kDebugPath,
+	kDebugScan,
+	kDebugFilePath,
+	kDebugScript,
+};
+
+enum GameFeatures {
+	GF_UTF8        = 1 << 0,
 };
 
 extern const PlainGameDescriptor GAME_NAMES[];
@@ -40,12 +44,14 @@ extern const ADGameDescription GAME_DESCRIPTIONS[];
 
 } // namespace Tetraedge
 
-class TetraedgeMetaEngineDetection : public AdvancedMetaEngineDetection {
+class TetraedgeMetaEngineDetection : public AdvancedMetaEngineDetection<ADGameDescription> {
 	static const DebugChannelDef debugFlagList[];
 
 public:
 	TetraedgeMetaEngineDetection();
 	~TetraedgeMetaEngineDetection() override {}
+
+	DetectedGame toDetectedGame(const ADDetectedGame &adGame, ADDetectedGameExtraInfo *extraInfo) const override;
 
 	const char *getEngineName() const override {
 		return "Tetraedge Engine";

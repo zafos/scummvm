@@ -61,6 +61,7 @@
 #include "wage/wage.h"
 #include "wage/world.h"
 #include "wage/entities.h"
+#include "wage/gui.h"
 
 #define SAVEGAME_CURRENT_VERSION 1
 
@@ -73,8 +74,6 @@
 //
 
 namespace Wage {
-
-static const uint32 WAGEflag = MKTAG('W', 'A', 'G', 'E');
 
 //TODO: make sure these are calculated right: (we add flag, description, etc)
 #define VARS_INDEX 0x005E
@@ -93,8 +92,9 @@ static const uint32 WAGEflag = MKTAG('W', 'A', 'G', 'E');
 int WageEngine::getSceneIndex(Scene *scene) const {
 	assert(scene);
 	Common::Array<Scene *> &orderedScenes = _world->_orderedScenes;
-	for (uint32 i = 0; i < orderedScenes.size(); ++i) {
-		if (orderedScenes[i] == scene) return i-1;
+	for (int32 i = 0; i < (int)orderedScenes.size(); ++i) {
+		if (orderedScenes[i] == scene)
+			return i - 1;
 	}
 
 	warning("Scene's index not found");
@@ -334,34 +334,7 @@ int WageEngine::saveGame(const Common::String &fileName, const Common::String &d
 	}
 
 	// the following is appended by ScummVM
-	int32 appendixOffset = out->pos();
-	if (appendixOffset < 0) {
-		warning("OutSaveFile::pos() failed");
-	}
-	out->writeUint32BE(WAGEflag);
-
-	// Write description of saved game, limited to WAGE_SAVEDGAME_DESCRIPTION_LEN characters + terminating NUL
-	const int WAGE_SAVEDGAME_DESCRIPTION_LEN = 127;
-	char description[WAGE_SAVEDGAME_DESCRIPTION_LEN + 1];
-
-	memset(description, 0, sizeof(description));
-	strncpy(description, descriptionString.c_str(), WAGE_SAVEDGAME_DESCRIPTION_LEN);
-	assert(WAGE_SAVEDGAME_DESCRIPTION_LEN + 1 == 128); // safety
-	out->write(description, 128);
-
-	out->writeByte(SAVEGAME_CURRENT_VERSION);
-	debug(9, "Writing save game version (%d)", SAVEGAME_CURRENT_VERSION);
-
-	// Thumbnail
-	Graphics::saveThumbnail(*out);
-
-	out->writeUint32BE(appendixOffset);
-
-	// this one to make checking easier:
-	// it couldn't be added to the beginning
-	// and we won't be able to find it in the middle,
-	// so these would be the last 4 bytes of the file
-	out->writeUint32BE(WAGEflag);
+	g_engine->getMetaEngine()->appendExtendedSave(out, g_engine->getTotalPlayTime(), descriptionString, fileName.contains("auto"));
 
 	out->finalize();
 	if (out->err()) {
@@ -529,10 +502,7 @@ int WageEngine::loadGame(int slotId) {
 	}
 	for (uint32 i = 0; i < orderedScenes.size(); ++i) {
 		Scene *scene = orderedScenes[i];
-		if (scene == _world->_storageScene) {
-			scene->_chrs.clear();
-			scene->_objs.clear();
-		} else {
+		if (scene != _world->_storageScene) {
 			int id = data->readSint16LE();
 
 			if (scene->_resourceId != id) {
@@ -554,6 +524,9 @@ int WageEngine::loadGame(int slotId) {
 			data->readByte();
 			scene->_visited = data->readByte() != 0;
 		}
+
+		scene->_chrs.clear();
+		scene->_objs.clear();
 	}
 
 	// update all char locations and stats
@@ -716,23 +689,62 @@ int WageEngine::loadGame(int slotId) {
 	_aim = aim;
 	_opponentAim = opponentAim;
 
+	// Load the savaegame header
+	ExtendedSavegameHeader header;
+	if (!MetaEngine::readSavegameHeader(data, &header, true))
+		error("Invalid savegame");
+
+	_defaultSaveDescritpion = header.description;
+
 	delete data;
 	return 0;
 }
 
 Common::Error WageEngine::loadGameState(int slot) {
-	if (loadGame(slot) == 0)
+	warning("LOADING %d", slot);
+
+	if (_isGameOver)
+		resetState();
+
+	_gui->_consoleWindow->clearText();
+
+	if (loadGame(slot) == 0) {
+		if (slot != getAutosaveSlot()) {
+			_defaultSaveSlot = slot;
+			// save description is set inside of loadGame()
+			_gui->enableSave();
+		}
+
+		sayText(_world->_player->_currentScene->_name, Common::TextToSpeechManager::QUEUE);
+
+		_gui->regenCommandsMenu();
+		_gui->regenWeaponsMenu();
+
+		_gui->_consoleWindow->setTextWindowFont(_world->_player->_currentScene->getFont());
+
+		Common::String input("look");
+		processTurn(&input, NULL);
+
 		return Common::kNoError;
-	else
+	} else {
 		return Common::kUnknownError;
+	}
 }
 
 Common::Error WageEngine::saveGameState(int slot, const Common::String &description, bool isAutosave) {
 	Common::String saveLoadSlot = getSaveStateName(slot);
-	if (saveGame(saveLoadSlot, description) == 0)
+	if (saveGame(saveLoadSlot, description) == 0) {
+		if (slot != getAutosaveSlot()) {
+			_defaultSaveSlot = slot;
+			_defaultSaveDescritpion = description;
+
+			_gui->enableSave();
+		}
+
 		return Common::kNoError;
-	else
+	} else {
 		return Common::kUnknownError;
+	}
 }
 
 bool WageEngine::scummVMSaveLoadDialog(bool isSave) {
@@ -753,7 +765,7 @@ bool WageEngine::scummVMSaveLoadDialog(bool isSave) {
 	Common::String desc = dialog.getResultString();
 
 	if (desc.empty()) {
-		// create our own description for the saved game, the user didnt enter it
+		// create our own description for the saved game, the user didn't enter it
 		desc = dialog.createDefaultSaveDescription(slot);
 	}
 

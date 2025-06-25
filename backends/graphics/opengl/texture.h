@@ -24,141 +24,17 @@
 
 #include "graphics/opengl/system_headers.h"
 #include "graphics/opengl/context.h"
+#include "graphics/opengl/texture.h"
 
 #include "graphics/pixelformat.h"
 #include "graphics/surface.h"
 
 #include "common/rect.h"
+#include "common/rotationmode.h"
 
 class Scaler;
 
 namespace OpenGL {
-
-enum WrapMode {
-	kWrapModeBorder,
-	kWrapModeEdge,
-	kWrapModeRepeat,
-	kWrapModeMirroredRepeat
-};
-
-/**
- * A simple GL texture object abstraction.
- *
- * This is used for low-level GL texture handling.
- */
-class GLTexture {
-public:
-	/**
-	 * Constrcut a new GL texture object.
-	 *
-	 * @param glIntFormat The internal format to use.
-	 * @param glFormat    The input format.
-	 * @param glType      The input type.
-	 */
-	GLTexture(GLenum glIntFormat, GLenum glFormat, GLenum glType);
-	~GLTexture();
-
-	/**
-	 * Enable or disable linear texture filtering.
-	 *
-	 * @param enable true to enable and false to disable.
-	 */
-	void enableLinearFiltering(bool enable);
-
-	/**
-	 * Test whether linear filtering is enabled.
-	 */
-	bool isLinearFilteringEnabled() const { return (_glFilter == GL_LINEAR); }
-
-	/**
-	 * Enable or disable linear texture filtering.
-	 *
-	 * @param enable true to enable and false to disable.
-	 */
-	void setWrapMode(WrapMode wrapMode);
-
-	/**
-	 * Destroy the OpenGL texture name.
-	 */
-	void destroy();
-
-	/**
-	 * Create the OpenGL texture name.
-	 */
-	void create();
-
-	/**
-	 * Bind the texture to the active texture unit.
-	 */
-	void bind() const;
-
-	/**
-	 * Sets the size of the texture in pixels.
-	 *
-	 * The internal OpenGL texture might have a different size. To query the
-	 * actual size use getWidth()/getHeight().
-	 *
-	 * @param width  The desired logical width.
-	 * @param height The desired logical height.
-	 * @return Whether the call was successful
-	 */
-	bool setSize(uint width, uint height);
-
-	/**
-	 * Copy image data to the texture.
-	 *
-	 * @param area     The area to update.
-	 * @param src      Surface for the whole texture containing the pixel data
-	 *                 to upload. Only the area described by area will be
-	 *                 uploaded.
-	 */
-	void updateArea(const Common::Rect &area, const Graphics::Surface &src);
-
-	/**
-	 * Query the GL texture's width.
-	 */
-	uint getWidth() const { return _width; }
-
-	/**
-	 * Query the GL texture's height.
-	 */
-	uint getHeight() const { return _height; }
-
-	/**
-	 * Query the logical texture's width.
-	 */
-	uint getLogicalWidth() const { return _logicalWidth; }
-
-	/**
-	 * Query the logical texture's height.
-	 */
-	uint getLogicalHeight() const { return _logicalHeight; }
-
-	/**
-	 * Obtain texture coordinates for rectangular drawing.
-	 */
-	const GLfloat *getTexCoords() const { return _texCoords; }
-
-	/**
-	 * Obtain texture name.
-	 *
-	 * Beware that the texture name changes whenever create is used.
-	 * destroy will invalidate the texture name.
-	 */
-	GLuint getGLTexture() const { return _glTexture; }
-private:
-	const GLenum _glIntFormat;
-	const GLenum _glFormat;
-	const GLenum _glType;
-
-	uint _width, _height;
-	uint _logicalWidth, _logicalHeight;
-	GLfloat _texCoords[4*2];
-
-	GLint _glFilter;
-
-	GLuint _glTexture;
-};
 
 /**
  * Interface for OpenGL implementations of a 2D surface.
@@ -184,6 +60,13 @@ public:
 	 * @param enable true to enable and false to disable.
 	 */
 	virtual void enableLinearFiltering(bool enable) = 0;
+
+	/**
+	 * Sets the rotate parameter of the texture
+	 *
+	 * @param rotation How to rotate the texture
+	 */
+	virtual void setRotation(Common::RotationMode rotation) = 0;
 
 	/**
 	 * Allocate storage for surface.
@@ -221,6 +104,7 @@ public:
 	 * @param color Color value in format returned by getFormat.
 	 */
 	void fill(uint32 color);
+	void fill(const Common::Rect &r, uint32 color);
 
 	void flagDirty() { _allDirty = true; }
 	virtual bool isDirty() const { return _allDirty || !_dirtyArea.isEmpty(); }
@@ -261,10 +145,11 @@ public:
 	/**
 	 * Obtain underlying OpenGL texture.
 	 */
-	virtual const GLTexture &getGLTexture() const = 0;
+	virtual const Texture &getGLTexture() const = 0;
 protected:
 	void clearDirty() { _allDirty = false; _dirtyArea = Common::Rect(); }
 
+	void addDirtyArea(const Common::Rect &r);
 	Common::Rect getDirtyArea() const;
 private:
 	bool _allDirty;
@@ -275,7 +160,7 @@ private:
  * An OpenGL texture wrapper. It automatically takes care of all OpenGL
  * texture handling issues and also provides access to the texture data.
  */
-class Texture : public Surface {
+class TextureSurface : public Surface {
 public:
 	/**
 	 * Create a new texture with the specific internal format.
@@ -285,14 +170,15 @@ public:
 	 * @param glType      The input type.
 	 * @param format      The format used for the texture input.
 	 */
-	Texture(GLenum glIntFormat, GLenum glFormat, GLenum glType, const Graphics::PixelFormat &format);
-	~Texture() override;
+	TextureSurface(GLenum glIntFormat, GLenum glFormat, GLenum glType, const Graphics::PixelFormat &format);
+	~TextureSurface() override;
 
 	void destroy() override;
 
 	void recreate() override;
 
 	void enableLinearFiltering(bool enable) override;
+	void setRotation(Common::RotationMode rotation) override;
 
 	void allocate(uint width, uint height) override;
 
@@ -308,23 +194,23 @@ public:
 	const Graphics::Surface *getSurface() const override { return &_userPixelData; }
 
 	void updateGLTexture() override;
-	const GLTexture &getGLTexture() const override { return _glTexture; }
+	const Texture &getGLTexture() const override { return _glTexture; }
 protected:
 	const Graphics::PixelFormat _format;
 
 	void updateGLTexture(Common::Rect &dirtyArea);
 
 private:
-	GLTexture _glTexture;
+	Texture _glTexture;
 
 	Graphics::Surface _textureData;
 	Graphics::Surface _userPixelData;
 };
 
-class FakeTexture : public Texture {
+class FakeTextureSurface : public TextureSurface {
 public:
-	FakeTexture(GLenum glIntFormat, GLenum glFormat, GLenum glType, const Graphics::PixelFormat &format, const Graphics::PixelFormat &fakeFormat);
-	~FakeTexture() override;
+	FakeTextureSurface(GLenum glIntFormat, GLenum glFormat, GLenum glType, const Graphics::PixelFormat &format, const Graphics::PixelFormat &fakeFormat);
+	~FakeTextureSurface() override;
 
 	void allocate(uint width, uint height) override;
 	void setMask(const byte *mask) override;
@@ -341,33 +227,35 @@ public:
 
 	void updateGLTexture() override;
 protected:
+	void applyPaletteAndMask(byte *dst, const byte *src, uint dstPitch, uint srcPitch, uint srcWidth, const Common::Rect &dirtyArea, const Graphics::PixelFormat &dstFormat, const Graphics::PixelFormat &srcFormat) const;
+
 	Graphics::Surface _rgbData;
 	Graphics::PixelFormat _fakeFormat;
 	uint32 *_palette;
 	uint8 *_mask;
 };
 
-class TextureRGB555 : public FakeTexture {
+class TextureSurfaceRGB555 : public FakeTextureSurface {
 public:
-	TextureRGB555();
-	~TextureRGB555() override {}
+	TextureSurfaceRGB555();
+	~TextureSurfaceRGB555() override {}
 
 	void updateGLTexture() override;
 };
 
-class TextureRGBA8888Swap : public FakeTexture {
+class TextureSurfaceRGBA8888Swap : public FakeTextureSurface {
 public:
-	TextureRGBA8888Swap();
-	~TextureRGBA8888Swap() override {}
+	TextureSurfaceRGBA8888Swap();
+	~TextureSurfaceRGBA8888Swap() override {}
 
 	void updateGLTexture() override;
 };
 
 #ifdef USE_SCALERS
-class ScaledTexture : public FakeTexture {
+class ScaledTextureSurface : public FakeTextureSurface {
 public:
-	ScaledTexture(GLenum glIntFormat, GLenum glFormat, GLenum glType, const Graphics::PixelFormat &format, const Graphics::PixelFormat &fakeFormat);
-	~ScaledTexture() override;
+	ScaledTextureSurface(GLenum glIntFormat, GLenum glFormat, GLenum glType, const Graphics::PixelFormat &format, const Graphics::PixelFormat &fakeFormat);
+	~ScaledTextureSurface() override;
 
 	void allocate(uint width, uint height) override;
 
@@ -396,16 +284,17 @@ protected:
 class TextureTarget;
 class CLUT8LookUpPipeline;
 
-class TextureCLUT8GPU : public Surface {
+class TextureSurfaceCLUT8GPU : public Surface {
 public:
-	TextureCLUT8GPU();
-	~TextureCLUT8GPU() override;
+	TextureSurfaceCLUT8GPU();
+	~TextureSurfaceCLUT8GPU() override;
 
 	void destroy() override;
 
 	void recreate() override;
 
 	void enableLinearFiltering(bool enable) override;
+	void setRotation(Common::RotationMode rotation) override;
 
 	void allocate(uint width, uint height) override;
 
@@ -425,18 +314,20 @@ public:
 	const Graphics::Surface *getSurface() const override { return &_userPixelData; }
 
 	void updateGLTexture() override;
-	const GLTexture &getGLTexture() const override;
+	const Texture &getGLTexture() const override;
 
 	static bool isSupportedByContext() {
 		return OpenGLContext.shadersSupported
 		    && OpenGLContext.multitextureSupported
-		    && OpenGLContext.framebufferObjectSupported;
+		    && OpenGLContext.framebufferObjectSupported
+		    // With 2^-8 precision this is too prone to approximation errors
+		    && OpenGLContext.textureLookupPrecision > 8;
 	}
 private:
 	void lookUpColors();
 
-	GLTexture _clut8Texture;
-	GLTexture _paletteTexture;
+	Texture _clut8Texture;
+	Texture _paletteTexture;
 
 	TextureTarget *_target;
 	CLUT8LookUpPipeline *_clut8Pipeline;

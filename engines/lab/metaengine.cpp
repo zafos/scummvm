@@ -42,7 +42,7 @@ uint32 LabEngine::getFeatures() const {
 
 } // End of namespace Lab
 
-class LabMetaEngine : public AdvancedMetaEngine {
+class LabMetaEngine : public AdvancedMetaEngine<ADGameDescription> {
 public:
 	const char *getName() const override {
 		return "lab";
@@ -56,7 +56,7 @@ public:
 	bool hasFeature(MetaEngineFeature f) const override;
 	SaveStateList listSaves(const char *target) const override;
 	int getMaximumSaveSlot() const override;
-	void removeSaveState(const char *target, int slot) const override;
+	bool removeSaveState(const char *target, int slot) const override;
 	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
 };
 
@@ -85,17 +85,15 @@ SaveStateList LabMetaEngine::listSaves(const char *target) const {
 	Common::String pattern = target;
 	pattern += ".###";
 
-	Common::StringArray filenames;
-	filenames = saveFileMan->listSavefiles(pattern.c_str());
-
+	Common::StringArray filenames = saveFileMan->listSavefiles(pattern.c_str());
 	SaveStateList saveList;
 
-	for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
+	for (const auto &filename : filenames) {
 		// Obtain the last 3 digits of the filename, since they correspond to the save slot
-		int slotNum = atoi(file->c_str() + file->size() - 3);
+		int slotNum = atoi(filename.c_str() + filename.size() - 3);
 
-		if ((slotNum >= 0) && (slotNum <= 999)) {
-			Common::InSaveFile *in = saveFileMan->openForLoading(file->c_str());
+		if (slotNum >= 0 && slotNum <= 999) {
+			Common::InSaveFile *in = saveFileMan->openForLoading(filename);
 			if (in) {
 				if (Lab::readSaveGameHeader(in, header))
 					saveList.push_back(SaveStateDescriptor(this, slotNum, header._descr.getDescription()));
@@ -113,9 +111,9 @@ int LabMetaEngine::getMaximumSaveSlot() const {
 	return 999;
 }
 
-void LabMetaEngine::removeSaveState(const char *target, int slot) const {
+bool LabMetaEngine::removeSaveState(const char *target, int slot) const {
 	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
-	saveFileMan->removeSavefile(Common::String::format("%s.%03u", target, slot));
+	return saveFileMan->removeSavefile(Common::String::format("%s.%03u", target, slot));
 }
 
 SaveStateDescriptor LabMetaEngine::querySaveMetaInfos(const char *target, int slot) const {

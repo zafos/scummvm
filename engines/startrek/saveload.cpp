@@ -45,7 +45,7 @@ bool StarTrekEngine::showSaveMenu() {
 	desc = dialog->getResultString();
 
 	if (desc.empty()) {
-		// create our own description for the saved game, the user didnt enter it
+		// create our own description for the saved game, the user didn't enter it
 		desc = dialog->createDefaultSaveDescription(slot);
 	}
 
@@ -188,7 +188,7 @@ bool StarTrekEngine::saveOrLoadGameData(Common::SeekableReadStream *in, Common::
 			_sound->clearAllMidiSlots();
 		else {
 			_sound->loadMusicFile(midiFilename);
-			_sound->playMidiMusicTracks(_sound->_loopingMidiTrack, _sound->_loopingMidiTrack);
+			_sound->playMidiTrackInSlot(0, _sound->_loopingMidiTrack);
 		}
 	}
 

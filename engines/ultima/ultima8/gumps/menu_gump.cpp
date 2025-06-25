@@ -24,9 +24,9 @@
 #include "ultima/ultima8/gumps/menu_gump.h"
 #include "ultima/ultima8/gumps/cru_menu_gump.h"
 #include "ultima/ultima8/games/game_data.h"
-#include "ultima/ultima8/graphics/gump_shape_archive.h"
-#include "ultima/ultima8/graphics/shape.h"
-#include "ultima/ultima8/graphics/shape_frame.h"
+#include "ultima/ultima8/gfx/gump_shape_archive.h"
+#include "ultima/ultima8/gfx/shape.h"
+#include "ultima/ultima8/gfx/shape_frame.h"
 #include "ultima/ultima8/ultima8.h"
 #include "ultima/ultima8/kernel/mouse.h"
 #include "ultima/ultima8/gumps/widgets/button_widget.h"
@@ -34,7 +34,7 @@
 #include "ultima/ultima8/gumps/quit_gump.h"
 #include "ultima/ultima8/games/game.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
-#include "ultima/ultima8/graphics/palette_manager.h"
+#include "ultima/ultima8/gfx/palette_manager.h"
 #include "ultima/ultima8/audio/music_process.h"
 #include "ultima/ultima8/gumps/widgets/edit_widget.h"
 #include "ultima/ultima8/gumps/u8_save_gump.h"
@@ -178,6 +178,13 @@ void MenuGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool scaled) {
 	Gump::PaintThis(surf, lerp_factor, scaled);
 }
 
+void MenuGump::onMouseDouble(int button, int32 mx, int32 my) {
+	// FIXME: this check should probably be in Game or GUIApp
+	MainActor *av = getMainActor();
+	if (av && !av->hasActorFlags(Actor::ACT_DEAD))
+		Close(); // don't allow closing if dead/game over
+}
+
 bool MenuGump::OnKeyDown(int key, int mod) {
 	if (Gump::OnKeyDown(key, mod)) return true;
 
@@ -209,8 +216,10 @@ void MenuGump::ChildNotify(Gump *child, uint32 message) {
 	}
 
 	ButtonWidget *buttonWidget = dynamic_cast<ButtonWidget *>(child);
-	if (buttonWidget && message == ButtonWidget::BUTTON_CLICK) {
-		selectEntry(child->GetIndex());
+	if (buttonWidget) {
+		if (message == ButtonWidget::BUTTON_CLICK || message == ButtonWidget::BUTTON_DOUBLE) {
+			selectEntry(buttonWidget->GetIndex());
+		}
 	}
 }
 

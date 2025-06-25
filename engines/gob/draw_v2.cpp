@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/endian.h"
@@ -737,7 +743,7 @@ void Draw_v2::spriteOperation(int16 operation) {
 			break;
 
 		_spritesArray[_destSurface]->blit(*_spritesArray[_sourceSurface],
-				_spriteLeft, spriteTop,
+				_spriteLeft, _spriteTop,
 				_spriteLeft + _spriteRight - 1,
 				_spriteTop + _spriteBottom - 1,
 				_destSpriteX, _destSpriteY, (_transparency == 0) ? -1 : 0, _transparency & 0x80);
@@ -754,15 +760,15 @@ void Draw_v2::spriteOperation(int16 operation) {
 
 	case DRAW_FILLRECT:
 		if (!(_backColor & 0xFF00) || !(_backColor & 0x0100)) {
-			_spritesArray[_destSurface]->fillRect(destSpriteX,
+			_spritesArray[_destSurface]->fillRect(_destSpriteX,
 					_destSpriteY, _destSpriteX + _spriteRight - 1,
-					_destSpriteY + _spriteBottom - 1, getColor(_backColor));
+					_destSpriteY + _spriteBottom - 1, _backColor);
 		} else {
 			uint8 strength = 16 - (((uint16) _backColor) >> 12);
 
-			_spritesArray[_destSurface]->shadeRect(destSpriteX,
+			_spritesArray[_destSurface]->shadeRect(_destSpriteX,
 					_destSpriteY, _destSpriteX + _spriteRight - 1,
-					_destSpriteY + _spriteBottom - 1, getColor(_backColor), strength);
+					_destSpriteY + _spriteBottom - 1, _backColor, strength);
 		}
 
 		dirtiedRect(_destSurface, _destSpriteX, _destSpriteY,
@@ -790,6 +796,9 @@ void Draw_v2::spriteOperation(int16 operation) {
 
 		if (!resource)
 			break;
+
+		if (_vm->_draw->_needAdjust == 3 || _vm->_draw->_needAdjust == 4)
+			adjustCoords(0, &_spriteRight, &_spriteBottom);
 
 		_vm->_video->drawPackedSprite(resource->getData(),
 				_spriteRight, _spriteBottom, _destSpriteX, _destSpriteY,
@@ -824,19 +833,19 @@ void Draw_v2::spriteOperation(int16 operation) {
 					len = *dataBuf++;
 					for (int i = 0; i < len; i++, dataBuf += 2) {
 						font->drawLetter(*_spritesArray[_destSurface], READ_LE_UINT16(dataBuf),
-								_destSpriteX, _destSpriteY, getColor(_frontColor),
-								getColor(_backColor), _transparency);
+								_destSpriteX, _destSpriteY, _frontColor,
+								_backColor, _transparency);
 					}
 				} else {
-					font->drawString(_textToPrint, _destSpriteX, _destSpriteY, getColor(_frontColor),
-							getColor(_backColor), _transparency, *_spritesArray[_destSurface]);
+					font->drawString(_textToPrint, _destSpriteX, _destSpriteY, _frontColor,
+							_backColor, _transparency, *_spritesArray[_destSurface]);
 					_destSpriteX += len * font->getCharWidth();
 				}
 			} else {
 				for (int i = 0; i < len; i++) {
 					font->drawLetter(*_spritesArray[_destSurface], _textToPrint[i],
-								_destSpriteX, _destSpriteY, getColor(_frontColor),
-								getColor(_backColor), _transparency);
+								_destSpriteX, _destSpriteY, _frontColor,
+								_backColor, _transparency);
 					_destSpriteX += font->getCharWidth(_textToPrint[i]);
 				}
 			}
@@ -897,7 +906,7 @@ void Draw_v2::spriteOperation(int16 operation) {
 		if ((_backColor != 16) && (_backColor != 144)) {
 			_spritesArray[_destSurface]->fillRect(_destSpriteX, _destSpriteY,
 			    _spriteRight, _spriteBottom,
-			    getColor(_backColor));
+			    _backColor);
 		}
 
 		dirtiedRect(_destSurface, _destSpriteX, _destSpriteY, _spriteRight, _spriteBottom);
@@ -905,13 +914,13 @@ void Draw_v2::spriteOperation(int16 operation) {
 
 	case DRAW_FILLRECTABS:
 		_spritesArray[_destSurface]->fillRect(_destSpriteX, _destSpriteY,
-		    _spriteRight, _spriteBottom, getColor(_backColor));
+		    _spriteRight, _spriteBottom, _backColor);
 
 		dirtiedRect(_destSurface, _destSpriteX, _destSpriteY, _spriteRight, _spriteBottom);
 		break;
 
 	default:
-		warning("unkown operation %d in Draw_v2::spriteOperation", operation);
+		warning("unknown operation %d in Draw_v2::spriteOperation", operation);
 		break;
 	}
 

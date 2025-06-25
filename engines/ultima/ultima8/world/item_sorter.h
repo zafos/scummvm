@@ -31,6 +31,7 @@ class MainShapeArchive;
 class Item;
 class RenderSurface;
 struct SortItem;
+struct Point3;
 
 class ItemSorter {
 	MainShapeArchive    *_shapes;
@@ -54,13 +55,13 @@ public:
 	};
 
 	// Begin creating the display list
-	void BeginDisplayList(const Rect &clipWindow, int32 camx, int32 camy, int32 camz);
+	void BeginDisplayList(const Rect &clipWindow, const Point3 &cam);
 
-	void AddItem(int32 x, int32 y, int32 z, uint32 shape_num, uint32 frame_num, uint32 item_flags, uint32 ext_flags, uint16 item_num = 0);
+	void AddItem(const Point3 &pt, uint32 shape_num, uint32 frame_num, uint32 item_flags, uint32 ext_flags, uint16 item_num = 0);
 	void AddItem(const Item *);                   // Add an Item. SetupLerp() MUST have been called
 
 	// Finishes the display list and Paints
-	void PaintDisplayList(RenderSurface *surf, bool item_highlight = false);
+	void PaintDisplayList(RenderSurface *surf, bool item_highlight = false, bool showFootpads = false, int gridlines = 0);
 
 	// Trace and find an object. Returns objid.
 	// If face is non-NULL, also return the face of the 3d bbox (x,y) is on
@@ -69,7 +70,7 @@ public:
 	void IncSortLimit(int count);
 
 private:
-	bool PaintSortItem(RenderSurface *surf, SortItem *si);
+	bool PaintSortItem(RenderSurface *surf, SortItem *si, bool showFootpad, int gridlines);
 };
 
 } // End of namespace Ultima8

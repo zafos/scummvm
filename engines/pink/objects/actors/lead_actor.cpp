@@ -59,9 +59,9 @@ void LeadActor::loadState(Archive &archive) {
 	_stateBeforeInventory = (State)archive.readByte();
 	_stateBeforePDA = (State)archive.readByte();
 	_isHaveItem = archive.readByte();
-	Common::String recepient = archive.readString();
-	if (!recepient.empty())
-		_recipient = _page->findActor(recepient);
+	Common::String recipient = archive.readString();
+	if (!recipient.empty())
+		_recipient = _page->findActor(recipient);
 	else
 		_recipient = nullptr;
 	_sequencer->loadState(archive);
@@ -156,7 +156,7 @@ void LeadActor::loadPDA(const Common::String &pageName) {
 	if (_state != kPDA) {
 		if (_state == kMoving)
 			cancelInteraction();
-		if (_state != kInventory)
+		if (_state != kInventory && !_page->getGame()->getScreen()->isMenuActive())
 			_page->pause(true);
 
 		_stateBeforePDA = _state;
@@ -317,8 +317,9 @@ void LeadActor::onPDAClose() {
 	_page->getGame()->getScreen()->loadStage();
 
 	_state = _stateBeforePDA;
+	_stateBeforePDA = kUndefined;
 	if (_state != kInventory)
-		_page->pause(0);
+		_page->pause(false);
 }
 
 bool LeadActor::isInteractingWith(const Actor *actor) const {

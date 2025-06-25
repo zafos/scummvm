@@ -19,6 +19,7 @@
  *
  */
 
+#include "common/events.h"
 #include "common/system.h"
 #include "common/translation.h"
 
@@ -31,25 +32,32 @@
 #include "director/director.h"
 #include "director/movie.h"
 #include "director/score.h"
-#include "director/cursor.h"
 #include "director/channel.h"
 #include "director/sprite.h"
 #include "director/window.h"
-#include "director/castmember.h"
-#include "director/lingo/lingo.h"
+#include "director/castmember/castmember.h"
 
 namespace Director {
 
-uint32 DirectorEngine::getMacTicks() { return (g_system->getMillis() * 60 / 1000.) - _tickBaseline; }
+int DirectorEngine::getMacTicks() { return (int)(g_system->getMillis() * 60 / 1000.) - _tickBaseline; }
 
-bool DirectorEngine::processEvents(bool captureClick) {
-	debugC(3, kDebugEvents, "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-	debugC(3, kDebugEvents, "@@@@   Processing events");
-	debugC(3, kDebugEvents, "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+bool DirectorEngine::pollEvent(Common::Event &event) {
+	// used by UnitTest XObject
+	if (!_injectedEvents.empty()) {
+		event = _injectedEvents.remove_at(0);
+		return true;
+	}
+	return g_system->getEventManager()->pollEvent(event);
+}
+
+bool DirectorEngine::processEvents(bool captureClick, bool skipWindowManager) {
+	debugC(9, kDebugEvents, "\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
+	debugC(9, kDebugEvents, "@@@@   Processing events");
+	debugC(9, kDebugEvents, "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 
 	Common::Event event;
-	while (g_system->getEventManager()->pollEvent(event)) {
-		if (!_wm->processEvent(event)) {
+	while (pollEvent(event)) {
+		if (skipWindowManager || !_wm->processEvent(event)) {
 			// We only want to handle these events if the event
 			// wasn't handled by the window manager.
 			switch (event.type) {
@@ -74,6 +82,8 @@ bool DirectorEngine::processEvents(bool captureClick) {
 				return true;
 			break;
 		case Common::EVENT_LBUTTONDOWN:
+		case Common::EVENT_RBUTTONDOWN:
+		case Common::EVENT_KEYDOWN:
 			if (captureClick)
 				return true;
 			break;
@@ -112,9 +122,15 @@ bool Window::processEvent(Common::Event &event) {
 }
 
 bool Movie::processEvent(Common::Event &event) {
+	// When in GUI message box is being shown, movie may record clicking on the message box as a movie event
+	// Make sure that these events (mouseUp, mouseDown) are not recorded in the movie
+	if (_inGuiMessageBox) {
+		return false;
+	}
+
 	Score *sc = getScore();
-	if (sc->getCurrentFrame() >= sc->_frames.size()) {
-		warning("processEvents: request to access frame %d of %d", sc->getCurrentFrame(), sc->_frames.size() - 1);
+	if (sc->getCurrentFrameNum() > sc->getFramesNum()) {
+		warning("processEvents: request to access frame %d of %d", sc->getCurrentFrameNum(), sc->getFramesNum());
 		return false;
 	}
 	uint16 spriteId = 0;
@@ -123,7 +139,7 @@ bool Movie::processEvent(Common::Event &event) {
 
 	switch (event.type) {
 	case Common::EVENT_MOUSEMOVE:
-		pos = _window->getMousePos();
+		pos = event.mouse;
 
 		_lastEventTime = g_director->getMacTicks();
 		_lastRollTime =	 _lastEventTime;
@@ -138,7 +154,7 @@ bool Movie::processEvent(Common::Event &event) {
 
 		// hiliteChannelId is specified for BitMap castmember, so we deal with them separately with other castmember
 		// if we are moving out of bounds, then we don't hilite it anymore
-		if (_currentHiliteChannelId && !sc->_channels[_currentHiliteChannelId]->isMouseIn(pos)) {
+		if (_currentHiliteChannelId && (sc->_channels[_currentHiliteChannelId]->isMouseIn(pos) != kCollisionYes)) {
 			g_director->getCurrentWindow()->setDirty(true);
 			g_director->getCurrentWindow()->addDirtyRect(sc->_channels[_currentHiliteChannelId]->getBbox());
 			_currentHiliteChannelId = 0;
@@ -160,10 +176,13 @@ bool Movie::processEvent(Common::Event &event) {
 
 		if (_currentDraggedChannel) {
 			if (_currentDraggedChannel->_sprite->_moveable) {
-				pos = _window->getMousePos();
-
-				_currentDraggedChannel->addDelta(pos - _draggingSpritePos);
-				_draggingSpritePos = pos;
+				pos = _draggingSpriteOffset + event.mouse;
+				if (!_currentDraggedChannel->_sprite->_trails) {
+					g_director->getCurrentMovie()->getWindow()->addDirtyRect(_currentDraggedChannel->getBbox());
+				}
+				_currentDraggedChannel->setPosition(pos.x, pos.y, true);
+				_currentDraggedChannel->_dirty = true;
+				g_director->getCurrentMovie()->getWindow()->addDirtyRect(_currentDraggedChannel->getBbox());
 			} else {
 				_currentDraggedChannel = nullptr;
 			}
@@ -172,39 +191,14 @@ bool Movie::processEvent(Common::Event &event) {
 
 	case Common::EVENT_LBUTTONDOWN:
 	case Common::EVENT_RBUTTONDOWN:
+		pos = event.mouse;
 		if (sc->_waitForClick) {
 			sc->_waitForClick = false;
-			sc->renderCursor(_window->getMousePos(), true);
+			sc->renderCursor(pos, true);
 		} else {
-			pos = _window->getMousePos();
+			pos = event.mouse;
 
-			// D3 doesn't have both mouse up and down.
-			// But we still want to know if the mouse is down for press effects.
-			// Since we don't have mouse up and down before D3, then we use ActiveSprite
-			if (g_director->getVersion() < 400)
-				spriteId = sc->getActiveSpriteIDFromPos(pos);
-			else
-				spriteId = sc->getMouseSpriteIDFromPos(pos);
-
-			// Set `the clickOn` Lingo property.
-			// Even in D4, `the clickOn` uses the old "active" sprite instead of mouse sprite.
-			_currentClickOnSpriteId = sc->getActiveSpriteIDFromPos(pos);
-
-			if (!spriteId && _isBeepOn) {
-				g_lingo->func_beep(1);
-			}
-
-			if (spriteId > 0 && sc->_channels[spriteId]->_sprite->shouldHilite()) {
-				_currentHiliteChannelId = spriteId;
-				g_director->_wm->_hilitingWidget = true;
-				g_director->getCurrentWindow()->setDirty(true);
-				g_director->getCurrentWindow()->addDirtyRect(sc->_channels[_currentHiliteChannelId]->getBbox());
-			}
-
-			CastMember *cast = getCastMember(sc->_channels[spriteId]->_sprite->_castId);
-			if (cast && cast->_type == kCastButton)
-				_mouseDownWasInButton = true;
-
+			// FIXME: Check if these are tracked with the right mouse button
 			_lastEventTime = g_director->getMacTicks();
 			_lastClickTime2 = _lastClickTime;
 			_lastClickTime = _lastEventTime;
@@ -212,68 +206,58 @@ bool Movie::processEvent(Common::Event &event) {
 			if (_timeOutMouse)
 				_lastTimeOut = _lastEventTime;
 
-			debugC(3, kDebugEvents, "event: Button Down @(%d, %d), movie '%s', sprite id: %d", pos.x, pos.y, _macName.c_str(), spriteId);
-			queueUserEvent(kEventMouseDown, spriteId);
+			LEvent ev = kEventMouseDown;
+			// In D5 and up, right mouse clicks don't trigger the mouseDown handler.
+			// They are caught by the rightMouseDown handler only.
+			if ((g_director->getVersion() >= 500) && event.type == Common::EVENT_RBUTTONDOWN)
+				ev = kEventRightMouseDown;
 
-			if (sc->_channels[spriteId]->_sprite->_moveable) {
-				_draggingSpritePos = _window->getMousePos();
-				_currentDraggedChannel = sc->_channels[spriteId];
-			}
+			debugC(3, kDebugEvents, "Movie::processEvent(): Button Down @(%d, %d), movie '%s'", pos.x, pos.y, _macName.c_str());
+			queueInputEvent(ev, 0, pos);
 		}
 
 		return true;
 
 	case Common::EVENT_LBUTTONUP:
 	case Common::EVENT_RBUTTONUP:
-		pos = _window->getMousePos();
+		{
+			pos = event.mouse;
 
-		if (g_director->getVersion() < 400)
-			spriteId = sc->getActiveSpriteIDFromPos(pos);
-		else
-			spriteId = sc->getMouseSpriteIDFromPos(pos);
+			debugC(3, kDebugEvents, "Movie::processEvent(): Button Up @(%d, %d), movie '%s'", pos.x, pos.y, _macName.c_str());
 
-		if (_currentHiliteChannelId && sc->_channels[_currentHiliteChannelId]) {
-			g_director->getCurrentWindow()->setDirty(true);
-			g_director->getCurrentWindow()->addDirtyRect(sc->_channels[_currentHiliteChannelId]->getBbox());
+			LEvent ev = kEventMouseUp;
+			// In D5 and up, right mouse clicks don't trigger the mouseUp handler.
+			// They are caught by the rightMouseUp handler only.
+			if ((g_director->getVersion() >= 500) && event.type == Common::EVENT_RBUTTONUP)
+				ev = kEventRightMouseUp;
+
+			queueInputEvent(ev, 0, pos);
+			sc->renderCursor(pos);
 		}
-
-		g_director->_wm->_hilitingWidget = false;
-
-		debugC(3, kDebugEvents, "event: Button Up @(%d, %d), movie '%s', sprite id: %d", pos.x, pos.y, _macName.c_str(), spriteId);
-
-		_currentDraggedChannel = nullptr;
-
-		// If this is a button cast member, and the last mouse down event was in a button
-		// (any button), flip this button's hilite flag.
-		// Now you might think, "Wait, we don't flip this flag in the mouseDown event.
-		// And why any button??? This doesn't make any sense."
-		// No, it doesn't make sense, but it's what Director does.
-		if (_mouseDownWasInButton) {
-			CastMember *cast = getCastMember(sc->_channels[spriteId]->_sprite->_castId);
-			if (cast && cast->_type == kCastButton)
-				cast->_hilite = !cast->_hilite;
-		}
-
-		queueUserEvent(kEventMouseUp, spriteId);
-		sc->renderCursor(pos);
-
-		_currentHiliteChannelId = 0;
-		_mouseDownWasInButton = false;
 		return true;
 
 	case Common::EVENT_KEYDOWN:
 		_keyCode = _vm->_KeyCodes.contains(event.kbd.keycode) ? _vm->_KeyCodes[event.kbd.keycode] : 0;
-		_key = (unsigned char)(event.kbd.ascii & 0xff);
+		_key = event.kbd.ascii;
 		_keyFlags = event.kbd.flags;
 
-		debugC(1, kDebugEvents, "processEvents(): movie '%s', keycode: %d", _macName.c_str(), _keyCode);
+		if (event.kbd.keycode == Common::KEYCODE_LSHIFT || event.kbd.keycode == Common::KEYCODE_RSHIFT ||
+			event.kbd.keycode == Common::KEYCODE_LCTRL || event.kbd.keycode == Common::KEYCODE_RCTRL ||
+			event.kbd.keycode == Common::KEYCODE_LALT || event.kbd.keycode == Common::KEYCODE_RALT ||
+			event.kbd.keycode == Common::KEYCODE_LSUPER || event.kbd.keycode == Common::KEYCODE_RSUPER) {
+			// modifier keys don't trigger a KEYDOWN event
+			return true;
+		}
+
+		debugC(1, kDebugEvents, "Movie::processEvent(): movie '%s', keycode: %d", _macName.c_str(), _keyCode);
 
 		_lastEventTime = g_director->getMacTicks();
 		_lastKeyTime = _lastEventTime;
 		if (_timeOutKeyDown)
 			_lastTimeOut = _lastEventTime;
 
-		queueUserEvent(kEventKeyDown);
+		queueInputEvent(kEventKeyDown);
+		g_director->loadSlowdownCooloff();
 		return true;
 
 	case Common::EVENT_KEYUP:

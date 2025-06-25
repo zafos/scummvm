@@ -112,6 +112,17 @@ static const ADGameDescription gameDescriptions[] = {
 		GUIO1(GUIO_NONE)
 	},
 
+	// Alternative Neverhood Russian translation.
+	{
+		"neverhood",
+		"Stream",
+		AD_ENTRY1s("hd.blb", "1b6bfa33c5e9e7a7cc02964e9ea7a6f8", 4540208),
+		Common::RU_RUS,
+		Common::kPlatformWindows,
+		ADGF_DROPPLATFORM,
+		GUIO1(GUIO_NONE)
+	},
+
 	// Neverhood Japanese version
 	// Bugreport #11074
 	{
@@ -130,40 +141,11 @@ static const ADGameDescription gameDescriptions[] = {
 } // End of namespace Neverhood
 
 
-class NeverhoodMetaEngineDetection : public AdvancedMetaEngineDetection {
+class NeverhoodMetaEngineDetection : public AdvancedMetaEngineDetection<ADGameDescription> {
 public:
-	NeverhoodMetaEngineDetection() : AdvancedMetaEngineDetection(Neverhood::gameDescriptions, sizeof(ADGameDescription), neverhoodGames) {
+	NeverhoodMetaEngineDetection() : AdvancedMetaEngineDetection(Neverhood::gameDescriptions, neverhoodGames) {
 		_guiOptions = GUIO5(GUIO_NOMIDI, GAMEOPTION_ORIGINAL_SAVELOAD, GAMEOPTION_SKIP_HALL_OF_RECORDS,
 				    GAMEOPTION_SCALE_MAKING_OF_VIDEOS, GAMEOPTION_REPEAT_WILLIE_HINT);
-	}
-
-	DetectedGames detectGames(const Common::FSList &fslist, uint32 skipADFlags, bool skipIncomplete) override {
-		DetectedGames detGames(AdvancedMetaEngineDetection::detectGames(fslist, skipADFlags, skipIncomplete));
-		bool hasSubs = false;
-
-		if (detGames.empty())
-			return detGames;
-
-		for (Common::FSList::const_iterator dr = fslist.begin(); dr != fslist.end() && !hasSubs; dr++) {
-			if (dr->getName().equalsIgnoreCase("language") && dr->isDirectory()) {
-				Common::FSList files;
-				if (!dr->getChildren(files, Common::FSNode::kListAll))
-					continue;
-				for (Common::FSList::const_iterator file = files.begin(); file != files.end(); file++) {
-					Common::String fname = file->getName();
-					if (fname.matchString("*.nhc", true) && !fname.equalsIgnoreCase("Fargusfx.nhc")) {
-						hasSubs = true;
-						break;
-					}
-				}
-			}
-		}
-		if (hasSubs)
-			return detGames;
-		for (DetectedGames::iterator it = detGames.begin(); it != detGames.end(); it++) {
-			it->appendGUIOptions("sndNoSubs");
-		}
-		return detGames;
 	}
 
 	const char *getName() const override {

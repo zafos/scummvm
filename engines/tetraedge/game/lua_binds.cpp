@@ -27,8 +27,11 @@
 #include "tetraedge/game/game.h"
 #include "tetraedge/game/lua_binds.h"
 #include "tetraedge/game/object3d.h"
+#include "tetraedge/game/syberia_game.h"
+#include "tetraedge/game/amerzone_game.h"
 #include "tetraedge/to_lua.h"
 #include "tetraedge/te/te_core.h"
+#include "tetraedge/te/te_sound_manager.h"
 #include "tetraedge/te/te_lua_thread.h"
 #include "tetraedge/te/te_particle.h"
 
@@ -59,7 +62,7 @@ static int tolua_ExportedFunctions_LoadObjectMaterials00(lua_State *L) {
 
 static void LoadObjectMaterials(const Common::String &imgname, const Common::String &objname) {
 	Game *game = g_engine->getGame();
-	bool result = game->scene().loadObjectMaterials(imgname, objname);
+	bool result = game->scene().loadObjectMaterials(Common::Path(imgname), objname);
 	if (!result)
 		error("[LoadObjectMaterials] Object \"%s\" doesn't exist in scene : \"%s\" or there is no material for this object.",
 				objname.c_str(), imgname.c_str());
@@ -76,17 +79,27 @@ static int tolua_ExportedFunctions_LoadObjectMaterials01(lua_State *L) {
 	return tolua_ExportedFunctions_LoadObjectMaterials00(L);
 }
 
-static void PlayMovie(const Common::String &vidpath, const Common::String &musicpath) {
+static void PlayMovie(Common::String vidpath, Common::String musicpath) {
 	Application *app = g_engine->getApplication();
-	app->mouseCursorLayout().load("pictures/cursor.png");
+	app->mouseCursorLayout().load(app->defaultCursor());
 	Game *game = g_engine->getGame();
-	game->playMovie(vidpath, musicpath);
+
+	// WORKAROUND: Fix some broken paths in Amerzone
+	if (musicpath == "Videos/sc19.ogg")
+		musicpath = "Videos/019.ogg";
+	if (vidpath == "Videos/sc18.ogv") {
+		// Need the correct path for callback, call this first.
+		game->playMovie(Common::Path(vidpath), Common::Path(musicpath));
+		vidpath = "Videos/I_018_P2_001.ogv";
+	}
+
+	game->playMovie(Common::Path(vidpath), Common::Path(musicpath));
 }
 
 static void PlayMovie(const Common::String &vidpath, const Common::String &musicpath, double volume) {
 	Game *game = g_engine->getGame();
 
-	if (!game->playMovie(vidpath, musicpath, (float)volume)) {
+	if (!game->playMovie(Common::Path(vidpath), Common::Path(musicpath), (float)volume)) {
 		warning("[PlayMovie] Movie \"%s\" doesn't exist.", vidpath.c_str());
 		return;
 	}
@@ -106,10 +119,19 @@ static int tolua_ExportedFunctions_PlayMovie00(lua_State *L) {
 		return 0;
 	} else if (tolua_isstring(L, 1, 0, &err) && tolua_isstring(L, 2, 0, &err)
 			&& tolua_isnumber(L, 3, 1, &err) && tolua_isnoobj(L, 4, &err)) {
+		// Syberia II macOS - includes volume
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		Common::String s2(tolua_tostring(L, 2, nullptr));
 		double d1 = tolua_tonumber(L, 3, 1.0);
 		PlayMovie(s1, s2, d1);
+		return 0;
+	} else if (tolua_isstring(L, 1, 0, &err) && tolua_isstring(L, 2, 0, &err)
+			&& tolua_isstring(L, 3, 0, &err) && tolua_isnoobj(L, 4, &err)) {
+		// iOS version.. sometimes has "video" as 3rd param?
+		Common::String s1(tolua_tostring(L, 1, nullptr));
+		Common::String s2(tolua_tostring(L, 2, nullptr));
+		Common::String s3(tolua_tostring(L, 3, nullptr));
+		PlayMovie(s1, s2);
 		return 0;
 	}
 	error("#ferror in function 'PlayMovie': %d %d %s", err.index, err.array, err.type);
@@ -122,11 +144,12 @@ static int tolua_ExportedFunctions_PlayMovieAndWaitForEnd00(lua_State *L) {
 		Common::String s2(tolua_tostring(L, 2, nullptr));
 		PlayMovie(s1, s2);
 
-		Game::YieldedCallback callback;
+		SyberiaGame::YieldedCallback callback;
 		callback._luaThread = TeLuaThread::threadFromState(L);
 		callback._luaFnName = "OnMovieFinished";
 		callback._luaParam = s1;
-		Game *game = g_engine->getGame();
+		SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+		assert(game);
 		for (const auto &cb : game->yieldedCallbacks()) {
 			if (cb._luaFnName == callback._luaFnName && cb._luaParam == s1)
 				warning("PlayMovieAndWaitForEnd: Reentrency error, your are already in a yielded/sync function call");
@@ -138,8 +161,9 @@ static int tolua_ExportedFunctions_PlayMovieAndWaitForEnd00(lua_State *L) {
 }
 
 static void AddRandomSound(const Common::String &s1, const Common::String &s2, float f1, float f2){
-	Game *game = g_engine->getGame();
-	game->addRandomSound(s1, s2, f1, f2);
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
+	game->addRandomSound(s1, Common::Path(s2), f1, f2);
 }
 
 static int tolua_ExportedFunctions_AddRandomSound00(lua_State *L) {
@@ -191,10 +215,20 @@ static int tolua_ExportedFunctions_Selected00(lua_State *L) {
 	error("#ferror in function 'Selected': %d %d %s", err.index, err.array, err.type);
 }
 
-static void TakeObject(const Common::String &obj) {
+static void TakeObject_Amerzone(const Common::String &obj) {
+	AmerzoneGame *game = dynamic_cast<AmerzoneGame *>(g_engine->getGame());
+	assert(game && game->warpY());
+	debug("TakeObject: lastObj %s, obj %s", game->lastHitObjectName().c_str(), obj.c_str());
+	game->luaContext().setGlobal(game->lastHitObjectName(), true);
+	game->warpY()->takeObject(game->lastHitObjectName());
+	if (!obj.empty()) {
+		game->addToBag(obj);
+		g_engine->getSoundManager()->playFreeSound("Sounds/SFX/N_prendre.ogg", 1.0, "sfx");
+	}
+}
+
+static void TakeObject_Syberia(const Common::String &obj) {
 	Game *game = g_engine->getGame();
-	// TODO: Set global _lastHitObjectName?? How is it used?
-	//game->luaContext().setGlobal(_lastHitObjectName, true);
 	if (!obj.empty())
 		game->addToBag(obj);
 }
@@ -203,14 +237,18 @@ static int tolua_ExportedFunctions_TakeObject00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
-		TakeObject(s1);
+		if (g_engine->gameIsAmerzone())
+			TakeObject_Amerzone(s1);
+		else
+			TakeObject_Syberia(s1);
 		return 0;
 	}
 	error("#ferror in function 'TakeObject': %d %d %s", err.index, err.array, err.type);
 }
 
 static void TakeObjectInHand(const Common::String &obj) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	// TODO: Set global _lastHitObjectName?? How is it used?
 	//game->luaContext().setGlobal(_lastHitObjectName, true);
 	if (!obj.empty())
@@ -317,6 +355,50 @@ static int tolua_ExportedFunctions_AddDocument00(lua_State *L) {
 	error("#ferror in function 'AddDocument': %d %d %s", err.index, err.array, err.type);
 }
 
+static bool IsFreemiumUnlocked() {
+	// Only called in demo versions of the game, so the answer is no.
+	return false;
+}
+
+static int tolua_ExportedFunctions_IsFreemiumUnlocked00(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isnoobj(L, 2, &err)) {
+		bool result = IsFreemiumUnlocked();
+		tolua_pushboolean(L, result);
+		return 1;
+	}
+	error("#ferror in function 'IsFreemiumUnlocked': %d %d %s", err.index, err.array, err.type);
+}
+
+static void ReachedFreemiumLimit() {
+	Application *app = g_engine->getApplication();
+	app->upsellScreen().enter();
+}
+
+static int tolua_ExportedFunctions_ReachedFreemiumLimit00(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isnoobj(L, 2, &err)) {
+		ReachedFreemiumLimit();
+		return 0;
+	}
+	error("#ferror in function 'ReachedFreemiumLimit': %d %d %s", err.index, err.array, err.type);
+}
+
+static bool IsFacebookLiked() {
+	// Only called in demo versions of the game, so the answer is no.
+	return false;
+}
+
+static int tolua_ExportedFunctions_IsFacebookLiked00(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isnoobj(L, 2, &err)) {
+		bool result = IsFacebookLiked();
+		tolua_pushboolean(L, result);
+		return 1;
+	}
+	error("#ferror in function 'IsFacebookLiked': %d %d %s", err.index, err.array, err.type);
+}
+
 static void AddUnrecalAnim(const Common::String &newanim) {
 	Application *app = g_engine->getApplication();
 	Common::Array<Common::String> &anims = app->unrecalAnims();
@@ -338,7 +420,8 @@ static int tolua_ExportedFunctions_AddUnrecalAnim00(lua_State *L) {
 }
 
 static void UnlockArtwork(const Common::String &name) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->addArtworkUnlocked(name, true);
 	Application *app = g_engine->getApplication();
 	app->saveOptions("options.xml");
@@ -367,8 +450,13 @@ static int tolua_ExportedFunctions_ChangeWarp00(lua_State *L) {
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isstring(L, 2, 0, &err) && tolua_isboolean(L, 3, 1, &err) && tolua_isnoobj(L, 4, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		Common::String s2(tolua_tostring(L, 2, nullptr));
-		bool flag = tolua_toboolean(L, 3, 0);
+		bool flag = tolua_toboolean(L, 3, false);
 		ChangeWarp(s1, s2, flag);
+		return 0;
+	} else if (g_engine->gameIsAmerzone() && tolua_isstring(L, 1, 0, &err) && tolua_isboolean(L, 2, 1, &err) && tolua_isnoobj(L, 3, &err)) {
+		Common::String s1(tolua_tostring(L, 1, nullptr));
+		bool flag = tolua_toboolean(L, 2, false);
+		ChangeWarp(s1, "", flag);
 		return 0;
 	}
 	error("#ferror in function 'ChangeWarp': %d %d %s", err.index, err.array, err.type);
@@ -382,21 +470,22 @@ static void SetCharacterPlayerVisible(bool val) {
 static int tolua_ExportedFunctions_SetCharacterPlayerVisible00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isboolean(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
-		SetCharacterPlayerVisible(tolua_toboolean(L, 1, 0));
+		SetCharacterPlayerVisible(tolua_toboolean(L, 1, false));
 		return 0;
 	}
 	error("#ferror in function 'SetCharacterPlayerVisible': %d %d %s", err.index, err.array, err.type);
 }
 
 static void MoveCharacterPlayerDisabled(bool val) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->_movePlayerCharacterDisabled = val;
 }
 
 static int tolua_ExportedFunctions_MoveCharacterPlayerDisabled00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isboolean(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
-		MoveCharacterPlayerDisabled(tolua_toboolean(L, 1, 0));
+		MoveCharacterPlayerDisabled(tolua_toboolean(L, 1, false));
 		return 0;
 	}
 	error("#ferror in function 'MoveCharacterPlayerDisabled': %d %d %s", err.index, err.array, err.type);
@@ -410,7 +499,7 @@ static void SetRunMode(bool run) {
 static int tolua_ExportedFunctions_SetRunMode00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isboolean(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
-		SetRunMode(tolua_toboolean(L, 1, 0));
+		SetRunMode(tolua_toboolean(L, 1, false));
 		return 0;
 	}
 	error("#ferror in function 'SetRunMode': %d %d %s", err.index, err.array, err.type);
@@ -452,7 +541,7 @@ static int tolua_ExportedFunctions_SetCharacterShadow00(lua_State *L) {
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isboolean(L, 2, 0, &err)
 			 && tolua_isnoobj(L, 3, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
-		bool b1 = tolua_toboolean(L, 2, 0);
+		bool b1 = tolua_toboolean(L, 2, false);
 		SetCharacterShadow(s1, b1);
 		return 0;
 	}
@@ -497,11 +586,11 @@ static int tolua_ExportedFunctions_AddCallbackPlayer00(lua_State *L) {
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isstring(L, 2, 0, &err)
 			&& tolua_isnumber(L, 3, 0, &err) && tolua_isnumber(L, 4, 1, &err)
 			&& tolua_isnoobj(L, 5, &err)) {
-		Common::String s2(tolua_tostring(L, 1, nullptr));
-		Common::String s3(tolua_tostring(L, 2, nullptr));
+		Common::String s1(tolua_tostring(L, 1, nullptr));
+		Common::String s2(tolua_tostring(L, 2, nullptr));
 		double n1 = tolua_tonumber(L, 3, 0.0);
 		double n2 = tolua_tonumber(L, 4, -1.0);
-		AddCallbackPlayer(s2, s3, n1, n2);
+		AddCallbackPlayer(s1, s2, n1, n2);
 		return 0;
 	}
 	error("#ferror in function 'AddCallbackPlayer': %d %d %s", err.index, err.array, err.type);
@@ -555,7 +644,7 @@ static int tolua_ExportedFunctions_DeleteCallbackPlayer00(lua_State *L) {
 static void AddMarker(const Common::String &markerName, const Common::String &imgPath, float x, float y,
 				const Common::String &loctype, const Common::String &markerVal, float anchorX, float anchorY) {
 	Game *game = g_engine->getGame();
-	game->scene().addMarker(markerName, imgPath, x, y, loctype, markerVal, anchorX, anchorY);
+	game->scene().addMarker(markerName, Common::Path(imgPath), x, y, loctype, markerVal, anchorX, anchorY);
 }
 
 static int tolua_ExportedFunctions_AddMarker00(lua_State *L) {
@@ -588,7 +677,7 @@ static int tolua_ExportedFunctions_SetVisibleMarker00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isboolean(L, 2, 0, &err) && tolua_isnoobj(L, 3, &err)) {
 		Common::String s(tolua_tostring(L, 1, nullptr));
-		bool b = tolua_toboolean(L, 2, 0);
+		bool b = tolua_toboolean(L, 2, false);
 		SetVisibleMarker(s, b);
 		return 0;
 	}
@@ -618,7 +707,7 @@ static void SetVisibleCellphone(bool visible) {
 static int tolua_ExportedFunctions_SetVisibleCellphone00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isboolean(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
-		SetVisibleCellphone(tolua_toboolean(L, 1, 0));
+		SetVisibleCellphone(tolua_toboolean(L, 1, false));
 		return 0;
 	}
 	error("#ferror in function 'SetVisibleCellphone': %d %d %s", err.index, err.array, err.type);
@@ -626,7 +715,7 @@ static int tolua_ExportedFunctions_SetVisibleCellphone00(lua_State *L) {
 
 static void ShowObject(const Common::String &objName);
 
-static void StartAnimation(const Common::String name, int loops, bool repeat) {
+static void StartAnimation(const Common::String &name, int loops, bool repeat) {
 	ShowObject(name);
 	Game *game = g_engine->getGame();
 	if (game->startAnimation(name, loops, repeat))
@@ -644,7 +733,7 @@ int tolua_ExportedFunctions_StartAnimation00(lua_State *L) {
 		&& tolua_isboolean(L, 3, 1, &err) && tolua_isnoobj(L, 4, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		double d1 = tolua_tonumber(L, 2, -1.0);
-		bool b1 = tolua_toboolean(L, 3, 0);
+		bool b1 = tolua_toboolean(L, 3, false);
 		StartAnimation(s1, d1, b1);
 		return 0;
 	}
@@ -658,14 +747,15 @@ int tolua_ExportedFunctions_StartAnimationAndWaitForEnd00(lua_State *L) {
 		&& tolua_isboolean(L, 3, 1, &err) && tolua_isnoobj(L, 4, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		double d1 = tolua_tonumber(L, 2, -1.0);
-		bool b1 = tolua_toboolean(L, 3, 0);
+		bool b1 = tolua_toboolean(L, 3, false);
 		StartAnimation(s1, d1, b1);
 
-		Game::YieldedCallback callback;
+		SyberiaGame::YieldedCallback callback;
 		callback._luaThread = TeLuaThread::threadFromState(L);
 		callback._luaFnName = "OnFinishedAnim";
 		callback._luaParam = s1;
-		Game *game = g_engine->getGame();
+		SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+		assert(game);
 		for (const auto &cb : game->yieldedCallbacks()) {
 			if (cb._luaFnName == callback._luaFnName && cb._luaParam == s1)
 				warning("StartAnimationAndWaitForEnd: Reentrency error, your are already in a yielded/sync function call");
@@ -679,7 +769,8 @@ int tolua_ExportedFunctions_StartAnimationAndWaitForEnd00(lua_State *L) {
 }
 
 static void RequestAutoSave() {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->setSaveRequested();
 }
 
@@ -701,7 +792,7 @@ static void SetVisibleButtonZoomed(bool val) {
 static int tolua_ExportedFunctions_SetVisibleButtonZoomed00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isboolean(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
-		bool b1 = tolua_toboolean(L, 1, 0);
+		bool b1 = tolua_toboolean(L, 1, false);
 		SetVisibleButtonZoomed(b1);
 		return 0;
 	}
@@ -837,7 +928,7 @@ static int tolua_ExportedFunctions_PlaceCharacterOnDummy00(lua_State *L) {
 }
 
 static void SetCharacterRotation(const Common::String &charname, float rx, float ry, float rz) {
-	TeQuaternion quat = TeQuaternion::fromEuler(TeVector3f32(rx * M_PI / 180.0, ry * M_PI / 180.0, rz * M_PI / 180.0));
+	const TeQuaternion quat = TeQuaternion::fromEulerDegrees(TeVector3f32(rx, ry, rz));
 	Game *game = g_engine->getGame();
 	Character *c = game->scene().character(charname);
 	if (c) {
@@ -867,10 +958,10 @@ static void SetCharacterOrientation(const Common::String &charname, float x, flo
 	Character *c = game->scene().character(charname);
 	if (c) {
 		const TeVector3f32 pos = c->_model->position();
-		TeVector3f32 euler(0, atan2f(abs(x - pos.x()), y - pos.z()), 0);
+		const TeVector3f32 euler(0, atan2f(-(x - pos.x()), y - pos.z()), 0);
 		c->_model->setRotation(TeQuaternion::fromEuler(euler));
 	} else {
-		warning("[SetCharacterRotation] Character not found %s", charname.c_str());
+		warning("[SetCharacterOrientation] Character not found %s", charname.c_str());
 	}
 }
 
@@ -906,8 +997,8 @@ static int tolua_ExportedFunctions_SetCharacterAnimation00(lua_State *L) {
 		&& tolua_isnoobj(L, 7, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		Common::String s2(tolua_tostring(L, 2, nullptr));
-		bool b1 = tolua_toboolean(L, 3, 1);
-		bool b2 = tolua_toboolean(L, 4, 0);
+		bool b1 = tolua_toboolean(L, 3, true);
+		bool b2 = tolua_toboolean(L, 4, false);
 		double f3 = tolua_tonumber(L, 5, -1.0);
 		double f4 = tolua_tonumber(L, 6, 9999.0);
 		SetCharacterAnimation(s1, s2, b1, b2, (int)f3, (int)f4);
@@ -926,18 +1017,19 @@ static int tolua_ExportedFunctions_SetCharacterAnimationAndWaitForEnd00(lua_Stat
 		&& tolua_isnoobj(L, 7, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		Common::String s2(tolua_tostring(L, 2, nullptr));
-		bool b1 = tolua_toboolean(L, 3, 1);
-		bool b2 = tolua_toboolean(L, 4, 0);
+		bool b1 = tolua_toboolean(L, 3, true);
+		bool b2 = tolua_toboolean(L, 4, false);
 		double f3 = tolua_tonumber(L, 5, -1.0);
 		double f4 = tolua_tonumber(L, 6, 9999.0);
 		SetCharacterAnimation(s1, s2, b1, b2, (int)f3, (int)f4);
 
-		Game::YieldedCallback callback;
+		SyberiaGame::YieldedCallback callback;
 		callback._luaThread = TeLuaThread::threadFromState(L);
 		callback._luaFnName = "OnCharacterAnimationFinished";
 		callback._luaParam = s1;
 		callback._luaParam2 = s2;
-		Game *game = g_engine->getGame();
+		SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+		assert(game);
 		for (const auto &cb : game->yieldedCallbacks()) {
 			if (cb._luaFnName == callback._luaFnName && cb._luaParam == s1 && cb._luaParam2 == s2)
 				warning("SetCharacterAnimationAndWaitForEnd: Reentrency error, your are already in a yielded/sync function call");
@@ -966,8 +1058,8 @@ static int tolua_ExportedFunctions_BlendCharacterAnimation00(lua_State *L) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		Common::String s2(tolua_tostring(L, 2, nullptr));
 		double f1 = tolua_tonumber(L, 3, 0.0);
-		bool b1 = tolua_toboolean(L, 4, 1);
-		bool b2 = tolua_toboolean(L, 5, 0);
+		bool b1 = tolua_toboolean(L, 4, true);
+		bool b2 = tolua_toboolean(L, 5, false);
 		BlendCharacterAnimation(s1, s2, f1, b1, b2);
 		return 0;
 	}
@@ -982,16 +1074,17 @@ static int tolua_ExportedFunctions_BlendCharacterAnimationAndWaitForEnd00(lua_St
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		Common::String s2(tolua_tostring(L, 2, nullptr));
 		double f1 = tolua_tonumber(L, 3, 0.0);
-		bool b1 = tolua_toboolean(L, 4, 1);
-		bool b2 = tolua_toboolean(L, 5, 0);
+		bool b1 = tolua_toboolean(L, 4, true);
+		bool b2 = tolua_toboolean(L, 5, false);
 		BlendCharacterAnimation(s1, s2, f1, b1, b2);
 
-		Game::YieldedCallback callback;
+		SyberiaGame::YieldedCallback callback;
 		callback._luaThread = TeLuaThread::threadFromState(L);
 		callback._luaFnName = "OnCharacterAnimationFinished";
 		callback._luaParam = s1;
 		callback._luaParam2 = s2;
-		Game *game = g_engine->getGame();
+		SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+		assert(game);
 		for (const auto &cb : game->yieldedCallbacks()) {
 			if (cb._luaFnName == callback._luaFnName && cb._luaParam == s1 && cb._luaParam2 == s2)
 				warning("BlendCharacterAnimationAndWaitForEnd: Reentrency error, your are already in a yielded/sync function call");
@@ -1057,8 +1150,7 @@ static void SetGroundObjectRotation(const Common::String &objname, float x, floa
 		return;
 	}
 
-	TeVector3f32 rotvec(x * M_PI / 180.0, y * M_PI / 180.0, z * M_PI / 180.0);
-	obj->model()->setRotation(TeQuaternion::fromEuler(rotvec));
+	obj->model()->setRotation(TeQuaternion::fromEulerDegrees(TeVector3f32(x, y, z)));
 	obj->model()->setVisible(true);
 }
 
@@ -1110,8 +1202,7 @@ static void RotateGroundObject(const Common::String &name, float x, float y, flo
 	Object3D *obj = game->scene().object3D(name);
 	if (!obj)
 		error("[RotateGroundObject] Object not found %s", name.c_str());
-	TeQuaternion rot = obj->model()->rotation();
-	obj->_rotateStart = rot;
+	obj->_rotateStart = obj->model()->rotation();
 	obj->_rotateAmount = TeVector3f32(x, y, z);
 	obj->_rotateTimer.start();
 	obj->_rotateTime = time;
@@ -1135,7 +1226,7 @@ static int tolua_ExportedFunctions_RotateGroundObject00(lua_State *L) {
 
 static void EnableLight(uint lightno, bool enable) {
 	Game *game = g_engine->getGame();
-	if (lightno > game->scene().lights().size()) {
+	if (lightno >= game->scene().lights().size()) {
 		error("[EnableLight] Light not found %d", lightno);
 	}
 	Common::SharedPtr<TeLight> light = game->scene().lights()[lightno];
@@ -1149,7 +1240,7 @@ static int tolua_ExportedFunctions_EnableLight00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isnumber(L, 1, 0, &err) && tolua_isboolean(L, 2, 0, &err) && tolua_isnoobj(L, 3, &err)) {
 		float f1 = tolua_tonumber(L, 1, 0.0);
-		bool b1 = tolua_toboolean(L, 2, 0);
+		bool b1 = tolua_toboolean(L, 2, false);
 		EnableLight(f1, b1);
 		return 0;
 	}
@@ -1288,7 +1379,8 @@ static int tolua_ExportedFunctions_HideBillboard00(lua_State *L) {
 }
 
 static void UnlockAchievement(int val) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->addToScore(val);
 }
 
@@ -1317,7 +1409,7 @@ static int tolua_ExportedFunctions_Save00(lua_State *L) {
 	error("#ferror in function 'Save': %d %d %s", err.index, err.array, err.type);
 }
 
-static void Wait(float seconds) {
+static void Wait(double seconds) {
 	Game *game = g_engine->getGame();
 	game->scene().waitTimeTimer().start();
 	game->scene().waitTimeTimer().stop();
@@ -1341,10 +1433,11 @@ static int tolua_ExportedFunctions_WaitAndWaitForEnd00(lua_State *L) {
 		double d = tolua_tonumber(L, 1, 0.0);
 		Wait(d);
 
-		Game::YieldedCallback callback;
+		SyberiaGame::YieldedCallback callback;
 		callback._luaThread = TeLuaThread::threadFromState(L);
 		callback._luaFnName = "OnWaitFinished";
-		Game *game = g_engine->getGame();
+		SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+		assert(game);
 		for (const auto &cb : game->yieldedCallbacks()) {
 			if (cb._luaFnName == callback._luaFnName)
 				warning("WaitAndWaitForEnd: Reentrency error, your are already in a yielded/sync function call");
@@ -1385,7 +1478,7 @@ static int tolua_ExportedFunctions_RequestMainMenu00(lua_State *L) {
 
 static void SetBackground(const Common::String &name) {
 	Game *game = g_engine->getGame();
-	if (!game->setBackground(name))
+	if (!game->setBackground(Common::Path(name)))
 		warning("[SetBackground] Background \"%s\" doesn't exist.", name.c_str());
 }
 
@@ -1435,11 +1528,12 @@ static int tolua_ExportedFunctions_LaunchDialogAndWaitForEnd00(lua_State *L) {
 		float f2 = tolua_tonumber(L, 5, 0.0);
 		LaunchDialog(s1, f1, s2, s3, f2);
 
-		Game::YieldedCallback callback;
+		SyberiaGame::YieldedCallback callback;
 		callback._luaThread = TeLuaThread::threadFromState(L);
 		callback._luaFnName = "OnDialogFinished";
 		callback._luaParam = s1;
-		Game *game = g_engine->getGame();
+		SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+		assert(game);
 		for (const auto &cb : game->yieldedCallbacks()) {
 			if (cb._luaFnName == callback._luaFnName && cb._luaParam == callback._luaParam)
 				warning("LaunchDialogAndWaitForEnd: Reentrency error, your are already in a yielded/sync function call");
@@ -1458,7 +1552,7 @@ static void PushAnswer(const Common::String &val, const Common::String &gui) {
 		locValStr = *locVal;
 	}
 	Game *game = g_engine->getGame();
-	game->question2().pushAnswer(val, locValStr, gui);
+	game->question2().pushAnswer(val, locValStr, Common::Path(gui));
 }
 
 static int tolua_ExportedFunctions_PushAnswer00(lua_State *L) {
@@ -1486,7 +1580,8 @@ static int tolua_ExportedFunctions_HideAnswers00(lua_State *L) {
 }
 
 static void PushTask(const Common::String &s1, const Common::String &s2) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->objectif().pushObjectif(s1, s2);
 }
 
@@ -1502,7 +1597,8 @@ static int tolua_ExportedFunctions_PushTask00(lua_State *L) {
 }
 
 static void DeleteTask(const Common::String &s1, const Common::String &s2) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->objectif().deleteObjectif(s1, s2);
 }
 
@@ -1521,14 +1617,15 @@ static int tolua_ExportedFunctions_DeleteTask00(lua_State *L) {
 }
 
 static void SetVisibleButtonHelp(bool val) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->objectif().setVisibleButtonHelp(val);
 }
 
 static int tolua_ExportedFunctions_SetVisibleButtonHelp00(lua_State *L) {
 	tolua_Error err;
-	if (tolua_isboolean(L, 1, 0, &err) && tolua_isnoobj(L, 3, &err)) {
-		bool b1 = tolua_toboolean(L, 1, 0);
+	if (tolua_isboolean(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
+		bool b1 = tolua_toboolean(L, 1, false);
 		SetVisibleButtonHelp(b1);
 		return 0;
 	}
@@ -1536,7 +1633,9 @@ static int tolua_ExportedFunctions_SetVisibleButtonHelp00(lua_State *L) {
 }
 
 static bool TestFileFlagSystemFlag(const Common::String &flagname, const Common::String &val) {
-	if (flagname == "platform" && val == "Android")
+	// Syberia 1 always returns that it is Android. Syberia 2 doesn't.
+	if (g_engine->gameType() == TetraedgeEngine::kSyberia
+			&& flagname == "platform" && val == "Android")
 		return true;
 	return g_engine->getCore()->fileFlagSystemFlag(flagname) == val;
 }
@@ -1554,7 +1653,8 @@ static int tolua_ExportedFunctions_TestFileFlagSystemFlag00(lua_State *L) {
 }
 
 static void ExitZone(const Common::String &zone) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->setExitZone(zone);
 }
 
@@ -1580,7 +1680,7 @@ static int tolua_ExportedFunctions_EnableRectBlocker00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isnumber(L, 1, 0, &err) && tolua_isboolean(L, 2, 0, &err) && tolua_isnoobj(L, 3, &err)) {
 		double d1 = tolua_tonumber(L, 1, 0.0f);
-		bool b1 = tolua_toboolean(L, 2, 0);
+		bool b1 = tolua_toboolean(L, 2, false);
 		EnableRectBlocker((uint)d1, b1);
 		return 0;
 	}
@@ -1599,7 +1699,7 @@ static int tolua_ExportedFunctions_EnableBlocker00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isnumber(L, 1, 0, &err) && tolua_isboolean(L, 2, 0, &err) && tolua_isnoobj(L, 3, &err)) {
 		double d1 = tolua_tonumber(L, 1, 0.0f);
-		bool b1 = tolua_toboolean(L, 2, 0);
+		bool b1 = tolua_toboolean(L, 2, false);
 		EnableBlocker((uint)d1, b1);
 		return 0;
 	}
@@ -1651,7 +1751,7 @@ static int tolua_ExportedFunctions_ActivateAnchorZone00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isboolean(L, 2, 0, &err) && tolua_isnoobj(L, 3, &err)) {
 		Common::String s(tolua_tostring(L, 1, nullptr));
-		bool b = tolua_toboolean(L, 2, 0);
+		bool b = tolua_toboolean(L, 2, false);
 		ActivateAnchorZone(s, b);
 		return 0;
 	}
@@ -1666,10 +1766,7 @@ static void SetCharacterLookChar(const Common::String &charname, const Common::S
 		return;
 	}
 	character->setLookingAtTallThing(tall);
-
-	if (f != 0.0)
-		warning("TODO: Use float param %f in SetCharacterLookChar", f);
-	character->setCharLookingAtFloat(f);
+	character->setCharLookingAtOffset(f);
 
 	if (destname.empty()) {
 		character->setCharLookingAt(nullptr);
@@ -1690,7 +1787,7 @@ static int tolua_ExportedFunctions_SetCharacterLookChar00(lua_State *L) {
 		&& tolua_isnoobj(L, 5, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		Common::String s2(tolua_tostring(L, 2, nullptr));
-		bool b = tolua_toboolean(L, 3, 1);
+		bool b = tolua_toboolean(L, 3, true);
 		float f = tolua_tonumber(L, 4, 0.0);
 		SetCharacterLookChar(s1, s2, b, f);
 		return 0;
@@ -1699,7 +1796,7 @@ static int tolua_ExportedFunctions_SetCharacterLookChar00(lua_State *L) {
 }
 
 static uint Random(uint max) {
-	return g_engine->getGame()->randomSource().getRandomNumber(max);
+	return g_engine->getRandomNumber(max - 1);
 }
 
 static int tolua_ExportedFunctions_Random00(lua_State *L) {
@@ -1727,7 +1824,7 @@ static int tolua_ExportedFunctions_SetCharacterMeshVisible00(lua_State *L) {
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isstring(L, 2, 0, &err) && tolua_isboolean(L, 3, 1, &err) && tolua_isnoobj(L, 4, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		Common::String s2(tolua_tostring(L, 2, nullptr));
-		bool b = tolua_toboolean(L, 3, 0);
+		bool b = tolua_toboolean(L, 3, false);
 		SetCharacterMeshVisible(s1, s2, b);
 		return 0;
 	}
@@ -1739,7 +1836,9 @@ static void SetRecallageY(const Common::String &charName, bool val) {
 	if (character) {
 		character->setRecallageY(val);
 	} else {
-		error("[SetRecallageY] Character not found %s", charName.c_str());
+		// Not an error - some scenes in Syberia 2 look for a Kate that isn't
+		// loaded yet.
+		warning("[SetRecallageY] Character not found %s", charName.c_str());
 	}
 }
 
@@ -1747,7 +1846,7 @@ static int tolua_ExportedFunctions_SetRecallageY00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isboolean(L, 2, 1, &err) && tolua_isnoobj(L, 3, &err)) {
 		Common::String s(tolua_tostring(L, 1, nullptr));
-		bool b = tolua_toboolean(L, 2, 0);
+		bool b = tolua_toboolean(L, 2, false);
 		SetRecallageY(s, b);
 		return 0;
 	}
@@ -1778,7 +1877,7 @@ static int tolua_ExportedFunctions_DisabledZone00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isboolean(L, 2, 1, &err) && tolua_isnoobj(L, 3, &err)) {
 		Common::String s(tolua_tostring(L, 1, nullptr));
-		bool b = tolua_toboolean(L, 2, 1);
+		bool b = tolua_toboolean(L, 2, true);
 		DisabledZone(s, b);
 		return 0;
 	}
@@ -1800,7 +1899,7 @@ static int tolua_ExportedFunctions_DisabledInt00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isboolean(L, 2, 1, &err) && tolua_isnoobj(L, 3, &err)) {
 		Common::String s(tolua_tostring(L, 1, nullptr));
-		bool b = tolua_toboolean(L, 2, 1);
+		bool b = tolua_toboolean(L, 2, true);
 		DisabledInt(s, b);
 		return 0;
 	}
@@ -1815,7 +1914,7 @@ static void LockCursor(bool b) {
 static int tolua_ExportedFunctions_LockCursor00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isboolean(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
-		bool b = tolua_toboolean(L, 1, 0);
+		bool b = tolua_toboolean(L, 1, false);
 		LockCursor(b);
 		return 0;
 	}
@@ -1833,6 +1932,17 @@ static int tolua_ExportedFunctions_PlaySound00(lua_State *L) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		double d1 = tolua_tonumber(L, 2, -1.0);
 		double d2 = tolua_tonumber(L, 3, 1.0);
+		//
+		// WORKAROUND: Syberia 2 script A1_MonCour/12200/Logic12200.lua
+		// calls this with (0.4, -1) - should be the other way around, and
+		// the sound name should have ".ogg" on the end.
+		//
+		if (d2 == -1 && s1 == "sounds/SFX/AB_12220-01") {
+			double tmp = d2;
+			d2 = d1;
+			d1 = tmp;
+			s1 += ".ogg";
+		}
 		PlaySound(s1, d1, d2);
 		return 0;
 	}
@@ -1847,11 +1957,12 @@ static int tolua_ExportedFunctions_PlaySoundAndWaitForEnd00(lua_State *L) {
 		double d2 = tolua_tonumber(L, 3, 1.0);
 		PlaySound(s1, d1, d2);
 
-		Game::YieldedCallback callback;
+		SyberiaGame::YieldedCallback callback;
 		callback._luaThread = TeLuaThread::threadFromState(L);
 		callback._luaFnName = "OnFreeSoundFinished";
 		callback._luaParam = s1;
-		Game *game = g_engine->getGame();
+		SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+		assert(game);
 		for (const auto &cb : game->yieldedCallbacks()) {
 			if (cb._luaFnName == callback._luaFnName && cb._luaParam == s1)
 				warning("PlaySoundAndWaitForEnd: Reentrency error, your are already in a yielded/sync function call");
@@ -1878,7 +1989,8 @@ static int tolua_ExportedFunctions_StopSound00(lua_State *L) {
 }
 
 static void PlayRandomSound(const Common::String &name) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->playRandomSound(name);
 }
 
@@ -1892,23 +2004,26 @@ static int tolua_ExportedFunctions_PlayRandomSound00(lua_State *L) {
 	error("#ferror in function 'PlayRandomSound': %d %d %s", err.index, err.array, err.type);
 }
 
-static void PlayMusic(const Common::String &path) {
+static void PlayMusic(const Common::String &path, float volume) {
 	TeMusic &music = g_engine->getApplication()->music();
 	// Note: stop and set repeat before starting,
 	// very slightly different to original because we can't
 	// change repeat value after starting.
 	music.stop();
-	music.repeat(false);
-	music.load(path);
+	music.repeat(g_engine->gameIsAmerzone());
+	music.load(Common::Path(path));
+	if (!g_engine->getApplication()->musicOn())
+		return;
 	music.play();
-	music.volume(1.0);
+	music.volume(volume);
 }
 
 static int tolua_ExportedFunctions_PlayMusic00(lua_State *L) {
 	tolua_Error err;
-	if (tolua_isstring(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
+	if (tolua_isstring(L, 1, 0, &err) && tolua_isnumber(L, 2, 1, &err) && tolua_isnoobj(L, 3, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
-		PlayMusic(s1);
+		float f1 = tolua_tonumber(L, 2, 1.0);
+		PlayMusic(s1, f1);
 		return 0;
 	}
 	error("#ferror in function 'PlayMusic': %d %d %s", err.index, err.array, err.type);
@@ -1946,8 +2061,7 @@ static void SetObjectRotation(const Common::String &obj, float xr, float yr, flo
 		warning("[SetObjectRotation] Object not found %s", obj.c_str());
 		return;
 	}
-	const TeVector3f32 rot(xr * M_PI / 180.0, yr * M_PI / 180.0, zr * M_PI / 180.0);
-	obj3d->_objRotation = TeQuaternion::fromEuler(rot);
+	obj3d->_objRotation = TeQuaternion::fromEulerDegrees(TeVector3f32(xr, yr, zr));
 }
 
 static int tolua_ExportedFunctions_SetObjectRotation00(lua_State *L) {
@@ -2063,7 +2177,8 @@ static int tolua_ExportedFunctions_CurrentCharacterAnimation00(lua_State *L) {
 }
 
 static void LoadCharacter(const Common::String &name) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->loadCharacter(name);
 }
 
@@ -2078,7 +2193,8 @@ static int tolua_ExportedFunctions_LoadCharacter00(lua_State *L) {
 }
 
 static void UnloadCharacter(const Common::String &name) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->unloadCharacter(name);
 }
 
@@ -2100,7 +2216,7 @@ static void MoveCharacterTo(const Common::String &charName, const Common::String
 static int tolua_ExportedFunctions_MoveCharacterTo00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isstring(L, 2, 0, &err)
-		&& tolua_isstring(L, 3, 0, &err) && tolua_isstring(L, 4, 0, &err)
+		&& tolua_isnumber(L, 3, 0, &err) && tolua_isnumber(L, 4, 0, &err)
 		&& tolua_isnoobj(L, 5, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		Common::String s2(tolua_tostring(L, 2, nullptr));
@@ -2115,7 +2231,7 @@ static int tolua_ExportedFunctions_MoveCharacterTo00(lua_State *L) {
 static int tolua_ExportedFunctions_MoveCharacterToAndWaitForEnd00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isstring(L, 2, 0, &err)
-		&& tolua_isstring(L, 3, 0, &err) && tolua_isstring(L, 4, 0, &err)
+		&& tolua_isnumber(L, 3, 0, &err) && tolua_isnumber(L, 4, 0, &err)
 		&& tolua_isnoobj(L, 5, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		Common::String s2(tolua_tostring(L, 2, nullptr));
@@ -2123,10 +2239,11 @@ static int tolua_ExportedFunctions_MoveCharacterToAndWaitForEnd00(lua_State *L) 
 		float f2 = tolua_tonumber(L, 4, 0.0);
 		MoveCharacterTo(s1, s2, f1, f2);
 
-		Game::YieldedCallback callback;
+		SyberiaGame::YieldedCallback callback;
 		callback._luaThread = TeLuaThread::threadFromState(L);
 		callback._luaFnName = "OnDisplacementFinished";
-		Game *game = g_engine->getGame();
+		SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+		assert(game);
 		for (const auto &cb : game->yieldedCallbacks()) {
 			if (cb._luaFnName == callback._luaFnName)
 				warning("MoveCharacterToAndWaitForEnd: Reentrency error, your are already in a yielded/sync function call");
@@ -2138,7 +2255,8 @@ static int tolua_ExportedFunctions_MoveCharacterToAndWaitForEnd00(lua_State *L) 
 }
 
 static void MoveCharacterPlayerTo(float x, float y, float z, bool walkFlag) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	if (game->_movePlayerCharacterDisabled)
 		return;
 
@@ -2186,7 +2304,7 @@ static int tolua_ExportedFunctions_MoveCharacterPlayerTo00(lua_State *L) {
 		float f1 = tolua_tonumber(L, 1, 0.0);
 		float f2 = tolua_tonumber(L, 2, 0.0);
 		float f3 = tolua_tonumber(L, 3, 0.0);
-		bool b1 = tolua_toboolean(L, 4, 0);
+		bool b1 = tolua_toboolean(L, 4, false);
 		MoveCharacterPlayerTo(f1, f2, f3, b1);
 		return 0;
 	}
@@ -2194,14 +2312,15 @@ static int tolua_ExportedFunctions_MoveCharacterPlayerTo00(lua_State *L) {
 }
 
 static void EnableRunMode(bool val) {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->setRunModeEnabled(val);
 }
 
 static int tolua_ExportedFunctions_EnableRunMode00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isboolean(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
-		bool b1 = tolua_toboolean(L, 1, 0);
+		bool b1 = tolua_toboolean(L, 1, false);
 		EnableRunMode(b1);
 		return 0;
 	}
@@ -2209,8 +2328,9 @@ static int tolua_ExportedFunctions_EnableRunMode00(lua_State *L) {
 }
 
 static void SetModelPlayer(const Common::String &name) {
-	Game *game = g_engine->getGame();
-	Character *character = game->scene().character(name);
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
+	Character *character = game->scene()._character;
 
 	if (!character) {
 		warning("[SetModelPlayer] Character not found %s", name.c_str());
@@ -2250,12 +2370,12 @@ static void BlendCharacterPlayerAnimation(const Common::String &anim, float amou
 static int tolua_ExportedFunctions_BlendCharacterPlayerAnimation00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isnumber(L, 2, 0, &err)
-		&& tolua_isboolean(L, 3, 0, &err) && tolua_isboolean(L, 4, 0, &err)
-		&& tolua_isnoobj(L, 6, &err)) {
+		&& tolua_isboolean(L, 3, 1, &err) && tolua_isboolean(L, 4, 1, &err)
+		&& tolua_isnoobj(L, 5, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		float f1 = tolua_tonumber(L, 2, 0.0);
-		float b1 = tolua_toboolean(L, 3, 0.0);
-		float b2 = tolua_toboolean(L, 4, 0.0);
+		bool b1 = tolua_toboolean(L, 3, true);
+		bool b2 = tolua_toboolean(L, 4, false);
 		BlendCharacterPlayerAnimation(s1, f1, b1, b2);
 		return 0;
 	}
@@ -2328,13 +2448,19 @@ static int tolua_ExportedFunctions_SetCharacterPlayerPosition00(lua_State *L) {
 	error("#ferror in function 'SetCharacterPlayerPosition': %d %d %s", err.index, err.array, err.type);
 }
 
-static void SetCharacterPlayerAnimation(const Common::String &animname, bool repeat, bool returnToIdle, int startframe, int endframe) {
+static void SetCharacterPlayerAnimation(Common::String animname, bool repeat, bool returnToIdle, int startframe, int endframe) {
 	Game *game = g_engine->getGame();
 	Character *c = game->scene()._character;
 	if (!c) {
 		warning("SetCharacterPlayerAnimation: no active character");
 		return;
 	}
+
+	//
+	// WORKAROUND: Typo in Syberia 2 A1_RomHaut/11110/Logic11110.lua
+	//
+	if (animname == "Kate/ka_esc_h2d.te3d")
+		animname = "Kate/ka_esc_h2d.te3da";
 
 	bool result = c->setAnimation(animname, repeat, returnToIdle, false, startframe, endframe);
 	if (!result) {
@@ -2349,8 +2475,8 @@ static int tolua_ExportedFunctions_SetCharacterPlayerAnimation00(lua_State *L) {
 		&& tolua_isboolean(L, 3, 1, &err) && tolua_isnumber(L, 4, 1, &err)
 		&& tolua_isnumber(L, 5, 1, &err) && tolua_isnoobj(L, 6, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
-		bool b1 = tolua_toboolean(L, 2, 1);
-		bool b2 = tolua_toboolean(L, 3, 0);
+		bool b1 = tolua_toboolean(L, 2, true);
+		bool b2 = tolua_toboolean(L, 3, false);
 		double f3 = tolua_tonumber(L, 4, -1.0);
 		double f4 = tolua_tonumber(L, 5, 9999.0);
 		SetCharacterPlayerAnimation(s1, b1, b2, (int)f3, (int)f4);
@@ -2386,7 +2512,7 @@ static void SetObjectMoveDest(const Common::String &obj, float x, float y, float
 static int tolua_ExportedFunctions_SetObjectMoveDest00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isnumber(L, 2, 0, &err)
-		&& tolua_isnumber(L, 2, 0, &err) && tolua_isnumber(L, 4, 0, &err)
+		&& tolua_isnumber(L, 3, 0, &err) && tolua_isnumber(L, 4, 0, &err)
 		&& tolua_isnoobj(L, 5, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		float f1 = tolua_tonumber(L, 2, 0.0);
@@ -2429,7 +2555,7 @@ static int tolua_ExportedFunctions_ActivateMask00(lua_State *L) {
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isboolean(L, 2, 0, &err)
 		&& tolua_isnoobj(L, 3, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
-		bool b1 = tolua_toboolean(L, 2, 0.0);
+		bool b1 = tolua_toboolean(L, 2, false);
 		ActivateMask(s1, b1);
 		return 0;
 	}
@@ -2443,7 +2569,7 @@ static void SetYoukiFollowKate(bool val) {
 static int tolua_ExportedFunctions_SetYoukiFollowKate00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isboolean(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
-		bool b1 = tolua_toboolean(L, 1, 0.0);
+		bool b1 = tolua_toboolean(L, 1, false);
 		SetYoukiFollowKate(b1);
 		return 0;
 	}
@@ -2457,11 +2583,11 @@ static void AddRandomAnimation(const Common::String &character, const Common::St
 static int tolua_ExportedFunctions_AddRandomAnimation00(lua_State *L) {
 	tolua_Error err;
 	if (tolua_isstring(L, 1, 0, &err) && tolua_isstring(L, 2, 0, &err) &&
-		tolua_isboolean(L, 3, 0, &err) && tolua_isnoobj(L, 4, &err)) {
+		tolua_isnumber(L, 3, 0, &err) && tolua_isnoobj(L, 4, &err)) {
 		Common::String s1(tolua_tostring(L, 1, nullptr));
 		Common::String s2(tolua_tostring(L, 2, nullptr));
-		bool b1 = tolua_toboolean(L, 3, 0.0);
-		AddRandomAnimation(s1, s2, b1);
+		double d1 = tolua_tonumber(L, 3, 0.0);
+		AddRandomAnimation(s1, s2, d1);
 		return 0;
 	}
 	error("#ferror in function 'AddRandomAnimation': %d %d %s", err.index, err.array, err.type);
@@ -2525,6 +2651,12 @@ static int tolua_ExportedFunctions_PlayVerticalScrolling00(lua_State *L) {
 	error("#ferror in function 'SetObjectMoveTime': %d %d %s", err.index, err.array, err.type);
 }
 
+static int tolua_ExportedFunctions_GetNXPadType(lua_State *L) {
+	// TODO: Actually implement this
+	tolua_pushstring(L, "Handheld");
+	return 1;
+}
+
 // Not your imagination, the implementation of these two is quite different to the others.
 static int tolua_GetParticleIndex(lua_State *L) {
 	Common::String s1(tolua_tostring(L, 1, nullptr));
@@ -2551,7 +2683,7 @@ static int tolua_EnableParticle(lua_State *L) {
 
 
 
-void LuaOpenBinds(lua_State *L) {
+static void LuaOpenBinds_Syberia(lua_State *L) {
 	tolua_open(L);
 	tolua_module(L, 0, 0);
 	tolua_beginmodule(L, 0);
@@ -2692,8 +2824,10 @@ void LuaOpenBinds(lua_State *L) {
 	tolua_function(L, "Random", tolua_ExportedFunctions_Random00);
 	tolua_function(L, "SetCharacterMeshVisible", tolua_ExportedFunctions_SetCharacterMeshVisible00);
 	tolua_function(L, "SetRecallageY", tolua_ExportedFunctions_SetRecallageY00);
-	// tolua_function(L, "IsFreemiumUnlocked", tolua_ExportedFunctions_IsFreemiumUnlocked00); // Unused
-	// tolua_function(L, "ReachedFreemiumLimit", tolua_ExportedFunctions_ReachedFreemiumLimit00); // Unused
+	tolua_function(L, "IsFreemiumUnlocked", tolua_ExportedFunctions_IsFreemiumUnlocked00);
+	tolua_function(L, "ReachedFreemiumLimit", tolua_ExportedFunctions_ReachedFreemiumLimit00);
+	tolua_function(L, "IsFacebookLiked", tolua_ExportedFunctions_IsFacebookLiked00);
+
 	tolua_function(L, "AddUnrecalAnim", tolua_ExportedFunctions_AddUnrecalAnim00);
 	tolua_function(L, "UnlockArtwork", tolua_ExportedFunctions_UnlockArtwork00);
 
@@ -2721,9 +2855,242 @@ void LuaOpenBinds(lua_State *L) {
 	tolua_function(L, "PlayVerticalScrolling", tolua_ExportedFunctions_PlayVerticalScrolling00);
 	tolua_function(L, "GetParticleIndex", tolua_GetParticleIndex);
 	tolua_function(L, "EnableParticle", tolua_EnableParticle);
+	tolua_function(L, "GetNXPadType", tolua_ExportedFunctions_GetNXPadType);
 
 	tolua_endmodule(L);
 }
+
+// ======== Amerzone-specific bind functions below ========
+
+static int tolua_ExportedFunctions_PrintDebugMessage00(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isstring(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
+		Common::String s1(tolua_tostring(L, 1, nullptr));
+		debug("%s", s1.c_str());
+		return 0;
+	}
+	error("#ferror in function 'PrintDebugMessage': %d %d %s", err.index, err.array, err.type);
+}
+
+static void PutObject(const Common::String &name, bool enable) {
+	AmerzoneGame *game = dynamic_cast<AmerzoneGame *>(g_engine->getGame());
+	assert(game);
+	game->warpY()->putObject(name, enable);
+}
+
+static int tolua_ExportedFunctions_PutObject00(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isstring(L, 1, 0, &err) && tolua_isboolean(L, 2, 1, &err)
+			&& tolua_isnoobj(L, 3, &err)) {
+		Common::String s1(tolua_tostring(L, 1, nullptr));
+		bool b1 = tolua_toboolean(L, 2, 1);
+		PutObject(s1, b1);
+		return 0;
+	}
+	error("#ferror in function 'PutObject': %d %d %s", err.index, err.array, err.type);
+}
+
+static void StartAnimationPart(const Common::String &name, int startFrame, int endFrame, int repCount, bool flag) {
+	AmerzoneGame *game = dynamic_cast<AmerzoneGame *>(g_engine->getGame());
+	assert(game);
+	// Note parameter order changes
+	game->warpY()->startAnimationPart(name, repCount, startFrame, endFrame, flag);
+}
+
+static int tolua_ExportedFunctions_StartAnimationPart00(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isstring(L, 1, 0, &err) && tolua_isnumber(L, 2, 0, &err)
+		&& tolua_isnumber(L, 3, 0, &err) && tolua_isnumber(L, 4, 1, &err)
+		&& tolua_isboolean(L, 5, 1, &err) && tolua_isnoobj(L, 6, &err)) {
+		Common::String s1(tolua_tostring(L, 1, nullptr));
+		double d1 = tolua_tonumber(L, 2, 0.0);
+		double d2 = tolua_tonumber(L, 3, 0.0);
+		double d3 = tolua_tonumber(L, 4, -1.0);
+		bool b1 = tolua_tonumber(L, 5, 0);
+		StartAnimationPart(s1, (int)d1, (int)d2, (int)d3, b1);
+		return 0;
+	}
+	error("#ferror in function 'SetAnimationPart': %d %d %s", err.index, err.array, err.type);
+}
+
+static void RemoveObject_Amerzone(const Common::String &name) {
+	AmerzoneGame *game = dynamic_cast<AmerzoneGame *>(g_engine->getGame());
+	assert(game);
+	game->warpY()->takeObject(name);
+}
+
+static int tolua_ExportedFunctions_RemoveObject00_Amerzone(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isstring(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
+		Common::String s1(tolua_tostring(L, 1, nullptr));
+		RemoveObject_Amerzone(s1);
+		return 0;
+	}
+	error("#ferror in function 'RemoveObject': %d %d %s", err.index, err.array, err.type);
+}
+
+static void AddToBag(const Common::String &name) {
+	Game *game = g_engine->getGame();
+	game->addToBag(name);
+	TeSoundManager *sndMgr = g_engine->getSoundManager();
+	sndMgr->playFreeSound("Sounds/SFX/N_prendre.ogg");
+}
+
+static int tolua_ExportedFunctions_AddToBag00(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isstring(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
+		Common::String s1(tolua_tostring(L, 1, nullptr));
+		AddToBag(s1);
+		return 0;
+	}
+	error("#ferror in function 'AddToBag': %d %d %s", err.index, err.array, err.type);
+}
+
+void SaveGame(const Common::String &name) {
+	g_engine->getGame()->saveBackup(name);
+}
+
+static int tolua_ExportedFunctions_SaveGame00(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isstring(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
+		Common::String s1(tolua_tostring(L, 1, nullptr));
+		SaveGame(s1);
+		return 0;
+	}
+	error("#ferror in function 'SaveGame': %d %d %s", err.index, err.array, err.type);
+}
+
+static void SetMarker(const Common::String &name, int imgNo, long markerId) {
+	AmerzoneGame *game = dynamic_cast<AmerzoneGame *>(g_engine->getGame());
+	assert(game);
+	game->warpY()->configMarker(name, imgNo, markerId);
+}
+
+static int tolua_ExportedFunctions_SetMarker00(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isstring(L, 1, 0, &err) && tolua_isnumber(L, 2, 0, &err)
+		&& tolua_isnumber(L, 3, 0, &err) && tolua_isnoobj(L, 4, &err)) {
+		Common::String s1(tolua_tostring(L, 1, nullptr));
+		double d1 = tolua_tonumber(L, 2, 0.0);
+		double d2 = tolua_tonumber(L, 3, 0.0);
+		SetMarker(s1, (int)d1, (long)d2);
+		return 0;
+	}
+	error("#ferror in function 'SetMarker': %d %d %s", err.index, err.array, err.type);
+}
+
+static void LookAt(int x, int y) {
+	AmerzoneGame *game = dynamic_cast<AmerzoneGame *>(g_engine->getGame());
+	assert(game);
+	// Note: Reverse the angles to what the game does, because we apply them
+	// using fromEuler.
+	game->setAngleX(x);
+	int yval = y - 360;
+	if (y < 90)
+		yval = y;
+	game->setAngleY(yval);
+}
+
+static int tolua_ExportedFunctions_LookAt00(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isnumber(L, 1, 0, &err) && tolua_isnumber(L, 2, 0, &err)
+			&& tolua_isnoobj(L, 3, &err)) {
+		double d1 = tolua_tonumber(L, 1, 0.0);
+		double d2 = tolua_tonumber(L, 2, 0.0);
+		LookAt((int)d1, (int)d2);
+		return 0;
+	}
+	error("#ferror in function 'LookAt': %d %d %s", err.index, err.array, err.type);
+}
+
+static void ShowPuzzle(int x, int y = 0, int z = 0) {
+	AmerzoneGame *game = dynamic_cast<AmerzoneGame *>(g_engine->getGame());
+	assert(game);
+	game->showPuzzle(x, y, z);
+}
+
+static int tolua_ExportedFunctions_ShowPuzzle00(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isnumber(L, 1, 0, &err) && tolua_isnoobj(L, 2, &err)) {
+		double d1 = tolua_tonumber(L, 1, 0.0);
+		ShowPuzzle((int)d1);
+		return 0;
+	}
+	error("#ferror in function 'ShowPuzzle': %d %d %s", err.index, err.array, err.type);
+}
+
+static int tolua_ExportedFunctions_ShowPuzzle01(lua_State *L) {
+	tolua_Error err;
+	if (tolua_isnumber(L, 1, 0, &err) && tolua_isnumber(L, 2, 0, &err)
+			&& tolua_isnumber(L, 3, 0, &err) && tolua_isnoobj(L, 4, &err)) {
+		double d1 = tolua_tonumber(L, 1, 0.0);
+		double d2 = tolua_tonumber(L, 2, 0.0);
+		double d3 = tolua_tonumber(L, 3, 0.0);
+		ShowPuzzle((int)d1, (int)d2, (int)d3);
+		return 0;
+	}
+	return tolua_ExportedFunctions_ShowPuzzle00(L);
+}
+
+
+static void LuaOpenBinds_Amerzone(lua_State *L) {
+	tolua_open(L);
+	tolua_module(L, 0, 0);
+	tolua_beginmodule(L, 0);
+
+	tolua_function(L, "Selected", tolua_ExportedFunctions_Selected00);
+	//tolua_function(L, "TestObjectLimit", tolua_ExportedFunctions_TestObjectLimit00); // unused
+	tolua_function(L, "PrintDebugMessage", tolua_ExportedFunctions_PrintDebugMessage00);
+	//tolua_function(L, "SetCondition", tolua_ExportedFunctions_SetCondition00); // unused
+	//tolua_function(L, "UnsetCondition", tolua_ExportedFunctions_UnsetCondition00); // unused
+	tolua_function(L, "TakeObject", tolua_ExportedFunctions_TakeObject00);
+	tolua_function(L, "PutObject", tolua_ExportedFunctions_PutObject00);
+	// This is not the same as RemoveObject from Syberia.
+	tolua_function(L, "RemoveObject", tolua_ExportedFunctions_RemoveObject00_Amerzone);
+	tolua_function(L, "StartAnimationPart", tolua_ExportedFunctions_StartAnimationPart00);
+	//tolua_function(L, "StartAnimation", tolua_ExportedFunctions_StartAnimation00); // unused
+	//tolua_function(L, "AnimationSetToEnd", tolua_ExportedFunctions_AnimationSetToEnd00); // unused
+	//tolua_function(L, "AnimationSetToStart", tolua_ExportedFunctions_AnimationSetToStart00); // unused
+	//tolua_function(L, "DrawText", tolua_ExportedFunctions_DrawText00); // unused
+	tolua_function(L, "ChangeWarp", tolua_ExportedFunctions_ChangeWarp00);
+	tolua_function(L, "AddToBag", tolua_ExportedFunctions_AddToBag00);
+	// Note: same as RemoveObject in Syberia
+	tolua_function(L, "RemoveFromBag", tolua_ExportedFunctions_RemoveObject00);
+	tolua_function(L, "RemoveFromBag", tolua_ExportedFunctions_RemoveObject01);
+	tolua_function(L, "SaveGame", tolua_ExportedFunctions_SaveGame00);
+	tolua_function(L, "SetMarker", tolua_ExportedFunctions_SetMarker00);
+	tolua_function(L, "LookAt", tolua_ExportedFunctions_LookAt00);
+	//tolua_function(L, "Wait", tolua_ExportedFunctions_Wait00); // unused
+	tolua_function(L, "PlaySound", tolua_ExportedFunctions_PlaySound00);
+	tolua_function(L, "StopSound", tolua_ExportedFunctions_StopSound00);
+	tolua_function(L, "PlayMusic", tolua_ExportedFunctions_PlayMusic00);
+	tolua_function(L, "ShowPuzzle", tolua_ExportedFunctions_ShowPuzzle00);
+	tolua_function(L, "ShowPuzzle", tolua_ExportedFunctions_ShowPuzzle01);
+	tolua_function(L, "PlayMovie", tolua_ExportedFunctions_PlayMovie00);
+	//tolua_function(L, "SetFOV", tolua_ExportedFunctions_SetFOV00); // unused
+	//tolua_function(L, "LoadSprite", tolua_ExportedFunctions_LoadSprite00); // unused
+	//tolua_function(L, "UnloadSprite", tolua_ExportedFunctions_UnloadSprite00); // unused
+	//tolua_function(L, "PushAnswer", tolua_ExportedFunctions_PushAnswer00); // unused
+	tolua_function(L, "FinishGame", tolua_ExportedFunctions_FinishGame00);
+	tolua_function(L, "ShowDocument", tolua_ExportedFunctions_ShowDocument00);
+	tolua_function(L, "HideDocument", tolua_ExportedFunctions_HideDocument00);
+	tolua_function(L, "AddDocument", tolua_ExportedFunctions_AddDocument00);
+	//tolua_function(L, "ClearImportantDocuments", tolua_ExportedFunctions_ClearImportantDocuments00); // unused
+	//tolua_function(L, "SetImportantDocument", tolua_ExportedFunctions_SetImportantDocument00); // unused
+	tolua_function(L, "TestFileFlagSystemFlag", tolua_ExportedFunctions_TestFileFlagSystemFlag00);
+	//tolua_function(L, "SetViewAngleXLimits", tolua_ExportedFunctions_SetViewAngleXLimits00); // unused
+	//tolua_function(L, "SetViewAngleYLimits", tolua_ExportedFunctions_SetViewAngleYLimits00); // unused
+
+	tolua_endmodule(L);
+}
+
+void LuaOpenBinds(lua_State *L) {
+	if (g_engine->gameIsAmerzone())
+		LuaOpenBinds_Amerzone(L);
+	else
+		LuaOpenBinds_Syberia(L);
+}
+
 
 }
 

@@ -55,18 +55,19 @@ public:
 	const byte *getPalette() const {
 		return _palette;
 	}
-	byte getAlphaAt(int x, int y) const;
+	uint16 getPaletteCount() const {
+		return _paletteCount;
+	}
 	bool writeBMPToStream(Common::WriteStream *stream) const;
-	bool resize(int newWidth, int newHeight);
 	bool saveBMPFile(const Common::String &filename) const;
-	bool copyFrom(BaseImage *origImage, int newWidth = 0, int newHeight = 0);
-	void copyFrom(const Graphics::Surface *surface);
+	void copyFrom(const Graphics::Surface *surface, int newWidth = 0, int newHeight = 0, byte flip = 0);
 private:
 	Common::String _filename;
 	Image::ImageDecoder *_decoder;
 	const Graphics::Surface *_surface;
 	Graphics::Surface *_deletableSurface;
 	const byte *_palette;
+	uint16 _paletteCount;
 	BaseFileManager *_fileManager;
 };
 

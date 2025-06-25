@@ -12,45 +12,37 @@ Location
 
 The configuration file saves to different default locations, depending on the platform. The configuration file path is also displayed on the :doc:`../settings/paths` tab.
 
+.. tab-set::
 
-.. tabbed:: Windows
+    .. tab-item:: Windows
 
-	.. panels::
-		:column: col-lg-12 mb-2
+        ``%APPDATA%\ScummVM\scummvm.ini``
 
-		``%APPDATA%\ScummVM\scummvm.ini``
-
-		For Windows 95/98/ME, the file is at ``C:\WINDOWS\scummvm.ini``
+        For Windows 95/98/ME, the file is at ``C:\WINDOWS\scummvm.ini``
 
 
-.. tabbed:: macOS
+    .. tab-item:: macOS
 
-	.. panels::
-		:column: col-lg-12 mb-2
+        ``~/Library/Preferences/ScummVM Preferences``
 
-		``~/Library/Preferences/ScummVM Preferences``
+        .. note::
 
-		.. note::
+            If an earlier version of ScummVM was installed on your system, the configuration file remains in the previous default location of ``~/.scummvmrc``.
 
-			If an earlier version of ScummVM was installed on your system, the configuration file remains in the previous default location of ``~/.scummvmrc``.
+        .. tip::
 
-		.. tip::
-
-			To see the Library folder, press :kbd:`Option` when clicking **Go** in the Finder menu.
+            To see the Library folder, press :kbd:`Option` when clicking **Go** in the Finder menu.
 
 
-.. tabbed:: Linux
+    .. tab-item:: Linux
 
-	.. panels::
-		:column: col-lg-12 mb-2
+        ScummVM follows the XDG Base Directory Specification, so by default the configuration file is found at ``~/.config/scummvm/scummvm.ini``, but its location might vary depending on the value of the ``XDG_CONFIG_HOME`` environment variable.
 
-		ScummVM follows the XDG Base Directory Specification, so by default the configuration file is found at ``~/.config/scummvm/scummvm.ini``, but its location might vary depending on the value of the ``XDG_CONFIG_HOME`` environment variable.
+        If ScummVM was installed using Snap, the configuration file is found at ``~/snap/scummvm/current/.config/scummvm/scummvm.ini``
 
-		If ScummVM was installed using Snap, the configuration file is found at ``~/snap/scummvm/current/.config/scummvm/scummvm.ini``
+        .. note::
 
-		.. note::
-
-			``.config`` is a hidden directory. To view it use ``ls -a`` on the command line.
+            ``.config`` is a hidden directory. To view it use ``ls -a`` on the command line.
 
 
 
@@ -105,9 +97,9 @@ Example of a configuration file
 Default configuration file option
 =====================================
 
-An initial (default) configuration file can be specified via the :doc:`command line <../advanced_topics/command_line>` using the ``--i`` or ``--initial-cfg`` option. ScummVM uses this default file if the configuration file is missing from its usual location, such as after initial install, or if the user deletes their configuration file. 
+An initial (default) configuration file can be specified via the :doc:`command line <../advanced_topics/command_line>` using the ``--i`` or ``--initial-cfg`` option. ScummVM uses this default file if the configuration file is missing from its usual location, such as after initial install, or if the user deletes their configuration file.
 
-Setting an initial configuration file in this way allows default settings to easily be bundled with a game. The alternatives are to use the command line for all settings, which has fewer options and in some cases means the user can't change settings, or to install a default configuration file to a writable location and using the ``--config`` option, which is harder to deploy, and leaves the user with no way to restore default settings except re-installing the game. 
+Setting an initial configuration file in this way allows default settings to easily be bundled with a game. The alternatives are to use the command line for all settings, which has fewer options and in some cases means the user can't change settings, or to install a default configuration file to a writable location and using the ``--config`` option, which is harder to deploy, and leaves the user with no way to restore default settings except re-installing the game.
 
 
 .. _configuration_keys:
@@ -115,7 +107,7 @@ Setting an initial configuration file in this way allows default settings to eas
 Configuration keys
 =====================
 
-There are many recognized configuration keys. In the table below, each key is either linked to an explanatory description in the Settings pages, or has further information in the **Decription/Options** column.
+There are many recognized configuration keys. In the table below, each key is either linked to an explanatory description in the Settings pages, or has further information in the **Description/Options** column.
 
 .. csv-table::
   	:header-rows: 1
@@ -227,6 +219,7 @@ There are many recognized configuration keys. In the table below, each key is ei
 		":ref:`font_override <fontoverride>`",boolean,false,
 		":ref:`footsteps <footsteps>`",boolean,true,
 		":ref:`force_2d_renderer <2d>`",boolean,false,
+		forced_dpi_scaling,integer,,"Overrides DPI scaling factor reported by the system."
 		":ref:`frameLimit <framelimit>`",boolean,true,
 		":ref:`frameSkip <frameskip>`",boolean,false,
 		":ref:`frames_per_secondfl <fpsfl>`",boolean,false,
@@ -257,7 +250,7 @@ There are many recognized configuration keys. In the table below, each key is ei
 	- timidity"
 		":ref:`gui_browser_native <guibrowser>`", boolean, true
 		gui_browser_show_hidden,boolean,false, Shows hidden files/folders in the ScummVM file browser.
-		gui_list_max_scan_entries,integer,-1, "Specifies the threshold for scanning directories in the Launcher. If the number of game entires exceeds the specified number, then scanning is skipped."
+		gui_list_max_scan_entries,integer,-1, "Specifies the threshold for scanning directories in the Launcher. If the number of game entries exceeds the specified number, then scanning is skipped."
 		":ref:`gui_return_to_launcher_at_exit <guireturn>`",boolean,false,
 		gui_saveload_chooser,string,grid,"- list
 	- grid"
@@ -306,14 +299,8 @@ There are many recognized configuration keys. In the table below, each key is ei
 		":ref:`keymap_sdl-graphics_ASPT <ASPT>`",string,C+A+a,
 		":ref:`keymap_sdl-graphics_CAPT <CAPT>`",string,C+m,
 		":ref:`keymap_sdl-graphics_FILT <FILT>`",string,C+A+f
-		":ref:`keymap_sdl-graphics_FLT1 <FLT1>`",string,C+A+1
-		":ref:`keymap_sdl-graphics_FLT2 <FLT2>`",string,C+A+2
-		":ref:`keymap_sdl-graphics_FLT3 <FLT3>`",string,C+A+3
-		":ref:`keymap_sdl-graphics_FLT4 <FLT4>`",string,C+A+4
-		":ref:`keymap_sdl-graphics_FLT5 <FLT5>`",string,C+A+5
-		":ref:`keymap_sdl-graphics_FLT6 <FLT6>`",string, C+A+6
-		":ref:`keymap_sdl-graphics_FLT7 <FLT7>`",string,C+A+7
-		":ref:`keymap_sdl-graphics_FLT8 <FLT8>`",string,C+A+8
+		":ref:`keymap_sdl-graphics_FLTN <FLTN>`",string,C+A+0
+		":ref:`keymap_sdl-graphics_FLTP <FLTP>`",string,C+A+9
 		":ref:`keymap_sdl-graphics_FULS <FULS>`",string,A+RETURN
 		":ref:`keymap_sdl-graphics_SCL- <SCL>`",string,C+A+MINUS
 		":ref:`keymap_sdl-graphics_SCL+ <SCL>`",string,C+A+PLUS
@@ -408,7 +395,7 @@ There are many recognized configuration keys. In the table below, each key is ei
 	- 44100"
 		":ref:`palette_mods <palette>`",boolean,false,
 		":ref:`platform <platform>`",string,,
-		":ref:`portaits_on <portraits>`",boolean,true,
+		":ref:`portraits_on <portraits>`",boolean,true,
 		":ref:`prefer_digitalsfx <dsfx>`",boolean,true,
 		":ref:`prerecorded_sounds <prerecorded>`",boolean,true,
 		":ref:`renderer <renderer>`",string,default,"
@@ -516,37 +503,26 @@ There are many recognized configuration keys. In the table below, each key is ei
 .. _screenshotpath:
 
 Screenshot path
-====================
-	The default location for the screenshotpath depends on your system.
+===============
+
+The default location for the screenshotpath depends on your system.
 
 
-	.. tabbed:: Windows
+.. tab-set::
 
-		.. panels::
-			:column: col-lg-12 mb-2
+    .. tab-item:: Windows
 
-			In ``Users\username\My Pictures\ScummVM Screenshots``
+        In ``%USERPROFILE%\Pictures\ScummVM Screenshots``
 
-	.. tabbed:: macOS
+    .. tab-item:: macOS
 
-		.. panels::
-			:column: col-lg-12 mb-2
-
-			On the Desktop.
+        On the Desktop.
 
 
-	.. tabbed:: Linux
+    .. tab-item:: Linux
 
-		.. panels::
-			:column: col-lg-12 mb-2
+        In the XDG Pictures user directory, for example ``~/Pictures/ScummVM Screenshots``
 
-			In the XDG Pictures user directory, for example ``~/Pictures/ScummVM Screenshots``
+    .. tab-item:: Any other OS
 
-	.. tabbed:: Any other OS
-
-		.. panels::
-			:column: col-lg-12 mb-2
-
-			In the current directory.
-
-
+        In the current directory.

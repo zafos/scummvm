@@ -719,7 +719,7 @@ void cGameEnemyState_Dog_Hunt::OnUpdate(float afTimeStep) {
 		// mpInit->mpEffectHandler->GetSubTitle()->Add("Update Path!",1.0f,true);
 		mfUpdatePathCount = mfUpdateFreq;
 
-		/*cAINodeContainer *pNodeCont = */mpEnemy->GetMover()->GetNodeContainer();
+		/*cAINodeContainer *pNodeCont = */ mpEnemy->GetMover()->GetNodeContainer();
 
 		// Log("%s: Checking free path\n",mpEnemy->GetName().c_str());
 
@@ -837,7 +837,7 @@ bool cGameEnemyState_Dog_Hunt::OnHearNoise(const cVector3f &avPosition, float af
 			// Check if a node is found near the sound.
 			cAINode *pNode = mpMover->GetAINodeAtPosInRange(avPosition, 0.0f, 5.0f, true, 0.1f);
 			if (pNode) {
-				// Update last player postion.
+				// Update last player position.
 				mbLostPlayer = false;
 				mfUpdatePathCount = 0;
 				mpEnemy->SetLastPlayerPos(pNode->GetPosition());
@@ -853,7 +853,7 @@ bool cGameEnemyState_Dog_Hunt::OnHearNoise(const cVector3f &avPosition, float af
 //-----------------------------------------------------------------------
 
 void cGameEnemyState_Dog_Hunt::OnDraw() {
-	/*float fWantedSpeed = */mpMover->GetCharBody()->GetMoveSpeed(eCharDir_Forward);
+	/*float fWantedSpeed = */ mpMover->GetCharBody()->GetMoveSpeed(eCharDir_Forward);
 	float fRealSpeed = cMath::Vector3Dist(mpMover->GetCharBody()->GetPosition(),
 										  mpMover->GetCharBody()->GetLastPosition());
 	fRealSpeed = fRealSpeed / (1.0f / 60.0f);
@@ -862,11 +862,11 @@ void cGameEnemyState_Dog_Hunt::OnDraw() {
 
 	mpInit->mpDefaultFont->draw(cVector3f(0, 110, 100), 14, cColor(1, 1, 1, 1), eFontAlign_Left,
 								Common::U32String::format("LostPlayerCount: %f FreePath: %d NoPath: %d MaxStuck: %d Dist: %f / %f",
-								mfLostPlayerCount, mbFreePlayerPath,
-								mbFoundNoPath,
-								mlStuckAtMaxCount,
-								fDist,
-								mpEnemyDog->mfAttackDistance));
+														  mfLostPlayerCount, mbFreePlayerPath,
+														  mbFoundNoPath,
+														  mlStuckAtMaxCount,
+														  fDist,
+														  mpEnemyDog->mfAttackDistance));
 }
 
 //-----------------------------------------------------------------------
@@ -1125,7 +1125,7 @@ void cGameEnemyState_Dog_Flee::OnUpdate(float afTimeStep) {
 	} else {
 		// Move forward
 		if (mpMover->IsMoving() == false || mpMover->GetStuckCounter() > 0.3f || mfTimer <= 0) {
-			// Check if there is any enemies nearaby and if anyone is allready fighting
+			// Check if there are any enemies nearby and if anyone is already fighting
 			if (mpEnemy->CheckForTeamMate(mpEnemyDog->mfCallBackupRange * 1.5f, false) &&
 				mpEnemy->CheckForTeamMate(8, true) == false) {
 				float fPlayerDist = mpMover->DistanceToChar(mpInit->mpPlayer->GetCharacterBody());
@@ -1491,13 +1491,13 @@ void cGameEnemyState_Dog_KnockDown::OnUpdate(float afTimeStep) {
 			// Calculate values
 			cVector3f vPosition;
 			cVector3f vAngles;
-			/*cMatrixf mtxTransform = */mpEnemy->GetMeshEntity()->CalculateTransformFromSkeleton(&vPosition, &vAngles);
+			/*cMatrixf mtxTransform = */ mpEnemy->GetMeshEntity()->CalculateTransformFromSkeleton(&vPosition, &vAngles);
 
 			// Seems to work better...
 			vPosition = mpEnemy->GetMeshEntity()->GetBoundingVolume()->GetWorldCenter();
 			cVector3f vGroundPos = vPosition;
 
-			/*bool bFoundGround = */mpEnemy->GetGroundFinder()->GetGround(vPosition, cVector3f(0, -1, 0), &vGroundPos, NULL);
+			/*bool bFoundGround = */ mpEnemy->GetGroundFinder()->GetGround(vPosition, cVector3f(0, -1, 0), &vGroundPos, NULL);
 
 			// Log("Found ground: %d | %s -> %s\n",bFoundGround,vPosition.ToString().c_str(),
 			//									vGroundPos.ToString().c_str());

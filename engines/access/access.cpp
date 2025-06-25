@@ -79,7 +79,6 @@ AccessEngine::AccessEngine(OSystem *syst, const AccessGameDescription *gameDesc)
 	_establish = nullptr;
 
 	_conversation = 0;
-	_currentMan = 0;
 	_newTime = 0;
 	_newDate = 0;
 	Common::fill(&_objectsTable[0], &_objectsTable[100], (SpriteResource *)nullptr);
@@ -120,6 +119,9 @@ AccessEngine::AccessEngine(OSystem *syst, const AccessGameDescription *gameDesc)
 	_pictureTaken = 0;
 
 	_vidEnd = false;
+
+	for (int i = 0; i < 6; ++i)
+		_countTbl[i] = 0;
 }
 
 AccessEngine::~AccessEngine() {
@@ -152,17 +154,18 @@ void AccessEngine::setVGA() {
 
 void AccessEngine::initialize() {
 	if (isCD()) {
-		const Common::FSNode gameDataDir(ConfMan.get("path"));
+		const Common::FSNode gameDataDir(ConfMan.getPath("path"));
 		// The CD version contains two versions of the game.
 		// - The MCGA version, in the CDROM folder
 		// - The VESA version, in the TDROM folder
 		// We use the hires version.
-		const Common::FSNode cdromDir = gameDataDir.getChild("tdrom");
+
+		// Use forward slash for the folders separator, as documented for SearchSet::addSubDirectoryMatching()
+		const Common::String subfolderMatchPrefix = "tdrom/";
 
 		for (int idx = 0; idx < 15; ++idx) {
-			Common::String folder = (idx == 0) ? "game" :
-				Common::String::format("chap%.2d", idx);
-			SearchMan.addSubDirectoryMatching(cdromDir, folder);
+			Common::String folder = subfolderMatchPrefix + ((idx == 0) ? "game" : Common::String::format("chap%.2d", idx));
+			SearchMan.addSubDirectoryMatching(gameDataDir, folder);
 		}
 	}
 
@@ -494,11 +497,11 @@ Common::Error AccessEngine::loadGameState(int slot) {
 	return Common::kNoError;
 }
 
-bool AccessEngine::canLoadGameStateCurrently() {
+bool AccessEngine::canLoadGameStateCurrently(Common::U32String *msg) {
 	return _canSaveLoad;
 }
 
-bool AccessEngine::canSaveGameStateCurrently() {
+bool AccessEngine::canSaveGameStateCurrently(Common::U32String *msg) {
 	return _canSaveLoad;
 }
 
@@ -567,7 +570,7 @@ void AccessEngine::writeSavegameHeader(Common::OutSaveFile *out, AccessSavegameH
 	out->writeByte('\0');
 
 	// Write a thumbnail of the screen
-	uint8 thumbPalette[PALETTE_SIZE];
+	uint8 thumbPalette[Graphics::PALETTE_SIZE];
 	_screen->getPalette(thumbPalette);
 	Graphics::Surface saveThumb;
 	::createThumbnail(&saveThumb, (const byte *)_screen->getPixels(),

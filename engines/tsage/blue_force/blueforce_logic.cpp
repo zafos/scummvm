@@ -291,49 +291,53 @@ void BlueForceGame::rightClick() {
 }
 
 void BlueForceGame::processEvent(Event &event) {
-	if (event.eventType == EVENT_KEYPRESS) {
-		switch (event.kbd.keycode) {
-		case Common::KEYCODE_F1:
+	if (event.eventType == EVENT_CUSTOM_ACTIONSTART) {
+		switch (event.customType) {
+		case kActionHelp:
 			// F1 - Help
 			int tmp;
 			tmp = BF_GLOBALS._dialogCenter.y;
 			BF_GLOBALS._dialogCenter.y = 100;
 			if (g_vm->getLanguage() == Common::ES_ESP) {
 				MessageDialog::show(ESP_HELP_MSG, ESP_OK_BTN_STRING);
+			} else if (g_vm->getLanguage() == Common::RU_RUS) {
+				MessageDialog::show(TsAGE::BlueForce::RUS_HELP_MSG, RUS_OK_BTN_STRING);
 			} else {
 				MessageDialog::show(HELP_MSG, OK_BTN_STRING);
 			}
 			BF_GLOBALS._dialogCenter.y = tmp;
 			break;
 
-		case Common::KEYCODE_F2:
+		case kActionSoundOptions:
 			// F2 - Sound Options
 			SoundDialog::execute();
 			break;
 
-		case Common::KEYCODE_F3:
+		case kActionQuitGame:
 			// F3 - Quit
 			quitGame();
 			event.handled = false;
 			break;
 
-		case Common::KEYCODE_F4:
+		case kActionRestartGame:
 			// F4 - Restart
 			restartGame();
 			g_globals->_events.setCursorFromFlag();
 			break;
 
-		case Common::KEYCODE_F7:
+		case kActionRestoreGame:
 			// F7 - Restore
 			restoreGame();
 			g_globals->_events.setCursorFromFlag();
 			break;
 
-		case Common::KEYCODE_F10:
+		case kActionPauseGame:
 			// F10 - Pause
 			GfxDialog::setPalette();
 			if (g_vm->getLanguage() == Common::ES_ESP) {
 				MessageDialog::show(ESP_GAME_PAUSED_MSG, ESP_OK_BTN_STRING);
+			} else if (g_vm->getLanguage() == Common::RU_RUS) {
+				MessageDialog::show(RUS_GAME_PAUSED_MSG, RUS_OK_BTN_STRING);
 			} else {
 				MessageDialog::show(GAME_PAUSED_MSG, OK_BTN_STRING);
 			}
@@ -982,6 +986,8 @@ void SceneHandlerExt::process(Event &event) {
 		int rc;
 		if (g_vm->getLanguage() == Common::ES_ESP) {
 			rc = MessageDialog::show2(ESP_WATCH_INTRO_MSG, ESP_START_PLAY_BTN_STRING, ESP_INTRODUCTION_BTN_STRING);
+		} else if (g_vm->getLanguage() == Common::RU_RUS) {
+			rc = MessageDialog::show2(RUS_WATCH_INTRO_MSG, RUS_START_PLAY_BTN_STRING, RUS_INTRODUCTION_BTN_STRING);
 		} else {
 			rc = MessageDialog::show2(WATCH_INTRO_MSG, START_PLAY_BTN_STRING, INTRODUCTION_BTN_STRING);
 		}
@@ -1243,6 +1249,13 @@ void BlueForceInvObjectList::setObjectScene(int objectNum, int sceneNumber) {
 	T2_GLOBALS._uiElements.updateInventory();
 }
 
+/**
+ * This method is called when the day changes (starting from the change from day 1 to day 2).
+ * It handles setting items to the inventory or their proper location at the start of a day
+ * It also resets the dialogue options for Hayley McCoy (at the City Hall (scene 385))
+ * The method is not called when initializing the game's day to 1.
+ * @param mode The day number
+ */
 void BlueForceInvObjectList::alterInventory(int mode) {
 	// Check for existing specific items in player's inventory
 	bool hasPrintout = getObjectScene(INV_PRINT_OUT) == 1;
@@ -1273,6 +1286,9 @@ void BlueForceInvObjectList::alterInventory(int mode) {
 	// Reset ticket book and miranda card back to motorcycle
 	setObjectScene(INV_TICKET_BOOK, 60);
 	setObjectScene(INV_MIRANDA_CARD, 60);
+
+	// The dialogue options for talking to Hayley McCoy is reset here for the day change
+	BF_GLOBALS._deziTopic = 0;
 
 	switch (mode) {
 	case 2:
@@ -1421,7 +1437,7 @@ void SceneMessage::signal() {
 
 void SceneMessage::process(Event &event) {
 	if ((event.eventType == EVENT_BUTTON_DOWN) ||
-		((event.eventType == EVENT_KEYPRESS) && (event.kbd.keycode == Common::KEYCODE_RETURN))) {
+		((event.eventType == EVENT_CUSTOM_ACTIONSTART) && (event.customType == kActionReturn))) {
 		signal();
 	}
 }

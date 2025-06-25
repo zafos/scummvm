@@ -57,14 +57,14 @@ public:
 	bool isDrawable() override { return true; }
 	bool isPlanar() override { return true; }
 	bool isShooting() { return _isShooting; }
-	void scale(int factor) override { _origin = _origin / factor; };
+	void scale(int factor) override;
 	Object *duplicate() override;
 
 	ObjectType getType() override { return kSensorType; };
 	Math::Vector3d getRotation() { return _rotation; }
 	void shouldShoot(bool shooting) { _isShooting = shooting; }
 
-	void draw(Freescape::Renderer *gfx) override;
+	void draw(Freescape::Renderer *gfx, float offset = 0.0) override;
 
 	bool playerDetected(const Math::Vector3d &position, Area *area);
 

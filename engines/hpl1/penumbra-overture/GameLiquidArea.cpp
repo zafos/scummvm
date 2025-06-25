@@ -124,7 +124,7 @@ void cGameLiquidArea::SetPhysicsMaterial(const tString asName) {
 	mpPhysicsMaterial = pPhysicsWorld->GetMaterialFromName(asName);
 	if (mpPhysicsMaterial == NULL) {
 		Error("Liquid '%s' could not find material '%s'\n", GetName().c_str(),
-			  mpPhysicsMaterial->GetName().c_str());
+			  asName.c_str());
 	}
 }
 
@@ -172,7 +172,7 @@ void cGameLiquidArea::Update(float afTimeStep) {
 	while (bodyIt.HasNext()) {
 		iPhysicsBody *pBody = static_cast<iPhysicsBody *>(bodyIt.Next());
 
-		/*iGameEntity *pEntity = (iGameEntity *)*/pBody->GetUserData();
+		/*iGameEntity *pEntity = (iGameEntity *)*/ pBody->GetUserData();
 
 		if (pBody->GetCollide() && pBody->IsActive()) {
 			if (pBody->GetMass() == 0 && pBody->IsCharacter() == false)

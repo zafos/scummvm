@@ -26,7 +26,7 @@
 
 namespace MM {
 
-bool StringsData::load(const Common::String &filename) {
+bool StringsData::load(const Common::Path &filename) {
 	Common::File f;
 	Common::Array<Common::String> prefixKeys;
 	Common::String key, value, fullKey;
@@ -67,6 +67,7 @@ bool StringsData::load(const Common::String &filename) {
 			value.deleteChar(0);
 			value.deleteLastChar();
 			value = searchAndReplace(value, "\"\"", "");
+			value = searchAndReplace(value, "\\\"", "\"");
 		}
 
 		// Replace any sequences

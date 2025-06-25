@@ -38,6 +38,13 @@ void TextEntry::display(int x, int y, int maxLen,
 	addView(this);
 }
 
+bool TextEntry::msgFocus(const FocusMessage &msg) {
+	TextView::msgFocus(msg);
+	MetaEngine::setKeybindingMode(KeybindingMode::KBMODE_MINIMAL);
+
+	return true;
+}
+
 void TextEntry::draw() {
 	drawText();
 	writeChar('_');
@@ -49,35 +56,34 @@ void TextEntry::drawText() {
 }
 
 bool TextEntry::msgKeypress(const KeypressMessage &msg) {
-	Common::KeyCode kc = msg.keycode;
-
 	if (msg.keycode == Common::KEYCODE_BACKSPACE &&
 			!_text.empty()) {
 		_text.deleteLastChar();
-		drawText();
-		return true;
+		redraw();
+
 	} else if (msg.ascii >= 32 && msg.ascii <= 127 &&
 			_text.size() < _maxLen) {
 		if (_isNumeric && (msg.ascii < '0' || msg.ascii > '9'))
 			return true;
 
 		_text += msg.ascii;
-		drawText();
 
 		// Single character numeric fields, particular spell
 		// level/number selection, return immediately
-		if (_isNumeric && _maxLen == 1)
-			kc = Common::KEYCODE_RETURN;
-	}
+		if (_isNumeric && _maxLen == 1) {
+			drawText();
+			msgAction(ActionMessage(KEYBIND_SELECT));
+		}
 
-	if (kc == Common::KEYCODE_RETURN && !_text.empty()) {
+		redraw();
+
+	} else if (msg.keycode == Common::KEYCODE_RETURN && !_text.empty()) {
 		drawText();
 		close();
 		_enterFn(_text);
-		return true;
 	}
 
-	return false;
+	return true;
 }
 
 bool TextEntry::msgAction(const ActionMessage &msg) {
@@ -85,10 +91,9 @@ bool TextEntry::msgAction(const ActionMessage &msg) {
 		drawText();
 		close();
 		_abortFn();
-		return true;
 	}
 
-	return false;
+	return true;
 }
 
 } // namespace Views

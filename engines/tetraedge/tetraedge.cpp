@@ -29,9 +29,9 @@
 #include "common/savefile.h"
 #include "engines/util.h"
 #include "engines/dialogs.h"
-#include "graphics/palette.h"
 
-#include "tetraedge/game/game.h"
+#include "tetraedge/game/amerzone_game.h"
+#include "tetraedge/game/syberia_game.h"
 #include "tetraedge/game/application.h"
 #include "tetraedge/game/character.h"
 #include "tetraedge/te/te_core.h"
@@ -41,6 +41,7 @@
 #include "tetraedge/te/te_sound_manager.h"
 #include "tetraedge/te/te_input_mgr.h"
 #include "tetraedge/te/te_particle.h"
+#include "tetraedge/obb_archive.h"
 
 namespace Tetraedge {
 
@@ -62,6 +63,8 @@ TetraedgeEngine::~TetraedgeEngine() {
 	delete _soundManager;
 	delete _resourceManager;
 	delete _inputMgr;
+	for (Common::Array<Common::Archive *>::iterator it = _rootArchives.begin(); it != _rootArchives.end(); it++)
+		delete *it;
 	Object3D::cleanup();
 	Character::cleanup();
 	TeAnimation::cleanup();
@@ -72,7 +75,7 @@ TetraedgeEngine::~TetraedgeEngine() {
 }
 
 /*static*/
-Common::StringArray TetraedgeEngine::splitString (const Common::String &text, char c) {
+Common::StringArray TetraedgeEngine::splitString(const Common::String &text, char c) {
 	Common::StringArray values;
 
 	Common::String str = text;
@@ -98,8 +101,12 @@ TeCore *TetraedgeEngine::getCore() {
 }
 
 Game *TetraedgeEngine::getGame() {
-	if (_game == nullptr)
-		_game = new Game();
+	if (_game == nullptr) {
+		if (gameIsAmerzone())
+			_game = new AmerzoneGame();
+		else
+			_game = new SyberiaGame();
+	}
 	return _game;
 }
 
@@ -134,17 +141,45 @@ Common::String TetraedgeEngine::getGameId() const {
 	return _gameDescription->gameId;
 }
 
-bool TetraedgeEngine::canLoadGameStateCurrently() {
+Common::Language TetraedgeEngine::getGameLanguage() const {
+	return _gameDescription->language;
+}
+
+Common::Platform TetraedgeEngine::getGamePlatform() const {
+	return _gameDescription->platform;
+}
+
+bool TetraedgeEngine::isUtf8Release() const {
+	return !!(_gameDescription->flags & GF_UTF8);
+}
+
+bool TetraedgeEngine::isGameDemo() const {
+	return (_gameDescription->flags & ADGF_DEMO) != 0;
+}
+
+bool TetraedgeEngine::canLoadGameStateCurrently(Common::U32String *msg) {
 	return _game && _application && !_application->mainMenu().isEntered();
 }
 
-bool TetraedgeEngine::canSaveGameStateCurrently() {
+bool TetraedgeEngine::canSaveGameStateCurrently(Common::U32String *msg) {
 	return canSaveAutosaveCurrently() && !_application->isLockCursor();
 }
 
 bool TetraedgeEngine::canSaveAutosaveCurrently() {
-	return _game && _application && _game->running()
-		&& !_game->currentScene().empty() && !_game->currentZone().empty();
+	if (!_game || !_application)
+		return false;
+
+	bool sceneLoaded;
+
+	if (gameIsAmerzone()) {
+		AmerzoneGame *game = dynamic_cast<AmerzoneGame *>(_game);
+		assert(game);
+		sceneLoaded = (game->warpY() != nullptr);
+	} else {
+		sceneLoaded = !_game->currentScene().empty() && !_game->currentZone().empty();
+	}
+
+	return _game->running() && sceneLoaded;
 }
 
 Common::Error TetraedgeEngine::loadGameState(int slot) {
@@ -171,29 +206,70 @@ Common::Error TetraedgeEngine::loadGameStream(Common::SeekableReadStream *stream
 	return retval;
 }
 
+void TetraedgeEngine::closeGameDialogs() {
+	if (!_game)
+		return;
+	_game->closeDialogs();
+}
+
 void TetraedgeEngine::configureSearchPaths() {
-	const Common::FSNode gameDataDir(ConfMan.get("path"));
-	SearchMan.addSubDirectoryMatching(gameDataDir, "Resources", 0, 5);
+	const Common::FSNode gameDataDir(ConfMan.getPath("path"));
+	if (_gameDescription->platform == Common::kPlatformMacintosh) {
+		SearchMan.addSubDirectoryMatching(gameDataDir, "Resources", 0, 6);
+		_rootArchives.push_back(new Common::FSDirectory(gameDataDir.getChild("Resources"), 10));
+	} else
+		_rootArchives.push_back(new Common::FSDirectory(gameDataDir, 10));
+
+	if (_gameDescription->platform == Common::Platform::kPlatformAndroid
+	    && strlen(_gameDescription->filesDescriptions[0].fileName) > 4
+	    && scumm_stricmp(_gameDescription->filesDescriptions[0].fileName + strlen(_gameDescription->filesDescriptions[0].fileName) - 4, ".obb") == 0) {
+		ObbArchive *obb = ObbArchive::open(_gameDescription->filesDescriptions[0].fileName);
+		_rootArchives.push_back(obb);
+		SearchMan.add("obbarchive", obb, 0, false);
+	}
 }
 
 int TetraedgeEngine::getDefaultScreenWidth() const {
-	return 800;
+	return gameIsAmerzone() ? 1280 : 800;
 }
 
 int TetraedgeEngine::getDefaultScreenHeight() const {
-	return 600;
+	return gameIsAmerzone() ? 800 : 600;
 }
 
 bool TetraedgeEngine::onKeyUp(const Common::KeyState &state) {
-	if (state.keycode == Common::KEYCODE_l) {
+	switch (state.keycode) {
+	case Common::KEYCODE_l:
 		if (loadGameDialog())
 			_game->initLoadedBackupData();
-	} else if (state.keycode == Common::KEYCODE_s) {
+		break;
+	case Common::KEYCODE_s:
 		saveGameDialog();
+		break;
+	case Common::KEYCODE_ESCAPE:
+		closeGameDialogs();
+		break;
+	default:
+		break;
 	}
 
 	return false;
 }
+
+void TetraedgeEngine::registerConfigDefaults() {
+	// The skips are mostly for debugging to jump straight to certain
+	// things.  If they are all enabled you get into a new game as
+	// soon as possible.
+	ConfMan.registerDefault("skip_videos", false);
+	ConfMan.registerDefault("skip_splash", false);
+	ConfMan.registerDefault("skip_mainmenu", false);
+	ConfMan.registerDefault("skip_confirm", false);
+
+	ConfMan.registerDefault("disable_shadows", false);
+	ConfMan.registerDefault("correct_movie_aspect", true);
+	ConfMan.registerDefault("restore_scenes", false);
+}
+
 
 Common::Error TetraedgeEngine::run() {
 	if (getGameId() == "syberia")
@@ -204,6 +280,8 @@ Common::Error TetraedgeEngine::run() {
 		_gameType = kAmerzone;
 	else
 		error("Unknown game id %s", getGameId().c_str());
+
+	registerConfigDefaults();
 
 	configureSearchPaths();
 	// from BasicOpenGLView::prepareOpenGL..
@@ -267,18 +345,12 @@ Graphics::RendererType TetraedgeEngine::preferredRendererType() const {
 #if defined(USE_OPENGL_GAME)
 			Graphics::kRendererTypeOpenGL |
 #endif
-#if defined(USE_OPENGL_SHADERS)
-			Graphics::kRendererTypeOpenGLShaders |
-#endif
 #if defined(USE_TINYGL)
 			Graphics::kRendererTypeTinyGL |
 #endif
 			0;
 
 	Graphics::RendererType matchingRendererType = Graphics::Renderer::getBestMatchingType(desiredRendererType, availableRendererTypes);
-	// Currently no difference between shaders and otherwise for this engine.
-	if (matchingRendererType == Graphics::kRendererTypeOpenGLShaders)
-		matchingRendererType = Graphics::kRendererTypeOpenGL;
 
 	if (matchingRendererType == 0) {
 		error("No supported renderer available.");
@@ -287,9 +359,135 @@ Graphics::RendererType TetraedgeEngine::preferredRendererType() const {
 	return matchingRendererType;
 }
 
+Common::Error TetraedgeEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
+	Common::Error result = Engine::saveGameState(slot, desc, isAutosave);
+	if (result.getCode() == Common::kNoError) {
+		ConfMan.setInt("last_save_slot", slot);
+		ConfMan.flushToDisk();
+	}
+	return result;
+}
+
 /*static*/
 void TetraedgeEngine::getSavegameThumbnail(Graphics::Surface &thumb) {
 	g_engine->getApplication()->getSavegameThumbnail(thumb);
+}
+
+bool TetraedgeFSNode::getChildren(TetraedgeFSList &fslist, Common::FSNode::ListMode mode, bool hidden) const {
+	if (!_archive)
+		return false;
+
+	Common::Array<Common::String> tmpsublist;
+	if(!_archive->getChildren(_archivePath, tmpsublist, (Common::Archive::ListMode)  mode, hidden))
+		return false;
+	fslist.clear();
+	for(Common::Array<Common::String>::iterator it = tmpsublist.begin(); it != tmpsublist.end(); it++) {
+		fslist.push_back(TetraedgeFSNode(_archive, _archivePath.join(*it)));
+	}
+	return true;
+}
+
+class SubPathArchive : public Common::Archive {
+public:
+	SubPathArchive(Common::Archive *archive, const Common::Path &prefix) : _archive(archive), _prefix(prefix) {}
+
+	bool hasFile(const Common::Path &path) const override {
+		return _archive && _archive->hasFile(_prefix.join(path));
+	}
+
+	bool isPathDirectory(const Common::Path &path) const override {
+		return _archive && _archive->isPathDirectory(_prefix.join(path));
+	}
+
+	bool getChildren(const Common::Path &path, Common::Array<Common::String> &list, ListMode mode, bool hidden) const override {
+		return _archive && getChildren(_prefix.join(path), list, mode, hidden);
+	}
+
+	int listMembers(Common::ArchiveMemberList &list) const override {
+		Common::ArchiveMemberList tmpList;
+		if (!_archive)
+			return 0;
+		_archive->listMembers(tmpList);
+		Common::String prefixStr = _prefix.toString();
+		if (!prefixStr.hasSuffix("/"))
+			prefixStr += "/";
+		int count = 0;
+		for (Common::ArchiveMemberList::iterator it = tmpList.begin(); it != tmpList.end(); it++) {
+			if ((*it)->getName().hasPrefix(prefixStr)) {
+				list.push_back(*it);
+				count++;
+			}
+		}
+		return count;
+	}
+
+	const Common::ArchiveMemberPtr getMember(const Common::Path &path) const override {
+		return _archive ? _archive->getMember(_prefix.join(path)) : nullptr;
+	}
+
+	Common::SeekableReadStream *createReadStreamForMember(const Common::Path &path) const override {
+		return _archive ? _archive->createReadStreamForMember(_prefix.join(path)) : nullptr;
+	}
+
+	char getPathSeparator() const override {
+		return _archive ? _archive->getPathSeparator() : '/';
+	}
+
+private:
+	Common::Archive *_archive;
+	Common::Path _prefix;
+};
+
+void TetraedgeFSNode::maybeAddToSearchMan() const {
+	const Common::String path = getPath().toString(Common::Path::kNativeSeparator);
+	if (SearchMan.hasArchive(path))
+		return;
+	if (!_archivePath.empty())
+		SearchMan.add(path, new SubPathArchive(_archive, _archivePath));
+}
+
+Common::SeekableReadStream *TetraedgeFSNode::createReadStream() const {
+	return _archive ? _archive->createReadStreamForMember(_archivePath) : nullptr;
+}
+
+bool TetraedgeFSNode::isReadable() const {
+	return _archive && _archive->hasFile(_archivePath);
+}
+
+bool TetraedgeFSNode::isDirectory() const {
+	return _archive && _archive->isPathDirectory(_archivePath);
+}
+
+Common::Path TetraedgeFSNode::getPath() const {
+	return _archivePath;
+}
+
+Common::String TetraedgeFSNode::toString() const {
+	return _archivePath.toString(Common::Path::kNativeSeparator);
+}
+
+TetraedgeFSNode TetraedgeFSNode::getChild(const Common::Path &path) const {
+	return TetraedgeFSNode(_archive, _archivePath.join(path));
+}
+
+bool TetraedgeFSNode::exists() const {
+	return isDirectory() || isReadable();
+}
+
+bool TetraedgeFSNode::loadXML(Common::XMLParser &parser) const {
+	return parser.loadStream(createReadStream(), _archivePath.toString());
+}
+
+Common::String TetraedgeFSNode::getName() const {
+	return _archivePath.getLastComponent().toString();
+}
+
+bool TetraedgeFSNode::operator<(const TetraedgeFSNode& node) const {
+	return getPath() < node.getPath();
+}
+
+int TetraedgeFSNode::getDepth() const {
+	return _archivePath.splitComponents().size();
 }
 
 } // namespace Tetraedge

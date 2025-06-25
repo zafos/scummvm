@@ -22,11 +22,14 @@
 #ifndef VCRUISE_TEXTPARSER_H
 #define VCRUISE_TEXTPARSER_H
 
+#include "common/hashmap.h"
+#include "common/hash-str.h"
 #include "common/str.h"
 #include "common/memstream.h"
 
 namespace Common {
 
+class Path;
 class ReadStream;
 
 } // End of namespace Common
@@ -54,21 +57,22 @@ public:
 	void requeue(const char *chars, uint numChars, const TextParserState &state);
 	void requeue(const Common::String &str, const TextParserState &state);
 
-	void expectToken(Common::String &outToken, const Common::String &blamePath);
-	void expectShort(int16 &outInt, const Common::String &blamePath);
-	void expectInt(int &outInt, const Common::String &blamePath);
-	void expectUInt(uint &outUInt, const Common::String &blamePath);
-	void expectLine(Common::String &outToken, const Common::String &blamePath, bool continueToNextLine);
+	void expectToken(Common::String &outToken, const Common::Path &blamePath);
+	void expectShort(int16 &outInt, const Common::Path &blamePath);
+	void expectInt(int &outInt, const Common::Path &blamePath);
+	void expectUInt(uint &outUInt, const Common::Path &blamePath);
+	void expectLine(Common::String &outToken, const Common::Path &blamePath, bool continueToNextLine);
 
-	void expect(const char *str, const Common::String &blamePath);
+	void expect(const char *str, const Common::Path &blamePath);
 
 	void skipToEOL();
 	bool checkEOL();
 
 private:
-	void expectTokenInternal(Common::String &outToken, const Common::String &blamePath, TextParserState &outState);
+	void expectTokenInternal(Common::String &outToken, const Common::Path &blamePath, TextParserState &outState);
 
 	static bool isDelimiter(char c);
+	static bool isCompoundDelimiter(char c1, char c2);
 	static bool isWhitespace(char c);
 
 	TextParserState _state;

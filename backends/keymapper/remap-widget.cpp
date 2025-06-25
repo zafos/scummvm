@@ -44,7 +44,7 @@ enum {
 };
 
 RemapWidget::RemapWidget(GuiObject *boss, const Common::String &name, const KeymapArray &keymaps) :
-		OptionsContainerWidget(boss, name, "", true, ""),
+		OptionsContainerWidget(boss, name, "", ""),
 		_keymapTable(keymaps),
 		_remapKeymap(nullptr),
 		_remapAction(nullptr),
@@ -98,13 +98,18 @@ void RemapWidget::handleInputChanged() {
 	refreshKeymap();
 }
 
+void RemapWidget::reflowLayout() {
+	OptionsContainerWidget::reflowLayout();
+	reflowActionWidgets();
+}
+
 void RemapWidget::reflowActionWidgets() {
 	int buttonHeight = g_gui.xmlEval()->getVar("Globals.Button.Height", 0);
 
 	int spacing = g_gui.xmlEval()->getVar("Globals.KeyMapper.Spacing");
 	int keyButtonWidth = g_gui.xmlEval()->getVar("Globals.KeyMapper.ButtonWidth");
 	int resetButtonWidth = g_gui.xmlEval()->getVar("Globals.KeyMapper.ResetWidth");
-	int labelWidth = widgetsBoss()->getWidth() - (spacing + keyButtonWidth + spacing);
+	int labelWidth = _w - (spacing + keyButtonWidth + spacing);
 	labelWidth = MAX(0, labelWidth);
 
 	uint textYOff = (buttonHeight - kLineHeight) / 2;
@@ -121,7 +126,7 @@ void RemapWidget::reflowActionWidgets() {
 
 			// Insert a keymap separator
 			uint descriptionX = 2 * spacing + keyButtonWidth;
-			uint resetX = widgetsBoss()->getWidth() - spacing - resetButtonWidth;
+			uint resetX = _w - spacing - resetButtonWidth;
 
 			KeymapTitleRow keymapTitle = _keymapSeparators[row.keymap];
 			if (keymapTitle.descriptionText) {
@@ -164,8 +169,6 @@ void RemapWidget::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 d
 		resetMapping(cmd - kResetActionCmd);
 	} else if (cmd >= kResetKeymapCmd && cmd < kResetKeymapCmd + _actions.size()) {
 		resetKeymap(cmd - kResetKeymapCmd);
-	} else if (cmd == kReflowCmd) {
-		reflowActionWidgets();
 	} else {
 		OptionsContainerWidget::handleCommand(sender, cmd, data);
 	}
@@ -272,10 +275,10 @@ void RemapWidget::handleTickle() {
 void RemapWidget::loadKeymap() {
 	assert(_actions.empty());
 
-	for (KeymapArray::const_iterator km = _keymapTable.begin(); km != _keymapTable.end(); km++) {
-		for (Keymap::ActionArray::const_iterator it = (*km)->getActions().begin(); it != (*km)->getActions().end(); ++it) {
+	for (const auto &km : _keymapTable) {
+		for (Keymap::ActionArray::const_iterator it = km->getActions().begin(); it != km->getActions().end(); ++it) {
 			ActionRow row;
-			row.keymap = *km;
+			row.keymap = km;
 			row.action = *it;
 
 			_actions.push_back(row);

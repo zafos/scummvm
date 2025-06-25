@@ -25,6 +25,7 @@
 #include "mads/mads.h"
 #include "mads/audio.h"
 #include "mads/dragonsphere/dragonsphere_scenes.h"
+#include "mads/forest/forest_scenes.h"
 #include "mads/nebular/nebular_scenes.h"
 #include "mads/phantom/phantom_scenes.h"
 
@@ -135,13 +136,16 @@ void Scene::loadSceneLogic() {
 	case GType_Phantom:
 		_sceneLogic = Phantom::SceneFactory::createScene(_vm);
 		break;
+	case GType_Forest:
+		_sceneLogic = Forest::SceneFactory::createScene(_vm);
+		break;
 #endif
 	default:
 		error("Scene logic: Unknown game");
 	}
 }
 
-void Scene::loadScene(int sceneId, const Common::String &prefix, bool palFlag) {
+void Scene::loadScene(int sceneId, const Common::Path &prefix, bool palFlag) {
 	// Store the previously active scene number and set the new one
 	_priorSceneId = _currentSceneId;
 	_currentSceneId = sceneId;
@@ -628,6 +632,11 @@ void Scene::checkKeyboard() {
 		_vm->_game->handleKeypress(evt);
 	}
 
+	if (events.isActionTriggered()) {
+		Common::CustomEventType evt = events.getAction();
+		_vm->_game->handleAction(evt);
+	}
+
 	if ((events._mouseStatus & 3) == 3 && _vm->_game->_player._stepEnabled) {
 		_reloadSceneFlag = true;
 		_vm->_dialogs->_pendingDialog = DIALOG_GAME_MENU;
@@ -636,7 +645,7 @@ void Scene::checkKeyboard() {
 	}
 }
 
-int Scene::loadAnimation(const Common::String &resName, int trigger) {
+int Scene::loadAnimation(const Common::Path &resName, int trigger) {
 	// WORKAROUND: If there's already a previous active animation used by the
 	// scene, then free it before we create the new one
 	if ((_vm->getGameID() == GType_RexNebular) && _animation[0])

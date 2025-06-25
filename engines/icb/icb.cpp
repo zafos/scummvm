@@ -85,46 +85,55 @@ Common::KeymapArray IcbEngine::initKeymapsIcb(const char *target) {
 	act->addDefaultInputMapping("JOY_RIGHT");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BFIR", _("Fire"));
 	act->setKeyEvent(KeyState(KEYCODE_SPACE));
 	act->addDefaultInputMapping("JOY_RIGHT_SHOULDER");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BUSE", _("Interact"));
 	act->setKeyEvent(KeyState(KEYCODE_LCTRL));
 	act->addDefaultInputMapping("JOY_A");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BINV", _("Inventory"));
 	act->setKeyEvent(KeyState(KEYCODE_RETURN));
 	act->addDefaultInputMapping("JOY_B");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BARM", _("Arm"));
 	act->setKeyEvent(KeyState(KEYCODE_LALT));
 	act->addDefaultInputMapping("JOY_LEFT_SHOULDER");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BREM", _("Remora"));
 	act->setKeyEvent(KeyState(KEYCODE_r));
 	act->addDefaultInputMapping("JOY_X");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BCRU", _("Crouch"));
 	act->setKeyEvent(KeyState(KEYCODE_x));
 	act->addDefaultInputMapping("JOY_Y");
 	engineKeyMap->addAction(act);
 
-	act = new Action("BSID", _("Side Step"));
+	// I18N: Action in In Cold Blood
+	act = new Action("BSID", _("Side step"));
 	act->setKeyEvent(KeyState(KEYCODE_LSHIFT));
 	act->addDefaultInputMapping("JOY_RIGHT_TRIGGER");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BRUN", _("Run"));
 	act->setKeyEvent(KeyState(KEYCODE_z));
 	act->addDefaultInputMapping("JOY_LEFT_TRIGGER");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BPAS", _("Pause"));
 	act->setKeyEvent(KeyState(KEYCODE_ESCAPE, ASCII_ESCAPE));
 	act->addDefaultInputMapping("ESCAPE");
@@ -160,31 +169,37 @@ Common::KeymapArray IcbEngine::initKeymapsEldorado(const char *target) {
 	act->addDefaultInputMapping("JOY_RIGHT");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BUSE", _("Interact"));
 	act->setKeyEvent(KeyState(KEYCODE_LCTRL));
 	act->addDefaultInputMapping("JOY_A");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BINV", _("Inventory"));
 	act->setKeyEvent(KeyState(KEYCODE_RETURN));
 	act->addDefaultInputMapping("JOY_B");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BCRU", _("Crouch"));
 	act->setKeyEvent(KeyState(KEYCODE_x));
 	act->addDefaultInputMapping("JOY_Y");
 	engineKeyMap->addAction(act);
 
-	act = new Action("BSID", _("Side Step"));
+	// I18N: Action in In Cold Blood
+	act = new Action("BSID", _("Side step"));
 	act->setKeyEvent(KeyState(KEYCODE_LSHIFT));
 	act->addDefaultInputMapping("JOY_RIGHT_TRIGGER");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BRUN", _("Run"));
 	act->setKeyEvent(KeyState(KEYCODE_z));
 	act->addDefaultInputMapping("JOY_LEFT_TRIGGER");
 	engineKeyMap->addAction(act);
 
+	// I18N: Action in In Cold Blood
 	act = new Action("BPAS", _("Pause"));
 	act->setKeyEvent(KeyState(KEYCODE_ESCAPE, ASCII_ESCAPE));
 	act->addDefaultInputMapping("ESCAPE");

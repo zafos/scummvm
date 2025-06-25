@@ -36,13 +36,19 @@ class CharacterInfo : public PartyView {
 	struct IconPos {
 		int _frame; int _x; int _y;
 	};
+	class AttributeView : public ScrollPopup {
+	public:
+		AttributeView() : ScrollPopup("ScrollText") {}
+		virtual ~AttributeView() {}
+		bool msgFocus(const FocusMessage &msg) override;
+	};
 private:
 	Shared::Xeen::SpriteResource _viewIcon;
 	static const IconPos ICONS[CHAR_ICONS_COUNT];
-	const char *ICONS_TEXT[CHAR_ICONS_COUNT];
+	Common::String ICONS_TEXT[CHAR_ICONS_COUNT];
 	int _cursorCell = 0;
 	bool _cursorVisible = false;
-	ScrollPopup _statInfo;
+	AttributeView _statInfo;
 private:
 	/**
 	 * Draw the title text
@@ -72,16 +78,31 @@ private:
 protected:
 	void timeout() override;
 
+	/**
+	 * Called when the selected character has been switched
+	 */
+	void charSwitched(Character *priorChar) override;
+	
 public:
 	CharacterInfo();
 	virtual ~CharacterInfo() {}
 
 	bool msgFocus(const FocusMessage &msg) override;
 	bool msgUnfocus(const UnfocusMessage &msg) override;
+	bool msgGame(const GameMessage &msg) override;
 	bool msgKeypress(const KeypressMessage &msg) override;
 	bool msgAction(const ActionMessage &msg) override;
 	bool msgMouseUp(const MouseUpMessage &msg) override;
 	void draw() override;
+};
+
+class CharacterInfoCombat : public CharacterInfo {
+public:
+	CharacterInfoCombat() : CharacterInfo() {
+		_name = "CharacterViewCombat";
+	}
+	virtual ~CharacterInfoCombat() {
+	}
 };
 
 } // namespace ViewsEnh

@@ -24,8 +24,10 @@
 #include "common/savefile.h"
 #include "common/config-manager.h"
 #include "common/translation.h"
-#include "common/gui_options.h"
 #include "common/md5.h"
+
+#include "gui/dialog.h"
+#include "gui/message.h"
 
 #include "audio/mididrv.h"
 
@@ -48,7 +50,7 @@
 
 namespace Scumm {
 
-Common::String ScummEngine::generateFilename(const int room) const {
+Common::Path ScummEngine::generateFilename(const int room) const {
 	const int diskNumber = (room > 0) ? _res->_types[rtRoom][room]._roomno : 0;
 	Common::String result;
 
@@ -79,12 +81,12 @@ Common::String ScummEngine::generateFilename(const int room) const {
 		}
 	}
 
-	return result;
+	return Common::Path(result, Common::Path::kNoSeparator);
 }
 
-Common::String ScummEngine_v60he::generateFilename(const int room) const {
+Common::Path ScummEngine_v60he::generateFilename(const int room) const {
 	Common::String result;
-	char id = 0;
+	char id;
 
 	switch (_filenamePattern.genMethod) {
 	case kGenHEMac:
@@ -118,10 +120,10 @@ Common::String ScummEngine_v60he::generateFilename(const int room) const {
 		return ScummEngine::generateFilename(room);
 	}
 
-	return result;
+	return Common::Path(result, Common::Path::kNoSeparator);
 }
 
-Common::String ScummEngine_v70he::generateFilename(const int room) const {
+Common::Path ScummEngine_v70he::generateFilename(const int room) const {
 	Common::String result;
 	char id = 0;
 
@@ -180,7 +182,7 @@ Common::String ScummEngine_v70he::generateFilename(const int room) const {
 				// For mac they're stored in game binary.
 				result = _filenamePattern.pattern;
 			} else {
-				Common::String pattern = id == 'b' ? bPattern : _filenamePattern.pattern;
+				Common::String pattern = id == 'b' ? Common::move(bPattern) : _filenamePattern.pattern;
 				if (_filenamePattern.genMethod == kGenHEMac)
 					result = Common::String::format("%s (%c)", pattern.c_str(), id);
 				else
@@ -195,11 +197,7 @@ Common::String ScummEngine_v70he::generateFilename(const int room) const {
 		return ScummEngine_v60he::generateFilename(room);
 	}
 
-	return result;
-}
-
-bool ScummEngine::isMacM68kIMuse() const {
-	return _game.platform == Common::kPlatformMacintosh && (_game.id == GID_MONKEY2 || _game.id == GID_INDY4) && !(_game.features & GF_MAC_CONTAINER);
+	return Common::Path(result, Common::Path::kNoSeparator);
 }
 
 } // End of namespace Scumm
@@ -244,9 +242,19 @@ bool ScummEngine::hasFeature(EngineFeature f) const {
 		(f == kSupportsHelp) ||
 		(
 			f == kSupportsChangingOptionsDuringRuntime &&
-			Common::String(_game.guioptions).contains(GUIO_AUDIO_OVERRIDE)
+			(Common::String(_game.guioptions).contains(GAMEOPTION_AUDIO_OVERRIDE) ||
+			 Common::String(_game.guioptions).contains(GAMEOPTION_NETWORK))
 		) ||
-		(f == kSupportsQuitDialogOverride && (_useOriginalGUI || !ChainedGamesMan.empty()));
+		(f == kSupportsQuitDialogOverride && (gameSupportsQuitDialogOverride() || !ChainedGamesMan.empty()));
+}
+
+bool ScummEngine::gameSupportsQuitDialogOverride() const {
+	bool supportsOverride = isUsingOriginalGUI();
+
+	supportsOverride &= !(_game.platform == Common::kPlatformNES);
+	supportsOverride &= !(_game.platform == Common::kPlatformSegaCD);
+
+	return supportsOverride;
 }
 
 
@@ -255,7 +263,8 @@ bool ScummEngine::hasFeature(EngineFeature f) const {
  *
  * This is heavily based on our MD5 detection scheme.
  */
-Common::Error ScummMetaEngine::createInstance(OSystem *syst, Engine **engine) {
+Common::Error ScummMetaEngine::createInstance(OSystem *syst, Engine **engine,
+	const DetectedGame &gameDescriptor, const void *metaEngineDescriptor) {
 	assert(syst);
 	assert(engine);
 	const char *gameid = ConfMan.get("gameid").c_str();
@@ -267,7 +276,7 @@ Common::Error ScummMetaEngine::createInstance(OSystem *syst, Engine **engine) {
 
 	// Fetch the list of files in the current directory.
 	Common::FSList fslist;
-	Common::FSNode dir(ConfMan.get("path"));
+	Common::FSNode dir(ConfMan.getPath("path"));
 	if (!dir.isDirectory())
 		return Common::kPathNotDirectory;
 	if (!dir.getChildren(fslist, Common::FSNode::kListAll))
@@ -356,6 +365,39 @@ Common::Error ScummMetaEngine::createInstance(OSystem *syst, Engine **engine) {
 		debug(1, "Using MD5 '%s'", res.md5.c_str());
 	}
 
+	bool foundCorruptedFanTranslation = false;
+
+	// Some fan-made translations used bad tools or techniques which deeply
+	// corrupted the resources of the game, making them buggy or even crash.
+	//
+	// One such example is a French translation of Indy3 VGA (ca. 2001-2002),
+	// known as "ryf's Indy3act", which contains corrupted opcodes in at least
+	// 07.LFL, 34.LFL and 72.LFL. See bug #5597 as an example of the fatal
+	// errors it introduced.
+	if (res.md5 == "1875b90fade138c9253a8e967007031a" && !strcmp(res.game.gameid, "indy3") && res.game.platform == Common::kPlatformDOS && (res.game.features & GF_OLD256)) {
+		Common::String md5OtherRes;
+		Common::FSNode resFile;
+		Common::File f;
+
+		// Look for 07.LFL, since this translation shares the English 00.LFL file
+		if (searchFSNode(fslist, "07.LFL", resFile))
+			f.open(resFile);
+		if (f.isOpen()) {
+			md5OtherRes = Common::computeStreamMD5AsString(f, kMD5FileSizeLimit);
+			f.close();
+		}
+
+		if (!md5OtherRes.empty() && md5OtherRes == "0f08943f6cda84ae4fb9b1b1af4f3c58")
+			foundCorruptedFanTranslation = true;
+	}
+
+	if (foundCorruptedFanTranslation) {
+		// Like ADGF_UNSUPPORTED, but cheap
+		GUIErrorMessage(_("This fan-made translation is not supported, because it is known to contain\n"
+		                  "corrupted resources that might make it crash or seriously misbehave."));
+		return Common::kUnsupportedGameidError;
+	}
+
 	// We don't support the "Lite" version off puttzoo iOS because it contains
 	// the full game.
 	if (!strcmp(res.game.gameid, "puttzoo") && !strcmp(res.extra, "Lite")) {
@@ -364,9 +406,21 @@ Common::Error ScummMetaEngine::createInstance(OSystem *syst, Engine **engine) {
 		return Common::kUnsupportedGameidError;
 	}
 
+	if (res.game.heversion != 0 && (res.extra && !strcmp(res.extra, "Steam"))) {
+		if (!strcmp(res.game.gameid, "baseball") ||
+			!strcmp(res.game.gameid, "soccer") ||
+			!strcmp(res.game.gameid, "baseball2001") ||
+			!strcmp(res.game.gameid, "basketball") ||
+			!strcmp(res.game.gameid, "football")) {
+			GUI::MessageDialog dialog(_("Warning: this re-release version contains patched game scripts,\n"
+										"and therefore it might crash or not work properly for the time being."));
+			dialog.runModal();
+		}
+	}
+
 	// If the GUI options were updated, we catch this here and update them in the users config
 	// file transparently.
-	Common::updateGameGUIOptions(res.game.guioptions, getGameGUIOptionsDescriptionLanguage(res.language));
+	Common::updateGameGUIOptions(customizeGuiOptions(res), getGameGUIOptionsDescriptionLanguage(res.language));
 
 	// If the game was added really long ago, it may be missing its "extra"
 	// field. When adding game-specific options, it may be our only way of
@@ -386,10 +440,16 @@ Common::Error ScummMetaEngine::createInstance(OSystem *syst, Engine **engine) {
 		res.language = Common::parseLanguage(ConfMan.get("language"));
 
 	// V3 FM-TOWNS games *always* should use the corresponding music driver,
-	// anything else makes no sense for them.
+	// anything else makes no sense for them. Same for Mac (but not limited to V3),
+	// except for the Steam macOS releases actually using DOS content.
 	// TODO: Maybe allow the null driver, too?
 	if (res.game.platform == Common::kPlatformFMTowns && res.game.version == 3)
 		res.game.midi = MDT_TOWNS;
+	else if (res.game.platform == Common::kPlatformMacintosh && res.game.version < 7 && res.game.heversion == 0) {
+		if (!(res.extra && strcmp(res.extra, "Steam") == 0))
+			res.game.midi = MDT_MACINTOSH;
+	}
+
 	// Finally, we have massaged the GameDescriptor to our satisfaction, and can
 	// instantiate the appropriate game engine. Hooray!
 	switch (res.game.version) {
@@ -427,6 +487,8 @@ Common::Error ScummMetaEngine::createInstance(OSystem *syst, Engine **engine) {
 			break;
 		case 98:
 		case 95:
+			*engine = new ScummEngine_v95he(syst, res);
+			break;
 		case 90:
 			*engine = new ScummEngine_v90he(syst, res);
 			break;
@@ -524,9 +586,9 @@ SaveStateList ScummMetaEngine::listSaves(const char *target) const {
 	return saveList;
 }
 
-void ScummMetaEngine::removeSaveState(const char *target, int slot) const {
+bool ScummMetaEngine::removeSaveState(const char *target, int slot) const {
 	Common::String filename = ScummEngine::makeSavegameName(target, slot, false);
-	g_system->getSavefileManager()->removeSavefile(filename);
+	return g_system->getSavefileManager()->removeSavefile(filename);
 }
 
 SaveStateDescriptor ScummMetaEngine::querySaveMetaInfos(const char *target, int slot) const {
@@ -561,35 +623,77 @@ SaveStateDescriptor ScummMetaEngine::querySaveMetaInfos(const char *target, int 
 	return desc;
 }
 
+GUI::OptionsContainerWidget *ScummMetaEngine::buildLoomOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const {
+	Common::Platform platform = Common::parsePlatform(ConfMan.get("platform", target));
+	if (platform != Common::kPlatformUnknown && platform != Common::kPlatformDOS && platform != Common::kPlatformMacintosh)
+		return nullptr;
+
+	Common::String extra = ConfMan.get("extra", target);
+
+	// The VGA Loom settings are only relevant for the DOS CD version, not
+	// the Steam version (which is assumed to be well timed already).
+
+	if (extra == "VGA")
+		return new Scumm::LoomVgaGameOptionsWidget(boss, name, target);
+
+	if (extra == "Steam" && platform != Common::kPlatformMacintosh)
+		return MetaEngine::buildEngineOptionsWidget(boss, name, target);
+	else if (extra == "Steam" && platform == Common::kPlatformMacintosh)
+		return nullptr;
+	else if (platform == Common::kPlatformMacintosh)
+		return new Scumm::MacGameOptionsWidget(boss, name, target, GID_LOOM, extra);
+
+	// These EGA Loom settings are only relevant for the EGA
+	// version, since that is the only one that has an overture.
+	return new Scumm::LoomEgaGameOptionsWidget(boss, name, target);
+}
+
+GUI::OptionsContainerWidget *ScummMetaEngine::buildMI1OptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const {
+	Common::String extra = ConfMan.get("extra", target);
+	Common::Platform platform = Common::parsePlatform(ConfMan.get("platform", target));
+
+	if (platform == Common::kPlatformMacintosh && extra != "Steam")
+		return new Scumm::MacGameOptionsWidget(boss, name, target, GID_MONKEY, extra);
+
+	if (extra == "CD" || platform == Common::kPlatformFMTowns || platform == Common::kPlatformSegaCD)
+		return new Scumm::MI1CdGameOptionsWidget(boss, name, target);
+
+	return nullptr;
+}
+
+
 GUI::OptionsContainerWidget *ScummMetaEngine::buildEngineOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const {
 	Common::String gameid = ConfMan.get("gameid", target);
 	Common::String extra = ConfMan.get("extra", target);
+	Common::Platform platform = Common::parsePlatform(ConfMan.get("platform", target));
 
 	if (gameid == "loom") {
-		Common::Platform platform = Common::parsePlatform(ConfMan.get("platform", target));
-		if (platform != Common::kPlatformUnknown && platform != Common::kPlatformDOS)
-			return MetaEngine::buildEngineOptionsWidget(boss, name, target);
-
-		// The VGA Loom settings are only relevant for the DOS CD
-		// version, not the Steam version (which is assumed to be well
-		// timed already).
-
-		if (extra == "VGA")
-			return new Scumm::LoomVgaGameOptionsWidget(boss, name, target);
-
-		if (extra == "Steam")
-			return MetaEngine::buildEngineOptionsWidget(boss, name, target);
-
-		// These EGA Loom settings are only relevant for the EGA
-		// version, since that is the only one that has an overture.
-
-		return new Scumm::LoomEgaGameOptionsWidget(boss, name, target);
+		GUI::OptionsContainerWidget *widget = buildLoomOptionsWidget(boss, name, target);
+		if (widget)
+			return widget;
 	} else if (gameid == "monkey") {
-		if (extra != "CD" && extra != "FM-TOWNS" && extra != "SEGA")
-			return MetaEngine::buildEngineOptionsWidget(boss, name, target);
-
-		return new Scumm::MI1CdGameOptionsWidget(boss, name, target);
+		GUI::OptionsContainerWidget *widget = buildMI1OptionsWidget(boss, name, target);
+		if (widget)
+			return widget;
+	} else if (platform == Common::kPlatformMacintosh) {
+		GUI::OptionsContainerWidget *widget = nullptr;
+		if (gameid == "monkey2")
+			widget = new Scumm::MacGameOptionsWidget(boss, name, target, GID_MONKEY2, extra);
+		else if (gameid == "atlantis")
+			widget = new Scumm::MacGameOptionsWidget(boss, name, target, GID_INDY4, extra);
+		if (widget)
+			return widget;
 	}
+#ifdef USE_ENET
+	else if (gameid == "football" || gameid == "baseball2001" || gameid == "football2002" ||
+		gameid == "moonbase")
+		return new Scumm::HENetworkGameOptionsWidget(boss, name, target, Common::move(gameid));
+#endif
+
+	const ExtraGuiOptions engineOptions = getExtraGuiOptions(target);
+
+	if (!engineOptions.empty())
+		return new Scumm::ScummGameOptionsWidget(boss, name, target, engineOptions);
 
 	return MetaEngine::buildEngineOptionsWidget(boss, name, target);
 }
@@ -603,7 +707,7 @@ static const ExtraGuiOption comiObjectLabelsOption = {
 	0
 };
 
-static const ExtraGuiOption mmnesObjectLabelsOption = {
+static const ExtraGuiOption mmnesClassicPaletteOption = {
 	_s("Use NES Classic Palette"),
 	_s("Use a more neutral color palette that closely emulates the NES Classic"),
 	"mm_nes_classic_palette",
@@ -621,9 +725,17 @@ static const ExtraGuiOption fmtownsTrimTo200 = {
 	0
 };
 
+static const ExtraGuiOption fmtownsForceHiResMode = {
+	_s("Run in original 640 x 480 resolution"),
+	_s("This allows more accurate pause/restart banners, but might impact performance or shader/scaler usage."),
+	"force_fmtowns_hires_mode",
+	false,
+	0,
+	0};
+
 static const ExtraGuiOption macV3LowQualityMusic = {
 	_s("Play simplified music"),
-	_s("This music was presumably intended for low-end Macs, and uses only one channel."),
+	_s("This music was intended for low-end Macs, and uses only one channel."),
 	"mac_v3_low_quality_music",
 	false,
 	0,
@@ -636,7 +748,7 @@ static const ExtraGuiOption smoothScrolling = {
 	"smooth_scroll",
 	true,
 	0,
-	1
+	0
 };
 
 static const ExtraGuiOption semiSmoothScrolling = {
@@ -644,14 +756,14 @@ static const ExtraGuiOption semiSmoothScrolling = {
 	_s("Allow scrolling to be less smooth during the fast camera movement in the intro."),
 	"semi_smooth_scroll",
 	false,
-	1,
+	0,
 	0
 };
 
 static const ExtraGuiOption enableEnhancements {
-	_s("Enable game-specific enhancements"),
-	_s("Allow ScummVM to make small enhancements to the game, usually based on other versions of the same game."),
-	"enable_enhancements",
+	"",
+	"",
+	"enhancements",
 	true,
 	0,
 	0
@@ -668,9 +780,18 @@ static const ExtraGuiOption audioOverride {
 
 static const ExtraGuiOption enableOriginalGUI = {
 	_s("Enable the original GUI and Menu"),
-	_s("Allow the game to use the in-engine graphical interface and the original save/load menu. \
-		Use it together with the \"Ask for confirmation on exit\" for a more complete experience."),
+	_s("Allow the game to use the in-engine graphical interface and the original save/load menu. "
+	   "Use it together with the \"Ask for confirmation on exit\" for a more complete experience."),
 	"original_gui",
+	true,
+	0,
+	0
+};
+
+static const ExtraGuiOption enableMacintoshGamma = {
+	_s("Enable gamma correction"),
+	_s("Brighten the graphics to simulate a Macintosh monitor."),
+	"gamma_correction",
 	true,
 	0,
 	0
@@ -678,13 +799,64 @@ static const ExtraGuiOption enableOriginalGUI = {
 
 static const ExtraGuiOption enableLowLatencyAudio = {
 	_s("Enable low latency audio mode"),
-	_s("Allows the game to use low latency audio, at the cost of sound accuracy. \
-		It is recommended to enable this feature only if you incur in audio latency issues during normal gameplay."),
+	_s("Allows the game to use low latency audio, at the cost of sound accuracy. "
+	   "It is recommended to enable this feature only if you incur in audio latency issues during normal gameplay."),
 	"dimuse_low_latency_mode",
 	false,
 	0,
 	0
 };
+
+static const ExtraGuiOption enableCOMISong = {
+	_s("Enable the \"A Pirate I Was Meant To Be\" song"),
+	_s("Enable the song at the beginning of Part 3 of the game, \"A Pirate I Was Meant To Be\", "
+	   "which was cut in international releases. Beware though: subtitles may not be fully translated."),
+	"enable_song",
+	false,
+	0,
+	0
+};
+
+static const ExtraGuiOption enableCopyProtection = {
+	_s("Enable copy protection"),
+	_s("Enable any copy protection that would otherwise be bypassed by default."),
+	"copy_protection",
+	false,
+	0,
+	0
+};
+
+static const ExtraGuiOption mmDemoModeOption = {
+	_s("Enable demo/kiosk mode"),
+	_s("Enable demo/kiosk mode in the full retail version of Maniac Mansion."),
+	"enable_demo_mode",
+	false,
+	0,
+	0
+};
+
+static const ExtraGuiOption useRemasteredAudio = {
+	_s("Use remastered audio"),
+	_s("Use the remastered speech and sound effects."),
+	"use_remastered_audio",
+	true,
+	0,
+	0
+};
+
+// TODO: Ambience sounds are disabled for now, as they require the following:
+// - WMA codec
+// - Read ambience track info from resource files
+#if 0
+static const ExtraGuiOption enableAmbienceSounds = {
+	_s("Enable ambience sounds"),
+	_s("Enable ambience sounds."),
+	"enable_ambience_sounds",
+	true,
+	0,
+	0
+};
+#endif
 
 const ExtraGuiOptions ScummMetaEngine::getExtraGuiOptions(const Common::String &target) const {
 	ExtraGuiOptions options;
@@ -694,33 +866,66 @@ const ExtraGuiOptions ScummMetaEngine::getExtraGuiOptions(const Common::String &
 	const Common::String extra = ConfMan.get("extra", target);
 	const Common::String guiOptions = parseGameGUIOptions(guiOptionsString);
 	const Common::Platform platform = Common::parsePlatform(ConfMan.get("platform", target));
+	const Common::String language = ConfMan.get("language", target);
 
-	if (target.empty() || guiOptions.contains(GUIO_ORIGINALGUI)) {
+	if (target.empty() || guiOptions.contains(GAMEOPTION_ORIGINALGUI)) {
 		options.push_back(enableOriginalGUI);
+
+		if (platform == Common::kPlatformMacintosh) {
+			options.push_back(enableMacintoshGamma);
+		}
 	}
-	if (target.empty() || guiOptions.contains(GUIO_ENHANCEMENTS)) {
+	if (target.empty() || guiOptions.contains(GAMEOPTION_COPY_PROTECTION)) {
+		options.push_back(enableCopyProtection);
+	}
+	if (target.empty() || guiOptions.contains(GAMEOPTION_ENHANCEMENTS)) {
 		options.push_back(enableEnhancements);
 	}
-	if (target.empty() || guiOptions.contains(GUIO_LOWLATENCYAUDIO)) {
+	if (target.empty() || guiOptions.contains(GAMEOPTION_LOWLATENCYAUDIO)) {
 		options.push_back(enableLowLatencyAudio);
 	}
-	if (target.empty() || guiOptions.contains(GUIO_AUDIO_OVERRIDE)) {
+	if (target.empty() || guiOptions.contains(GAMEOPTION_AUDIO_OVERRIDE)) {
 		options.push_back(audioOverride);
+	}
+	if (target.empty() || guiOptions.contains(GAMEOPTION_USE_REMASTERED_AUDIO)) {
+		options.push_back(useRemasteredAudio);
+#if 0
+		if (gameid == "monkey" || gameid == "monkey2")
+			options.push_back(enableAmbienceSounds);
+#endif
 	}
 	if (target.empty() || gameid == "comi") {
 		options.push_back(comiObjectLabelsOption);
+
+		if (!language.equals("en")) {
+			options.push_back(enableCOMISong);
+		}
 	}
 	if (target.empty() || platform == Common::kPlatformNES) {
-		options.push_back(mmnesObjectLabelsOption);
+		options.push_back(mmnesClassicPaletteOption);
 	}
 	if (target.empty() || platform == Common::kPlatformFMTowns) {
 		options.push_back(smoothScrolling);
 		if (target.empty() || gameid == "loom")
 			options.push_back(semiSmoothScrolling);
-		if (guiOptions.contains(GUIO_TRIM_FMTOWNS_TO_200_PIXELS))
+		if (guiOptions.contains(GAMEOPTION_TRIM_FMTOWNS_TO_200_PIXELS))
 			options.push_back(fmtownsTrimTo200);
+#ifndef DISABLE_TOWNS_DUAL_LAYER_MODE
+		if (platform == Common::kPlatformFMTowns && Common::parseLanguage(language) != Common::JA_JPN)
+			options.push_back(fmtownsForceHiResMode);
+#endif
 	}
+	if (target.empty() || gameid == "maniac") {
+		// The kiosk demo script is in V1/V2 DOS, V2 Atari ST and V2 Amiga.
+		bool isValidTarget = !extra.contains("Demo") &&
+			(platform == Common::kPlatformDOS   ||
+			 platform == Common::kPlatformAmiga ||
+			 platform == Common::kPlatformAtariST) &&
+			 !guiOptionsString.contains("lang_Italian");
 
+		if (isValidTarget)
+			options.push_back(mmDemoModeOption);
+	}
 	// The Steam Mac versions of Loom and Indy 3 are more akin to the VGA
 	// DOS versions, and that's how ScummVM usually sees them. But that
 	// rebranding does not happen until later.
@@ -728,11 +933,22 @@ const ExtraGuiOptions ScummMetaEngine::getExtraGuiOptions(const Common::String &
 	// The low quality music in Loom was probably intended for low-end
 	// Macs. It plays only one channel, instead of three.
 
-	if (target.empty() || (gameid == "loom" && platform == Common::kPlatformMacintosh && extra != "Steam")) {
+	if (target.empty() || (gameid == "indy3" && platform == Common::kPlatformMacintosh && extra != "Steam")) {
 		options.push_back(macV3LowQualityMusic);
 	}
 
 	return options;
+}
+
+void ScummMetaEngine::registerDefaultSettings(const Common::String &) const {
+	const ExtraGuiOptions engineOptions = getExtraGuiOptions("");
+	for (uint i = 0; i < engineOptions.size(); i++) {
+		if (strcmp(engineOptions[i].configOption, "enhancements") == 0)
+			ConfMan.registerDefault(engineOptions[i].configOption, kEnhGameBreakingBugFixes | kEnhGrp1);
+		else
+			ConfMan.registerDefault(engineOptions[i].configOption, engineOptions[i].defaultState);
+	}
+	ConfMan.registerDefault("gamma_correction", true);
 }
 
 Common::KeymapArray ScummMetaEngine::initKeymaps(const char *target) const {
@@ -746,7 +962,7 @@ Common::KeymapArray ScummMetaEngine::initKeymaps(const char *target) const {
 	if (gameId == "ft") {
 		Keymap *insaneKeymap = new Keymap(Keymap::kKeymapTypeGame, insaneKeymapId, "SCUMM - Bike Fights");
 
-		act = new Action("DOWNLEFT", _("Down Left"));
+		act = new Action("DOWNLEFT", _("Down left"));
 		act->setCustomEngineActionEvent(kScummActionInsaneDownLeft);
 		act->addDefaultInputMapping("KP1");
 		act->addDefaultInputMapping("END");
@@ -759,7 +975,7 @@ Common::KeymapArray ScummMetaEngine::initKeymaps(const char *target) const {
 		act->addDefaultInputMapping("JOY_DOWN");
 		insaneKeymap->addAction(act);
 
-		act = new Action("DOWNRIGHT", _("Down Right"));
+		act = new Action("DOWNRIGHT", _("Down right"));
 		act->setCustomEngineActionEvent(kScummActionInsaneDownRight);
 		act->addDefaultInputMapping("KP3");
 		act->addDefaultInputMapping("PAGEDOWN");
@@ -779,7 +995,7 @@ Common::KeymapArray ScummMetaEngine::initKeymaps(const char *target) const {
 		act->addDefaultInputMapping("JOY_RIGHT");
 		insaneKeymap->addAction(act);
 
-		act = new Action("UPLEFT", _("Up Left"));
+		act = new Action("UPLEFT", _("Up left"));
 		act->setCustomEngineActionEvent(kScummActionInsaneUpLeft);
 		act->addDefaultInputMapping("KP7");
 		act->addDefaultInputMapping("INSERT");
@@ -792,7 +1008,7 @@ Common::KeymapArray ScummMetaEngine::initKeymaps(const char *target) const {
 		act->addDefaultInputMapping("JOY_UP");
 		insaneKeymap->addAction(act);
 
-		act = new Action("UPRIGHT", _("Up Right"));
+		act = new Action("UPRIGHT", _("Up right"));
 		act->setCustomEngineActionEvent(kScummActionInsaneUpRight);
 		act->addDefaultInputMapping("KP9");
 		act->addDefaultInputMapping("PAGEUP");

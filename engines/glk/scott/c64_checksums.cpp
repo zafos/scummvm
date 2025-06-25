@@ -206,6 +206,9 @@ int savageIslandMenu(uint8_t **sf, size_t *extent, int recIndex) {
 				g_scott->glk_request_char_event(_G(_bottomWindow));
 			}
 		}
+
+		if (g_vm->shouldQuit())
+			return 0;
 	} while (result == 0);
 
 	g_scott->glk_window_clear(_G(_bottomWindow));
@@ -235,7 +238,6 @@ int savageIslandMenu(uint8_t **sf, size_t *extent, int recIndex) {
 		return decrunchC64(sf, extent, rec);
 	} else {
 		error("savageIslandMenu: Failed loading file %s\n", rec._appendFile);
-		return 0;
 	}
 }
 
@@ -258,6 +260,7 @@ void appendSIfiles(uint8_t **sf, size_t *extent) {
 	*extent = offset + _G(_saveIslandAppendix1Length) + _G(_saveIslandAppendix2Length);
 	*sf = new uint8_t[*extent];
 	memcpy(*sf, megabuf, *extent);
+	delete[] megabuf;
 }
 
 int mysteriousMenu(uint8_t **sf, size_t *extent, int recindex) {
@@ -284,6 +287,9 @@ int mysteriousMenu(uint8_t **sf, size_t *extent, int recindex) {
 				g_scott->glk_request_char_event(_G(_bottomWindow));
 			}
 		}
+
+		if (g_vm->shouldQuit())
+			return 0;
 	} while (result == 0);
 
 	g_scott->glk_window_clear(_G(_bottomWindow));
@@ -310,7 +316,6 @@ int mysteriousMenu(uint8_t **sf, size_t *extent, int recindex) {
 		break;
 	default:
 		error("mysteriousMenu: Unknown Game");
-		break;
 	}
 
 	int length;
@@ -351,6 +356,9 @@ int mysteriousMenu2(uint8_t **sf, size_t *extent, int recindex) {
 				g_scott->glk_request_char_event(_G(_bottomWindow));
 			}
 		}
+
+		if (g_vm->shouldQuit())
+			return 0;
 	} while (result == 0);
 
 	g_scott->glk_window_clear(_G(_bottomWindow));
@@ -374,7 +382,6 @@ int mysteriousMenu2(uint8_t **sf, size_t *extent, int recindex) {
 		break;
 	default:
 		error("mysteriousMenu2: Unknown Game");
-		break;
 	}
 
 	int length;
@@ -388,7 +395,6 @@ int mysteriousMenu2(uint8_t **sf, size_t *extent, int recindex) {
 		return decrunchC64(sf, extent, rec);
 	} else {
 		error("mysteriousMenu2: Failed loading file %s", filename);
-		return 0;
 	}
 }
 
@@ -424,11 +430,13 @@ int detectC64(uint8_t **sf, size_t *extent) {
 			memcpy(megabuf + newlength + g_C64Registry[index]._parameter, appendix + 2, appendixlen);
 			newlength += appendixlen;
 		}
+		delete[] appendix;
 
 		if (largest_file) {
 			*sf = megabuf;
 			*extent = newlength;
 		}
+		delete[] largest_file;
 
 	} else if (g_C64Registry[index]._type == TYPE_T64) {
 		uint8_t *file_records = *sf + 64;

@@ -24,7 +24,7 @@
 
 #include "audio/mixer.h"
 #include "zvision/scripting/scripting_effect.h"
-#include "zvision/text/subtitles.h"
+#include "zvision/text/subtitle_manager.h"
 
 namespace Common {
 class String;
@@ -33,7 +33,7 @@ class String;
 namespace ZVision {
 class SyncSoundNode : public ScriptingEffect {
 public:
-	SyncSoundNode(ZVision *engine, uint32 key, Common::String &file, int32 syncto);
+	SyncSoundNode(ZVision *engine, uint32 key, Common::Path &file, int32 syncto);
 	~SyncSoundNode() override;
 
 	/**
@@ -47,7 +47,7 @@ public:
 private:
 	int32 _syncto;
 	Audio::SoundHandle _handle;
-	Subtitle *_sub;
+	uint16 _sub;
 };
 
 } // End of namespace ZVision

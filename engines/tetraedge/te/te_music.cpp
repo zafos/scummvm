@@ -63,9 +63,8 @@ bool TeMusic::play() {
 	if (!_fileNode.exists())
 		return false;
 
-	Common::File *streamfile = new Common::File();
-	if (!streamfile->open(_fileNode)) {
-		delete streamfile;
+	Common::SeekableReadStream *streamfile = _fileNode.createReadStream();
+	if (!streamfile) {
 		return false;
 	}
 	Audio::AudioStream *stream = Audio::makeVorbisStream(streamfile, DisposeAfterUse::YES);
@@ -82,7 +81,7 @@ bool TeMusic::play() {
 		soundType = Audio::Mixer::kMusicSoundType;
 	}
 
-	//debug("playing %s on channel %s at vol %d", _fileNode.getPath().c_str(), _channelName.c_str(), vol);
+	//debug("playing %s on channel %s at vol %d", _fileNode.toString().c_str(), _channelName.c_str(), vol);
 	mixer->playStream(soundType, &_sndHandle, stream, -1, vol);
 	_sndHandleValid = true;
 	_isPaused = false;
@@ -162,7 +161,7 @@ bool TeMusic::isPlaying() {
 	return retval;
 }
 
-bool TeMusic::load(const Common::String &path) {
+bool TeMusic::load(const Common::Path &path) {
 	if (path.empty())
 		return false;
 
@@ -178,14 +177,14 @@ bool TeMusic::onSoundManagerVolumeChanged() {
 	return false;
 }
 
-Common::String TeMusic::path() {
+Common::Path TeMusic::path() {
 	_mutex.lock();
-	Common::String retval = _rawPath;
+	Common::Path retval = _rawPath;
 	_mutex.unlock();
 	return retval;
 }
 
-void TeMusic::setFilePath(const Common::String &name) {
+void TeMusic::setFilePath(const Common::Path &name) {
 	stop();
 	setAccessName(name);
 	_rawPath = name;

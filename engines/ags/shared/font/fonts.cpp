@@ -19,11 +19,12 @@
  *
  */
 
-#include "ags/lib/std/algorithm.h"
+#include "common/std/algorithm.h"
 #include "ags/lib/alfont/alfont.h"
-#include "ags/lib/std/vector.h"
+#include "common/std/vector.h"
 #include "ags/shared/ac/common.h" // set_our_eip
 #include "ags/shared/ac/game_struct_defines.h"
+#include "ags/shared/debugging/out.h"
 #include "ags/shared/font/fonts.h"
 #include "ags/shared/font/ttf_font_renderer.h"
 #include "ags/shared/font/wfn_font_renderer.h"
@@ -69,7 +70,7 @@ bool font_first_renderer_loaded() {
 }
 
 bool is_font_loaded(size_t fontNumber) {
-	return fontNumber < _GP(fonts).size() && _GP(fonts)[fontNumber].Renderer != nullptr;;
+	return fontNumber < _GP(fonts).size() && _GP(fonts)[fontNumber].Renderer != nullptr;
 }
 
 // Finish font's initialization
@@ -77,7 +78,7 @@ static void font_post_init(size_t fontNumber) {
 	Font &font = _GP(fonts)[fontNumber];
 	// If no font height property was provided, then try several methods,
 	// depending on which interface is available
-	if (font.Metrics.Height == 0 && font.Renderer) {
+	if (font.Metrics.NominalHeight == 0 && font.Renderer) {
 		int height = 0;
 		if (font.Renderer2)
 			height = font.Renderer2->GetFontHeight(fontNumber);
@@ -90,13 +91,14 @@ static void font_post_init(size_t fontNumber) {
 			height = font.Renderer->GetTextHeight(height_test_string, fontNumber);
 		}
 
-		font.Metrics.Height = std::max(0, height);
-		font.Metrics.RealHeight = font.Metrics.Height;
+		font.Metrics.NominalHeight = std::max(0, height);
+		font.Metrics.RealHeight = font.Metrics.NominalHeight;
+		font.Metrics.VExtent = std::make_pair(0, font.Metrics.RealHeight);
 	}
 	// Use either nominal or real pixel height to define font's logical height
 	// and default linespacing; logical height = nominal height is compatible with the old games
 	font.Metrics.CompatHeight = (font.Info.Flags & FFLG_REPORTNOMINALHEIGHT) != 0 ?
-		font.Metrics.Height : font.Metrics.RealHeight;
+		font.Metrics.NominalHeight : font.Metrics.RealHeight;
 
 	if (font.Info.Outline != FONT_OUTLINE_AUTO) {
 		font.Info.AutoOutlineThickness = 0;
@@ -205,6 +207,8 @@ int get_text_width(const char *texx, size_t fontNumber) {
 int get_text_width_outlined(const char *text, size_t font_number) {
 	if (font_number >= _GP(fonts).size() || !_GP(fonts)[font_number].Renderer)
 		return 0;
+	if (text == nullptr || text[0] == 0) // we ignore outline width since the text is empty
+		return 0;
 	int self_width = _GP(fonts)[font_number].Renderer->GetTextWidth(text, font_number);
 	int outline = _GP(fonts)[font_number].Info.Outline;
 	if (outline < 0 || static_cast<size_t>(outline) > _GP(fonts).size()) { // FONT_OUTLINE_AUTO or FONT_OUTLINE_NONE
@@ -212,6 +216,12 @@ int get_text_width_outlined(const char *text, size_t font_number) {
 	}
 	int outline_width = _GP(fonts)[outline].Renderer->GetTextWidth(text, outline);
 	return MAX(self_width, outline_width);
+}
+
+int get_text_height(const char *text, size_t font_number) {
+	if (font_number >= _GP(fonts).size() || !_GP(fonts)[font_number].Renderer)
+		return 0;
+	return _GP(fonts)[font_number].Renderer->GetTextHeight(text, font_number);
 }
 
 int get_font_outline(size_t font_number) {
@@ -262,7 +272,13 @@ int get_font_height_outlined(size_t fontNumber) {
 int get_font_surface_height(size_t fontNumber) {
 	if (fontNumber >= _GP(fonts).size() || !_GP(fonts)[fontNumber].Renderer)
 		return 0;
-	return _GP(fonts)[fontNumber].Metrics.RealHeight;
+	return _GP(fonts)[fontNumber].Metrics.ExtentHeight();
+}
+
+std::pair<int, int> get_font_surface_extent(size_t fontNumber) {
+	if (fontNumber >= _GP(fonts).size() || !_GP(fonts)[fontNumber].Renderer)
+		return std::make_pair(0, 0);
+	return _GP(fonts)[fontNumber].Metrics.VExtent;
 }
 
 int get_font_linespacing(size_t fontNumber) {
@@ -391,7 +407,7 @@ size_t split_lines(const char *todis, SplitLines &lines, int wii, int fonnt, siz
 				break;
 			}
 			// add this line; do the temporary terminator trick again
-			const int next_chwas = *split_at;
+			const int next_chwas = ugetc(split_at);
 			*split_at = 0;
 			lines.Add(theline);
 			usetc(split_at, next_chwas);
@@ -421,6 +437,13 @@ void wouttextxy(Shared::Bitmap *ds, int xxx, int yyy, size_t fontNumber, color_t
 		return;                   // each char is clipped but this speeds it up
 
 	if (_GP(fonts)[fontNumber].Renderer != nullptr) {
+		if (text_color == makeacol32(255, 0, 255, 255)) { // transparent color (magenta)
+			// WORKAROUND: Some Allegro routines are not implemented and alfont treats some magenta texts as invisible
+			// even if the alpha channel is fully opaque
+			// Slightly change the value if the game uses that color for fonts, so that they don't turn invisible
+			debug(0, "Overriding transparent text color!");
+			text_color--;
+		}
 		_GP(fonts)[fontNumber].Renderer->RenderText(texx, fontNumber, (BITMAP *)ds->GetAllegroBitmap(), xxx, yyy, text_color);
 	}
 }
@@ -449,22 +472,28 @@ bool load_font_size(size_t fontNumber, const FontInfo &font_info) {
 	params.LoadMode = (font_info.Flags & FFLG_LOADMODEMASK);
 	FontMetrics metrics;
 
-	if (_GP(ttfRenderer).LoadFromDiskEx(fontNumber, font_info.Size, &params, &metrics)) {
-		_GP(fonts)[fontNumber].Renderer = &_GP(ttfRenderer);
-		_GP(fonts)[fontNumber].Renderer2 = &_GP(ttfRenderer);
-		_GP(fonts)[fontNumber].RendererInt = &_GP(ttfRenderer);
-	} else if (_GP(wfnRenderer).LoadFromDiskEx(fontNumber, font_info.Size, &params, &metrics)) {
-		_GP(fonts)[fontNumber].Renderer = &_GP(wfnRenderer);
-		_GP(fonts)[fontNumber].Renderer2 = &_GP(wfnRenderer);
-		_GP(fonts)[fontNumber].RendererInt = &_GP(wfnRenderer);
+	Font &font = _GP(fonts)[fontNumber];
+	String src_filename;
+	if (_GP(ttfRenderer).LoadFromDiskEx(fontNumber, font_info.Size, &src_filename, &params, &metrics)) {
+		font.Renderer = &_GP(ttfRenderer);
+		font.Renderer2 = &_GP(ttfRenderer);
+		font.RendererInt = &_GP(ttfRenderer);
+	} else if (_GP(wfnRenderer).LoadFromDiskEx(fontNumber, font_info.Size, &src_filename, &params, &metrics)) {
+		font.Renderer = &_GP(wfnRenderer);
+		font.Renderer2 = &_GP(wfnRenderer);
+		font.RendererInt = &_GP(wfnRenderer);
 	}
 
-	if (!_GP(fonts)[fontNumber].Renderer)
+	if (!font.Renderer)
 		return false;
 
-	_GP(fonts)[fontNumber].Info = font_info;
-	_GP(fonts)[fontNumber].Metrics = metrics;
+	font.Info = font_info;
+	font.Metrics = metrics;
 	font_post_init(fontNumber);
+
+	Debug::Printf("Loaded font %d: %s, req size: %d; nominal h: %d, real h: %d, extent: %d,%d",
+				  fontNumber, src_filename.GetCStr(), font_info.Size, font.Metrics.NominalHeight, font.Metrics.RealHeight,
+				  font.Metrics.VExtent.first, font.Metrics.VExtent.second);
 	return true;
 }
 

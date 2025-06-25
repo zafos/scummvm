@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #ifndef GOB_VIDEOPLAYER_H
@@ -98,6 +104,11 @@ public:
 		bool hasSound; ///< Does the video have sound?
 		bool canceled; ///< Was the video canceled?
 
+		int slot; ///< Explicit slot index (-1 = auto).
+		bool reuseSlotWitSameFilename;
+
+		bool noWaitSound;
+
 		Properties();
 	};
 
@@ -109,7 +120,7 @@ public:
 	int  openVideo(bool primary, const Common::String &file, Properties &properties);
 	bool closeVideo(int slot = 0);
 
-	void closeLiveSound();
+	void closeLiveVideos();
 	void closeAll();
 
 	bool reopenVideo(int slot = 0);
@@ -126,20 +137,24 @@ public:
 	int32 getExpectedFrameFromCurrentTime(int slot);
 
 	bool isPlayingLive() const;
+	bool isSoundPlaying() const;
 
-	void updateLive(bool force = false);
+	void updateLive(bool force = false, int exceptSlot = -1);
 
 	bool slotIsOpen(int slot = 0) const;
 
 	Common::String getFileName(int slot = 0) const;
 
-	uint32 getFrameCount  (int slot = 0) const;
-	uint32 getCurrentFrame(int slot = 0) const;
-	uint16 getWidth       (int slot = 0) const;
-	uint16 getHeight      (int slot = 0) const;
-	uint16 getDefaultX    (int slot = 0) const;
-	uint16 getDefaultY    (int slot = 0) const;
-	uint32 getFlags       (int slot = 0) const;
+	uint32 getFrameCount     (int slot = 0) const;
+	uint32 getCurrentFrame   (int slot = 0) const;
+	uint16 getWidth          (int slot = 0) const;
+	uint16 getHeight         (int slot = 0) const;
+	uint16 getDefaultX       (int slot = 0) const;
+	uint16 getDefaultY       (int slot = 0) const;
+	uint32 getFlags          (int slot = 0) const;
+	uint16 getSoundFlags     (int slot = 0) const;
+	uint32 getVideoBufferSize(int slot = 0) const;
+	bool   hasVideo          (int slot = 0) const;
 
 
 	const Common::List<Common::Rect> *getDirtyRects(int slot = 0) const;
@@ -162,6 +177,8 @@ private:
 		Common::String fileName;
 
 		SurfacePtr surface;
+		Common::SharedPtr<Graphics::Surface> tmpSurfBppConversion;
+		uint32 *highColorMap;
 
 		Properties properties;
 
@@ -176,6 +193,9 @@ private:
 	};
 
 	static const int kVideoSlotCount = 32;
+	static const int kPrimaryVideoSlot = 0;
+	static const int kLiveVideoSlotCount = 6;
+	static const int kVideoSlotWithCurFrameVarCount = 4;
 
 	static const char *const _extensions[];
 
@@ -200,6 +220,7 @@ private:
 
 	bool reopenVideo(Video &video);
 
+	bool lastFrameReached(Video &video, Properties &properties);
 	bool playFrame(int slot, Properties &properties);
 
 	void checkAbort(Video &video, Properties &properties);

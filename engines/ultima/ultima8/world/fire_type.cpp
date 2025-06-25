@@ -35,17 +35,6 @@
 namespace Ultima {
 namespace Ultima8 {
 
-FireType::FireType(uint16 typeNo, uint16 minDamage, uint16 maxDamage, uint8 range,
-				 uint8 numShots, uint16 shieldCost, uint8 shieldMask, bool accurate,
-				 uint16 cellsPerRound, uint16 roundDuration, bool nearSprite) :
-	_typeNo(typeNo), _minDamage(minDamage), _maxDamage(maxDamage),
-	_range(range), _numShots(numShots), _shieldCost(shieldCost),
-	_shieldMask(shieldMask), _accurate(accurate),
-	_cellsPerRound(cellsPerRound), _roundDuration(roundDuration),
-	_nearSprite(nearSprite) {
-	assert(maxDamage >= minDamage);
-}
-
 uint16 FireType::getRandomDamage() const {
 	if (_minDamage == _maxDamage)
 		return _minDamage;
@@ -260,8 +249,7 @@ void FireType::applySplashDamageAround(const Point3 &pt, int damage, int rangedi
 			continue;
 		int splashitemdamage = damage;
 		if (_typeNo == 3 || _typeNo == 4 || _typeNo == 10) {
-			Point3 pt2;
-			splashitem->getLocation(pt2);
+			Point3 pt2 = splashitem->getLocation();
 			int splashrange = pt.maxDistXYZ(pt2);
 			splashrange = (splashrange / 32) / 3;
 			if (splashrange)

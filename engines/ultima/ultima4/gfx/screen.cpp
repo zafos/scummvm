@@ -83,11 +83,10 @@ Screen::~Screen() {
 }
 
 void Screen::init() {
-	Graphics::PixelFormat SCREEN_FORMAT(2, 5, 6, 5, 0, 11, 5, 0, 0);
 	Common::Point size(SCREEN_WIDTH * settings._scale, SCREEN_HEIGHT * settings._scale);
 
-	initGraphics(size.x, size.y, &SCREEN_FORMAT);
-	create(size.x, size.y, SCREEN_FORMAT);
+	initGraphics(size.x, size.y, nullptr);
+	create(size.x, size.y, g_system->getScreenFormat());
 
 	loadMouseCursors();
 	screenLoadGraphicsFromConf();
@@ -96,8 +95,7 @@ void Screen::init() {
 
 	/* find the tile animations for our tileset */
 	_tileAnims = nullptr;
-	for (Std::vector<TileAnimSet *>::const_iterator i = _tileAnimSets.begin(); i != _tileAnimSets.end(); i++) {
-		TileAnimSet *set = *i;
+	for (auto *set : _tileAnimSets) {
 		if (set->_name == settings._videoType)
 			_tileAnims = set;
 	}
@@ -132,9 +130,8 @@ void Screen::clear() {
 	// Clear any pending updates for the current screen
 	update();
 
-	Std::vector<Layout *>::const_iterator i;
-	for (i = _layouts.begin(); i != _layouts.end(); ++i)
-		delete (*i);
+	for (auto *layout : _layouts)
+		delete layout;
 	_layouts.clear();
 
 	ImageMgr::destroy();
@@ -150,7 +147,9 @@ void Screen::clear() {
 void Screen::loadMouseCursors() {
 	// enable or disable the mouse cursor
 	if (settings._mouseOptions._enabled) {
-		Shared::File cursorsFile("data/graphics/cursors.txt");
+		Common::File cursorsFile;
+		if (!cursorsFile.open("data/graphics/cursors.txt"))
+			error("Could not load mouse cursors");
 
 		for (int idx = 0; idx < 5; ++idx)
 			_mouseCursors[idx] = loadMouseCursor(cursorsFile);
@@ -158,9 +157,7 @@ void Screen::loadMouseCursors() {
 		// Set the default initial cursor
 		const uint TRANSPARENT = format.RGBToColor(0x80, 0x80, 0x80);
 		MouseCursorSurface *c = _mouseCursors[MC_DEFAULT];
-		CursorMan.pushCursor(c->getPixels(),
-			MOUSE_CURSOR_SIZE, MOUSE_CURSOR_SIZE,
-			c->_hotspot.x, c->_hotspot.y, TRANSPARENT, false, &format);
+		CursorMan.pushCursor(*c, c->_hotspot.x, c->_hotspot.y, TRANSPARENT, false);
 		CursorMan.showMouse(true);
 
 	} else {
@@ -179,12 +176,11 @@ void Screen::setMouseCursor(MouseCursor cursor) {
 		_currentMouseCursor = cursor;
 
 		const uint TRANSPARENT = format.RGBToColor(0x80, 0x80, 0x80);
-		CursorMan.replaceCursor(c->getPixels(), MOUSE_CURSOR_SIZE, MOUSE_CURSOR_SIZE,
-		                        c->_hotspot.x, c->_hotspot.y, TRANSPARENT, false, &format);
+		CursorMan.replaceCursor(*c, c->_hotspot.x, c->_hotspot.y, TRANSPARENT, false);
 	}
 }
 
-MouseCursorSurface *Screen::loadMouseCursor(Shared::File &src) {
+MouseCursorSurface *Screen::loadMouseCursor(Common::File &src) {
 	uint row, col, endCol, pixel;
 	int hotX, hotY;
 	Common::String line;
@@ -349,18 +345,16 @@ void Screen::screenLoadGraphicsFromConf() {
 	const Config *config = Config::getInstance();
 
 	Std::vector<ConfigElement> graphicsConf = config->getElement("graphics").getChildren();
-	for (Std::vector<ConfigElement>::iterator conf = graphicsConf.begin(); conf != graphicsConf.end(); conf++) {
+	for (const auto &conf : graphicsConf) {
 
-		if (conf->getName() == "layout")
-			_layouts.push_back(screenLoadLayoutFromConf(*conf));
-		else if (conf->getName() == "tileanimset")
-			_tileAnimSets.push_back(new TileAnimSet(*conf));
+		if (conf.getName() == "layout")
+			_layouts.push_back(screenLoadLayoutFromConf(conf));
+		else if (conf.getName() == "tileanimset")
+			_tileAnimSets.push_back(new TileAnimSet(conf));
 	}
 
 	_gemLayoutNames.clear();
-	Std::vector<Layout *>::const_iterator i;
-	for (i = _layouts.begin(); i != _layouts.end(); i++) {
-		Layout *layout = *i;
+	for (const auto *layout : _layouts) {
 		if (layout->_type == LAYOUT_GEM) {
 			_gemLayoutNames.push_back(layout->_name);
 		}
@@ -369,9 +363,7 @@ void Screen::screenLoadGraphicsFromConf() {
 	/*
 	 * Find gem layout to use.
 	 */
-	for (i = _layouts.begin(); i != _layouts.end(); i++) {
-		Layout *layout = *i;
-
+	for (auto *layout : _layouts) {
 		if (layout->_type == LAYOUT_GEM && layout->_name == settings._gemLayout) {
 			_gemLayout = layout;
 			break;
@@ -383,22 +375,22 @@ void Screen::screenLoadGraphicsFromConf() {
 
 Layout *Screen::screenLoadLayoutFromConf(const ConfigElement &conf) {
 	Layout *layout;
-	static const char *typeEnumStrings[] = {"standard", "gem", "dungeon_gem", nullptr};
+	static const char *const typeEnumStrings[] = {"standard", "gem", "dungeon_gem", nullptr};
 
 	layout = new Layout();
 	layout->_name = conf.getString("name");
 	layout->_type = static_cast<LayoutType>(conf.getEnum("type", typeEnumStrings));
 
 	Std::vector<ConfigElement> children = conf.getChildren();
-	for (Std::vector<ConfigElement>::iterator i = children.begin(); i != children.end(); i++) {
-		if (i->getName() == "tileshape") {
-			layout->_tileShape.x = i->getInt("width");
-			layout->_tileShape.y = i->getInt("height");
-		} else if (i->getName() == "viewport") {
-			layout->_viewport.left = i->getInt("x");
-			layout->_viewport.top = i->getInt("y");
-			layout->_viewport.setWidth(i->getInt("width"));
-			layout->_viewport.setHeight(i->getInt("height"));
+	for (const auto &i : children) {
+		if (i.getName() == "tileshape") {
+			layout->_tileShape.x = i.getInt("width");
+			layout->_tileShape.y = i.getInt("height");
+		} else if (i.getName() == "viewport") {
+			layout->_viewport.left = i.getInt("x");
+			layout->_viewport.top = i.getInt("y");
+			layout->_viewport.setWidth(i.getInt("width"));
+			layout->_viewport.setHeight(i.getInt("height"));
 		}
 	}
 
@@ -1195,10 +1187,7 @@ void Screen::screenShowGemTile(Layout *layout, Map *map, MapTile &t, bool focus,
 
 Layout *Screen::screenGetGemLayout(const Map *map) {
 	if (map->_type == Map::DUNGEON) {
-		Std::vector<Layout *>::const_iterator i;
-		for (i = _layouts.begin(); i != _layouts.end(); i++) {
-			Layout *layout = *i;
-
+		for (auto *layout : _layouts) {
 			if (layout->_type == LAYOUT_DUNGEONGEM)
 				return layout;
 		}
@@ -1347,7 +1336,7 @@ Image *Screen::screenScale(Image *src, int scale, int n, int filter) {
 		dest = (*scalerGet("point"))(src, scale, n);
 
 	if (!dest)
-		dest = Image::duplicate(src);
+		dest = Image::duplicate(src, src->format());
 
 	if (isTransparent)
 		dest->setTransparentIndex(transparentIndex);
@@ -1369,7 +1358,7 @@ Image *Screen::screenScaleDown(Image *src, int scale) {
 
 	src->alphaOff();
 
-	dest = Image::create(src->width() / scale, src->height() / scale, src->isIndexed(), Image::HARDWARE);
+	dest = Image::create(src->width() / scale, src->height() / scale, src->format());
 	if (!dest)
 		return nullptr;
 

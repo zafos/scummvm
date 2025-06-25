@@ -159,7 +159,7 @@ struct GLParamBuffer {
 
 struct GLList {
 	GLParamBuffer *first_op_buffer;
-	// TODO: extensions for an hash table or a better allocating scheme
+	// TODO: extensions for a hash table or a better allocating scheme
 };
 
 struct GLVertex {
@@ -284,6 +284,10 @@ struct GLContext {
 	// Z buffer
 	FrameBuffer *fb;
 	Common::Rect renderRect;
+
+	// scissor
+	bool scissor_test_enabled;
+	int scissor[4];
 
 	// blending
 	bool blending_enabled;
@@ -448,9 +452,11 @@ struct GLContext {
 	float fog_start;
 	float fog_end;
 
-	Common::Rect _scissorRect;
-
 	bool _enableDirtyRectangles;
+
+	// stipple
+	bool polygon_stipple_enabled;
+	byte polygon_stipple_pattern[128];
 
 	// blit test
 	Common::List<BlitImage *> _blitImages;

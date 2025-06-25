@@ -39,7 +39,55 @@
 #include "mm/xeen/swordsofxeen/swordsofxeen.h"
 #endif
 
-class MMMetaEngine : public AdvancedMetaEngine {
+static const ADExtraGuiOptionsMap optionsList[] = {
+	{
+		GAMEOPTION_COPY_PROTECTION,
+		{
+			_s("Enable copy protection"),
+			_s("Enable any copy protection that would otherwise be bypassed by default."),
+			"copy_protection",
+			false,
+			0,
+			0
+		},
+	},
+	{
+		GAMEOPTION_SHOW_ITEM_COSTS,
+		{
+			_s("Show item costs in standard inventory mode"),
+			_s("Shows item costs in standard inventory mode, allowing the value of items to be compared"),
+			"ShowItemCosts",
+			false,
+			0,
+			0
+		}
+	},
+	{
+		GAMEOPTION_DURABLE_ARMOR,
+		{
+			_s("More durable armor"),
+			_s("Armor won't break until character is at -80HP, rather than merely -10HP"),
+			"DurableArmor",
+			false,
+			0,
+			0
+		}
+	},
+	{
+		GAMEOPTION_SHOW_HP_SP_BARS,
+		{
+			_s("Hitpoint bars"),
+			_s("Replace a colored gem with bars for hit points and spell points."),
+			"ShowHpSpBars",
+			false,
+			0,
+			0
+		}
+	},
+	AD_EXTRA_GUI_OPTIONS_TERMINATOR
+};
+
+class MMMetaEngine : public AdvancedMetaEngine<MM::MightAndMagicGameDescription> {
 private:
 	/**
 	 * Gets the game Id given a target string
@@ -56,10 +104,14 @@ public:
 	}
 
 	bool hasFeature(MetaEngineFeature f) const override;
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	Common::Error createInstance(OSystem *syst, Engine **engine, const MM::MightAndMagicGameDescription *desc) const override;
 	SaveStateList listSaves(const char *target) const override;
 	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
 	Common::KeymapArray initKeymaps(const char *target) const override;
+
+	const ADExtraGuiOptionsMap *getAdvancedExtraGuiOptions() const override {
+		return optionsList;
+	}
 };
 
 bool MMMetaEngine::hasFeature(MetaEngineFeature f) const {
@@ -67,9 +119,7 @@ bool MMMetaEngine::hasFeature(MetaEngineFeature f) const {
 		(f == kSupportsLoadingDuringStartup);
 }
 
-Common::Error MMMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	const MM::MightAndMagicGameDescription *gd = (const MM::MightAndMagicGameDescription *)desc;
-
+Common::Error MMMetaEngine::createInstance(OSystem *syst, Engine **engine, const MM::MightAndMagicGameDescription *gd) const {
 	switch (gd->gameID) {
 #ifdef ENABLE_MM1
 	case MM::GType_MightAndMagic1:

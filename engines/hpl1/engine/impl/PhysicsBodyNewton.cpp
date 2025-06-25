@@ -382,9 +382,9 @@ struct DrawParameters {
 };
 
 ///////////////////////////////////////////
-static void RenderDebugPolygon(void* params, int alVertexCount, const dFloat *apFaceVertex, int alId) {
+static void RenderDebugPolygon(void *params, int alVertexCount, const dFloat *apFaceVertex, int alId) {
 	int i = alVertexCount - 1;
-	const DrawParameters* drawParams = static_cast<DrawParameters*>(params);
+	const DrawParameters *drawParams = static_cast<DrawParameters *>(params);
 	cVector3f vP0(apFaceVertex[i * 3 + 0], apFaceVertex[i * 3 + 1], apFaceVertex[i * 3 + 2]);
 	for (i = 0; i < alVertexCount; ++i) {
 		cVector3f vP1(apFaceVertex[i * 3 + 0], apFaceVertex[i * 3 + 1], apFaceVertex[i * 3 + 2]);
@@ -397,7 +397,7 @@ static void RenderDebugPolygon(void* params, int alVertexCount, const dFloat *ap
 
 void cPhysicsBodyNewton::RenderDebugGeometry(iLowLevelGraphics *apLowLevel, const cColor &aColor) {
 	DrawParameters params{apLowLevel, aColor};
-	NewtonCollisionForEachPolygonDo(NewtonBodyGetCollision(mpNewtonBody), GetLocalMatrix().GetTranspose().v, RenderDebugPolygon, static_cast<void*>(&params));
+	NewtonCollisionForEachPolygonDo(NewtonBodyGetCollision(mpNewtonBody), GetLocalMatrix().GetTranspose().v, RenderDebugPolygon, static_cast<void *>(&params));
 }
 
 //-----------------------------------------------------------------------
@@ -415,7 +415,7 @@ void cPhysicsBodyNewton::ClearForces() {
 
 //-----------------------------------------------------------------------
 
-void cPhysicsBodyNewton::OnTransformCallback(const NewtonBody *apBody, const dFloat *apMatrix, int) {
+void cPhysicsBodyNewton::OnTransformCallback(const NewtonBody *apBody, const dFloat *apMatrix, int32) {
 	cPhysicsBodyNewton *pRigidBody = (cPhysicsBodyNewton *)NewtonBodyGetUserData(apBody);
 
 	pRigidBody->m_mtxLocalTransform.FromTranspose(apMatrix);
@@ -430,9 +430,9 @@ void cPhysicsBodyNewton::OnTransformCallback(const NewtonBody *apBody, const dFl
 
 //-----------------------------------------------------------------------
 
-int cPhysicsBodyNewton::BuoyancyPlaneCallback(const int alCollisionID, void *apContext,
-								 const float *afGlobalSpaceMatrix, float *afGlobalSpacePlane) {
-	cPlanef surfacePlane = static_cast<cPhysicsBodyNewton*>(apContext)->mBuoyancy.mSurface;
+int cPhysicsBodyNewton::BuoyancyPlaneCallback(const int32 alCollisionID, void *apContext,
+											  const float *afGlobalSpaceMatrix, float *afGlobalSpacePlane) {
+	cPlanef surfacePlane = static_cast<cPhysicsBodyNewton *>(apContext)->mBuoyancy.mSurface;
 	afGlobalSpacePlane[0] = surfacePlane.a;
 	afGlobalSpacePlane[1] = surfacePlane.b;
 	afGlobalSpacePlane[2] = surfacePlane.c;
@@ -440,7 +440,7 @@ int cPhysicsBodyNewton::BuoyancyPlaneCallback(const int alCollisionID, void *apC
 	return 1;
 }
 
-void cPhysicsBodyNewton::OnUpdateCallback(NewtonBody *apBody, float, int) {
+void cPhysicsBodyNewton::OnUpdateCallback(NewtonBody *apBody, float, int32) {
 	float fMass;
 	float fX, fY, fZ;
 

@@ -76,11 +76,11 @@ bool BuriedEngine::isCompressed() const {
 	return (_gameDescription->flags & GF_COMPRESSED) != 0;
 }
 
-Common::String BuriedEngine::getEXEName() const {
+Common::Path BuriedEngine::getEXEName() const {
 	return _gameDescription->filesDescriptions[0].fileName;
 }
 
-Common::String BuriedEngine::getLibraryName() const {
+Common::Path BuriedEngine::getLibraryName() const {
 	return _gameDescription->filesDescriptions[1].fileName;
 }
 
@@ -90,7 +90,7 @@ Common::Language BuriedEngine::getLanguage() const {
 
 } // End of namespace Buried
 
-class BuriedMetaEngine : public AdvancedMetaEngine {
+class BuriedMetaEngine : public AdvancedMetaEngine<ADGameDescription> {
 public:
 	const char *getName() const override {
 		return "buried";

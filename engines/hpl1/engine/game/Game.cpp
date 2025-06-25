@@ -93,7 +93,7 @@ cSetupVarContainer::cSetupVarContainer() {
 //-----------------------------------------------------------------------
 
 void cSetupVarContainer::AddString(const tString &asName, const tString &asValue) {
-	Hpl1::Std::map<tString, tString>::value_type val(asName, asValue);
+	Common::StableMap<tString, tString>::value_type val(asName, asValue);
 	m_mapVars.insert(val);
 }
 
@@ -110,7 +110,7 @@ void cSetupVarContainer::AddBool(const tString &asName, bool abValue) {
 //-----------------------------------------------------------------------
 
 const tString &cSetupVarContainer::GetString(const tString &asName) {
-	Hpl1::Std::map<tString, tString>::iterator it = m_mapVars.find(asName);
+	Common::StableMap<tString, tString>::iterator it = m_mapVars.find(asName);
 	if (it == m_mapVars.end())
 		return msBlank;
 	else
@@ -268,8 +268,6 @@ void cGame::GameInit(LowLevelGameSetup *apGameSetup, cSetupVarContainer &aVars) 
 	// Since game is not done:
 	mbGameIsDone = false;
 
-	mbRenderOnce = false;
-
 	mfUpdateTime = 0;
 	mfGameTime = 0;
 
@@ -318,10 +316,6 @@ cGame::~cGame() {
 
 int glClearUpdateCheck = 0;
 void cGame::Run() {
-	// Log line that ends user init.
-	Log("--------------------------------------------------------\n\n");
-
-	bool bDone = false;
 	double fNumOfTimes = 0;
 	double fMediumTime = 0;
 
@@ -332,22 +326,12 @@ void cGame::Run() {
 	// Loop the game... fix the var...
 	unsigned long lTempTime = GetApplicationTime();
 
-	// reset the mouse, really reset the damn thing :P
-	for (int i = 0; i < 10; i++)
-		//mpInput->GetMouse()->Reset();
-
-	Log("Game Running\n");
-	Log("--------------------------------------------------------\n");
-
 	mfFrameTime = 0;
 	unsigned long lTempFrameTime = GetApplicationTime();
 
 	bool mbIsUpdated = true;
 
-	// cMemoryManager::SetLogCreation(true);
-
 	while (!mbGameIsDone && !g_engine->shouldQuit()) {
-		// Log("-----------------\n");
 		//////////////////////////
 		// Update logic.
 		while (mpLogicTimer->WantUpdate() && !mbGameIsDone) {
@@ -368,27 +352,16 @@ void cGame::Run() {
 
 		// If not making a single rendering is better to use gpu and
 		// cpu at the same time and make query checks etc after logic update.
-		// If any delete has occured in the update this might crash. so skip it for now.
+		// If any delete has occurred in the update this might crash. so skip it for now.
 		/*if(mbRenderOnce==false)	{
 			mpGraphics->GetRenderer3D()->FetchOcclusionQueries();
 			mpUpdater->OnPostBufferSwap();
 		}*/
 
 		// Draw graphics!
-		if (mbRenderOnce && bDone)
-			continue;
-		if (mbRenderOnce)
-			bDone = true;
-
-		if (mbIsUpdated) {
+		if (mbIsUpdated)
 			mpScene->UpdateRenderList(mfFrameTime);
-			if (mbLimitFPS == false)
-				mbIsUpdated = false;
-		}
-
 		if (mbLimitFPS == false || mbIsUpdated) {
-			// LogUpdate("----------- RENDER GFX START --------------\n");
-
 			mbIsUpdated = false;
 
 			// Get the the from the last frame.
@@ -399,30 +372,17 @@ void cGame::Run() {
 			// unsigned long lFTime = GetApplicationTime();
 			mpUpdater->OnDraw();
 			mpScene->Render(mpUpdater, mfFrameTime);
-			// if(mpScene->GetDrawScene()) LogUpdate("FrameTime: %d ms\n", GetApplicationTime() - lFTime);
 
 			// Update fps counter.
 			mpFPSCounter->AddFrame();
 
 			// Update the screen.
 			mpGraphics->GetLowLevel()->SwapBuffers();
-			// Log("Swap done: %d\n", GetApplicationTime());
-			// if(mbRenderOnce)
-			{
-				mpGraphics->GetRenderer3D()->FetchOcclusionQueries();
-				mpUpdater->OnPostBufferSwap();
-			}
+			mpGraphics->GetRenderer3D()->FetchOcclusionQueries();
+			mpUpdater->OnPostBufferSwap();
 
 			fNumOfTimes++;
 		}
-
-		// if(cMemoryManager::GetLogCreation())
-		//{
-		// cMemoryManager::SetLogCreation(false);
-		// Log("----\nCreations made: %d\n------\n",cMemoryManager::GetCreationCount());
-		//}
-
-		//g_system->delayMillis(10);
 	}
 	Log("--------------------------------------------------------\n\n");
 

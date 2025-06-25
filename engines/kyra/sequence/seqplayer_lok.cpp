@@ -46,7 +46,7 @@ SeqPlayer::SeqPlayer(KyraEngine_LoK *vm, OSystem *system) {
 	_seqWsaCurDecodePage = 0;
 	_seqDisplayedTextTimer = 0;
 	_seqDisplayTextFlag = false;
-	_seqDisplayedText = 0;;
+	_seqDisplayedText = 0;
 	_seqDisplayedChar = 0;
 	_seqDisplayedTextX = 0;
 	_seqTalkTextPrinted = false;
@@ -252,7 +252,7 @@ void SeqPlayer::s1_skip() {
 	uint32 vocPlayTime = _vm->snd_getVoicePlayTime();
 	if (vocPlayTime) {
 		if (((_system->getMillis() - _seqVocStartTimer) / _vm->tickLength()) < (val * (vocPlayTime / _vm->tickLength()) / 100))
-			_seqSkipCommand = false;		
+			_seqSkipCommand = false;
 	}
 }
 

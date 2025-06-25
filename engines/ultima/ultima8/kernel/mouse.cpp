@@ -19,19 +19,21 @@
  *
  */
 
+#include "common/config-manager.h"
 #include "graphics/cursorman.h"
 #include "ultima/ultima.h"
 #include "ultima/ultima8/kernel/mouse.h"
 #include "ultima/ultima8/games/game_data.h"
-#include "ultima/ultima8/graphics/render_surface.h"
+#include "ultima/ultima8/gfx/render_surface.h"
 #include "ultima/ultima8/gumps/gump.h"
 #include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/misc/direction_util.h"
 #include "ultima/ultima8/world/get_object.h"
+#include "ultima/ultima8/world/actors/avatar_mover_process.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
-#include "ultima/ultima8/graphics/shape.h"
-#include "ultima/ultima8/graphics/shape_frame.h"
-#include "ultima/ultima8/graphics/palette.h"
+#include "ultima/ultima8/gfx/shape.h"
+#include "ultima/ultima8/gfx/shape_frame.h"
+#include "ultima/ultima8/gfx/palette.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -45,6 +47,22 @@ Mouse::Mouse() : _lastMouseFrame(-1), _flashingCursorTime(0), _mouseOverGump(0),
 
 	_cursors.push(MOUSE_NONE);
 	CursorMan.showMouse(false);
+
+	// The original game switches cursors from small -> medium -> large on
+	// rectangles - in x, ~30px and ~130px away from the avatar (center) on
+	// the 320px screen, and approximately the same proportions in y.
+	//
+	// These cursors correspond to the player movement of step -> walk -> run.
+	// 
+	// Modern players may be in a window so give them a little bit more
+	// space to make the large cursor without having to hit the edge.
+
+	// Walk & run threshold range of 0-255
+	ConfMan.registerDefault("walk_threshold", 50);
+	ConfMan.registerDefault("run_threshold", 160);
+
+	_walkThreshold = CLIP<int>(ConfMan.getInt("walk_threshold"), 0, 255);
+	_runThreshold = CLIP<int>(ConfMan.getInt("run_threshold"), 0, 255);
 }
 
 Mouse::~Mouse() {
@@ -54,7 +72,6 @@ Mouse::~Mouse() {
 bool Mouse::buttonDown(MouseButton button) {
 	assert(button != MOUSE_LAST);
 	bool handled = false;
-	uint32 now = g_system->getMillis();
 
 	MButton &mbutton = _mouseButton[button];
 
@@ -67,12 +84,14 @@ bool Mouse::buttonDown(MouseButton button) {
 		mbutton._downGump = 0;
 	}
 
-	mbutton._curDown = now;
+	mbutton._lastDown = mbutton._curDown;
+	mbutton._curDown = g_system->getMillis();
 	mbutton._downPoint = _mousePos;
 	mbutton.setState(MBS_DOWN);
 	mbutton.clearState(MBS_HANDLED);
 
-	if (mbutton.isUnhandledDoubleClick()) {
+	uint32 timeout = getDoubleClickTime();
+	if (mbutton.isUnhandledDoubleClick(timeout)) {
 		if (_dragging == Mouse::DRAG_NOT) {
 			Gump *gump = getGump(mbutton._downGump);
 			if (gump) {
@@ -85,7 +104,6 @@ bool Mouse::buttonDown(MouseButton button) {
 			mbutton._lastDown = 0;
 		}
 	}
-	mbutton._lastDown = now;
 
 	return handled;
 }
@@ -130,32 +148,32 @@ bool Mouse::isMouseDownEvent(MouseButton button) const {
 }
 
 int Mouse::getMouseLength(int mx, int my) const {
-	Rect dims;
-	RenderSurface *screen = Ultima8Engine::get_instance()->getRenderScreen();
-	screen->GetSurfaceDims(dims);
+	Ultima8Engine *engine = Ultima8Engine::get_instance();
+	AvatarMoverProcess *proc = engine->getAvatarMoverProcess();
+	if (proc) {
+		if (proc->hasMovementFlags(AvatarMoverProcess::MOVE_STEP))
+			return 0;
+		if (proc->hasMovementFlags(AvatarMoverProcess::MOVE_RUN))
+			return 2;
+	}
 
-	//
-	// The original game switches cursors from small -> medium -> large on
-	// rectangles - in x, ~30px and ~130px away from the avatar (center) on
-	// the 320px screen, and approximately the same proportions in y.
-	//
-	// Modern players may be in a window so give them a little bit more
-	// space to make the large cursor without having to hit the edge.
-	//
+	Rect dims;
+	RenderSurface *screen = engine->getRenderScreen();
+	screen->GetSurfaceDims(dims);
 
 	// Reference point is the center of the screen
 	int dx = abs(mx - dims.width() / 2);
 	int dy = abs((dims.height() / 2) - my);
-	int xmed = dims.width() * 100 / 320;
-	int ymed = dims.height() * 100 / 320;
+	int xmed = dims.width() / 2 * _runThreshold / 255;
+	int ymed = dims.height() / 2 * _runThreshold / 255;
 
 	if (dx > xmed || dy > ymed)
 		return 2;
 
 	// For short cursor, reference point is near the avatar's feet
 	dy = abs((dims.height() / 2 + 14) - my); //! constant
-	int xshort = dims.width() * 30 / 320;
-	int yshort = dims.height() * 30 / 320;
+	int xshort = dims.width() / 2 * _walkThreshold / 255;
+	int yshort = dims.height() / 2 * _walkThreshold / 255;
 
 	if (dx > xshort || dy > yshort)
 		return 1;
@@ -194,6 +212,8 @@ int Mouse::getMouseFrame() {
 	// 38 = quill
 	// 39 = magnifying glass
 	// 40 = red cross
+	if (_cursors.empty())
+		return -1;
 
 	MouseCursor cursor = _cursors.top();
 
@@ -275,13 +295,13 @@ void Mouse::setMouseCoords(int mx, int my) {
 
 	if (mx < dims.left)
 		mx = dims.left;
-	else if (mx > dims.width())
-		mx = dims.width();
+	else if (mx >= dims.right)
+		mx = dims.right - 1;
 
 	if (my < dims.top)
 		my = dims.top;
-	else if (my > dims.height())
-		my = dims.height();
+	else if (my >= dims.bottom)
+		my = dims.bottom - 1;
 
 	_mousePos.x = mx;
 	_mousePos.y = my;
@@ -514,10 +534,18 @@ void Mouse::stopDragging(int mx, int my) {
 	popMouseCursor();
 }
 
+uint32 Mouse::getDoubleClickTime() const {
+	uint32 timeout = g_system->getDoubleClickTime();
+	return timeout > 0 ? timeout : 400;
+}
+
 void Mouse::handleDelayedEvents() {
+	uint32 now = g_system->getMillis();
+	uint32 timeout = getDoubleClickTime();
+
 	for (int button = 0; button < MOUSE_LAST; ++button) {
-		if (!(_mouseButton[button]._state & (MBS_HANDLED | MBS_DOWN)) &&
-			!_mouseButton[button].lastWithinDblClkTimeout()) {
+		if (!_mouseButton[button].isState(MBS_DOWN) &&
+			_mouseButton[button].isUnhandledPastTimeout(now, timeout)) {
 			Gump *gump = getGump(_mouseButton[button]._downGump);
 			if (gump) {
 				int32 mx = _mouseButton[button]._downPoint.x;
@@ -552,8 +580,8 @@ void Mouse::update() {
 
 			if (frame >= 0 && (uint)frame < mouse->frameCount()) {
 				const ShapeFrame *f = mouse->getFrame(frame);
-				CursorMan.replaceCursor(f->_pixels, f->_width, f->_height, f->_xoff, f->_yoff, f->_keycolor);
-				CursorMan.replaceCursorPalette(mouse->getPalette()->_palette, 0, 256);
+				CursorMan.replaceCursor(f->getSurface(), f->_xoff, f->_yoff, f->_keycolor);
+				CursorMan.replaceCursorPalette(mouse->getPalette()->data(), 0, 256);
 				CursorMan.showMouse(true);
 			} else {
 				CursorMan.showMouse(false);

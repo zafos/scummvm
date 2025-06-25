@@ -386,12 +386,14 @@ void Anim::load(uint16 animId, const ByteArray &resourceData) {
 	anim->magic = headerReadS.readUint16LE(); // cause ALWAYS LE
 	if (anim->magic != 0x0044) {
 		warning ("Anim::load animId=%d animation magic mismatch (0x%x vs 0x%x), skipping", animId, anim->magic, 0x0044);
+		delete anim;
 		return;
 	}
 	anim->screenWidth = headerReadS.readUint16();
 	anim->screenHeight = headerReadS.readUint16();
 	if (anim->screenHeight > 2000 || anim->screenWidth > 2000) {
 		warning ("Anim::load animId=%d Excessive dimensions %dx%d, skipping", animId, anim->screenWidth, anim->screenHeight);
+		delete anim;
 		return;
 	}
 
@@ -701,7 +703,7 @@ void Anim::decodeFrame(AnimationData *anim, size_t frameOffset, byte *buf, size_
 		int curY = 0, curX = 0;
 		unsigned realY = 0;
 		unsigned outbit = 0;
-		// TODO: Check if we want to use tempaltes instead to optimize AGA case
+		// TODO: Check if we want to use templates instead to optimize AGA case
 		unsigned int pixelSize = _vm->isAGA() ? 8 : 5;
 		while (1) {
 			markByte = readS.readByte();

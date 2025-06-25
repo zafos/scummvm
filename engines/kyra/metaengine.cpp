@@ -153,10 +153,22 @@ const ADExtraGuiOptionsMap gameGuiOptions[] = {
 		}
 	},
 
+	{
+		GAMEOPTION_EOB_ADDRULES,
+		{
+			_s("Faithful AD&D rules"),
+			_s("Make implementation of AD&D rules more compliant with the AD&D 2nd edition handbook"),
+			"addrules",
+			false,
+			0,
+			0
+		}
+	},
+
 	AD_EXTRA_GUI_OPTIONS_TERMINATOR
 };
 
-class KyraMetaEngine : public AdvancedMetaEngine {
+class KyraMetaEngine : public AdvancedMetaEngine<KYRAGameDescription> {
 public:
 	const char *getName() const override {
 		return "kyra";
@@ -167,11 +179,11 @@ public:
 	}
 
 	bool hasFeature(MetaEngineFeature f) const override;
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	Common::Error createInstance(OSystem *syst, Engine **engine, const KYRAGameDescription *desc) const override;
 
 	SaveStateList listSaves(const char *target) const override;
 	int getMaximumSaveSlot() const override;
-	void removeSaveState(const char *target, int slot) const override;
+	bool removeSaveState(const char *target, int slot) const override;
 	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
 	int getAutosaveSlot() const override { return 999; }
 
@@ -198,9 +210,7 @@ bool Kyra::KyraEngine_v1::hasFeature(EngineFeature f) const {
 	    (f == kSupportsSubtitleOptions);
 }
 
-Common::Error KyraMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	const KYRAGameDescription *gd = (const KYRAGameDescription *)desc;
-
+Common::Error KyraMetaEngine::createInstance(OSystem *syst, Engine **engine, const KYRAGameDescription *gd) const {
 	Kyra::GameFlags flags = gd->flags;
 
 	flags.lang = gd->desc.language;
@@ -302,16 +312,16 @@ int KyraMetaEngine::getMaximumSaveSlot() const {
 	return 999;
 }
 
-void KyraMetaEngine::removeSaveState(const char *target, int slot) const {
+bool KyraMetaEngine::removeSaveState(const char *target, int slot) const {
 	// In Kyra games slot 0 can't be deleted, it's for restarting the game(s).
 	// An exception makes Lands of Lore here, it does not have any way to restart the
 	// game except via its main menu.
 	const Common::String gameId = ConfMan.getDomain(target)->getVal("gameid");
 	if (slot == 0 && !gameId.equalsIgnoreCase("lol") && !gameId.equalsIgnoreCase("eob") && !gameId.equalsIgnoreCase("eob2"))
-		return;
+		return false;
 
 	Common::String filename = Kyra::KyraEngine_v1::getSavegameFilename(target, slot);
-	g_system->getSavefileManager()->removeSavefile(filename);
+	return g_system->getSavefileManager()->removeSavefile(filename);
 }
 
 SaveStateDescriptor KyraMetaEngine::querySaveMetaInfos(const char *target, int slot) const {

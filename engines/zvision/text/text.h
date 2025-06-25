@@ -23,8 +23,8 @@
 #ifndef ZVISION_TEXT_H
 #define ZVISION_TEXT_H
 
-#include "zvision/text/truetype_font.h"
 #include "zvision/zvision.h"
+#include "zvision/text/truetype_font.h"
 
 namespace ZVision {
 
@@ -76,15 +76,13 @@ public:
 
 	void drawTextWithJustification(const Common::String &text, StyledTTFont &font, uint32 color, Graphics::Surface &dest, int lineY, TextJustification jusification);
 	int32 drawText(const Common::String &text, TextStyleState &state, Graphics::Surface &dest);
-	void drawTextWithWordWrapping(const Common::String &text, Graphics::Surface &dest);
+	void drawTextWithWordWrapping(const Common::String &text, Graphics::Surface &dest, bool blackFrame = false);
 
 private:
 	ZVision *_engine;
 };
 
-Common::String readWideLine(Common::SeekableReadStream &stream);
-int8 getUtf8CharSize(char chr);
-uint16 readUtf8Char(const char *chr);
+Common::U32String readWideLine(Common::SeekableReadStream &stream);
 
 } // End of namespace ZVision
 

@@ -29,9 +29,15 @@ namespace MM {
 namespace MM1 {
 namespace ViewsEnh {
 
+void PartyView::draw() {
+	debug(11, "PartyView::draw()");
+
+	ScrollView::draw();
+}
+
 bool PartyView::msgFocus(const FocusMessage &msg) {
 	// Turn on highlight for selected character
-	if (!g_globals->_currCharacter)
+	if (!g_globals->_currCharacter && selectCharByDefault())
 		g_globals->_currCharacter = &g_globals->_party[0];
 
 	g_events->send("GameParty", GameMessage("CHAR_HIGHLIGHT", (int)true));
@@ -49,10 +55,11 @@ bool PartyView::msgUnfocus(const UnfocusMessage &msg) {
 
 bool PartyView::msgMouseDown(const MouseDownMessage &msg) {
 	if (canSwitchChar()) {
-		return send("GameParty", msg);
-	} else {
-		return ScrollView::msgMouseDown(msg);
+		if (send("GameParty", msg))
+			return true;
 	}
+
+	return ScrollView::msgMouseDown(msg);
 }
 
 bool PartyView::msgGame(const GameMessage &msg) {
@@ -66,9 +73,25 @@ bool PartyView::msgGame(const GameMessage &msg) {
 
 bool PartyView::msgAction(const ActionMessage &msg) {
 	if (msg._action >= KEYBIND_VIEW_PARTY1 &&
-			msg._action <= KEYBIND_VIEW_PARTY6 && canSwitchChar())
-		return send("GameParty", msg);
+			msg._action < (int)(KEYBIND_VIEW_PARTY1 + g_globals->_party.size()) &&
+			canSwitchChar()) {
+		Character *priorChar = g_globals->_currCharacter;
+		Character *newChar =  &g_globals->_party[msg._action - KEYBIND_VIEW_PARTY1];
+
+		if (canSwitchToChar(newChar)) {
+			g_globals->_currCharacter = newChar;
+			charSwitched(priorChar);
+			redraw();
+		}
+
+		return true;
+	}
+
 	return false;
+}
+
+void PartyView::charSwitched(Character *priorChar) {
+	g_events->findView("GameParty")->draw();
 }
 
 } // namespace ViewsEnh

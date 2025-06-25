@@ -32,14 +32,16 @@ namespace Views {
 
 class Title : public UIElement {
 private:
-	Graphics::ManagedSurface _screens[SCREENS_COUNT];
-	int _screenNum = -1;
-	int _fadeIndex = 0;
-
 	/**
 	 * Starts the slideshow of game scenes
 	 */
 	void startSlideshow();
+
+protected:
+	Graphics::ManagedSurface _screens[SCREENS_COUNT];
+	int _screenNum = -1;
+	int _fadeIndex = 0;
+
 public:
 	Title();
 	virtual ~Title() {}

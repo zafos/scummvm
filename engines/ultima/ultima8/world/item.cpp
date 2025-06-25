@@ -28,11 +28,12 @@
 #include "ultima/ultima8/world/world.h"
 #include "ultima/ultima8/kernel/kernel.h"
 #include "ultima/ultima8/kernel/delay_process.h"
+#include "ultima/ultima8/kernel/object_manager.h"
 #include "ultima/ultima8/world/get_object.h"
-#include "ultima/ultima8/graphics/main_shape_archive.h"
-#include "ultima/ultima8/graphics/gump_shape_archive.h"
-#include "ultima/ultima8/graphics/shape.h"
-#include "ultima/ultima8/graphics/shape_frame.h"
+#include "ultima/ultima8/gfx/main_shape_archive.h"
+#include "ultima/ultima8/gfx/gump_shape_archive.h"
+#include "ultima/ultima8/gfx/shape.h"
+#include "ultima/ultima8/gfx/shape_frame.h"
 #include "ultima/ultima8/world/item_factory.h"
 #include "ultima/ultima8/world/current_map.h"
 #include "ultima/ultima8/world/coord_utils.h"
@@ -77,7 +78,7 @@ Item::Item()
 	  _flags(0), _quality(0), _npcNum(0), _mapNum(0),
 	  _extendedFlags(0), _parent(0),
 	  _cachedShape(nullptr), _cachedShapeInfo(nullptr),
-	  _gump(0), _gravityPid(0), _lastSetup(0),
+	  _gump(0), _bark(0), _gravityPid(0), _lastSetup(0),
 	  _ix(0), _iy(0), _iz(0), _damagePoints(1) {
 }
 
@@ -130,22 +131,31 @@ Container *Item::getParentAsContainer() const {
 	return p;
 }
 
-const Item *Item::getTopItem() const {
-	const Container *parentItem = getParentAsContainer();
-
-	if (!parentItem) return this;
-
-	while (parentItem->getParentAsContainer()) {
-		parentItem = parentItem->getParentAsContainer();
+Container* Item::getRootContainer() const {
+	Container *root = nullptr;
+	Container *parent = getParentAsContainer();
+	while (parent) {
+		root = parent;
+		parent = parent->getParentAsContainer();
 	}
+	return root;
+}
 
-	return parentItem;
+const Item *Item::getTopItem() const {
+	Container *root = getRootContainer();
+	return root ? root : this;
 }
 
 void Item::setLocation(int32 X, int32 Y, int32 Z) {
 	_x = X;
 	_y = Y;
 	_z = Z;
+}
+
+void Item::setLocation(const Point3 &pt) {
+	_x = pt.x;
+	_y = pt.y;
+	_z = pt.z;
 }
 
 void Item::move(const Point3 &pt) {
@@ -157,8 +167,8 @@ void Item::move(int32 X, int32 Y, int32 Z) {
 	CurrentMap *map = World::get_instance()->getCurrentMap();
 	int mapChunkSize = map->getChunkSize();
 
-	if (getObjId() == 1 && Z < 0) {
-		warning("Moving avatar below Z=0. (%d,%d,%d)", X, Y, Z);
+	if (getObjId() == kMainActorId && Z < 0) {
+		warning("Moving main actor below Z=0. (%d,%d,%d)", X, Y, Z);
 	}
 
 	// TODO: In Crusader, if we are moving the avatar the game also checks whether
@@ -171,7 +181,7 @@ void Item::move(int32 X, int32 Y, int32 Z) {
 		World::get_instance()->etherealRemove(_objId);
 	}
 
-	// Remove from container (if contained or equiped)
+	// Remove from container (if contained or equipped)
 	if (_flags & (FLG_CONTAINED | FLG_EQUIPPED)) {
 		if (_parent) {
 			// If we are flagged as Ethereal, we are already removed
@@ -225,13 +235,21 @@ void Item::move(int32 X, int32 Y, int32 Z) {
 	// No lerping for this move
 	if (no_lerping) _extendedFlags |= EXT_LERP_NOPREV;
 
+	//
 	// If the destination is not in the fast area, and we are in
 	// the fast area, we need to call leaveFastArea, as long as we aren't
-	// being followed by the camera. We also disable lerping in such a case
+	// being followed by the camera. We also disable lerping in such a case.
+	//
+	// In Crusader, the camera does not directly track the avatar (instead
+	// it uses SnapProcess), so manually move the camera here when moving
+	// the controlled actor.
+	//
 	if (!dest_fast && (_flags & Item::FLG_FASTAREA)) {
 		_extendedFlags |= EXT_LERP_NOPREV;
 		if (_extendedFlags & EXT_CAMERA)
 			CameraProcess::GetCameraProcess()->itemMoved();
+		else if (GAME_IS_CRUSADER && this == getControlledActor() && (X || Y))
+			CameraProcess::GetCameraProcess()->moveToLocation(X, Y, Z);
 		else
 			leaveFastArea();
 
@@ -277,7 +295,7 @@ bool Item::moveToContainer(Container *container, bool checkwghtvol) {
 		World::get_instance()->etherealRemove(_objId);
 	}
 
-	// Remove from container (if contained or equiped)
+	// Remove from container (if contained or equipped)
 	if (_flags & (FLG_CONTAINED | FLG_EQUIPPED)) {
 		if (_parent) {
 			// If we are flagged as Ethereal, we are already removed
@@ -316,11 +334,8 @@ bool Item::moveToContainer(Container *container, bool checkwghtvol) {
 	_flags |= FLG_CONTAINED;
 
 	// If moving to avatar, mark as OWNED
-	Item *p = this;
-	while (p->getParentAsContainer())
-		p = p->getParentAsContainer();
-	// In Avatar's inventory?
-	if (p->getObjId() == 1)
+	Container *root = getRootContainer();
+	if (root && root->getObjId() == kMainActorId)
 		setFlagRecursively(FLG_OWNED);
 
 	// No lerping when moving to a container
@@ -410,19 +425,16 @@ int32 Item::getZ() const {
 	return _z;
 }
 
-void Item::getLocationAbsolute(int32 &X, int32 &Y, int32 &Z) const {
+Point3 Item::getLocationAbsolute() const {
 	if (_parent) {
 		Item *p = getParentAsContainer();
 
 		if (p) {
-			p->getLocationAbsolute(X, Y, Z);
-			return;
+			return p->getLocationAbsolute();
 		}
 	}
 
-	X = _x;
-	Y = _y;
-	Z = _z;
+	return Point3(_x, _y, _z);
 }
 
 void Item::getGumpLocation(int32 &X, int32 &Y) const {
@@ -446,18 +458,20 @@ void Item::randomGumpLocation() {
 	_y = 0xFFFF;
 }
 
-void Item::getCentre(int32 &X, int32 &Y, int32 &Z) const {
+Point3 Item::getCentre() const {
 	// constants!
+	Point3 pt(_x, _y, _z);
 	const ShapeInfo *shapeinfo = getShapeInfo();
 	if (_flags & FLG_FLIPPED) {
-		X = _x - shapeinfo->_y * 16;
-		Y = _y - shapeinfo->_x * 16;
+		pt.x -= shapeinfo->_y * 16;
+		pt.y -= shapeinfo->_x * 16;
 	} else {
-		X = _x - shapeinfo->_x * 16;
-		Y = _y - shapeinfo->_y * 16;
+		pt.x -= shapeinfo->_x * 16;
+		pt.y -= shapeinfo->_y * 16;
 	}
 
-	Z = _z + shapeinfo->_z * 4;
+	pt.y += shapeinfo->_z * 4;
+	return pt;
 }
 
 Box Item::getWorldBox() const {
@@ -492,67 +506,75 @@ void Item::setShape(uint32 shape) {
 }
 
 bool Item::overlaps(const Item &item2) const {
-	int32 x1a, y1a, z1a, x1b, y1b, z1b;
-	int32 x2a, y2a, z2a, x2b, y2b, z2b;
-	getLocation(x1b, y1b, z1a);
-	item2.getLocation(x2b, y2b, z2a);
+	int32 x1a, y1a, z1b;
+	int32 x2a, y2a, z2b;
+	Point3 pt1 = getLocation();
+	Point3 pt2 = item2.getLocation();
 
 	int32 xd, yd, zd;
 	getFootpadWorld(xd, yd, zd);
-	x1a = x1b - xd;
-	y1a = y1b - yd;
-	z1b = z1a + zd;
+	x1a = pt1.x - xd;
+	y1a = pt1.y - yd;
+	z1b = pt1.z + zd;
 
 	item2.getFootpadWorld(xd, yd, zd);
-	x2a = x2b - xd;
-	y2a = y2b - yd;
-	z2b = z2a + zd;
+	x2a = pt2.x - xd;
+	y2a = pt2.y - yd;
+	z2b = pt2.z + zd;
 
-	if (x1b <= x2a || x2b <= x1a) return false;
-	if (y1b <= y2a || y2b <= y1a) return false;
-	if (z1b <= z2a || z2b <= z1a) return false;
+	if (pt1.x <= x2a || pt2.x <= x1a)
+		return false;
+	if (pt1.y <= y2a || pt2.y <= y1a)
+		return false;
+	if (z1b <= pt2.z || z2b <= pt1.z)
+		return false;
 	return true;
 }
 
 bool Item::overlapsxy(const Item &item2) const {
-	int32 x1a, y1a, z1a, x1b, y1b;
-	int32 x2a, y2a, z2a, x2b, y2b;
-	getLocation(x1b, y1b, z1a);
-	item2.getLocation(x2b, y2b, z2a);
+	int32 x1a, y1a;
+	int32 x2a, y2a;
+	Point3 pt1 = getLocation();
+	Point3 pt2 = item2.getLocation();
 
 	int32 xd, yd, zd;
 	getFootpadWorld(xd, yd, zd);
-	x1a = x1b - xd;
-	y1a = y1b - yd;
+	x1a = pt1.x - xd;
+	y1a = pt1.y - yd;
 
 	item2.getFootpadWorld(xd, yd, zd);
-	x2a = x2b - xd;
-	y2a = y2b - yd;
+	x2a = pt2.x - xd;
+	y2a = pt2.y - yd;
 
-	if (x1b <= x2a || x2b <= x1a) return false;
-	if (y1b <= y2a || y2b <= y1a) return false;
+	if (pt1.x <= x2a || pt2.x <= x1a)
+		return false;
+	if (pt1.y <= y2a || pt2.y <= y1a)
+		return false;
 	return true;
 }
 
 bool Item::isOn(const Item &item2) const {
-	int32 x1a, y1a, z1a, x1b, y1b;
-	int32 x2a, y2a, z2a, x2b, y2b, z2b;
-	getLocation(x1b, y1b, z1a);
-	item2.getLocation(x2b, y2b, z2a);
+	int32 x1a, y1a;
+	int32 x2a, y2a, z2b;
+	Point3 pt1 = getLocation();
+	Point3 pt2 = item2.getLocation();
 
 	int32 xd, yd, zd;
 	getFootpadWorld(xd, yd, zd);
-	x1a = x1b - xd;
-	y1a = y1b - yd;
+	x1a = pt1.x - xd;
+	y1a = pt1.y - yd;
 
 	item2.getFootpadWorld(xd, yd, zd);
-	x2a = x2b - xd;
-	y2a = y2b - yd;
-	z2b = z2a + zd;
+	x2a = pt2.x - xd;
+	y2a = pt2.y - yd;
+	z2b = pt2.z + zd;
 
-	if (x1b <= x2a || x2b <= x1a) return false;
-	if (y1b <= y2a || y2b <= y1a) return false;
-	if (z2b == z1a) return true;
+	if (pt1.x <= x2a || pt2.x <= x1a)
+		return false;
+	if (pt1.y <= y2a || pt2.y <= y1a)
+		return false;
+	if (z2b == pt1.z)
+		return true;
 	return false;
 }
 
@@ -560,42 +582,43 @@ bool Item::isCompletelyOn(const Item &item2) const {
 	if (hasFlags(FLG_CONTAINED) || item2.hasFlags(FLG_CONTAINED))
 		return false;
 
-	int32 x1a, y1a, z1a, x1b, y1b;
-	int32 x2a, y2a, z2a, x2b, y2b, z2b;
-	getLocation(x1b, y1b, z1a);
-	item2.getLocation(x2b, y2b, z2a);
+	int32 x1a, y1a;
+	int32 x2a, y2a, z2b;
+	Point3 pt1 = getLocation();
+	Point3 pt2 = item2.getLocation();
 
 	int32 xd, yd, zd;
 	getFootpadWorld(xd, yd, zd);
-	x1a = x1b - xd;
-	y1a = y1b - yd;
+	x1a = pt1.x - xd;
+	y1a = pt1.y - yd;
 
 	item2.getFootpadWorld(xd, yd, zd);
-	x2a = x2b - xd;
-	y2a = y2b - yd;
-	z2b = z2a + zd;
+	x2a = pt2.x - xd;
+	y2a = pt2.y - yd;
+	z2b = pt2.z + zd;
 
-	return ((x1b <= x2b && x2a <= x1a) &&
-			(y1b <= y2b && y2a <= y1a) &&
-			(z2b == z1a));
+	return ((pt1.x <= pt2.x && x2a <= x1a) &&
+			(pt1.y <= pt2.y && y2a <= y1a) &&
+			(z2b == pt1.z));
 }
 
 bool Item::isCentreOn(const Item &item2) const {
-	int32 x1c, y1c, z1c;
-	int32 x2a, y2a, z2a, x2b, y2b, z2b;
-	item2.getLocation(x2b, y2b, z2a);
-
-	getCentre(x1c, y1c, z1c);
+	int32 x2a, y2a, z2b;
+	Point3 pt1 = getCentre();
+	Point3 pt2 = item2.getLocation();
 
 	int32 xd, yd, zd;
 	item2.getFootpadWorld(xd, yd, zd);
-	x2a = x2b - xd;
-	y2a = y2b - yd;
-	z2b = z2a + zd;
+	x2a = pt2.x - xd;
+	y2a = pt2.y - yd;
+	z2b = pt2.z + zd;
 
-	if (x1c <= x2a || x2b <= x1c) return false;
-	if (y1c <= y2a || y2b <= y1c) return false;
-	if (z2b == getZ()) return true;
+	if (pt1.x <= x2a || pt2.x <= pt1.x)
+		return false;
+	if (pt1.y <= y2a || pt2.y <= pt1.y)
+		return false;
+	if (z2b == getZ())
+		return true;
 	return false;
 }
 
@@ -653,65 +676,66 @@ bool Item::isPartlyOnScreen() const {
 
 bool Item::canExistAt(int32 x, int32 y, int32 z, bool needsupport) const {
 	CurrentMap *cm = World::get_instance()->getCurrentMap();
-	const Item *support;
-	bool valid = cm->isValidPosition(x, y, z, getShape(), getObjId(),
-	                                 &support, 0);
-	return valid && (!needsupport || support);
+	int32 xd, yd, zd;
+	getFootpadWorld(xd, yd, zd);
+	Box target(x, y, z, xd, yd, zd);
+	Box empty;
+
+	PositionInfo info = cm->getPositionInfo(target, empty, 0, getObjId());
+	return info.valid && (!needsupport || info.supported);
+}
+
+bool Item::canExistAt(const Point3 &pt, bool needsupport) const {
+	return canExistAt(pt.x, pt.y, pt.z, needsupport);
 }
 
 Direction Item::getDirToItemCentre(const Item &item2) const {
-	int32 xv, yv, zv;
-	getCentre(xv, yv, zv);
+	Point3 i1 = getCentre();
+	Point3 i2 = item2.getCentre();
 
-	int32 i2x, i2y, i2z;
-	item2.getCentre(i2x, i2y, i2z);
-
-	return Direction_GetWorldDir(i2y - yv, i2x - xv, dirmode_8dirs);
+	return Direction_GetWorldDir(i2.y - i1.y, i2.x - i1.x, dirmode_8dirs);
 }
 
 Direction Item::getDirToItemCentre(const Point3 &pt) const {
-	int32 xv, yv, zv;
-	getCentre(xv, yv, zv);
+	Point3 i1 = getCentre();
 
-	return Direction_GetWorldDir(pt.y - yv, pt.x - xv, dirmode_8dirs);
+	return Direction_GetWorldDir(pt.y - i1.y, pt.x - i1.x, dirmode_8dirs);
 }
 
 
 int Item::getRange(const Item &item2, bool checkz) const {
-	int32 thisX, thisY, thisZ;
-	int32 otherX, otherY, otherZ;
 	int32 thisXd, thisYd, thisZd;
 	int32 otherXd, otherYd, otherZd;
 	int32 thisXmin, thisYmin, thisZmax;
 	int32 otherXmin, otherYmin, otherZmax;
 
-	getLocationAbsolute(thisX, thisY, thisZ);
-	item2.getLocationAbsolute(otherX, otherY, otherZ);
+	Point3 pt1 = getLocationAbsolute();
+	Point3 pt2 = item2.getLocationAbsolute();
 	getFootpadWorld(thisXd, thisYd, thisZd);
 	item2.getFootpadWorld(otherXd, otherYd, otherZd);
 
-	thisXmin = thisX - thisXd;
-	thisYmin = thisY - thisYd;
-	thisZmax = thisZ + thisZd;
+	thisXmin = pt1.x - thisXd;
+	thisYmin = pt1.y - thisYd;
+	thisZmax = pt1.z + thisZd;
 
-	otherXmin = otherX - otherXd;
-	otherYmin = otherY - otherYd;
-	otherZmax = otherZ + otherZd;
+	otherXmin = pt2.x - otherXd;
+	otherYmin = pt2.y - otherYd;
+	otherZmax = pt2.z + otherZd;
 
 	int32 range = 0;
 
-	if (thisXmin - otherX > range)
-		range = thisYmin - otherY;
-	if (otherXmin - thisX > range)
-		range = thisXmin - otherX;
-	if (thisYmin - otherY > range)
-		range = otherXmin - thisX;
-	if (otherYmin - thisY > range)
-		range = otherYmin - thisY;
-	if (checkz && thisZ - otherZmax > range)
-		range = thisZ - otherZmax;
-	if (checkz && otherZ - thisZmax > range)
-		range = otherZ - thisZmax;
+	if (thisXmin - pt2.x > range)
+		range = thisYmin - pt2.y;
+	if (otherXmin - pt1.x > range)
+		range = thisXmin - pt2.x;
+	if (thisYmin - pt2.y > range)
+		range = otherXmin - pt1.x;
+	if (otherYmin - pt1.y > range)
+		range = otherYmin - pt1.y;
+	if (checkz && pt1.z - otherZmax > range)
+		range = pt1.z - otherZmax;
+	if (checkz && pt2.z - thisZmax > range)
+		range = pt2.z - thisZmax;
 
 	return range;
 }
@@ -719,30 +743,25 @@ int Item::getRange(const Item &item2, bool checkz) const {
 int Item::getRangeIfVisible(const Item &item2) const {
 	World *world = World::get_instance();
 	CurrentMap *map = world->getCurrentMap();
-	int32 start[3];
-	int32 end[3];
-	int32 dims[3] = {1, 1, 1};
 	Std::list<CurrentMap::SweepItem> hitItems;
-	getCentre(start[0], start[1], start[2]);
-	item2.getCentre(end[0], end[1], end[2]);
 
-	int xdiff = abs(start[0] - end[0]);
-	int ydiff = abs(start[1] - end[1]);
-	int zdiff = abs(start[2] - end[2]);
+	Point3 start = getCentre();
+	Point3 end = item2.getCentre();
+	int32 dims[3] = {1, 1, 1};
+
+	int xdiff = abs(start.x - end.x);
+	int ydiff = abs(start.y - end.y);
+	int zdiff = abs(start.z - end.z);
 
 	map->sweepTest(start, end, dims, getShapeInfo()->_flags, _objId, true, &hitItems);
 
-	if (hitItems.size() > 0) {
-		for (Std::list<CurrentMap::SweepItem>::const_iterator it = hitItems.begin();
-			 it != hitItems.end();
-			 it++) {
-			int objId = it->_item;
-			if (it->_blocking && objId != _objId && objId != item2.getObjId()) {
-				//int out[3];
-				//it->GetInterpolatedCoords(out, start, end);
-				//warning("found blocking item %d at %d %d %d.", objId, out[0], out[1], out[2]);
-				return 0;
-			}
+	for (const auto &hit : hitItems) {
+		int objId = hit._item;
+		if (hit._blocking && objId != _objId && objId != item2.getObjId()) {
+			//int out[3];
+			//hit.GetInterpolatedCoords(out, start, end);
+			//warning("found blocking item %d at %d %d %d.", objId, out[0], out[1], out[2]);
+			return 0;
 		}
 	}
 
@@ -1030,17 +1049,13 @@ int32 Item::collideMove(int32 dx, int32 dy, int32 dz, bool teleport, bool force,
 	if (hititem) *hititem = 0;
 	if (dirs) *dirs = 0;
 
-	int32 end[3] = { dx, dy, dz };
+	Point3 start(dx, dy, dz);
+	Point3 end(dx, dy, dz);
 
-	int32 start[3];
-	if (_parent) {
-		// If we are moving from a container, only check the destination
-		start[0] = end[0];
-		start[1] = end[1];
-		start[2] = end[2];
-	} else {
-		// Otherwise check from where we are to where we want to go
-		getLocation(start[0], start[1], start[2]);
+	// If we are moving from a container, only check the destination
+	// Otherwise check from where we are to where we want to go
+	if (!_parent) {
+		start = getLocation();
 	}
 
 	int32 dims[3];
@@ -1048,16 +1063,15 @@ int32 Item::collideMove(int32 dx, int32 dy, int32 dz, bool teleport, bool force,
 
 	// Do the sweep test
 	Std::list<CurrentMap::SweepItem> collisions;
-	Std::list<CurrentMap::SweepItem>::iterator it;
 	map->sweepTest(start, end, dims, getShapeInfo()->_flags, _objId, false, &collisions);
 
 	// Ok, now to work out what to do
 
 
 	// the force of the hit, used for the gotHit/hit usecode calls
-	int deltax = ABS(start[0] - end[0]) / 4;
-	int deltay = ABS(start[1] - end[1]) / 4;
-	int deltaz = ABS(start[2] - end[2]);
+	int deltax = ABS(start.x - end.x) / 4;
+	int deltay = ABS(start.y - end.y) / 4;
+	int deltaz = ABS(start.z - end.z);
 	int maxdirdelta = deltay;
 	if (deltay > maxdirdelta) maxdirdelta = deltay;
 	if (deltaz > maxdirdelta) maxdirdelta = deltaz;
@@ -1067,11 +1081,13 @@ int32 Item::collideMove(int32 dx, int32 dy, int32 dz, bool teleport, bool force,
 	if (teleport || _parent) {
 		// If teleporting and not force, work out if we can reach the end
 		if (!force) {
-			for (it = collisions.begin(); it != collisions.end(); it++) {
+			for (const auto &collision : collisions) {
 				// Uh oh, we hit something, can't move
-				if (it->_endTime == 0x4000 && !it->_touching && it->_blocking) {
-					if (hititem) *hititem = it->_item;
-					if (dirs) *dirs = it->_dirs;
+				if (collision._endTime == 0x4000 && !collision._touching && collision._blocking) {
+					if (hititem)
+						*hititem = collision._item;
+					if (dirs)
+						*dirs = collision._dirs;
 					return 0;
 				}
 			}
@@ -1079,27 +1095,28 @@ int32 Item::collideMove(int32 dx, int32 dy, int32 dz, bool teleport, bool force,
 
 		// Trigger all the required events
 		bool we_were_released = false;
-		for (it = collisions.begin(); it != collisions.end(); it++) {
-			Item *item = getItem(it->_item);
+		for (const auto &collision : collisions) {
+			Item *item = getItem(collision._item);
 			if (!item)
 				continue; // shouldn't happen..
 
 			// Hitting us at the start and end, don't do anything
-			if (!_parent && it->_hitTime == 0x0000 &&
-			        it->_endTime == 0x4000) {
+			if (!_parent && collision._hitTime == 0x0000 &&
+				collision._endTime == 0x4000) {
 				continue;
 			}
 			// Hitting us at the end (call hit on us, got hit on them)
-			else if (it->_endTime == 0x4000) {
-				if (_objId == 1 && guiapp->isShowTouchingItems())
+			else if (collision._endTime == 0x4000) {
+				if (_objId == kMainActorId && guiapp->isShowTouchingItems())
 					item->setExtFlag(Item::EXT_HIGHLIGHT);
 
 				item->callUsecodeEvent_gotHit(_objId, hitforce);
 				callUsecodeEvent_hit(item->getObjId(), hitforce);
 			}
 			// Hitting us at the start (call release on us and them)
-			else if (!_parent && it->_hitTime == 0x0000) {
-				if (_objId == 1) item->clearExtFlag(Item::EXT_HIGHLIGHT);
+			else if (!_parent && collision._hitTime == 0x0000) {
+				if (_objId == kMainActorId)
+					item->clearExtFlag(Item::EXT_HIGHLIGHT);
 				we_were_released = true;
 				item->callUsecodeEvent_release();
 			}
@@ -1109,7 +1126,7 @@ int32 Item::collideMove(int32 dx, int32 dy, int32 dz, bool teleport, bool force,
 		if (we_were_released) callUsecodeEvent_release();
 
 		// Move US!
-		move(end[0], end[1], end[2]);
+		move(end);
 
 		// We reached the end
 		return 0x4000;
@@ -1120,34 +1137,38 @@ int32 Item::collideMove(int32 dx, int32 dy, int32 dz, bool teleport, bool force,
 		// if not, need to do 'stuff'
 		// We don't care about items hitting us at the start
 		if (!force) {
+			Std::list<CurrentMap::SweepItem>::iterator it;
 			for (it = collisions.begin(); it != collisions.end(); it++) {
 				if (it->_blocking && !it->_touching) {
-					if (hititem) *hititem = it->_item;
-					if (dirs) *dirs = it->_dirs;
+					if (hititem)
+						*hititem = it->_item;
+					if (dirs)
+						*dirs = it->_dirs;
 					hit = it->_hitTime;
 					break;
 				}
 			}
-			if (hit < 0) hit = 0;
+			if (hit < 0)
+				hit = 0;
 
 			if (hit != 0x4000) {
 				debugC(kDebugCollision, "Hit time: %d; Start: %d, %d, %d; End: %d, %d, %d",
-					hit, start[0], start[1], start[2], end[0], end[1], end[2]);
+					hit, start.x, start.y, start.z, end.x, end.y, end.z);
 
-				it->GetInterpolatedCoords(end, start, end);
+				end = it->GetInterpolatedCoords(start, end);
 
-				debugC(kDebugCollision, "Collision: %d, %d, %d", end[0], end[1], end[2]);
+				debugC(kDebugCollision, "Collision: %d, %d, %d", end.x, end.y, end.z);
 			}
 		}
 
 		// Trigger all the required events
 		bool we_were_released = false;
-		for (it = collisions.begin(); it != collisions.end(); it++) {
-			Item *item = getItem(it->_item);
+		for (const auto &collision : collisions) {
+			Item *item = getItem(collision._item);
 			if (!item) continue;
 
 			// Did we go past the endpoint of the move?
-			if (it->_hitTime > hit) break;
+			if (collision._hitTime > hit) break;
 
 			uint16 proc_gothit = 0, proc_rel = 0;
 
@@ -1155,9 +1176,9 @@ int32 Item::collideMove(int32 dx, int32 dy, int32 dz, bool teleport, bool force,
 			// called gotHit and hit.  In Crusader we call
 			// hit for every hitting frame to make sickbays
 			// and teleporters work.
-			bool call_hit = it->_hitTime >= 0 || GAME_IS_CRUSADER;
-			if ((!it->_touching || it->_touchingFloor) && call_hit) {
-				if (_objId == 1 && guiapp->isShowTouchingItems())
+			bool call_hit = collision._hitTime >= 0 || GAME_IS_CRUSADER;
+			if ((!collision._touching || collision._touchingFloor) && call_hit) {
+				if (_objId == kMainActorId && guiapp->isShowTouchingItems())
 					item->setExtFlag(Item::EXT_HIGHLIGHT);
 
 				proc_gothit = item->callUsecodeEvent_gotHit(_objId, hitforce);
@@ -1165,8 +1186,9 @@ int32 Item::collideMove(int32 dx, int32 dy, int32 dz, bool teleport, bool force,
 			}
 
 			// If not hitting at end, we will need to call release
-			if (it->_endTime < hit) {
-				if (_objId == 1) item->clearExtFlag(Item::EXT_HIGHLIGHT);
+			if (collision._endTime < hit) {
+				if (_objId == kMainActorId)
+					item->clearExtFlag(Item::EXT_HIGHLIGHT);
 				we_were_released = true;
 				proc_rel = item->callUsecodeEvent_release();
 			}
@@ -1182,7 +1204,7 @@ int32 Item::collideMove(int32 dx, int32 dy, int32 dz, bool teleport, bool force,
 		if (we_were_released) callUsecodeEvent_release();
 
 		// Move US!
-		move(end[0], end[1], end[2]);
+		move(end);
 
 		return hit;
 	}
@@ -1191,15 +1213,14 @@ int32 Item::collideMove(int32 dx, int32 dy, int32 dz, bool teleport, bool force,
 }
 
 uint16 Item::fireWeapon(int32 x, int32 y, int32 z, Direction dir, int firetype, bool findtarget) {
-	int32 ix, iy, iz;
-	getLocation(ix, iy, iz);
+	Point3 pt = getLocation();
 
 	if (!GAME_IS_CRUSADER)
 		return 0;
 
-	ix += x;
-	iy += y;
-	iz += z;
+	pt.x += x;
+	pt.y += y;
+	pt.z += z;
 
 	CurrentMap *currentmap = World::get_instance()->getCurrentMap();
 	const FireType *firetypedat = GameData::get_instance()->getFireType(firetype);
@@ -1210,23 +1231,21 @@ uint16 Item::fireWeapon(int32 x, int32 y, int32 z, Direction dir, int firetype, 
 	Common::RandomSource &rs = Ultima8Engine::get_instance()->getRandomSource();
 	int damage = firetypedat->getRandomDamage();
 
-	const Item *blocker = nullptr;
 	// CHECKME: the original doesn't exclude the source like this,
 	// but it seems obvious we have to or NPCs shoot themselves?
-	bool isvalid = currentmap->isValidPosition(ix, iy, iz, BULLET_SPLASH_SHAPE, _objId, nullptr, nullptr, &blocker);
+	PositionInfo info = currentmap->getPositionInfo(pt.x, pt.y, pt.z, BULLET_SPLASH_SHAPE, _objId);
 
-	if (!isvalid && blocker) {
-		Item *block = getItem(blocker->getObjId());
-		Point3 blockpt;
-		block->getLocation(blockpt);
-		Direction damagedir = Direction_GetWorldDir(blockpt.y - iy, blockpt.x - ix, dirmode_8dirs);
+	if (!info.valid && info.blocker) {
+		Item *block = getItem(info.blocker->getObjId());
+		Point3 blockpt = block->getLocation();
+		Direction damagedir = Direction_GetWorldDir(blockpt.y - pt.y, blockpt.x - pt.x, dirmode_8dirs);
 		block->receiveHit(getObjId(), damagedir, damage, firetype);
 		if (firetypedat->getRange() != 0) {
 			int splashdamage = firetypedat->getRandomDamage();
 			firetypedat->applySplashDamageAround(blockpt, splashdamage, 1, block, this);
 		}
 		if (firetypedat->getNearSprite())
-			firetypedat->makeBulletSplashShapeAndPlaySound(ix, iy, iz);
+			firetypedat->makeBulletSplashShapeAndPlaySound(pt.x, pt.y, pt.z);
 		return 0;
 	}
 
@@ -1270,7 +1289,7 @@ uint16 Item::fireWeapon(int32 x, int32 y, int32 z, Direction dir, int firetype, 
 		break;
 	}
 
-	// HACK: this should be fixed to use inheritence so the behavior
+	// HACK: this should be fixed to use inheritance so the behavior
 	// is clean for both Item and Actor.
 	DirectionMode dirmode = dirmode_8dirs;
 	const Actor *thisactor = dynamic_cast<Actor *>(this);
@@ -1303,16 +1322,14 @@ uint16 Item::fireWeapon(int32 x, int32 y, int32 z, Direction dir, int firetype, 
 				target = getControlledActor();
 			// else already set above to attackproc target
 		} else {
-			target = currentmap->findBestTargetItem(ix, iy, iz - z, dir, dirmode);
+			target = currentmap->findBestTargetItem(pt.x, pt.y, pt.z - z, dir, dirmode);
 		}
 	}
 
-	int32 tx = -1;
-	int32 ty = 0;
-	int32 tz = 0;
+	Point3 t(-1, 0, 0);
 	if (target) {
-		target->getCentre(tx, ty, tz);
-		tz = target->getTargetZRelativeToAttackerZ(getZ());
+		t = target->getCentre();
+		t.z = target->getTargetZRelativeToAttackerZ(getZ());
 	}
 
 	// TODO: check if we need the equivalent of FUN_1130_0299 here..
@@ -1326,27 +1343,25 @@ uint16 Item::fireWeapon(int32 x, int32 y, int32 z, Direction dir, int firetype, 
 		CrosshairProcess *chp = CrosshairProcess::get_instance();
 		assert(chp);
 		const Item *crosshair = getItem(chp->getItemNum());
-		int32 ssx, ssy, ssz;
-		if (tx != -1) {
+		Point3 ss;
+		if (t.x != -1) {
 			// Shoot toward the target
-			ssx = tx;
-			ssy = ty;
-			ssz = tz;
+			ss = t;
 			findtarget = true;
 		} else if (this == getControlledActor() && crosshair) {
 			// Shoot toward the crosshair
-			crosshair->getLocation(ssx, ssy, ssz);
-			ssz = iz;
+			ss = crosshair->getLocation();
+			ss.z = pt.z;
 		} else {
 			// Just send the projectile off into the distance
-			ssx = ix + Direction_XFactor(dir) * 0x500;
-			ssy = iy + Direction_YFactor(dir) * 0x500;
-			ssz = iz;
+			ss.x = pt.x + Direction_XFactor(dir) * 0x500;
+			ss.y = pt.y + Direction_YFactor(dir) * 0x500;
+			ss.z = pt.z;
 		}
 
 		uint16 targetid = (target ? target->getObjId() : 0);
 		ssp = new SuperSpriteProcess(BULLET_SPLASH_SHAPE, spriteframe,
-									 ix, iy, iz, ssx, ssy, ssz, firetype,
+									 pt.x, pt.y, pt.z, ss.x, ss.y, ss.z, firetype,
 									 damage, _objId, targetid, findtarget);
 		Kernel::get_instance()->addProcess(ssp);
 		spriteprocpid = ssp->getPid();
@@ -1417,11 +1432,8 @@ uint16 Item::fireDistance(const Item *other, Direction dir, int16 xoff, int16 yo
 		}
 	}
 
-	int32 x, y, z;
-	getLocation(x, y, z);
-
-	int32 ox, oy, oz;
-	other->getLocation(ox, oy, oz);
+	Point3 pt = getLocation();
+	Point3 pto = other->getLocation();
 
 	int32 dist = 0;
 
@@ -1430,37 +1442,32 @@ uint16 Item::fireDistance(const Item *other, Direction dir, int16 xoff, int16 yo
 		return 0;
 
 	for (int i = 0; i < (other_offsets ? 2 : 1) && dist == 0; i++) {
-		int32 cx = x + (i == 0 ? xoff : xoff2);
-		int32 cy = y + (i == 0 ? yoff : yoff2);
-		int32 cz = z + (i == 0 ? zoff : zoff2);
-		const Item *blocker = nullptr;
-		bool valid = cm->isValidPosition(cx, cy, cz, BULLET_SPLASH_SHAPE,
-										 getObjId(), nullptr, nullptr, &blocker);
-		if (!valid) {
-			if (blocker->getObjId() == other->getObjId())
-				dist = MAX(abs(_x - ox), abs(_y - oy));
+		int32 cx = pt.x + (i == 0 ? xoff : xoff2);
+		int32 cy = pt.y + (i == 0 ? yoff : yoff2);
+		int32 cz = pt.z + (i == 0 ? zoff : zoff2);
+		PositionInfo info = cm->getPositionInfo(cx, cy, cz, BULLET_SPLASH_SHAPE, getObjId());
+		if (!info.valid && info.blocker) {
+			if (info.blocker->getObjId() == other->getObjId())
+				dist = MAX(abs(_x - pto.x), abs(_y - pto.y));
 		} else {
-			int32 ocx, ocy, ocz;
-			other->getCentre(ocx, ocy, ocz);
-			ocz = other->getTargetZRelativeToAttackerZ(getZ());
-			const int32 start[3] = {cx, cy, cz};
-			const int32 end[3] = {ocx, ocy, ocz};
+			Point3 oc = other->getCentre();
+			oc.z = other->getTargetZRelativeToAttackerZ(getZ());
+			const Point3 start(cx, cy, cz);
+			const Point3 end = oc;
 			const int32 dims[3] = {2, 2, 2};
 
 			Std::list<CurrentMap::SweepItem> collisions;
-			Std::list<CurrentMap::SweepItem>::iterator it;
 			cm->sweepTest(start, end, dims, ShapeInfo::SI_SOLID,
 						   _objId, true, &collisions);
-			for (it = collisions.begin(); it != collisions.end(); it++) {
-				if (it->_item == getObjId())
+			for (const auto &collision : collisions) {
+				if (collision._item == getObjId())
 					continue;
-				if (it->_touching)
+				if (collision._touching)
 					continue;
-				if (it->_item != other->getObjId())
+				if (collision._item != other->getObjId())
 					break;
-				int32 out[3];
-				it->GetInterpolatedCoords(out, start, end);
-				dist = MAX(abs(_x - out[0]), abs(_y - out[1]));
+				Point3 out = collision.GetInterpolatedCoords(start, end);
+				dist = MAX(abs(_x - out.x), abs(_y - out.y));
 				break;
 			}
 		}
@@ -1866,13 +1873,19 @@ uint32 Item::enterFastArea() {
 		if (actor && actor->isDead() && !call_even_if_dead) {
 			// dead actor, don't call the usecode
 		} else {
-			if (actor && _objId != 1 && GAME_IS_CRUSADER) {
-				uint16 lastactivity = actor->getLastActivityNo();
-				actor->clearLastActivityNo();
-				actor->clearInCombat();
-				actor->setToStartOfAnim(Animation::stand);
-				actor->clearActorFlag(Actor::ACT_WEAPONREADY);
-				actor->setActivity(lastactivity);
+			if (actor && _objId != kMainActorId) {
+				if (GAME_IS_CRUSADER) {
+					uint16 lastactivity = actor->getLastActivityNo();
+					actor->clearLastActivityNo();
+					actor->clearInCombat();
+					actor->setToStartOfAnim(Animation::stand);
+					actor->clearActorFlag(Actor::ACT_WEAPONREADY);
+					actor->setActivity(lastactivity);
+				} else {
+					actor->clearInCombat();
+					actor->setToStartOfAnim(Animation::stand);
+					actor->clearActorFlag(Actor::ACT_WEAPONREADY);
+				}
 			}
 
 			// TODO: For eggs, Crusader also resets the NPC info if a
@@ -1924,7 +1937,7 @@ uint32 Item::enterFastArea() {
 
 // Called when an item is leaving the fast area
 void Item::leaveFastArea() {
-	if (_objId == 1) {
+	if (_objId == kMainActorId) {
 		debugC(kDebugActor, "Main actor leaving fast area");
 	}
 
@@ -1934,9 +1947,9 @@ void Item::leaveFastArea() {
 		callUsecodeEvent_leaveFastArea();
 
 	// If we have a gump open, close it (unless we're in a container)
-	if (!_parent && (_flags & FLG_GUMP_OPEN)) {
-		Gump *g = Ultima8Engine::get_instance()->getGump(_gump);
-		if (g) g->Close();
+	if (!_parent) {
+		closeGump();
+		closeBark();
 	}
 
 	// Unset the flag
@@ -1961,7 +1974,7 @@ void Item::leaveFastArea() {
 		if (c) c->destroyContents();
 
 		destroy();
-		// NB: destroy() creates an DestroyItemProcess to actually
+		// NB: destroy() creates a DestroyItemProcess to actually
 		// delete the item in this case.
 	}
 	// If we have a gravity process, move us to the ground
@@ -1982,7 +1995,7 @@ uint16 Item::openGump(uint32 gumpshape) {
 
 	ContainerGump *cgump;
 
-	if (getObjId() != 1) { //!! constant
+	if (getObjId() != kMainActorId) {
 		cgump = new ContainerGump(shapeP, 0, _objId, Gump::FLAG_ITEM_DEPENDENT |
 		                          Gump::FLAG_DRAGGABLE);
 	} else {
@@ -2019,6 +2032,40 @@ void Item::clearGump() {
 	_flags &= ~FLG_GUMP_OPEN;
 }
 
+ProcId Item::bark(const Std::string &msg) {
+	closeBark();
+
+	uint32 shapenum = getShape();
+
+	Gump *gump = new BarkGump(getObjId(), msg, shapenum);
+	_bark = gump->getObjId();
+
+	// Adds talk animations when bark is active.
+	// FIXME: This also affects bark after look unlike original game
+	if (getObjId() < 256) { // CONSTANT!
+		GumpNotifyProcess *notifyproc;
+		notifyproc = new ActorBarkNotifyProcess(getObjId());
+		Kernel::get_instance()->addProcess(notifyproc);
+		gump->SetNotifyProcess(notifyproc);
+	}
+
+	gump->InitGump(0);
+
+	return gump->GetNotifyProcess()->getPid();
+}
+
+void Item::closeBark() {
+	Gump *gump = Ultima8Engine::get_instance()->getGump(_bark);
+	if (gump)
+		gump->Close();
+
+	clearBark();
+}
+
+void Item::clearBark() {
+	_bark = 0;
+}
+
 int32 Item::ascend(int delta) {
 	debugC(kDebugObject, "Ascend: _objId=%u, delta=%d", getObjId(), delta);
 
@@ -2044,9 +2091,8 @@ int32 Item::ascend(int delta) {
 	}
 
 	// move self
-	int32 xv, yv, zv;
-	getLocation(xv, yv, zv);
-	int dist = collideMove(xv, yv, zv + delta, false, false);
+	Point3 ptv = getLocation();
+	int dist = collideMove(ptv.x, ptv.y, ptv.z + delta, false, false);
 	delta = (delta * dist) / 0x4000;
 
 	debugC(kDebugObject, "Ascend: dist=%d", dist);
@@ -2057,10 +2103,14 @@ int32 Item::ascend(int delta) {
 		if (!item) continue;
 		if (item->getShapeInfo()->is_fixed()) continue;
 
-		item->getLocation(_ix, _iy, _iz);
+		Point3 pti = item->getLocation();
+		_ix = pti.x;
+		_iy = pti.y;
+		_iz = pti.z;
 
-		if (item->canExistAt(_ix, _iy, _iz + delta)) {
-			item->move(_ix, _iy, _iz + delta); // automatically un-etherealizes item
+		pti.z += delta;
+		if (item->canExistAt(pti)) {
+			item->move(pti); // automatically un-etherealizes item
 		} else {
 			// uh oh...
 			// CHECKME: what do we do here?
@@ -2164,8 +2214,7 @@ void Item::explode(int explosion_type, bool destroy_item, bool cause_damage) {
 
 		setFlag(FLG_BROKEN);
 		// TODO: original game puts them at cx/cy/cz, but that looks wrong..
-		int32 cx, cy, cz;
-		getCentre(cx, cy, cz);
+		Point3 c = getCentre();
 		static const int expshapes[] = {0x31C, 0x31F, 0x326, 0x320, 0x321, 0x324, 0x323, 0x325};
 		uint rnd = rs.getRandomNumber(UINT_MAX);
 		int spriteno;
@@ -2184,7 +2233,7 @@ void Item::explode(int explosion_type, bool destroy_item, bool cause_damage) {
 			break;
 		}
 		p = new SpriteProcess(spriteno, 0, 39, 1, 1, //!! constants
-	                               _x, _y, cz);
+	                               _x, _y, c.z);
 	} else {
 		p = new SpriteProcess(578, 20, 34, 1, 1, //!! constants
 	                               _x, _y, _z);
@@ -2203,8 +2252,7 @@ void Item::explode(int explosion_type, bool destroy_item, bool cause_damage) {
 		audioproc->playSFX(sfx, 0x60, 0, 0);
 	}
 
-	int32 xv, yv, zv;
-	getLocation(xv, yv, zv);
+	Point3 ptv = getLocation();
 
 	if (destroy_item) {
 		destroy(); // delete self
@@ -2219,21 +2267,20 @@ void Item::explode(int explosion_type, bool destroy_item, bool cause_damage) {
 		LOOPSCRIPT(script, LS_TOKEN_TRUE); // we want all items
 		CurrentMap *currentmap = World::get_instance()->getCurrentMap();
 		currentmap->areaSearch(&itemlist, script, sizeof(script), 0,
-							   160, false, xv, yv); //! CHECKME: 128?
+							   160, false, ptv.x, ptv.y); //! CHECKME: 128?
 
 		for (unsigned int i = 0; i < itemlist.getSize(); ++i) {
 			Item *item = getItem(itemlist.getuint16(i));
 			if (!item) continue;
 			if (getRange(*item, true) > 160) continue; // check vertical distance
 
-			item->getLocation(xv, yv, zv);
-			Direction dir = Direction_GetWorldDir(xv - xv, yv - yv, dirmode_8dirs); //!! CHECKME
+			Point3 pti = item->getLocation();
+			Direction dir = Direction_GetWorldDir(pti.x - ptv.x, pti.y - ptv.y, dirmode_8dirs); //!! CHECKME
 			item->receiveHit(0, dir, rs.getRandomNumberRng(6, 11),
 							 WeaponInfo::DMG_BLUNT | WeaponInfo::DMG_FIRE);
 		}
 	} else {
-		Point3 pt;
-		getLocation(pt);
+		Point3 pt = getLocation();
 		// Note: same FireType number used in both Remorse and Regret
 		const FireType *firetypedat = GameData::get_instance()->getFireType(4);
 		if (firetypedat) {
@@ -2366,23 +2413,24 @@ int Item::getThrowRange() const {
 static bool checkLineOfSightCollisions(
 	const Std::list<CurrentMap::SweepItem> &collisions,
 	bool usingAlternatePos, ObjId item, ObjId other) {
-	Std::list<CurrentMap::SweepItem>::const_iterator it;
 	int32 other_hit_time = 0x4000;
 	int32 blocked_time = 0x4000;
-	for (it = collisions.begin(); it != collisions.end(); it++) {
+	for (const auto &collision : collisions) {
 		// ignore self and other
-		if (it->_item == item) continue;
-		if (it->_item == other && !usingAlternatePos) {
-			other_hit_time = it->_hitTime;
+		if (collision._item == item)
+			continue;
+		if (collision._item == other && !usingAlternatePos) {
+			other_hit_time = collision._hitTime;
 			continue;
 		}
 
 		// only touching?
-		if (it->_touching) continue;
+		if (collision._touching)
+			continue;
 
 		// hit something
-		if (it->_blocking && it->_hitTime < blocked_time) {
-			blocked_time = it->_hitTime;
+		if (collision._blocking && collision._hitTime < blocked_time) {
+			blocked_time = collision._hitTime;
 		}
 	}
 
@@ -2393,7 +2441,6 @@ static bool checkLineOfSightCollisions(
 bool Item::canReach(const Item *other, int range,
 					int32 otherX, int32 otherY, int32 otherZ) const {
 	// get location and dimensions of self and other (or their root containers)
-	int32 thisX, thisY, thisZ;
 	int32 thisXd, thisYd, thisZd;
 	int32 otherXd, otherYd, otherZd;
 	int32 thisXmin, thisYmin;
@@ -2401,40 +2448,40 @@ bool Item::canReach(const Item *other, int range,
 
 	bool usingAlternatePos = (otherX != 0);
 
-	getLocationAbsolute(thisX, thisY, thisZ);
+	Point3 pt1 = getLocationAbsolute();
 	other = other->getTopItem();
-	if (otherX == 0)
-		other->getLocationAbsolute(otherX, otherY, otherZ);
+	if (otherX == 0) {
+		Point3 pt2 = other->getLocationAbsolute();
+		otherX = pt2.x;
+		otherY = pt2.y;
+		otherZ = pt2.z;
+	}
 
 	getFootpadWorld(thisXd, thisYd, thisZd);
 	other->getFootpadWorld(otherXd, otherYd, otherZd);
 
-	thisXmin = thisX - thisXd;
-	thisYmin = thisY - thisYd;
+	thisXmin = pt1.x - thisXd;
+	thisYmin = pt1.y - thisYd;
 
 	otherXmin = otherX - otherXd;
 	otherYmin = otherY - otherYd;
 
 	// if items are further away than range in any direction, return false
 	if (thisXmin - otherX > range) return false;
-	if (otherXmin - thisX > range) return false;
+	if (otherXmin - pt1.x > range)
+		return false;
 	if (thisYmin - otherY > range) return false;
-	if (otherYmin - thisY > range) return false;
+	if (otherYmin - pt1.y > range)
+		return false;
 
 
 	// if not, do line of sight between origins of items
-	int32 start[3];
-	int32 end[3];
+	Point3 start = pt1;
+	Point3 end(otherX, otherY, otherZ);
 	int32 dims[3] = { 2, 2, 2 };
 
-	start[0] = thisX;
-	start[1] = thisY;
-	start[2] = thisZ;
-	end[0] = otherX;
-	end[1] = otherY;
-	end[2] = otherZ;
-	if (otherZ > thisZ && otherZ < thisZ + thisZd)
-		start[2] = end[2]; // bottom of other between bottom and top of this
+	if (otherZ > pt1.z && otherZ < pt1.z + thisZd)
+		start.z = end.z; // bottom of other between bottom and top of this
 
 	Std::list<CurrentMap::SweepItem> collisions;
 	Std::list<CurrentMap::SweepItem>::iterator it;
@@ -2447,15 +2494,15 @@ bool Item::canReach(const Item *other, int range,
 		return true;
 
 	// if that fails, try line of sight between centers
-	start[0] = thisX - thisXd / 2; // xy center of this
-	start[1] = thisY - thisYd / 2;
-	start[2] = thisZ;
+	start.x = pt1.x - thisXd / 2; // xy center of this
+	start.y = pt1.y - thisYd / 2;
+	start.z = pt1.z;
 	if (thisZd > 16)
-		start[2] += thisZd - 8; // eye height
+		start.z += thisZd - 8; // eye height
 
-	end[0] = otherX - otherXd / 2; // xyz center of other
-	end[1] = otherY - otherYd / 2;
-	end[2] = otherZ + otherZd / 2;
+	end.x = otherX - otherXd / 2; // xyz center of other
+	end.y = otherY - otherYd / 2;
+	end.z = otherZ + otherZd / 2;
 
 	collisions.clear();
 	map->sweepTest(start, end, dims, ShapeInfo::SI_SOLID,
@@ -2465,7 +2512,7 @@ bool Item::canReach(const Item *other, int range,
 		return true;
 
 	// if that fails, try line of sight between eye level and top of 2nd
-	end[2] = otherZ + otherZd;
+	end.z = otherZ + otherZd;
 
 	collisions.clear();
 	map->sweepTest(start, end, dims, ShapeInfo::SI_SOLID,
@@ -2605,6 +2652,9 @@ void Item::saveData(Common::WriteStream *ws) {
 	}
 	if ((_flags & FLG_ETHEREAL) && (_flags & (FLG_CONTAINED | FLG_EQUIPPED)))
 		ws->writeUint16LE(_parent);
+
+	// TODO: Consider saving this
+	// ws->writeUint16LE(_bark);
 }
 
 bool Item::loadData(Common::ReadStream *rs, uint32 version) {
@@ -2633,6 +2683,8 @@ bool Item::loadData(Common::ReadStream *rs, uint32 version) {
 	else
 		_parent = 0;
 
+	_bark = 0;
+
 	//!! hackish...
 	if (_extendedFlags & EXT_INCURMAP) {
 		World::get_instance()->getCurrentMap()->addItem(this);
@@ -2655,63 +2707,56 @@ uint32 Item::I_getX(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
 	if (!item) return 0;
 
-	int32 x, y, z;
-	item->getLocationAbsolute(x, y, z);
-	return World_ToUsecodeCoord(x);
+	Point3 pt = item->getLocationAbsolute();
+	return World_ToUsecodeCoord(pt.x);
 }
 
 uint32 Item::I_getY(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
 	if (!item) return 0;
 
-	int32 x, y, z;
-	item->getLocationAbsolute(x, y, z);
-	return World_ToUsecodeCoord(y);
+	Point3 pt = item->getLocationAbsolute();
+	return World_ToUsecodeCoord(pt.y);
 }
 
 uint32 Item::I_getZ(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
 	if (!item) return 0;
 
-	int32 x, y, z;
-	item->getLocationAbsolute(x, y, z);
-	return z;
+	Point3 pt = item->getLocationAbsolute();
+	return pt.z;
 }
 
 uint32 Item::I_getCX(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
 	if (!item) return 0;
 
-	int32 x, y, z;
-	item->getLocationAbsolute(x, y, z);
+	Point3 pt = item->getLocationAbsolute();
 
 	if (item->_flags & FLG_FLIPPED)
-		return World_ToUsecodeCoord(x - item->getShapeInfo()->_y * 16);
+		return World_ToUsecodeCoord(pt.x - item->getShapeInfo()->_y * 16);
 	else
-		return World_ToUsecodeCoord(x - item->getShapeInfo()->_x * 16);
+		return World_ToUsecodeCoord(pt.x - item->getShapeInfo()->_x * 16);
 }
 
 uint32 Item::I_getCY(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
 	if (!item) return 0;
 
-	int32 x, y, z;
-	item->getLocationAbsolute(x, y, z);
+	Point3 pt = item->getLocationAbsolute();
 
 	if (item->_flags & FLG_FLIPPED)
-		return World_ToUsecodeCoord(y - item->getShapeInfo()->_x * 16);
+		return World_ToUsecodeCoord(pt.y - item->getShapeInfo()->_x * 16);
 	else
-		return World_ToUsecodeCoord(y - item->getShapeInfo()->_y * 16);
+		return World_ToUsecodeCoord(pt.y - item->getShapeInfo()->_y * 16);
 }
 
 uint32 Item::I_getCZ(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
 	if (!item) return 0;
 
-	int32 x, y, z;
-	item->getLocationAbsolute(x, y, z);
-
-	return z + item->getShapeInfo()->_z * 4;
+	Point3 pt = item->getLocationAbsolute();
+	return pt.z + item->getShapeInfo()->_z * 4;
 }
 
 uint32 Item::I_getPoint(const uint8 *args, unsigned int /*argsize*/) {
@@ -2719,15 +2764,13 @@ uint32 Item::I_getPoint(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_UC_PTR(ptr);
 	if (!item) return 0;
 
-	int32 x, y, z;
-	item->getLocationAbsolute(x, y, z);
-
-	World_ToUsecodeXY(x, y);
+	Point3 pt = item->getLocationAbsolute();
+	World_ToUsecodeXY(pt.x, pt.y);
 
 	WorldPoint point;
-	point.setX(x);
-	point.setY(y);
-	point.setZ(z);
+	point.setX(pt.x);
+	point.setY(pt.y);
+	point.setZ(pt.z);
 
 	UCMachine::get_instance()->assignPointer(ptr, point._buf, 5);
 
@@ -2833,20 +2876,17 @@ uint32 Item::I_getContainer(const uint8 *args, unsigned int /*argsize*/) {
 
 uint32 Item::I_getRootContainer(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
-	if (!item) return 0;
+	if (!item)
+		return 0;
 
-	Container *_parent = item->getParentAsContainer();
+	Container *root = item->getRootContainer();
 
 	//! What do we do if item has no _parent?
 	//! What do we do with equipped items?
+	if (!root)
+		return 0;
 
-	if (!_parent) return 0;
-
-	while (_parent->getParentAsContainer()) {
-		_parent = _parent->getParentAsContainer();
-	}
-
-	return _parent->getObjId();
+	return root->getObjId();
 }
 
 uint32 Item::I_getQ(const uint8 *args, unsigned int /*argsize*/) {
@@ -3016,8 +3056,15 @@ uint32 Item::I_getWeightIncludingContents(const uint8 *args,
 uint32 Item::I_bark(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
 	ARG_STRING(str);
-	if (id_item == 666)
-		item = getItem(1);
+	if (!item && id_item == kGuardianId) {
+		Actor *actor = ItemFactory::createActor(kGuardianId, 0, 0, Item::FLG_ETHEREAL | Item::FLG_IN_NPC_LIST, kGuardianId, 0, Item::EXT_PERMANENT_NPC, false);
+		if (!actor) {
+			warning("Couldn't create actor");
+			return 0;
+		}
+		ObjectManager::get_instance()->assignActorObjId(actor, kGuardianId);
+		item = actor;
+	}
 
 	if (!item) {
 		// Hack! Items should always be valid?
@@ -3025,21 +3072,7 @@ uint32 Item::I_bark(const uint8 *args, unsigned int /*argsize*/) {
 		return 0;
 	}
 
-	uint32 shapenum = item->getShape();
-	if (id_item == 666)
-		shapenum = 666; // Hack for guardian barks
-	Gump *gump = new BarkGump(item->getObjId(), str, shapenum);
-
-	if (item->getObjId() < 256) { // CONSTANT!
-		GumpNotifyProcess *notifyproc;
-		notifyproc = new ActorBarkNotifyProcess(item->getObjId());
-		Kernel::get_instance()->addProcess(notifyproc);
-		gump->SetNotifyProcess(notifyproc);
-	}
-
-	gump->InitGump(0);
-
-	return gump->GetNotifyProcess()->getPid();
+	return item->bark(str);
 }
 
 uint32 Item::I_look(const uint8 *args, unsigned int /*argsize*/) {
@@ -3122,6 +3155,10 @@ uint32 Item::I_ask(const uint8 *args, unsigned int /*argsize*/) {
 
 	if (!answers) return 0;
 
+	Actor *actor = getMainActor();
+	if (actor)
+		actor->closeBark();
+
 	// Use AskGump
 	Gump *_gump = new AskGump(1, answers);
 	_gump->InitGump(0);
@@ -3140,10 +3177,13 @@ uint32 Item::I_legalCreateAtPoint(const uint8 *args, unsigned int /*argsize*/) {
 
 	World_FromUsecodeXY(x, y);
 
-	// check if item can exist
+	Point3 pt(x, y, z);
 	CurrentMap *cm = World::get_instance()->getCurrentMap();
-	bool valid = cm->isValidPosition(x, y, z, shape, 0, 0, 0);
-	if (!valid)
+	cm->setFastAtPoint(pt);
+
+	// check if item can exist
+	PositionInfo info = cm->getPositionInfo(x, y, z, shape, 0);
+	if (!info.valid)
 		return 0;
 
 	Item *newitem = ItemFactory::createItem(shape, frame, 0, 0, 0, 0, 0, true);
@@ -3172,10 +3212,13 @@ uint32 Item::I_legalCreateAtCoords(const uint8 *args, unsigned int /*argsize*/) 
 
 	World_FromUsecodeXY(x, y);
 
-	// check if item can exist
+	Point3 pt(x, y, z);
 	CurrentMap *cm = World::get_instance()->getCurrentMap();
-	bool valid = cm->isValidPosition(x, y, z, shape, 0, 0, 0);
-	if (!valid)
+	cm->setFastAtPoint(pt);
+
+	// check if item can exist
+	PositionInfo info = cm->getPositionInfo(x, y, z, shape, 0);
+	if (!info.valid)
 		return 0;
 
 	// if yes, create it
@@ -3236,7 +3279,8 @@ uint32 Item::I_legalCreateInCont(const uint8 *args, unsigned int /*argsize*/) {
 
 uint32 Item::I_destroy(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_ITEM_FROM_PTR(item);
-	if (!item || item->getObjId() == 1) return 0;
+	if (!item || item->getObjId() == kMainActorId)
+		return 0;
 
 	item->destroy();
 
@@ -3478,8 +3522,7 @@ uint32 Item::I_popToContainer(const uint8 *args, unsigned int /*argsize*/) {
 	if (container) {
 		item->moveToContainer(container);
 	} else if (citem) {
-		Point3 pt;
-		citem->getLocation(pt);
+		Point3 pt = citem->getLocation();
 		item->move(pt);
 	} else {
 		warning("Trying to popToContainer to invalid container (%u)", id_citem);
@@ -3521,8 +3564,7 @@ uint32 Item::I_popToEnd(const uint8 *args, unsigned int /*argsize*/) {
 	if (container) {
 		item->moveToContainer(container);
 	} else if (citem) {
-		Point3 pt;
-		citem->getLocation(pt);
+		Point3 pt = citem->getLocation();
 		item->move(pt);
 	} else {
 		warning("Trying to popToEnd to invalid container (%u)", id_citem);
@@ -3587,18 +3629,15 @@ uint32 Item::I_legalMoveToPoint(const uint8 *args, unsigned int argsize) {
 	//
 	int retval = 1;
 	Std::list<CurrentMap::SweepItem> collisions;
-	int32 start[3], end[3], dims[3];
-	end[0] = x;
-	end[1] = y;
-	end[2] = z;
-	item->getLocation(start[0], start[1], start[2]);
+	Point3 start = item->getLocation();
+	Point3 end(x, y, z);
+	int32 dims[3];
 	item->getFootpadWorld(dims[0], dims[1], dims[2]);
 	CurrentMap *map = World::get_instance()->getCurrentMap();
 	map->sweepTest(start, end, dims, item->getShapeInfo()->_flags,
 				   item->getObjId(), true, &collisions);
-	for (Std::list<CurrentMap::SweepItem>::iterator it = collisions.begin();
-		 it != collisions.end(); it++) {
-		if (it->_blocking && !it->_touching && it->_endTime > 0) {
+	for (const auto &collision : collisions) {
+		if (collision._blocking && !collision._touching && collision._endTime > 0) {
 			if (abort_if_blocked)
 				return 0;
 			retval = 0;
@@ -3669,10 +3708,9 @@ uint32 Item::I_getDirToCoords(const uint8 *args, unsigned int /*argsize*/) {
 
 	World_FromUsecodeXY(x, y);
 
-	int32 ix, iy, iz;
-	item->getLocationAbsolute(ix, iy, iz);
+	Point3 pt = item->getLocationAbsolute();
 
-	return Direction_ToUsecodeDir(Direction_GetWorldDir(y - iy, x - ix, dirmode_8dirs));
+	return Direction_ToUsecodeDir(Direction_GetWorldDir(y - pt.y, x - pt.x, dirmode_8dirs));
 }
 
 uint32 Item::I_getDirFromCoords(const uint8 *args, unsigned int /*argsize*/) {
@@ -3683,10 +3721,9 @@ uint32 Item::I_getDirFromCoords(const uint8 *args, unsigned int /*argsize*/) {
 
 	World_FromUsecodeXY(x, y);
 
-	int32 ix, iy, iz;
-	item->getLocationAbsolute(ix, iy, iz);
+	Point3 pt = item->getLocationAbsolute();
 
-	return Direction_ToUsecodeDir(Direction_GetWorldDir(iy - y, ix - x, dirmode_8dirs));
+	return Direction_ToUsecodeDir(Direction_GetWorldDir(pt.y - y, pt.x - x, dirmode_8dirs));
 }
 
 uint32 Item::I_getDirToItem(const uint8 *args, unsigned int /*argsize*/) {
@@ -3695,13 +3732,10 @@ uint32 Item::I_getDirToItem(const uint8 *args, unsigned int /*argsize*/) {
 	if (!item) return 0;
 	if (!item2) return 0;
 
-	int32 ix, iy, iz;
-	item->getLocationAbsolute(ix, iy, iz);
+	Point3 pt1 = item->getLocationAbsolute();
+	Point3 pt2 = item2->getLocationAbsolute();
 
-	int32 i2x, i2y, i2z;
-	item2->getLocationAbsolute(i2x, i2y, i2z);
-
-	return Direction_ToUsecodeDir(Direction_GetWorldDir(i2y - iy, i2x - ix, dirmode_8dirs));
+	return Direction_ToUsecodeDir(Direction_GetWorldDir(pt2.y - pt1.y, pt2.x - pt1.x, dirmode_8dirs));
 }
 
 uint32 Item::I_getDirFromItem(const uint8 *args, unsigned int /*argsize*/) {
@@ -3710,13 +3744,10 @@ uint32 Item::I_getDirFromItem(const uint8 *args, unsigned int /*argsize*/) {
 	if (!item) return 0;
 	if (!item2) return 0;
 
-	int32 ix, iy, iz;
-	item->getLocationAbsolute(ix, iy, iz);
+	Point3 pt1 = item->getLocationAbsolute();
+	Point3 pt2 = item2->getLocationAbsolute();
 
-	int32 i2x, i2y, i2z;
-	item2->getLocationAbsolute(i2x, i2y, i2z);
-
-	return Direction_ToUsecodeDir(Direction_Invert(Direction_GetWorldDir(i2y - iy, i2x - ix, dirmode_8dirs)));
+	return Direction_ToUsecodeDir(Direction_Invert(Direction_GetWorldDir(pt2.y - pt1.y, pt2.x - pt1.x, dirmode_8dirs)));
 }
 
 uint32 Item::I_getDirFromTo16(const uint8 *args, unsigned int /*argsize*/) {
@@ -3767,7 +3798,7 @@ uint32 Item::I_shoot(const uint8 *args, unsigned int /*argsize*/) {
 	ARG_UINT16(gravity); // either 2 (fish) or 1 (death disk, dart)
 	if (!item) return 0;
 
-	MissileTracker tracker(item, point.getX(), point.getY(), point.getZ(),
+	MissileTracker tracker(item, 0, point.getX(), point.getY(), point.getZ(),
 	                       speed, gravity);
 	tracker.launchItem();
 

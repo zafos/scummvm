@@ -31,12 +31,14 @@
 
 namespace Chamber {
 
+#if 0
 static const char restart_name[] = "CLEARx.BIN";
 
 #ifdef VERSION_USA
 static const char savegame_name[] = "SCENACx.BIN";
 #else
 static const char savegame_name[] = "SCENAx.BIN";
+#endif
 #endif
 
 #ifdef VERSION_USA
@@ -672,6 +674,7 @@ extern void askDisk2(void);
 
 void restartGame(void) {
 	warning("STUB: restartGame()");
+	g_vm->_shouldRestart = true;
 
 #if 0
 	int16 f;
@@ -690,7 +693,6 @@ void restartGame(void) {
 	script_byte_vars.cur_spot_flags = 0xFF;
 	script_byte_vars.load_flag = 2;
 
-	longjmp(restart_jmp, 1);
 #endif
 }
 

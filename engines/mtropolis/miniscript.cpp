@@ -24,9 +24,39 @@
 #include "common/random.h"
 #include "common/memstream.h"
 
+#include "mtropolis/coroutines.h"
 #include "mtropolis/miniscript.h"
 
 namespace MTropolis {
+
+class MiniscriptInstructionParserFeedback : public IMiniscriptInstructionParserFeedback {
+public:
+	explicit MiniscriptInstructionParserFeedback(Common::Array<MiniscriptReferences::GlobalRef> *globalRefs);
+
+	uint registerGlobalGUIDIndex(uint32 guid) override;
+
+private:
+	Common::Array<MiniscriptReferences::GlobalRef> *_globalRefs;
+};
+
+MiniscriptInstructionParserFeedback::MiniscriptInstructionParserFeedback(Common::Array<MiniscriptReferences::GlobalRef> *globalRefs) : _globalRefs(globalRefs) {
+}
+
+uint MiniscriptInstructionParserFeedback::registerGlobalGUIDIndex(uint32 guid) {
+	for (uint i = 0; i < _globalRefs->size(); i++) {
+		if ((*_globalRefs)[i].guid == guid)
+			return i;
+	}
+
+	uint newIndex = _globalRefs->size();
+
+	MiniscriptReferences::GlobalRef globalRef;
+	globalRef.guid = guid;
+
+	_globalRefs->push_back(globalRef);
+
+	return newIndex;
+}
 
 bool miniscriptEvaluateTruth(const DynamicValue &value) {
 	// NOTE: Comparing equal to "true" only passes for 1 exactly, but for conditions,
@@ -45,25 +75,48 @@ bool miniscriptEvaluateTruth(const DynamicValue &value) {
 	}
 }
 
+IMiniscriptInstructionParserFeedback::~IMiniscriptInstructionParserFeedback() {
+}
+
 MiniscriptInstruction::~MiniscriptInstruction() {
 }
 
 MiniscriptReferences::LocalRef::LocalRef() : guid(0) {
 }
 
-MiniscriptReferences::MiniscriptReferences(const Common::Array<LocalRef> &localRefs) : _localRefs(localRefs) {
+MiniscriptReferences::GlobalRef::GlobalRef() : guid(0) {
+}
+
+MiniscriptReferences::MiniscriptReferences(const Common::Array<LocalRef> &localRefs, const Common::Array<GlobalRef> &globalRefs) : _localRefs(localRefs), _globalRefs(globalRefs) {
 }
 
 void MiniscriptReferences::linkInternalReferences(ObjectLinkingScope *scope) {
 	// Resolve using name lookups since there are some known cases where the GUID is broken
 	// e.g. "bArriveFromCutScene" in "Set bArriveFromCutScene on PE" in Obsidian
-	for (Common::Array<LocalRef>::iterator it = _localRefs.begin(), itEnd = _localRefs.end(); it != itEnd; ++it) {
+	for (Common::Array<LocalRef>::iterator it = _localRefs.begin(), itEnd = _localRefs.end(); it != itEnd; ++it)
 		it->resolution = scope->resolve(it->guid, it->name, false);
-	}
+
+	for (Common::Array<GlobalRef>::iterator it = _globalRefs.begin(), itEnd = _globalRefs.end(); it != itEnd; ++it)
+		it->resolution = scope->resolve(it->guid, "", true);
 }
 
 void MiniscriptReferences::visitInternalReferences(IStructuralReferenceVisitor *visitor) {
 	for (LocalRef &ref : _localRefs) {
+		Common::SharedPtr<RuntimeObject> obj = ref.resolution.lock();
+		if (obj) {
+			if (obj->isModifier()) {
+				Common::WeakPtr<Modifier> mod = obj.staticCast<Modifier>();
+				visitor->visitWeakModifierRef(mod);
+				ref.resolution = mod;
+			} else if (obj->isStructural()) {
+				Common::WeakPtr<Structural> struc = obj.staticCast<Structural>();
+				visitor->visitWeakStructuralRef(struc);
+				ref.resolution = struc;
+			}
+		}
+	}
+
+	for (GlobalRef &ref : _globalRefs) {
 		Common::SharedPtr<RuntimeObject> obj = ref.resolution.lock();
 		if (obj) {
 			if (obj->isModifier()) {
@@ -83,6 +136,13 @@ Common::WeakPtr<RuntimeObject> MiniscriptReferences::getRefByIndex(uint index) c
 	if (index >= _localRefs.size())
 		return Common::WeakPtr<RuntimeObject>();
 	return _localRefs[index].resolution;
+}
+
+Common::WeakPtr<RuntimeObject> MiniscriptReferences::getGlobalRefByIndex(uint index) const {
+	if (index >= _globalRefs.size())
+		return Common::WeakPtr<RuntimeObject>();
+	return _globalRefs[index].resolution;
+	
 }
 
 MiniscriptProgram::MiniscriptProgram(const Common::SharedPtr<Common::Array<uint8> > &programData, const Common::Array<MiniscriptInstruction *> &instructions, const Common::Array<Attribute> &attributes)
@@ -105,18 +165,18 @@ const Common::Array<MiniscriptProgram::Attribute> &MiniscriptProgram::getAttribu
 
 template<class T>
 struct MiniscriptInstructionLoader {
-	static bool loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader);
+	static bool loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, IMiniscriptInstructionParserFeedback &feedback);
 };
 
 template<class T>
-bool MiniscriptInstructionLoader<T>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader) {
+bool MiniscriptInstructionLoader<T>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, IMiniscriptInstructionParserFeedback &feedback) {
 	// Default loader for simple instructions with no private data
 	new (dest) T();
 	return true;
 }
 
 template<>
-bool MiniscriptInstructionLoader<MiniscriptInstructions::Send>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader) {
+bool MiniscriptInstructionLoader<MiniscriptInstructions::Send>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, IMiniscriptInstructionParserFeedback &feedback) {
 	Data::Event dataEvent;
 	if (!dataEvent.load(instrDataReader))
 		return false;
@@ -135,7 +195,7 @@ bool MiniscriptInstructionLoader<MiniscriptInstructions::Send>::loadInstruction(
 }
 
 template<>
-bool MiniscriptInstructionLoader<MiniscriptInstructions::BuiltinFunc>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader) {
+bool MiniscriptInstructionLoader<MiniscriptInstructions::BuiltinFunc>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, IMiniscriptInstructionParserFeedback &feedback) {
 	uint32 functionID;
 	if (!instrDataReader.readU32(functionID))
 		return false;
@@ -148,7 +208,7 @@ bool MiniscriptInstructionLoader<MiniscriptInstructions::BuiltinFunc>::loadInstr
 }
 
 template<>
-bool MiniscriptInstructionLoader<MiniscriptInstructions::GetChild>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader) {
+bool MiniscriptInstructionLoader<MiniscriptInstructions::GetChild>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, IMiniscriptInstructionParserFeedback &feedback) {
 	uint32 childAttribute;
 	if (!instrDataReader.readU32(childAttribute))
 		return false;
@@ -158,7 +218,7 @@ bool MiniscriptInstructionLoader<MiniscriptInstructions::GetChild>::loadInstruct
 }
 
 template<>
-bool MiniscriptInstructionLoader<MiniscriptInstructions::PushGlobal>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader) {
+bool MiniscriptInstructionLoader<MiniscriptInstructions::PushGlobal>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, IMiniscriptInstructionParserFeedback &feedback) {
 	uint32 globalID;
 	if (!instrDataReader.readU32(globalID))
 		return false;
@@ -168,7 +228,7 @@ bool MiniscriptInstructionLoader<MiniscriptInstructions::PushGlobal>::loadInstru
 }
 
 template<>
-bool MiniscriptInstructionLoader<MiniscriptInstructions::Jump>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader) {
+bool MiniscriptInstructionLoader<MiniscriptInstructions::Jump>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, IMiniscriptInstructionParserFeedback &feedback) {
 	uint32 jumpFlags, unknown, instrOffset;
 	if (!instrDataReader.readU32(jumpFlags) || !instrDataReader.readU32(unknown) || !instrDataReader.readU32(instrOffset))
 		return false;
@@ -185,7 +245,7 @@ bool MiniscriptInstructionLoader<MiniscriptInstructions::Jump>::loadInstruction(
 }
 
 template<>
-bool MiniscriptInstructionLoader<MiniscriptInstructions::PushValue>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader) {
+bool MiniscriptInstructionLoader<MiniscriptInstructions::PushValue>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, IMiniscriptInstructionParserFeedback &feedback) {
 	uint16 dataType;
 	if (!instrDataReader.readU16(dataType))
 		return false;
@@ -217,7 +277,9 @@ bool MiniscriptInstructionLoader<MiniscriptInstructions::PushValue>::loadInstruc
 		if (!instrDataReader.readU32(refValue))
 			return false;
 
-		new (dest) MiniscriptInstructions::PushValue(MiniscriptInstructions::PushValue::kDataTypeGlobalRef, &refValue, (instrFlags & 1) != 0);
+		uint32 indexedRef = feedback.registerGlobalGUIDIndex(refValue);
+
+		new (dest) MiniscriptInstructions::PushValue(MiniscriptInstructions::PushValue::kDataTypeGlobalRef, &indexedRef, (instrFlags & 1) != 0);
 	} else if (dataType == 0x1d) {
 		MiniscriptInstructions::PushValue::Label label;
 		if (!instrDataReader.readU32(label.superGroup) || !instrDataReader.readU32(label.id))
@@ -231,7 +293,7 @@ bool MiniscriptInstructionLoader<MiniscriptInstructions::PushValue>::loadInstruc
 }
 
 template<>
-bool MiniscriptInstructionLoader<MiniscriptInstructions::PushString>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader) {
+bool MiniscriptInstructionLoader<MiniscriptInstructions::PushString>::loadInstruction(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, IMiniscriptInstructionParserFeedback &feedback) {
 	uint16 strLength;
 	if (!instrDataReader.readU16(strLength))
 		return false;
@@ -247,14 +309,14 @@ bool MiniscriptInstructionLoader<MiniscriptInstructions::PushString>::loadInstru
 }
 
 struct SIMiniscriptInstructionFactory {
-	bool (*create)(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, MiniscriptInstruction *&outMiniscriptInstructionPtr);
+	bool (*create)(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, MiniscriptInstruction *&outMiniscriptInstructionPtr, IMiniscriptInstructionParserFeedback &feedback);
 	void (*getSizeAndAlignment)(size_t &outSize, size_t &outAlignment);
 };
 
 template<class T>
 class MiniscriptInstructionFactory {
 public:
-	static bool create(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, MiniscriptInstruction *&outMiniscriptInstructionPtr);
+	static bool create(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, MiniscriptInstruction *&outMiniscriptInstructionPtr, IMiniscriptInstructionParserFeedback &feedback);
 	static void getSizeAndAlignment(size_t &outSize, size_t &outAlignment);
 
 	static SIMiniscriptInstructionFactory *getInstance();
@@ -264,8 +326,8 @@ private:
 };
 
 template<class T>
-bool MiniscriptInstructionFactory<T>::create(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, MiniscriptInstruction *&outMiniscriptInstructionPtr) {
-	if (!MiniscriptInstructionLoader<T>::loadInstruction(dest, instrFlags, instrDataReader))
+bool MiniscriptInstructionFactory<T>::create(void *dest, uint32 instrFlags, Data::DataReader &instrDataReader, MiniscriptInstruction *&outMiniscriptInstructionPtr, IMiniscriptInstructionParserFeedback &feedback) {
+	if (!MiniscriptInstructionLoader<T>::loadInstruction(dest, instrFlags, instrDataReader, feedback))
 		return false;
 
 	outMiniscriptInstructionPtr = static_cast<MiniscriptInstruction *>(static_cast<T *>(dest));
@@ -295,6 +357,7 @@ MiniscriptParser::InstructionData::InstructionData()
 
 bool MiniscriptParser::parse(const Data::MiniscriptProgram &program, Common::SharedPtr<MiniscriptProgram> &outProgram, Common::SharedPtr<MiniscriptReferences> &outReferences) {
 	Common::Array<MiniscriptReferences::LocalRef> localRefs;
+	Common::Array<MiniscriptReferences::GlobalRef> globalRefs;
 	Common::Array<MiniscriptProgram::Attribute> attributes;
 	Common::SharedPtr<Common::Array<uint8> > programDataPtr;
 	Common::Array<MiniscriptInstruction *> miniscriptInstructions;
@@ -302,7 +365,7 @@ bool MiniscriptParser::parse(const Data::MiniscriptProgram &program, Common::Sha
 	// If the program is empty then just return an empty program
 	if (program.bytecode.size() == 0 || program.numOfInstructions == 0) {
 		outProgram = Common::SharedPtr<MiniscriptProgram>(new MiniscriptProgram(programDataPtr, miniscriptInstructions, attributes));
-		outReferences = Common::SharedPtr<MiniscriptReferences>(new MiniscriptReferences(localRefs));
+		outReferences = Common::SharedPtr<MiniscriptReferences>(new MiniscriptReferences(localRefs, globalRefs));
 		return true;
 	}
 
@@ -317,8 +380,8 @@ bool MiniscriptParser::parse(const Data::MiniscriptProgram &program, Common::Sha
 		attributes[i].name = program.attributes[i].name;
 	}
 
-	Common::MemoryReadStreamEndian stream(&program.bytecode[0], program.bytecode.size(), program.isBigEndian);
-	Data::DataReader reader(0, stream, program.projectFormat);
+	Common::MemoryReadStream stream(&program.bytecode[0], program.bytecode.size());
+	Data::DataReader reader(0, stream, program.dataFormat, kRuntimeVersion100, false);
 
 	Common::Array<InstructionData> rawInstructions;
 	rawInstructions.resize(program.numOfInstructions);
@@ -377,6 +440,8 @@ bool MiniscriptParser::parse(const Data::MiniscriptProgram &program, Common::Sha
 
 	miniscriptInstructions.resize(program.numOfInstructions);
 
+	MiniscriptInstructionParserFeedback parserFeedback(&globalRefs);
+
 	// Create instructions
 	for (size_t i = 0; i < program.numOfInstructions; i++) {
 		const InstructionData &rawInstruction = rawInstructions[i];
@@ -385,10 +450,10 @@ bool MiniscriptParser::parse(const Data::MiniscriptProgram &program, Common::Sha
 		if (rawInstruction.contents.size() != 0)
 			dataLoc = &rawInstruction.contents[0];
 
-		Common::MemoryReadStreamEndian instrContentsStream(static_cast<const byte *>(dataLoc), rawInstruction.contents.size(), reader.isBigEndian());
-		Data::DataReader instrContentsReader(0, instrContentsStream, reader.getProjectFormat());
+		Common::MemoryReadStream instrContentsStream(static_cast<const byte *>(dataLoc), rawInstruction.contents.size());
+		Data::DataReader instrContentsReader(0, instrContentsStream, reader.getDataFormat(), reader.getRuntimeVersion(), reader.isVersionAutoDetect());
 
-		if (!rawInstruction.instrFactory->create(&programData[baseOffset + rawInstruction.pdPosition], rawInstruction.flags, instrContentsReader, miniscriptInstructions[i])) {
+		if (!rawInstruction.instrFactory->create(&programData[baseOffset + rawInstruction.pdPosition], rawInstruction.flags, instrContentsReader, miniscriptInstructions[i], parserFeedback)) {
 			// Destroy any already-created instructions
 			for (size_t di = 0; di < i; di++) {
 				miniscriptInstructions[i - 1 - di]->~MiniscriptInstruction();
@@ -400,7 +465,7 @@ bool MiniscriptParser::parse(const Data::MiniscriptProgram &program, Common::Sha
 
 	// Done
 	outProgram = Common::SharedPtr<MiniscriptProgram>(new MiniscriptProgram(programDataPtr, miniscriptInstructions, attributes));
-	outReferences = Common::SharedPtr<MiniscriptReferences>(new MiniscriptReferences(localRefs));
+	outReferences = Common::SharedPtr<MiniscriptReferences>(new MiniscriptReferences(localRefs, globalRefs));
 
 	return true;
 }
@@ -566,7 +631,7 @@ MiniscriptInstructionOutcome Send::execute(MiniscriptThread *thread) const {
 
 	if (_messageFlags.immediate) {
 		thread->getRuntime()->sendMessageOnVThread(dispatch);
-		return kMiniscriptInstructionOutcomeYieldToVThreadNoRetry;
+		return kMiniscriptInstructionOutcomeYieldToVThread;
 	} else {
 		thread->getRuntime()->queueMessage(dispatch);
 		return kMiniscriptInstructionOutcomeContinue;
@@ -698,7 +763,19 @@ MiniscriptInstructionOutcome Modulo::arithExecute(MiniscriptThread *thread, doub
 		thread->error("Arithmetic error: Modulo division by zero");
 		return kMiniscriptInstructionOutcomeFailed;
 	}
-	result = fmod(left, right);
+
+	// fmod keeps the sign from the left operand, but mTropolis modulo keeps the
+	// sign of the right operand.
+	double r = fmod(left, right);
+	if (signbit(left) != signbit(right)) {
+		if (r == 0.0)
+			r = copysign(0.0, right);
+		else
+			r += right;
+	}
+
+	result = r;
+
 	return kMiniscriptInstructionOutcomeContinue;
 }
 
@@ -1184,9 +1261,21 @@ MiniscriptInstructionOutcome BuiltinFunc::executeStr2Num(MiniscriptThread *threa
 	const Common::String &str = inputDynamicValue.getString();
 	if (str.empty())
 		result = 0.0;
-	else if (str.size() == 0 || !sscanf(str.c_str(), "%lf", &result)) {
-		thread->error("Couldn't parse number");
-		return kMiniscriptInstructionOutcomeFailed;
+	else if (!sscanf(str.c_str(), "%lf", &result)) {
+		// NOTE: sscanf will properly handle cases where a number is followed by a non-numeric value,
+		// which is consistent with mTropolis' behavior.
+		// 
+		// If it fails, the result is 0.0 and no script error.
+		//
+		// This includes a case in Obsidian where it tries to parse in invalid room number "L100"
+		// upon entering the sky face for the first time in Bureau.
+
+#ifdef MTROPOLIS_DEBUG_ENABLE
+		if (Debugger *debugger = thread->getRuntime()->debugGetDebugger())
+			debugger->notify(kDebugSeverityWarning, Common::String::format("Failed to parse '%s' as a number", str.c_str()));
+#endif
+
+		result = 0.0;
 	}
 
 	returnValue->setFloat(result);
@@ -1662,8 +1751,8 @@ MiniscriptInstructionOutcome PushValue::execute(MiniscriptThread *thread) const 
 		value.setObject(ObjectReference(thread->getRefs()->getRefByIndex(_value.ref)));
 		break;
 	case DataType::kDataTypeGlobalRef:
-		thread->error("Global references are not implemented");
-		return kMiniscriptInstructionOutcomeFailed;
+		value.setObject(ObjectReference(thread->getRefs()->getGlobalRefByIndex(_value.ref)));
+		break;
 	case DataType::kDataTypeLabel: {
 		MTropolis::Label label;
 		label.id = _value.lbl.id;
@@ -1822,11 +1911,6 @@ MiniscriptThread::MiniscriptThread(Runtime *runtime, const Common::SharedPtr<Mes
 	: _runtime(runtime), _msgProps(msgProps), _program(program), _refs(refs), _modifier(modifier), _currentInstruction(0), _failed(false) {
 }
 
-void MiniscriptThread::runOnVThread(VThread &vthread, const Common::SharedPtr<MiniscriptThread> &thread) {
-	ResumeTaskData *taskData = vthread.pushTask("MiniscriptThread::resumeTask", resumeTask);
-	taskData->thread = thread;
-}
-
 void MiniscriptThread::error(const Common::String &message) {
 #ifdef MTROPOLIS_DEBUG_ENABLE
 	if (_runtime->debugGetDebugger())
@@ -1938,6 +2022,10 @@ void MiniscriptThread::createWriteIncomingDataProxy(DynamicValueWriteProxy &prox
 	proxy.pod.ptrOrOffset = 0;
 }
 
+void MiniscriptThread::retryInstruction() {
+	_currentInstruction--;
+}
+
 MiniscriptInstructionOutcome MiniscriptThread::IncomingDataWriteInterface::write(MiniscriptThread *thread, const DynamicValue &value, void *objectRef, uintptr ptrOrOffset) {
 	thread->_msgProps->setValue(value);
 
@@ -1954,50 +2042,40 @@ MiniscriptInstructionOutcome MiniscriptThread::IncomingDataWriteInterface::refAt
 	return kMiniscriptInstructionOutcomeFailed;
 }
 
+CORO_BEGIN_DEFINITION(MiniscriptThread::ResumeThreadCoroutine)
+	struct Locals {
+		MiniscriptThread *self = nullptr;
+		size_t numInstrs = 0;
+		size_t instrNum = 0;
+	};
 
-VThreadState MiniscriptThread::resumeTask(const ResumeTaskData &data) {
-	return data.thread->resume(data);
-}
+	CORO_BEGIN_FUNCTION
+		locals->self = params->thread.get();
+		locals->numInstrs = locals->self->_program->getInstructions().size();
 
-VThreadState MiniscriptThread::resume(const ResumeTaskData &taskData) {
-	const Common::Array<MiniscriptInstruction *> &instrsArray = _program->getInstructions();
+		CORO_IF (locals->numInstrs == 0)
+			CORO_RETURN;
+		CORO_END_IF
 
-	if (instrsArray.size() == 0)
-		return kVThreadReturn;
+		CORO_WHILE (locals->self->_currentInstruction < locals->numInstrs && !locals->self->_failed)
+			CORO_AWAIT_MINISCRIPT(locals->self->runNextInstruction());
+		CORO_END_WHILE
+	CORO_END_FUNCTION
+CORO_END_DEFINITION
 
-	MiniscriptInstruction *const *instrs = &instrsArray[0];
-	size_t numInstrs = instrsArray.size();
+MiniscriptInstructionOutcome MiniscriptThread::runNextInstruction() {
+	const MiniscriptInstruction *instr = _program->getInstructions()[_currentInstruction++];
 
-	if (_currentInstruction >= numInstrs || _failed)
-		return kVThreadReturn;
+	MiniscriptInstructionOutcome outcome = instr->execute(this);
 
-	// Requeue now so that any VThread tasks queued by instructions run in front of the resume
-	{
-		ResumeTaskData *requeueData = _runtime->getVThread().pushTask("MiniscriptThread::resumeTask", resumeTask);
-		requeueData->thread = taskData.thread;
+	if (outcome == kMiniscriptInstructionOutcomeFailed) {
+		// Treat this as non-fatal but bail out of the execution loop
+		_failed = true;
+		return kMiniscriptInstructionOutcomeContinue;
 	}
 
-	while (_currentInstruction < numInstrs && !_failed) {
-		size_t instrNum = _currentInstruction++;
-		MiniscriptInstruction *instr = instrs[instrNum];
-
-		MiniscriptInstructionOutcome outcome = instr->execute(this);
-		if (outcome == kMiniscriptInstructionOutcomeFailed) {
-			// Should this also interrupt the message dispatch?
-			_failed = true;
-			return kVThreadReturn;
-		}
-
-		if (outcome == kMiniscriptInstructionOutcomeYieldToVThreadAndRetry) {
-			_currentInstruction = instrNum;
-			return kVThreadReturn;
-		}
-
-		if (outcome == kMiniscriptInstructionOutcomeYieldToVThreadNoRetry)
-			return kVThreadReturn;
-	}
-
-	return kVThreadReturn;
+	// Otherwise continue
+	return outcome;
 }
 
 MiniscriptInstructionOutcome MiniscriptThread::tryLoadVariable(MiniscriptStackValue &stackValue) {
@@ -2010,6 +2088,13 @@ MiniscriptInstructionOutcome MiniscriptThread::tryLoadVariable(MiniscriptStackVa
 	}
 
 	return kMiniscriptInstructionOutcomeContinue;
+}
+
+MiniscriptInstructionOutcome miniscriptIgnoreFailure(MiniscriptInstructionOutcome outcome) {
+	if (outcome == kMiniscriptInstructionOutcomeFailed)
+		return kMiniscriptInstructionOutcomeContinue;
+
+	return outcome;
 }
 
 } // End of namespace MTropolis

@@ -29,9 +29,9 @@
 
 #include "hpl1/engine/impl/tinyXML/tinyxml.h"
 
-#include "hpl1/engine/system/low_level_system.h"
 #include "hpl1/engine/system/Script.h"
 #include "hpl1/engine/system/String.h"
+#include "hpl1/engine/system/low_level_system.h"
 
 #include "hpl1/engine/math/Math.h"
 #include "hpl1/engine/math/MathTypes.h"
@@ -264,7 +264,7 @@ void cWorld3D::SetUpData() {
 
 		// Log("World Min: (%s) Max: (%s)\n",vMin.ToString().c_str(), vMax.ToString().c_str());
 
-		// Create a 10 m border around the world aswell:
+		// Create a 10 m border around the world as well:
 		vMin = vMin - cVector3f(10, 10, 10);
 		vMax = vMax + cVector3f(10, 10, 10);
 
@@ -811,7 +811,7 @@ cAINodeContainer *cWorld3D::CreateAINodeContainer(const tString &asName,
 	// unsigned long lStartTime = mpSystem->GetLowLevel()->GetTime();
 
 	//////////////////////////////////
-	// See if the container is allready loaded.
+	// See if the container is already loaded.
 	tAINodeContainerListIt it = mlstAINodeContainers.begin();
 	for (; it != mlstAINodeContainers.end(); ++it) {
 		cAINodeContainer *pCont = *it;

@@ -23,8 +23,9 @@
 #include "sci/engine/kernel.h"
 #include "sci/engine/selector.h"
 #include "sci/engine/state.h"
+#include "sci/graphics/drivers/gfxdriver.h"
 #include "sci/graphics/maciconbar.h"
-#include "sci/graphics/palette.h"
+#include "sci/graphics/palette16.h"
 #include "sci/graphics/screen.h"
 
 #include "common/memstream.h"
@@ -34,7 +35,8 @@
 
 namespace Sci {
 
-GfxMacIconBar::GfxMacIconBar() {
+GfxMacIconBar::GfxMacIconBar(ResourceManager *resMan, EventManager *eventMan, SegManager *segMan, GfxScreen *screen, GfxPalette *palette) :
+	_resMan(resMan), _eventMan(eventMan), _segMan(segMan), _screen(screen), _palette(palette)  {
 	if (g_sci->getGameId() == GID_FREDDYPHARKAS)
 		_inventoryIndex = 5;
 	else
@@ -42,8 +44,8 @@ GfxMacIconBar::GfxMacIconBar() {
 
 	_inventoryIcon = nullptr;
 	_allDisabled = true;
-	
-	_isUpscaled = (g_sci->_gfxScreen->getUpscaledHires() == GFX_SCREEN_UPSCALED_640x400);
+
+	_isUpscaled = (_screen->getUpscaledHires() == GFX_SCREEN_UPSCALED_640x400);
 }
 
 GfxMacIconBar::~GfxMacIconBar() {
@@ -83,7 +85,7 @@ void GfxMacIconBar::freeIcons() {
 
 void GfxMacIconBar::addIcon(reg_t obj) {
 	IconBarItem item;
-	uint32 iconIndex = readSelectorValue(g_sci->getEngineState()->_segMan, obj, SELECTOR(iconIndex));
+	uint32 iconIndex = readSelectorValue(_segMan, obj, SELECTOR(iconIndex));
 
 	item.object = obj;
 	item.nonSelectedImage = createImage(iconIndex, false);
@@ -99,7 +101,7 @@ void GfxMacIconBar::addIcon(reg_t obj) {
 	uint16 x = _iconBarItems.empty() ? 0 : _iconBarItems.back().rect.right;
 
 	// Start below the main viewing window and add a two pixel buffer
-	uint16 y = g_sci->_gfxScreen->getHeight() + 2;
+	uint16 y = _screen->getHeight() + 2;
 
 	if (item.nonSelectedImage)
 		item.rect = Common::Rect(x, y, MIN<uint32>(x + item.nonSelectedImage->w, 320), y + item.nonSelectedImage->h);
@@ -198,21 +200,17 @@ void GfxMacIconBar::drawImage(Graphics::Surface *surface, const Common::Rect &re
 			upscaleSurface.init(dstRect.width(), dstRect.height(), dstRect.width(), _upscaleBuffer->getUnsafeDataAt(0, upscaleSize), surface->format);
 			drawDisabledPattern(upscaleSurface, dstRect);
 		}
-		g_system->copyRectToScreen(_upscaleBuffer->getUnsafeDataAt(0, upscaleSize), dstRect.width(), dstRect.left, dstRect.top, dstRect.width(), dstRect.height());
+		_screen->gfxDriver()->copyRectToScreen(_upscaleBuffer->getUnsafeDataAt(0, upscaleSize), 0, 0, dstRect.width(), dstRect.left, dstRect.top, dstRect.width(), dstRect.height(), nullptr, nullptr);
 	} else {
 		if (!enable) {
 			Graphics::Surface disableSurface;
 			disableSurface.copyFrom(*surface);
 			drawDisabledPattern(disableSurface, rect);
-			g_system->copyRectToScreen(disableSurface.getPixels(), disableSurface.pitch, rect.left, rect.top, rect.width(), rect.height());
+			_screen->gfxDriver()->copyRectToScreen((const byte*)disableSurface.getPixels(), 0, 0, disableSurface.pitch, rect.left, rect.top, rect.width(), rect.height(), nullptr, nullptr);
 		} else {
-			g_system->copyRectToScreen(surface->getPixels(), surface->pitch, rect.left, rect.top, rect.width(), rect.height());
+			_screen->gfxDriver()->copyRectToScreen((const byte*)surface->getPixels(), 0, 0, surface->pitch, rect.left, rect.top, rect.width(), rect.height(), nullptr, nullptr);
 		}
 	}
-}
-
-void GfxMacIconBar::drawSelectedImage(uint16 iconIndex) {
-	drawImage(_iconBarItems[iconIndex].selectedImage, _iconBarItems[iconIndex].rect, true);
 }
 
 bool GfxMacIconBar::isIconEnabled(uint16 iconIndex) const {
@@ -253,7 +251,7 @@ void GfxMacIconBar::setInventoryIcon(int16 icon) {
 }
 
 Graphics::Surface *GfxMacIconBar::loadPict(ResourceId id) {
-	Resource *res = g_sci->getResMan()->findResource(id, false);
+	Resource *res = _resMan->findResource(id, false);
 
 	if (!res || res->size() == 0)
 		return nullptr;
@@ -265,7 +263,7 @@ Graphics::Surface *GfxMacIconBar::loadPict(ResourceId id) {
 
 	Graphics::Surface *surface = new Graphics::Surface();
 	surface->copyFrom(*pictDecoder.getSurface());
-	remapColors(surface, pictDecoder.getPalette());
+	remapColors(surface, pictDecoder.getPalette().data());
 
 	return surface;
 }
@@ -286,7 +284,7 @@ void GfxMacIconBar::remapColors(Graphics::Surface *surf, const byte *palette) {
 		byte g = palette[color * 3 + 1];
 		byte b = palette[color * 3 + 2];
 
-		*pixels++ = g_sci->_gfxPalette16->findMacIconBarColor(r, g, b);
+		*pixels++ = _palette->findMacIconBarColor(r, g, b);
 	}
 }
 
@@ -295,7 +293,6 @@ bool GfxMacIconBar::pointOnIcon(uint32 iconIndex, Common::Point point) {
 }
 
 bool GfxMacIconBar::handleEvents(SciEvent evt, reg_t &iconObj) {
-	EventManager *evtMgr = g_sci->getEventManager();
 	iconObj = NULL_REG;
 
 	// Not a mouse press
@@ -303,7 +300,7 @@ bool GfxMacIconBar::handleEvents(SciEvent evt, reg_t &iconObj) {
 		return false;
 
 	// If the mouse is not over the icon bar, return
-	if (evt.mousePos.y < g_sci->_gfxScreen->getHeight())
+	if (evt.mousePos.y < _screen->getHeight())
 		return false;
 
 	// Mouse press on the icon bar, check the icon rectangles
@@ -329,7 +326,7 @@ bool GfxMacIconBar::handleEvents(SciEvent evt, reg_t &iconObj) {
 			drawIcon(iconNr, isSelected);
 		}
 
-		evt = evtMgr->getSciEvent(kSciEventMouseRelease);
+		evt = _eventMan->getSciEvent(kSciEventMouseRelease);
 		g_system->delayMillis(10);
 	}
 

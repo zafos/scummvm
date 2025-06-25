@@ -19,7 +19,15 @@
  *
  */
 
-/**
+/*************************************
+ *
+ * USED IN:
+ * teamxtreme1-win
+ * teamxtreme2-win
+ *
+ *************************************/
+
+/*
  * Findsys
  * I      mNew                --Creates a new instance of the XObject
  * X      mDispose            --Disposes of XObject instance
@@ -29,8 +37,6 @@
  * --     string beginning with the word 'Error:<description>'
  * -- The Windows directory is where you should write Preferences files etc.
  * -- Mark_Carolan@aapda.com.au Compuserve 100242,1154
- *
- * USED IN: teamxtreme2-win
  */
 
 #include "director/director.h"
@@ -42,19 +48,19 @@
 namespace Director {
 
 // The name is different from the obj filename.
-const char *FindSys::xlibName = "FindSys";
-const char *FindSys::fileNames[] = {
-	"FindSys",
-	nullptr
+const char *const FindSys::xlibName = "FindSys";
+const XlibFileDesc FindSys::fileNames[] = {
+	{ "FindSys",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",		FindSys::m_new,			 0, 0,	400 },	// D4
 	{ "do",			FindSys::m_do,			 0, 0,  400 },	// D4
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void FindSys::open(int type) {
+void FindSys::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		FindSysXObject::initMethods(xlibMethods);
 		FindSysXObject *xobj = new FindSysXObject(kXObj);
@@ -62,7 +68,7 @@ void FindSys::open(int type) {
 	}
 }
 
-void FindSys::close(int type) {
+void FindSys::close(ObjectType type) {
 	if (type == kXObj) {
 		FindSysXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -79,7 +85,7 @@ void FindSys::m_new(int nargs) {
 }
 
 void FindSys::m_do(int nargs) {
-	g_lingo->push(Common::String("C:\\WINDOWS"));
+	g_lingo->push(Common::String("C:\\WINDOWS\\"));
 }
 
 } // End of namespace Director

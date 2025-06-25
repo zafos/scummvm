@@ -63,23 +63,23 @@ void Dialog2::launchNextDialog() {
 		const Common::String formatStr = _gui.value("textFormat").toString();
 		Common::String formattedVal = Common::String::format(formatStr.c_str(), _currentDialogData._stringVal.c_str());
 		_gui.textLayout("text")->setText(formattedVal);
-		_music.load(_currentDialogData._sound.toString());
+		_music.load(_currentDialogData._sound);
 		_music.setChannelName("dialog");
 		_music.play();
 		if (!_currentDialogData._charname.empty()) {
 			Character *c = game->scene().character(_currentDialogData._charname);
 			if (!c) {
-				error("[Dialog2::launchNextDialog] Character's \"%s\" doesn't exist", _currentDialogData._charname.c_str());
-			}
-
-			if (_currentDialogData._animBlend == 0.0f) {
-				if (!c->setAnimation(_currentDialogData._animfile, false, true))
-					error("[Dialog2::launchNextDialog] Character's animation \"%s\" doesn't exist for the character\"%s\"",
-							_currentDialogData._animfile.c_str(), _currentDialogData._charname.c_str());
+				warning("[Dialog2::launchNextDialog] Character's \"%s\" doesn't exist", _currentDialogData._charname.c_str());
 			} else {
-				if (!c->blendAnimation(_currentDialogData._animfile, _currentDialogData._animBlend, false, true))
-					error("[Dialog2::launchNextDialog] Character's animation \"%s\" doesn't exist for the character\"%s\"",
-							_currentDialogData._animfile.c_str(), _currentDialogData._charname.c_str());
+				if (_currentDialogData._animBlend == 0.0f) {
+					if (!c->setAnimation(_currentDialogData._animfile, false, true))
+						error("[Dialog2::launchNextDialog] Character's animation \"%s\" doesn't exist for the character\"%s\"",
+								_currentDialogData._animfile.c_str(), _currentDialogData._charname.c_str());
+				} else {
+					if (!c->blendAnimation(_currentDialogData._animfile, _currentDialogData._animBlend, false, true))
+						error("[Dialog2::launchNextDialog] Character's animation \"%s\" doesn't exist for the character\"%s\"",
+								_currentDialogData._animfile.c_str(), _currentDialogData._charname.c_str());
+				}
 			}
 		}
 		lockBtn->setVisible(true);
@@ -98,7 +98,8 @@ void Dialog2::load() {
 	setSize(TeVector3f32(1.0f, 1.0f, usersz.z()));
 	size(); // refresh size? seems to do nothing with result
 	_music.repeat(false);
-	_gui.load("menus/dialog.lua");
+	const char *luaPath = g_engine->gameIsAmerzone() ? "GUI/dialog.lua" : "menus/dialog.lua";
+	_gui.load(luaPath);
 	size(); // refresh size? seems to do nothing with result
 	TeButtonLayout *dialogLockBtn = _gui.buttonLayoutChecked("dialogLockButton");
 

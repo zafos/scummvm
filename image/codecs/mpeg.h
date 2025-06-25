@@ -19,13 +19,13 @@
  *
  */
 
-#ifdef USE_MPEG2
-
 #ifndef IMAGE_CODECS_MPEG_H
 #define IMAGE_CODECS_MPEG_H
 
 #include "image/codecs/codec.h"
 #include "graphics/pixelformat.h"
+
+#ifdef USE_MPEG2
 
 typedef struct mpeg2dec_s mpeg2dec_t;
 typedef struct mpeg2_info_s mpeg2_info_t;
@@ -48,11 +48,17 @@ namespace Image {
 class MPEGDecoder : public Codec {
 public:
 	MPEGDecoder();
-	~MPEGDecoder();
+	~MPEGDecoder() override;
 
 	// Codec interface
-	const Graphics::Surface *decodeFrame(Common::SeekableReadStream &stream);
-	Graphics::PixelFormat getPixelFormat() const { return _pixelFormat; }
+	const Graphics::Surface *decodeFrame(Common::SeekableReadStream &stream) override;
+	Graphics::PixelFormat getPixelFormat() const override { return _pixelFormat; }
+	bool setOutputPixelFormat(const Graphics::PixelFormat &format) override {
+		if (format.bytesPerPixel != 2 && format.bytesPerPixel != 4)
+			return false;
+		_pixelFormat = format;
+		return true;
+	}
 
 	// MPEGPSDecoder call
 	bool decodePacket(Common::SeekableReadStream &packet, uint32 &framePeriod, Graphics::Surface *dst = 0);

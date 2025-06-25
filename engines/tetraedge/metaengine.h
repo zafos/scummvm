@@ -25,7 +25,10 @@
 #include "engines/achievements.h"
 #include "engines/advancedDetector.h"
 
-class TetraedgeMetaEngine : public AdvancedMetaEngine {
+#define GAMEOPTION_CORRECT_MOVIE_ASPECT GUIO_GAMEOPTIONS1
+#define GAMEOPTION_RESTORE_SCENES GUIO_GAMEOPTIONS2
+
+class TetraedgeMetaEngine : public AdvancedMetaEngine<ADGameDescription> {
 public:
 	const char *getName() const override;
 
@@ -33,12 +36,15 @@ public:
 
 	void getSavegameThumbnail(Graphics::Surface &thumb) override;
 
+	const ADExtraGuiOptionsMap *getAdvancedExtraGuiOptions() const override;
+
 	/**
 	 * Determine whether the engine supports the specified MetaEngine feature.
 	 *
 	 * Used by e.g. the launcher to determine whether to enable the Load button.
 	 */
 	bool hasFeature(MetaEngineFeature f) const override;
+
 };
 
 #endif

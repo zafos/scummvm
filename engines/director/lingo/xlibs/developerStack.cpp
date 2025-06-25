@@ -22,7 +22,16 @@
 #include "audio/mixer.h"
 
 #include "director/director.h"
+#include "director/lingo/lingo.h"
+#include "director/lingo/lingo-object.h"
 #include "director/lingo/xlibs/developerStack.h"
+
+/*************************************
+ *
+ * USED IN:
+ * overringunder: Over-Ring-Under
+ *
+ *************************************/
 
 /*************************************
  *
@@ -92,13 +101,7 @@
   */
 
 
-/*************************************
- *
- * XCMD: SetVolume
- *
- * USED IN:
- * overringunder: Over-Ring-Under
- *
+/*
  * This XCMD sets the current volume level of the Macintosh.
  *
  * This XCMD is ©1988 by Steve Drazga and all rights are reserved.
@@ -128,22 +131,22 @@
 
 namespace Director {
 
-const char *DeveloperStack::xlibName = "SetVolume";
-const char *DeveloperStack::fileNames[] = {
-	"SetVolume",
-	nullptr
+const char *const DeveloperStack::xlibName = "SetVolume";
+const XlibFileDesc DeveloperStack::fileNames[] = {
+	{ "SetVolume",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static BuiltinProto builtins[] = {
-	{ "SetVolume",	DeveloperStack::b_setvolume, 2, 2, 300, HBLTIN },
+static const BuiltinProto builtins[] = {
+	{ "SetVolume", DeveloperStack::b_setvolume, 2, 2, 300, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
-void DeveloperStack::open(int type) {
+void DeveloperStack::open(ObjectType type, const Common::Path &path) {
 	g_lingo->initBuiltIns(builtins);
 }
 
-void DeveloperStack::close(int type) {
+void DeveloperStack::close(ObjectType type) {
 	g_lingo->cleanupBuiltIns(builtins);
 }
 

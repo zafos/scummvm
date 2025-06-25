@@ -82,7 +82,7 @@ public:
 	bool GetBool(const tString &asName, bool abDefault);
 
 private:
-	Hpl1::Std::map<tString, tString> m_mapVars;
+	Common::StableMap<tString, tString> m_mapVars;
 	tString msBlank;
 };
 
@@ -178,8 +178,6 @@ public:
 	void SetFPSUpdateRate(float afSec);
 	float GetFPSUpdateRate();
 
-	void SetRenderOnce(bool abX) { mbRenderOnce = abX; }
-
 	float GetFrameTime() { return mfFrameTime; }
 
 	float GetUpdateTime() { return mfUpdateTime; }
@@ -191,8 +189,6 @@ public:
 
 private:
 	bool mbGameIsDone;
-
-	bool mbRenderOnce;
 
 	float mfFrameTime;
 
@@ -220,6 +216,6 @@ private:
 	cGui *mpGui;
 };
 
-}     // namespace hpl
+} // namespace hpl
 
 #endif // HPL_GAME_H

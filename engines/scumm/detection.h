@@ -29,11 +29,14 @@ namespace Scumm {
 
 
 // GUI-options, primarily used by detection_tables.h
-#define GUIO_TRIM_FMTOWNS_TO_200_PIXELS                GUIO_GAMEOPTIONS1
-#define GUIO_ENHANCEMENTS                              GUIO_GAMEOPTIONS2
-#define GUIO_AUDIO_OVERRIDE                            GUIO_GAMEOPTIONS3
-#define GUIO_ORIGINALGUI                               GUIO_GAMEOPTIONS4
-#define GUIO_LOWLATENCYAUDIO                           GUIO_GAMEOPTIONS5
+#define GAMEOPTION_TRIM_FMTOWNS_TO_200_PIXELS                GUIO_GAMEOPTIONS1
+#define GAMEOPTION_ENHANCEMENTS                              GUIO_GAMEOPTIONS2
+#define GAMEOPTION_AUDIO_OVERRIDE                            GUIO_GAMEOPTIONS3
+#define GAMEOPTION_ORIGINALGUI                               GUIO_GAMEOPTIONS4
+#define GAMEOPTION_LOWLATENCYAUDIO                           GUIO_GAMEOPTIONS5
+#define GAMEOPTION_NETWORK                                   GUIO_GAMEOPTIONS6
+#define GAMEOPTION_COPY_PROTECTION                           GUIO_GAMEOPTIONS7
+#define GAMEOPTION_USE_REMASTERED_AUDIO                      GUIO_GAMEOPTIONS8
 
 /**
  * Descriptor of a specific SCUMM game. Used internally to store
@@ -199,7 +202,18 @@ enum GameFeatures {
 	 * The "Ultimate Talkie" versions of Monkey Island, which have been
 	 * patched so that most workarounds/bugfixes no longer apply to them.
 	 */
-	GF_ULTIMATE_TALKIE = 1 << 18
+	GF_ULTIMATE_TALKIE = 1 << 18,
+
+	/**
+	 * HE99 games which were ported to a C++ codebase with HE99 opcodes
+	 * and several HE100 GFX/Wiz features.
+	 */
+	GF_HE_995 = 1 << 19,
+
+	/**
+	 * Games packed within Doublefine PAK containers.
+	 */
+	GF_DOUBLEFINE_PAK = 1 << 20
 };
 
 enum ScummGameId {
@@ -244,6 +258,27 @@ enum ScummGameId {
 	GID_MOONBASE,
 	GID_PJGAMES,
 	GID_HECUP		// CUP demos
+};
+
+struct RuScummPatcher {
+	ScummGameId gameid;
+	const char *variant;
+	const char *patcherName;
+};
+
+enum {
+	DEBUG_GENERAL = 1,	// General debug
+	DEBUG_SCRIPTS,		// Track script execution (start/stop/pause)
+	DEBUG_OPCODES,		// Track opcode invocations
+	DEBUG_VARS,			// Track variable changes
+	DEBUG_RESOURCE,		// Track resource loading / allocation
+	DEBUG_IMUSE,		// Track iMUSE events
+	DEBUG_SOUND,		// General Sound Debug
+	DEBUG_ACTORS,		// General Actor Debug
+	DEBUG_INSANE,		// Track INSANE
+	DEBUG_SMUSH,		// Track SMUSH
+	DEBUG_MOONBASE_AI,	// Moonbase AI
+	DEBUG_NETWORK,		// Track Networking
 };
 
 } // End of namespace Scumm

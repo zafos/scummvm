@@ -46,7 +46,9 @@ namespace Image {
 
 JPEGDecoder::JPEGDecoder() :
 		_surface(),
+		_palette(0),
 		_colorSpace(kColorSpaceRGB),
+		_accuracy(CodecAccuracy::Default),
 		_requestedPixelFormat(getByteOrderRgbPixelFormat()) {
 }
 
@@ -55,11 +57,7 @@ JPEGDecoder::~JPEGDecoder() {
 }
 
 Graphics::PixelFormat JPEGDecoder::getByteOrderRgbPixelFormat() const {
-#ifdef SCUMM_BIG_ENDIAN
-	return Graphics::PixelFormat(3, 8, 8, 8, 0, 16, 8, 0, 0);
-#else
-	return Graphics::PixelFormat(3, 8, 8, 8, 0, 0, 8, 16, 0);
-#endif
+	return Graphics::PixelFormat::createFormatRGB24();
 }
 
 const Graphics::Surface *JPEGDecoder::getSurface() const {
@@ -77,8 +75,14 @@ const Graphics::Surface *JPEGDecoder::decodeFrame(Common::SeekableReadStream &st
 	return getSurface();
 }
 
+void JPEGDecoder::setCodecAccuracy(CodecAccuracy accuracy) {
+	_accuracy = accuracy;
+}
+
 Graphics::PixelFormat JPEGDecoder::getPixelFormat() const {
-	return _surface.format;
+	if (_surface.getPixels())
+		return _surface.format;
+	return _requestedPixelFormat;
 }
 
 #ifdef USE_JPEG
@@ -242,6 +246,11 @@ bool JPEGDecoder::loadStream(Common::SeekableReadStream &stream) {
 
 	// Initialize the decompression structure
 	jpeg_create_decompress(&cinfo);
+
+	if (_accuracy <= CodecAccuracy::Fast)
+		cinfo.dct_method = JDCT_FASTEST;
+	else if (_accuracy >= CodecAccuracy::Accurate)
+		cinfo.dct_method = JDCT_ISLOW;
 
 	// Initialize our buffer handling
 	jpeg_scummvm_src(&cinfo, &stream);

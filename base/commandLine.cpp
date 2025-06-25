@@ -39,6 +39,7 @@
 #include "common/system.h"
 #include "common/textconsole.h"
 #include "common/tokenizer.h"
+#include "common/zip-set.h"
 
 #include "gui/ThemeEngine.h"
 
@@ -48,6 +49,10 @@
 
 #define DETECTOR_TESTING_HACK
 #define UPGRADE_ALL_TARGETS_HACK
+
+#ifdef SDL_BACKEND
+#include "backends/platform/sdl/sdl-sys.h"
+#endif
 
 namespace Base {
 
@@ -72,6 +77,8 @@ static const char HELP_STRING1[] =
 	"  -t, --list-targets       Display list of configured targets and exit\n"
 	"  --list-engines           Display list of supported engines and exit\n"
 	"  --list-all-engines       Display list of all detection engines and exit\n"
+	"  --dump-all-detection-entries Create a DAT file containing MD5s from detection entries of all engines\n"
+	"  --stats                  Display statistics about engines and games and exit\n"
 	"  --list-debugflags=engine Display list of engine specified debugflags\n"
 	"                           if engine=global or engine is not specified, then it will list global debugflags\n"
 	"  --list-all-debugflags    Display list of all engine specified debugflags\n"
@@ -85,11 +92,13 @@ static const char HELP_STRING1[] =
 	"                           Use --path=PATH to specify a directory.\n"
 	"  --game=ID                In combination with --add or --detect only adds or attempts to\n"
 	"                           detect the game with id ID.\n"
-	"  --engine=ID              In combination with --list-games or --list-all-games only lists\n"
-	"                           games for this engine.\n"
+	"  --engine=ID              In combination with --list-games, --list-all-games, --list-targets, or --stats only\n"
+	"                           lists games for this engine. Multiple engines can be listed separated by a coma.\n"
 	"  --auto-detect            Display a list of games from current or specified directory\n"
 	"                           and start the first one. Use --path=PATH to specify a directory.\n"
 	"  --recursive              In combination with --add or --detect recurse down all subdirectories\n"
+	"  --no-exit                In combination with commands that exit after running, like --add or --list-engines,\n"
+	"                           open the launcher instead of exiting\n"
 #if defined(WIN32)
 	"  --console                Enable the console window (default:enabled)\n"
 #endif
@@ -105,6 +114,9 @@ static const char HELP_STRING1[] =
 	"  -f, --fullscreen         Force full-screen mode\n"
 	"  -F, --no-fullscreen      Force windowed mode\n"
 	"  -g, --gfx-mode=MODE      Select graphics mode\n"
+#ifdef USE_OPENGL
+	"  --shader=PATH            Name of internal shader or path to shader file (OpenGL only)\n"
+#endif
 	"  --stretch-mode=MODE      Select stretch mode (center, pixel-perfect, even-pixels,\n"
 	"                           fit, stretch, fit_force_aspect)\n"
 	"  --scaler=MODE            Select graphics scaler (normal,hq,edge,advmame,sai,\n"
@@ -178,12 +190,13 @@ static const char HELP_STRING4[] =
 	"  --no-show-fps            Set the turn off display FPS info in 3D games\n"
 	"  --random-seed=SEED       Set the random seed used to initialize entropy\n"
 	"  --renderer=RENDERER      Select 3D renderer (software, opengl, opengl_shaders)\n"
+	"  --antialiasing=SAMPLES   Select the antialiasing level\n"
 	"  --aspect-ratio           Enable aspect ratio correction\n"
 	"  --[no-]dirtyrects        Enable dirty rectangles optimisation in software renderer\n"
 	"                           (default: enabled)\n"
 	"  --render-mode=MODE       Enable additional render modes (hercGreen, hercAmber,\n"
-	"                           cga, ega, vga, amiga, fmtowns, pc9821, pc9801, 2gs,\n"
-	"                           atari, macintosh, macintoshbw)\n"
+	"                           cga, ega, vga, amiga, fmtowns, pc98-256c, pc98-16c, pc98-8c, 2gs,\n"
+	"                           atari, macintosh, macintoshbw, vgaGray)\n"
 #ifdef ENABLE_EVENTRECORDER
 	"  --record-mode=MODE       Specify record mode for event recorder (record, playback,\n"
 	"                           info, update, passthrough [default])\n"
@@ -213,6 +226,14 @@ static const char HELP_STRING4[] =
 #ifdef ENABLE_SCUMM
 	"  --tempo=NUM              Set music tempo (in percent, 50-200) for SCUMM games\n"
 	"                           (default: 100)\n"
+#endif
+#if defined(ENABLE_HE) && defined(USE_ENET)
+	"  --host-game              Host an online game for Moonbase Commander.\n"
+	"                           This method only works on the full version of the game,\n"
+	"                           Demo users can still host a game via the main menu.\n"
+	"  --join-game=IP[:PORT]    Join an online game for Moonbase Commander.\n"
+	"                           This method only works on the full version of the game,\n"
+	"                           Demo users can still join a game via the main menu.\n"
 #endif
 	"  --engine-speed=NUM       Set frame per second limit (0 - 100), 0 = no limit\n"
 	"                           (default: 60)\n"
@@ -275,14 +296,14 @@ void registerDefaults() {
 	// Graphics
 	ConfMan.registerDefault("fullscreen", false);
 	ConfMan.registerDefault("filtering", false);
-	ConfMan.registerDefault("aspect_ratio", false);
+	ConfMan.registerDefault("aspect_ratio", true);
 	ConfMan.registerDefault("gfx_mode", "normal");
 	ConfMan.registerDefault("render_mode", "default");
 	ConfMan.registerDefault("desired_screen_aspect_ratio", "auto");
 	ConfMan.registerDefault("stretch_mode", "default");
 	ConfMan.registerDefault("scaler", "default");
 	ConfMan.registerDefault("scale_factor", -1);
-	ConfMan.registerDefault("shader", "default");
+	ConfMan.registerDefault("shader", Common::Path("default", Common::Path::kNoSeparator));
 	ConfMan.registerDefault("show_fps", false);
 	ConfMan.registerDefault("dirtyrects", true);
 	ConfMan.registerDefault("vsync", true);
@@ -305,15 +326,19 @@ void registerDefaults() {
 
 	ConfMan.registerDefault("music_driver", "auto");
 	ConfMan.registerDefault("mt32_device", "null");
-	ConfMan.registerDefault("gm_device", "null");
+	ConfMan.registerDefault("gm_device", "auto");
 	ConfMan.registerDefault("opl2lpt_parport", "null");
 
 	ConfMan.registerDefault("cdrom", 0);
 
 	ConfMan.registerDefault("enable_unsupported_game_warning", true);
 
+#ifdef USE_FLUIDSYNTH
+	ConfMan.registerDefault("soundfont", "Roland_SC-55.sf2");
+#endif
+
 	// Game specific
-	ConfMan.registerDefault("path", "");
+	ConfMan.registerDefault("path", Common::Path());
 	ConfMan.registerDefault("platform", Common::kPlatformDOS);
 	ConfMan.registerDefault("language", "en");
 	ConfMan.registerDefault("subtitles", false);
@@ -336,6 +361,10 @@ void registerDefaults() {
 #ifdef ENABLE_SCUMM
 	ConfMan.registerDefault("tempo", 0);
 #endif
+#if defined(ENABLE_HE) && defined(USE_ENET)
+	ConfMan.registerDefault("host_game", false);
+	ConfMan.registerDefault("join_game", "null");
+#endif
 #if defined(ENABLE_SKY) || defined(ENABLE_QUEEN)
 	ConfMan.registerDefault("alt_intro", false);
 #endif
@@ -344,6 +373,7 @@ void registerDefaults() {
 	ConfMan.registerDefault("joystick_num", 0);
 	ConfMan.registerDefault("confirm_exit", false);
 	ConfMan.registerDefault("disable_sdl_parachute", false);
+	ConfMan.registerDefault("disable_sdl_audio", false);
 
 	ConfMan.registerDefault("disable_display", false);
 	ConfMan.registerDefault("record_mode", "none");
@@ -369,7 +399,7 @@ void registerDefaults() {
 	// their appropriate values.
 	ConfMan.registerDefault("fluidsynth_chorus_activate", true);
 	ConfMan.registerDefault("fluidsynth_chorus_nr", 3);
-	ConfMan.registerDefault("fluidsynth_chorus_level", 100);
+	ConfMan.registerDefault("fluidsynth_chorus_level", 200);
 	ConfMan.registerDefault("fluidsynth_chorus_speed", 30);
 	ConfMan.registerDefault("fluidsynth_chorus_depth", 80);
 	ConfMan.registerDefault("fluidsynth_chorus_waveform", "sine");
@@ -377,7 +407,7 @@ void registerDefaults() {
 	ConfMan.registerDefault("fluidsynth_reverb_activate", true);
 	ConfMan.registerDefault("fluidsynth_reverb_roomsize", 20);
 	ConfMan.registerDefault("fluidsynth_reverb_damping", 0);
-	ConfMan.registerDefault("fluidsynth_reverb_width", 1);
+	ConfMan.registerDefault("fluidsynth_reverb_width", 5);
 	ConfMan.registerDefault("fluidsynth_reverb_level", 90);
 
 	ConfMan.registerDefault("fluidsynth_misc_interpolation", "4th");
@@ -451,6 +481,41 @@ static Common::String createTemporaryTarget(const Common::String &engineId, cons
 	return domainName;
 }
 
+/**
+ * A re-usable auxiliary method to ensure that the value given for a path command line option is
+ * a folder path, and meets the specified readability / writeability requirements.
+ * If the path given on command line is a file path, the method will use the parent folder path instead,
+ * updating the "settings" table and checking the readability / writeability requirements for that one.
+ * This method is to be used from within parseCommandLine() method.
+ * Note 1: The method assumes that path.exists() check was already done and is true.
+ * Note 2: The method will work with paths that are symbolic links to folders (isDirectory() returns true),
+ * but for symbolic links to files it will not deduce a valid folder path and will just return false.
+ *
+ * @param node The filesystem node created from the command line value and modified if needed to get a folder from a file
+ * @param ensureWriteable A boolean flag that is set true if the path should be writeable, false otherwise
+ * @param ensureReadable A boolean flag that is set true if the path should be readable, false otherwise
+ * @param acceptFile true if the command line option allows (tolerates) a file path to deduce the folder path from
+ * @return true if given path was already a folder path or, if it was a file path, then a parent folder path
+ * was deduced from it, and the path (original or deduced respectively) meets the specified
+ * readability / writeability requirements.
+ */
+bool ensureAccessibleDirectoryForPathOption(Common::FSNode &node,
+                                            bool ensureWriteable,
+                                            bool ensureReadable,
+                                            bool acceptFile) {
+	if (node.isDirectory()) {
+		if ((!ensureWriteable || node.isWritable())
+		    && (!ensureReadable || node.isReadable())
+		    && (ensureWriteable || ensureReadable)) {
+			return true;
+		}
+	} else if (acceptFile) {
+		node = node.getParent();
+		return ensureAccessibleDirectoryForPathOption(node, ensureWriteable, ensureReadable, false);
+	}
+	return false;
+}
+
 //
 // Various macros used by the command line parser.
 //
@@ -458,7 +523,7 @@ static Common::String createTemporaryTarget(const Common::String &engineId, cons
 #ifndef DISABLE_COMMAND_LINE
 
 // Use this for options which have an *optional* value
-#define DO_OPTION_OPT(shortCmd, longCmd, defaultVal) \
+#define DO_OPTION_OPT_ALIASED(shortCmd, longCmd, defaultVal, settingsKey) \
 	if (isLongCmd ? (!strcmp(s + 2, longCmd) || !strncmp(s + 2, longCmd"=", sizeof(longCmd"=") - 1)) : (tolower(s[1]) == shortCmd)) { \
 		s += 2; \
 		if (isLongCmd) { \
@@ -469,11 +534,19 @@ static Common::String createTemporaryTarget(const Common::String &engineId, cons
 		const char *option = s; \
 		if (*s == '\0' && !isLongCmd) { option = s2; i++; } \
 		if (!option || *option == '\0') option = defaultVal; \
-		if (option) settings[longCmd] = option;
+		if (option) settings[settingsKey] = option;
+
+#define DO_OPTION_OPT(shortCmd, longCmd, defaultVal) \
+	DO_OPTION_OPT_ALIASED(shortCmd, longCmd, defaultVal, longCmd)
 
 // Use this for options which have a required (string) value
 #define DO_OPTION(shortCmd, longCmd) \
 	DO_OPTION_OPT(shortCmd, longCmd, 0) \
+	if (!option) usage("Option '%s' requires an argument", argv[isLongCmd ? i : i-1]);
+
+// Use this for options alias which have a required (string) value
+#define DO_OPTION_ALIASED(shortCmd, longCmd, settingsKey) \
+	DO_OPTION_OPT_ALIASED(shortCmd, longCmd, 0, settingsKey) \
 	if (!option) usage("Option '%s' requires an argument", argv[isLongCmd ? i : i-1]);
 
 // Use this for options which have a required integer value
@@ -499,6 +572,22 @@ static Common::String createTemporaryTarget(const Common::String &engineId, cons
 		const char *option = boolValue ? "true" : "false"; \
 		settings[longCmd] = option;
 
+#define DO_OPTION_PATH(shortCmd, longCmd) \
+	DO_OPTION(shortCmd, longCmd) \
+	Common::FSNode node(Common::Path::fromCommandLine(option)); \
+	if (!node.exists()) { \
+		usage("Non-existent path '%s' for option %s%c%s", option, \
+				isLongCmd ? "--" : "-", \
+				isLongCmd ? longCmd[0] : shortCmd, \
+				isLongCmd ? (longCmd) + 1 : ""); \
+	} else if (!ensureAccessibleDirectoryForPathOption(node, false, true, true)) { \
+		usage("Non-readable path '%s' for option %s%c%s", option, \
+				isLongCmd ? "--" : "-", \
+				isLongCmd ? longCmd[0] : shortCmd, \
+				isLongCmd ? (longCmd) + 1 : ""); \
+	} \
+	settings[longCmd] = node.getPath().toConfig();
+
 // Use this for options which never have a value, i.e. for 'commands', like "--help".
 #define DO_COMMAND(shortCmd, longCmd) \
 	if (isLongCmd ? (!strcmp(s + 2, longCmd)) : (tolower(s[1]) == shortCmd)) { \
@@ -514,7 +603,10 @@ static Common::String createTemporaryTarget(const Common::String &engineId, cons
 #define DO_LONG_OPTION(longCmd)         DO_OPTION(0, longCmd)
 #define DO_LONG_OPTION_INT(longCmd)     DO_OPTION_INT(0, longCmd)
 #define DO_LONG_OPTION_BOOL(longCmd)    DO_OPTION_BOOL(0, longCmd)
+#define DO_LONG_OPTION_PATH(longCmd)    DO_OPTION_PATH(0, longCmd)
 #define DO_LONG_COMMAND(longCmd)        DO_COMMAND(0, longCmd)
+
+#define DO_LONG_OPTION_ALIASED(longCmd, settingsKey)  DO_OPTION_ALIASED(0, longCmd, settingsKey)
 
 // End an option handler
 #define END_OPTION \
@@ -561,7 +653,7 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			// to pass the process serial number. We need to ignore it to avoid an error.
 			// When using XCode it also adds -NSDocumentRevisionsDebugMode YES argument if XCode option
 			// "Allow debugging when using document Versions Browser" is on (which is the default).
-#ifdef MACOSX
+#if defined(MACOSX) || defined(IPHONE)
 			if (strncmp(s, "-psn_", 5) == 0)
 				continue;
 			if (strcmp(s, "-NSDocumentRevisionsDebugMode") == 0) {
@@ -599,6 +691,12 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			END_COMMAND
 
 			DO_LONG_COMMAND("list-all-engines")
+			END_COMMAND
+
+			DO_LONG_COMMAND("dump-all-detection-entries")
+			END_COMMAND
+
+			DO_LONG_COMMAND("stats")
 			END_COMMAND
 
 			DO_COMMAND('a', "add")
@@ -641,13 +739,7 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			DO_OPTION('l', "logfile")
 			END_OPTION
 
-			DO_LONG_OPTION("screenshotpath")
-				Common::FSNode path(option);
-				if (!path.exists()) {
-					usage("Non-existent game path '%s'", option);
-				} else if (!path.isWritable()) {
-					usage("Non-writable screenshot path '%s'", option);
-				}
+			DO_LONG_OPTION_PATH("screenshotpath")
 			END_OPTION
 #endif
 
@@ -658,6 +750,9 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			END_OPTION
 
 			DO_LONG_OPTION("debugflags")
+			END_OPTION
+
+			DO_LONG_OPTION_ALIASED("debug-flags", "debugflags")
 			END_OPTION
 
 			DO_LONG_OPTION_BOOL("debug-channels-only")
@@ -696,7 +791,7 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 
 				settings["last_window_width"] = w;
 				settings["last_window_height"] = h;
-				settings.erase("window_size");
+				settings.erase("window-size");
 			END_OPTION
 #endif
 
@@ -741,13 +836,7 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			DO_OPTION_BOOL('n', "subtitles")
 			END_OPTION
 
-			DO_OPTION('p', "path")
-				Common::FSNode path(option);
-				if (!path.exists()) {
-					usage("Non-existent game path '%s'", option);
-				} else if (!path.isReadable()) {
-					usage("Non-readable game path '%s'", option);
-				}
+			DO_OPTION_PATH('p', "path")
 			END_OPTION
 
 			DO_OPTION('q', "language")
@@ -785,17 +874,22 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			END_OPTION
 
 			DO_LONG_OPTION("soundfont")
-				Common::FSNode path(option);
+				Common::FSNode path(Common::Path::fromCommandLine(option));
 				if (!path.exists()) {
 					usage("Non-existent soundfont path '%s'", option);
 				} else if (!path.isReadable()) {
 					usage("Non-readable soundfont path '%s'", option);
 				}
+				settings["soundfont"] = path.getPath().toConfig();
 			END_OPTION
 
+#ifdef SDL_BACKEND
 			DO_LONG_OPTION_BOOL("disable-sdl-parachute")
 			END_OPTION
 
+			DO_LONG_OPTION_BOOL("disable-sdl-audio")
+			END_OPTION
+#endif
 			DO_LONG_OPTION_BOOL("multi-midi")
 			END_OPTION
 
@@ -829,34 +923,19 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 					usage("Unrecognized renderer type '%s'", option);
 			END_OPTION
 
+			DO_LONG_OPTION_INT("antialiasing")
+			END_OPTION
+
 			DO_LONG_OPTION_BOOL("show-fps")
 			END_OPTION
 
-			DO_LONG_OPTION("savepath")
-				Common::FSNode path(option);
-				if (!path.exists()) {
-					usage("Non-existent saved games path '%s'", option);
-				} else if (!path.isWritable()) {
-					usage("Non-writable saved games path '%s'", option);
-				}
+			DO_LONG_OPTION_PATH("savepath")
 			END_OPTION
 
-			DO_LONG_OPTION("extrapath")
-				Common::FSNode path(option);
-				if (!path.exists()) {
-					usage("Non-existent extra path '%s'", option);
-				} else if (!path.isReadable()) {
-					usage("Non-readable extra path '%s'", option);
-				}
+			DO_LONG_OPTION_PATH("extrapath")
 			END_OPTION
 
-			DO_LONG_OPTION("iconspath")
-			Common::FSNode path(option);
-			if (!path.exists()) {
-				usage("Non-existent icons path '%s'", option);
-			} else if (!path.isReadable()) {
-				usage("Non-readable icons path '%s'", option);
-			}
+			DO_LONG_OPTION_PATH("iconspath")
 			END_OPTION
 
 			DO_LONG_OPTION("md5-path")
@@ -888,13 +967,25 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			DO_LONG_OPTION_BOOL("recursive")
 			END_OPTION
 
-			DO_LONG_OPTION("themepath")
-				Common::FSNode path(option);
-				if (!path.exists()) {
-					usage("Non-existent theme path '%s'", option);
-				} else if (!path.isReadable()) {
-					usage("Non-readable theme path '%s'", option);
+			DO_LONG_OPTION_BOOL("exit")
+			END_OPTION
+
+			DO_LONG_OPTION_PATH("themepath")
+			END_OPTION
+
+			DO_LONG_OPTION("shader")
+				Common::SearchSet _shaderSet;
+				Common::generateZipSet(_shaderSet, "shaders.dat", "shaders*.dat");
+				Common::FSNode path(Common::Path::fromCommandLine(option));
+				
+				if (!_shaderSet.hasFile(Common::Path::fromCommandLine(option))) {
+					if (!path.exists()) {
+						usage("Non-existent shader path '%s' or internal shader", option);
+					} else if (!path.isReadable()) {
+						usage("Non-readable shader path '%s'", option);
+					}
 				}
+				settings["shader"] = path.getPath().toConfig();
 			END_OPTION
 
 			DO_LONG_COMMAND("list-themes")
@@ -905,6 +996,13 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 
 #ifdef ENABLE_SCUMM
 			DO_LONG_OPTION_INT("tempo")
+			END_OPTION
+#endif
+
+#if defined(ENABLE_HE) && defined(USE_ENET)
+			DO_LONG_OPTION_BOOL("host-game")
+			END_OPTION
+			DO_LONG_OPTION("join-game")
 			END_OPTION
 #endif
 
@@ -953,22 +1051,27 @@ unknownOption:
 /** List all available game IDs, i.e. all games which any loaded plugin supports. */
 static void listGames(const Common::String &engineID) {
 	const bool all = engineID.empty();
+	Common::StringArray engines;
+	if (!all) {
+		Common::StringTokenizer tokenizer(engineID, ",");
+		engines = tokenizer.split();
+	}
 
 	printf("Game ID                        Full Title                                                 \n"
 	       "------------------------------ -----------------------------------------------------------\n");
 
 	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE);
-	for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
-		const Plugin *p = EngineMan.findPlugin((*iter)->getName());
-		/* If for some reason, we can't find the MetaEngine for this Engine, just ignore it */
+	for (const auto &plugin : plugins) {
+		const Plugin *p = EngineMan.findDetectionPlugin(plugin->getName());
+		/* If for some reason, we can't find the MetaEngineDetection for this Engine, just ignore it */
 		if (!p) {
 			continue;
 		}
 
-		if (all || (p->getName() == engineID)) {
+		if (all || Common::find(engines.begin(), engines.end(), p->getName()) != engines.end()) {
 			PlainGameList list = p->get<MetaEngineDetection>().getSupportedGames();
-			for (PlainGameList::const_iterator v = list.begin(); v != list.end(); ++v) {
-				printf("%-30s %s\n", buildQualifiedGameName(p->get<MetaEngineDetection>().getName(), v->gameId).c_str(), v->description);
+			for (const auto &v : list) {
+				printf("%-30s %s\n", buildQualifiedGameName(p->get<MetaEngineDetection>().getName(), v.gameId).c_str(), v.description);
 			}
 		}
 	}
@@ -977,18 +1080,23 @@ static void listGames(const Common::String &engineID) {
 /** List all known game IDs, i.e. all games which can be detected. */
 static void listAllGames(const Common::String &engineID) {
 	const bool any = engineID.empty();
+	Common::StringArray engines;
+	if (!any) {
+		Common::StringTokenizer tokenizer(engineID, ",");
+		engines = tokenizer.split();
+	}
 
 	printf("Game ID                        Full Title                                                 \n"
 	       "------------------------------ -----------------------------------------------------------\n");
 
-	const PluginList &plugins = EngineMan.getPlugins();
-	for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
-		const MetaEngineDetection &metaEngine = (*iter)->get<MetaEngineDetection>();
+	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
+	for (const auto &plugin : plugins) {
+		const MetaEngineDetection &metaEngine = plugin->get<MetaEngineDetection>();
 
-		if (any || (metaEngine.getName() == engineID)) {
+		if (any || Common::find(engines.begin(), engines.end(), metaEngine.getName()) != engines.end()) {
 			PlainGameList list = metaEngine.getSupportedGames();
-			for (PlainGameList::const_iterator v = list.begin(); v != list.end(); ++v) {
-				printf("%-30s %s\n", buildQualifiedGameName(metaEngine.getName(), v->gameId).c_str(), v->description);
+			for (const auto &v : list) {
+				printf("%-30s %s\n", buildQualifiedGameName(metaEngine.getName(), v.gameId).c_str(), v.description);
 			}
 		}
 	}
@@ -1000,9 +1108,9 @@ static void listEngines() {
 	       "--------------- ------------------------------------------------------\n");
 
 	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE);
-	for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
-		const Plugin *p = EngineMan.findPlugin((*iter)->getName());
-		/* If for some reason, we can't find the MetaEngine for this Engine, just ignore it */
+	for (const auto &plugin : plugins) {
+		const Plugin *p = EngineMan.findDetectionPlugin(plugin->getName());
+		/* If for some reason, we can't find the MetaEngineDetection for this Engine, just ignore it */
 		if (!p) {
 			continue;
 		}
@@ -1016,45 +1124,128 @@ static void listAllEngines() {
 	printf("Engine ID       Engine Name                                           \n"
 	       "--------------- ------------------------------------------------------\n");
 
-	const PluginList &plugins = EngineMan.getPlugins();
-	for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
-		const MetaEngineDetection &metaEngine = (*iter)->get<MetaEngineDetection>();
+	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
+	for (const auto &plugin : plugins) {
+		const MetaEngineDetection &metaEngine = plugin->get<MetaEngineDetection>();
 		printf("%-15s %s\n", metaEngine.getName(), metaEngine.getEngineName());
 	}
 }
 
 /** List all targets which are configured in the config file. */
-static void listTargets() {
+static void listTargets(const Common::String &engineID) {
+	const bool any = engineID.empty();
+	Common::StringArray engines;
+	if (!any) {
+		Common::StringTokenizer tokenizer(engineID, ",");
+		engines = tokenizer.split();
+	}
+
 	printf("Target               Description                                           \n"
 	       "-------------------- ------------------------------------------------------\n");
 
 	const Common::ConfigManager::DomainMap &domains = ConfMan.getGameDomains();
-	Common::ConfigManager::DomainMap::const_iterator iter;
 
 	Common::Array<Common::String> targets;
 	targets.reserve(domains.size());
 
-	for (iter = domains.begin(); iter != domains.end(); ++iter) {
-		Common::String name(iter->_key);
-		Common::String description(iter->_value.getValOrDefault("description"));
+	for (const auto &domain : domains) {
+		Common::String name(domain._key);
+		Common::String description(domain._value.getValOrDefault("description"));
+		Common::String engine;
+		if (!any)
+			engine = domain._value.getValOrDefault("engineid");
 
 		// If there's no description, fallback on the default description.
-		if (description.empty()) {
+		if (description.empty() || (!any && engine.empty())) {
 			QualifiedGameDescriptor g = EngineMan.findTarget(name);
-			if (!g.description.empty())
+			if (description.empty() && !g.description.empty())
 				description = g.description;
+			if (!any && engine.empty() && !g.engineId.empty())
+				engine = g.engineId;
 		}
 		// If there's still no description, we cannot come up with one. Insert some dummy text.
 		if (description.empty())
 			description = "<Unknown game>";
 
-		targets.push_back(Common::String::format("%-20s %s", name.c_str(), description.c_str()));
+		if (any || Common::find(engines.begin(), engines.end(), engine) != engines.end())
+			targets.push_back(Common::String::format("%-20s %s", name.c_str(), description.c_str()));
 	}
 
 	Common::sort(targets.begin(), targets.end());
 
-	for (Common::Array<Common::String>::const_iterator i = targets.begin(), end = targets.end(); i != end; ++i)
-		printf("%s\n", i->c_str());
+	for (const auto &target : targets)
+		printf("%s\n", target.c_str());
+}
+
+static void printStatistics(const Common::String &engineID) {
+	const bool summary = engineID.empty();
+	const bool all = engineID == "all";
+	Common::StringArray engines;
+	if (!summary && !all) {
+		Common::StringTokenizer tokenizer(engineID, ",");
+		engines = tokenizer.split();
+	}
+
+	printf("Engines         Games         Variants      Added targets\n"
+	       "--------------- ------------- ------------- -------------\n");
+
+	int targetCount = 0;
+	Common::HashMap<Common::String, int> engineTargetCount;
+	const Common::ConfigManager::DomainMap &domains = ConfMan.getGameDomains();
+	for (const auto &domain : domains) {
+		if (!summary) {
+			Common::String engine(domain._value.getValOrDefault("engineid"));
+			if (engine.empty()) {
+				QualifiedGameDescriptor g = EngineMan.findTarget(domain._key);
+				if (!g.engineId.empty())
+					engine = g.engineId;
+			}
+			if (!all && Common::find(engines.begin(), engines.end(), engine) == engines.end())
+				continue;
+			Common::HashMap<Common::String, int>::iterator engineIter = engineTargetCount.find(engine);
+			if (engineIter == engineTargetCount.end())
+				engineTargetCount[engine] = 1;
+			else
+				++(engineIter->_value);
+		}
+		++targetCount;
+	}
+
+	bool approximation = false;
+	int engineCount = 0, gameCount = 0, variantCount = 0;
+	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
+	for (const auto &plugin : plugins) {
+		const MetaEngineDetection &metaEngine = plugin->get<MetaEngineDetection>();
+		if (summary || all || Common::find(engines.begin(), engines.end(), metaEngine.getName()) != engines.end()) {
+			PlainGameList list = metaEngine.getSupportedGames();
+			++engineCount;
+			gameCount += list.size();
+			int variants = metaEngine.getGameVariantCount();
+			if (variants == -1) {
+				approximation = true;
+				variantCount += list.size();
+			} else
+				variantCount += variants;
+			if (!summary) {
+				int targets = 0;
+				Common::HashMap<Common::String, int>::const_iterator engineIter = engineTargetCount.find(metaEngine.getName());
+				if (engineIter != engineTargetCount.end())
+					targets = engineIter->_value;
+				if (variants != -1)
+					printf("%-15s %13d %13d %13d\n", metaEngine.getName(), list.size(), variants, targets);
+				else
+					printf("%-15s %13d %13s %13d\n", metaEngine.getName(), list.size(), "?", targets);
+			}
+		}
+	}
+	if (engines.size() != 1) {
+		if (!summary)
+			printf("--------------- ------------- ------------- -------------\n");
+		if (approximation)
+			printf("%15d %13d %12d+ %13d\n", engineCount, gameCount, variantCount, targetCount);
+		else
+			printf("%15d %13d %13d %13d\n", engineCount, gameCount, variantCount, targetCount);
+	}
 }
 
 static void printDebugFlags(const DebugChannelDef *debugChannels) {
@@ -1070,9 +1261,9 @@ static void listDebugFlags(const Common::String &engineID) {
 	if (engineID == "global")
 		printDebugFlags(gDebugChannels);
 	else {
-		const PluginList &plugins = EngineMan.getPlugins();
-		for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
-			const MetaEngineDetection &metaEngine = (*iter)->get<MetaEngineDetection>();
+		const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
+		for (const auto &plugin : plugins) {
+			const MetaEngineDetection &metaEngine = plugin->get<MetaEngineDetection>();
 			if (metaEngine.getName() == engineID) {
 				printf("Flag name       Flag description                                           \n");
 				printf("--------------- ------------------------------------------------------\n");
@@ -1089,9 +1280,9 @@ static void listDebugFlags(const Common::String &engineID) {
 static void listAllEngineDebugFlags() {
 	printf("Flag name       Flag description                                           \n");
 
-	const PluginList &plugins = EngineMan.getPlugins();
-	for (PluginList::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
-		const MetaEngineDetection &metaEngine = (*iter)->get<MetaEngineDetection>();
+	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
+	for (const auto &plugin : plugins) {
+		const MetaEngineDetection &metaEngine = plugin->get<MetaEngineDetection>();
 		printf("--------------- ------------------------------------------------------\n");
 		printf("ID=%-12s Name=%s\n", metaEngine.getName(), metaEngine.getEngineName());
 		printDebugFlags(metaEngine.getDebugChannels());
@@ -1106,11 +1297,10 @@ static void assembleTargets(const Common::String &singleTarget, Common::Array<Co
 
 	// If no target is specified, list save games for all known targets
 	const Common::ConfigManager::DomainMap &domains = ConfMan.getGameDomains();
-	Common::ConfigManager::DomainMap::const_iterator iter;
 
 	targets.reserve(domains.size());
-	for (iter = domains.begin(); iter != domains.end(); ++iter) {
-		targets.push_back(iter->_key);
+	for (const auto &domain : domains) {
+		targets.push_back(domain._key);
 	}
 }
 
@@ -1126,17 +1316,16 @@ static Common::Error listRecords(const Common::String &singleTarget) {
 
 	Common::String oldDomain = ConfMan.getActiveDomainName();
 
-	for (Common::Array<Common::String>::const_iterator i = targets.begin(), end = targets.end(); i != end; ++i) {
+	for (const auto &target : targets) {
 		Common::String currentTarget;
 		QualifiedGameDescriptor game;
 
-		if (ConfMan.hasGameDomain(*i)) {
+		if (ConfMan.hasGameDomain(target)) {
 			// The name is a known target
-			currentTarget = *i;
-			EngineMan.upgradeTargetIfNecessary(*i);
-			const Plugin *metaEnginePlugin = nullptr;
-			game = EngineMan.findTarget(*i, &metaEnginePlugin);
-		} else if (game = findGameMatchingName(*i), !game.gameId.empty()) {
+			currentTarget = target;
+			EngineMan.upgradeTargetIfNecessary(target);
+			game = EngineMan.findTarget(target);
+		} else if (game = findGameMatchingName(target), !game.gameId.empty()) {
 			currentTarget = createTemporaryTarget(game.engineId, game.gameId);
 		} else {
 			return Common::Error(Common::kEnginePluginNotFound, Common::String::format("target '%s'", singleTarget.c_str()));
@@ -1149,9 +1338,9 @@ static Common::Error listRecords(const Common::String &singleTarget) {
 		if (files.empty()) {
 			continue;
 		}
-		printf("Recordings for target '%s' (gameid '%s'):\n", i->c_str(), qualifiedGameId.c_str());
-		for (Common::StringArray::const_iterator x = files.begin(); x != files.end(); ++x) {
-			printf("  %s\n", x->c_str());
+		printf("Recordings for target '%s' (gameid '%s'):\n", target.c_str(), qualifiedGameId.c_str());
+		for (const auto &x : files) {
+			printf("  %s\n", x.c_str());
 		}
 	}
 
@@ -1174,92 +1363,101 @@ static Common::Error listSaves(const Common::String &singleTarget) {
 
 	Common::String oldDomain = ConfMan.getActiveDomainName();
 
+	struct GameTarget {
+		Common::String target;
+		QualifiedGameDescriptor game;
+	};
+	Common::Array<GameTarget> gameTargets;
+
 	bool atLeastOneFound = false;
-	for (Common::Array<Common::String>::const_iterator i = targets.begin(), end = targets.end(); i != end; ++i) {
+	for (const auto &target : targets) {
 		// Check whether there is either a game domain (i.e. a target) matching
 		// the specified game name, or alternatively whether there is a matching game id.
 		Common::String currentTarget;
 		QualifiedGameDescriptor game;
 
-		const Plugin *metaEnginePlugin = nullptr;
-		const Plugin *enginePlugin = nullptr;
-
-		if (ConfMan.hasGameDomain(*i)) {
+		if (ConfMan.hasGameDomain(target)) {
 			// The name is a known target
-			currentTarget = *i;
-			EngineMan.upgradeTargetIfNecessary(*i);
-			game = EngineMan.findTarget(*i, &metaEnginePlugin);
-		} else if (game = findGameMatchingName(*i), !game.gameId.empty()) {
+			currentTarget = target;
+			EngineMan.upgradeTargetIfNecessary(target);
+			game = EngineMan.findTarget(target);
+		} else if (game = findGameMatchingName(target), !game.gameId.empty()) {
 			// The name is a known game id
-			metaEnginePlugin = EngineMan.findPlugin(game.engineId);
 			currentTarget = createTemporaryTarget(game.engineId, game.gameId);
 		} else {
 			return Common::Error(Common::kEnginePluginNotFound, Common::String::format("target '%s'", singleTarget.c_str()));
 		}
+		gameTargets.push_back({currentTarget, game});
+	}
+
+#if defined(UNCACHED_PLUGINS) && defined(DYNAMIC_MODULES) && !defined(DETECTION_STATIC)
+	// Unload all MetaEnginesDetection if we're using uncached plugins to save extra memory.
+	PluginMan.unloadDetectionPlugin();
+#endif
+
+	for (const auto &gameTarget : gameTargets) {
+		const Plugin *enginePlugin = nullptr;
 
 		// If we actually found a domain, we're going to change the domain
-		ConfMan.setActiveDomain(currentTarget);
+		ConfMan.setActiveDomain(gameTarget.target);
 
-		if (!metaEnginePlugin) {
+		enginePlugin = PluginMan.findEnginePlugin(gameTarget.game.engineId);
+
+		if (!enginePlugin) {
 			// If the target was specified, treat this as an error, and otherwise skip it.
-			if (!singleTarget.empty())
-				return Common::Error(Common::kMetaEnginePluginNotFound,
-				                     Common::String::format("target '%s'", i->c_str()));
-			printf("MetaEnginePlugin could not be loaded for target '%s'\n", i->c_str());
-			continue;
-		} else {
-			enginePlugin = PluginMan.getEngineFromMetaEngine(metaEnginePlugin);
-
-			if (!enginePlugin) {
-				// If the target was specified, treat this as an error, and otherwise skip it.
-				if (!singleTarget.empty())
-					return Common::Error(Common::kEnginePluginNotFound,
-				                     	 Common::String::format("target '%s'", i->c_str()));
-				printf("EnginePlugin could not be loaded for target '%s'\n", i->c_str());
-				continue;
+			if (!singleTarget.empty()) {
+				result = Common::Error(Common::kEnginePluginNotFound,
+						 Common::String::format("target '%s'", gameTarget.target.c_str()));
+				break;
 			}
+			printf("EnginePlugin could not be loaded for target '%s'\n", gameTarget.target.c_str());
+			continue;
 		}
 
 		const MetaEngine &metaEngine = enginePlugin->get<MetaEngine>();
-		Common::String qualifiedGameId = buildQualifiedGameName(game.engineId, game.gameId);
+		Common::String qualifiedGameId = buildQualifiedGameName(gameTarget.game.engineId, gameTarget.game.gameId);
 
 		if (!metaEngine.hasFeature(MetaEngine::kSupportsListSaves)) {
 			// If the target was specified, treat this as an error, and otherwise skip it.
-			if (!singleTarget.empty())
+			if (!singleTarget.empty()) {
 				// TODO: Include more info about the target (desc, engine name, ...) ???
-				return Common::Error(Common::kEnginePluginNotSupportSaves,
-				                     Common::String::format("target '%s', gameid '%s'", i->c_str(), qualifiedGameId.c_str()));
+				result = Common::Error(Common::kEnginePluginNotSupportSaves,
+									   Common::String::format("target '%s', gameid '%s'", gameTarget.target.c_str(), qualifiedGameId.c_str()));
+				break;
+			}
 			continue;
 		}
 
 		// Query the plugin for a list of saved games
-		SaveStateList saveList = metaEngine.listSaves(i->c_str());
+		SaveStateList saveList = metaEngine.listSaves(gameTarget.target.c_str());
 
 		if (!saveList.empty()) {
 			// TODO: Include more info about the target (desc, engine name, ...) ???
 			if (atLeastOneFound)
 				printf("\n");
-			printf("Save states for target '%s' (gameid '%s'):\n", i->c_str(), qualifiedGameId.c_str());
+			printf("Save states for target '%s' (gameid '%s'):\n", gameTarget.target.c_str(), qualifiedGameId.c_str());
 			printf("  Slot Description                                           \n"
 					   "  ---- ------------------------------------------------------\n");
 
-			for (SaveStateList::const_iterator x = saveList.begin(); x != saveList.end(); ++x) {
-				printf("  %-4d %s\n", x->getSaveSlot(), x->getDescription().encode().c_str());
+			for (const auto &x : saveList) {
+				printf("  %-4d %s\n", x.getSaveSlot(), x.getDescription().encode().c_str());
 				// TODO: Could also iterate over the full hashmap, printing all key-value pairs
 			}
 			atLeastOneFound = true;
 		} else {
 			// If the target was specified, indicate no save games were found for it. Otherwise just skip it.
 			if (!singleTarget.empty())
-				printf("There are no save states for target '%s' (gameid '%s'):\n", i->c_str(), qualifiedGameId.c_str());
+				printf("There are no save states for target '%s' (gameid '%s'):\n", gameTarget.target.c_str(), qualifiedGameId.c_str());
 		}
 	}
 
 	// Revert to the old active domain
 	ConfMan.setActiveDomain(oldDomain);
 
-	if (!atLeastOneFound && singleTarget.empty())
+	if (!atLeastOneFound && singleTarget.empty() && result.getCode() == Common::kNoError)
 		printf("No save states could be found.\n");
+
+	PluginMan.loadDetectionPlugin(); // only for uncached manager
 
 	return result;
 }
@@ -1273,8 +1471,8 @@ static void listThemes() {
 	printf("Theme          Description\n");
 	printf("-------------- ------------------------------------------------\n");
 
-	for (ThList::const_iterator i = thList.begin(); i != thList.end(); ++i)
-		printf("%-14s %s\n", i->id.c_str(), i->name.c_str());
+	for (const auto &theme : thList)
+		printf("%-14s %s\n", theme.id.c_str(), theme.name.c_str());
 }
 
 /** Lists all output devices */
@@ -1284,12 +1482,27 @@ static void listAudioDevices() {
 	printf("ID                             Description\n");
 	printf("------------------------------ ------------------------------------------------\n");
 
-	for (PluginList::const_iterator i = pluginList.begin(), iend = pluginList.end(); i != iend; ++i) {
-		const MusicPluginObject &musicObject = (*i)->get<MusicPluginObject>();
+	for (const auto &plugin : pluginList) {
+		const MusicPluginObject &musicObject = plugin->get<MusicPluginObject>();
 		MusicDevices deviceList = musicObject.getDevices();
-		for (MusicDevices::iterator j = deviceList.begin(), jend = deviceList.end(); j != jend; ++j) {
-			printf("%-30s %s\n", Common::String::format("\"%s\"", j->getCompleteId().c_str()).c_str(), j->getCompleteName().c_str());
+		for (auto &device : deviceList) {
+			printf("%-30s %s\n", Common::String::format("\"%s\"", device.getCompleteId().c_str()).c_str(), device.getCompleteName().c_str());
 		}
+	}
+}
+
+/** Dump MD5s from detection entries into STDOUT */
+static void dumpAllDetectionEntries() {
+	const PluginList &plugins = EngineMan.getPlugins(PLUGIN_TYPE_ENGINE_DETECTION);
+
+	printf("scummvm (\n");
+	printf("\tauthor \"scummvm\"\n");
+	printf("\tversion \"%s\"\n", gScummVMVersion);
+	printf(")\n\n");
+
+	for (const auto &iter : plugins) {
+		const MetaEngineDetection &metaEngine = iter->get<MetaEngineDetection>();
+		metaEngine.dumpDetectionEntries();
 	}
 }
 
@@ -1299,7 +1512,7 @@ static DetectedGames getGameList(const Common::FSNode &dir) {
 
 	// Collect all files from directory
 	if (!dir.getChildren(files, Common::FSNode::kListAll)) {
-		printf("Path %s does not exist or is not a directory.\n", dir.getPath().c_str());
+		printf("Path %s does not exist or is not a directory.\n", dir.getPath().toString(Common::Path::kNativeSeparator).c_str());
 		return DetectedGames();
 	}
 
@@ -1320,12 +1533,12 @@ static DetectedGames recListGames(const Common::FSNode &dir, const Common::Strin
 	if (recursive) {
 		Common::FSList files;
 		dir.getChildren(files, Common::FSNode::kListDirectoriesOnly);
-		for (Common::FSList::const_iterator file = files.begin(); file != files.end(); ++file) {
-			DetectedGames rec = recListGames(*file, engineId, gameId, recursive);
-			for (DetectedGames::const_iterator game = rec.begin(); game != rec.end(); ++game) {
-				if ((game->engineId == engineId && game->gameId == gameId)
+		for (const auto &file : files) {
+			DetectedGames rec = recListGames(file, engineId, gameId, recursive);
+			for (auto &game : rec) {
+				if ((game.engineId == engineId && game.gameId == gameId)
 				    || gameId.empty())
-					list.push_back(*game);
+					list.push_back(game);
 			}
 		}
 	}
@@ -1334,14 +1547,14 @@ static DetectedGames recListGames(const Common::FSNode &dir, const Common::Strin
 }
 
 /** Display all games in the given directory, return ID of first detected game */
-static Common::String detectGames(const Common::String &path, const Common::String &engineId, const Common::String &gameId, bool recursive) {
+static Common::String detectGames(const Common::Path &path, const Common::String &engineId, const Common::String &gameId, bool recursive) {
 	bool noPath = path.empty();
 	//Current directory
 	Common::FSNode dir(path);
 	DetectedGames candidates = recListGames(dir, engineId, gameId, recursive);
 
 	if (candidates.empty()) {
-		printf("WARNING: ScummVM could not find any game in %s\n", dir.getPath().c_str());
+		printf("WARNING: ScummVM could not find any game in %s\n", dir.getPath().toString(Common::Path::kNativeSeparator).c_str());
 		if (noPath) {
 			printf("WARNING: Consider using --path=<path> to specify a directory\n");
 		}
@@ -1353,11 +1566,11 @@ static Common::String detectGames(const Common::String &path, const Common::Stri
 	// TODO this is not especially pretty
 	printf("GameID                         Description                                                Full Path\n");
 	printf("------------------------------ ---------------------------------------------------------- ---------------------------------------------------------\n");
-	for (DetectedGames::const_iterator v = candidates.begin(); v != candidates.end(); ++v) {
+	for (const auto &v : candidates) {
 		printf("%-30s %-58s %s\n",
-		       buildQualifiedGameName(v->engineId, v->gameId).c_str(),
-		       v->description.c_str(),
-		       v->path.c_str());
+		       buildQualifiedGameName(v.engineId, v.gameId).c_str(),
+		       v.description.c_str(),
+		       v.path.toString(Common::Path::kNativeSeparator).c_str());
 	}
 
 	return buildQualifiedGameName(candidates[0].engineId, candidates[0].gameId);
@@ -1366,27 +1579,27 @@ static Common::String detectGames(const Common::String &path, const Common::Stri
 static int recAddGames(const Common::FSNode &dir, const Common::String &engineId, const Common::String &gameId, bool recursive) {
 	int count = 0;
 	DetectedGames list = getGameList(dir);
-	for (DetectedGames::const_iterator v = list.begin(); v != list.end(); ++v) {
-		if ((v->engineId != engineId || v->gameId != gameId)
+	for (const auto &v : list) {
+		if ((v.engineId != engineId || v.gameId != gameId)
 		    && !gameId.empty()) {
 			printf("Found %s, only adding %s per --game option, ignoring...\n",
-			       buildQualifiedGameName(v->engineId, v->gameId).c_str(),
+			       buildQualifiedGameName(v.engineId, v.gameId).c_str(),
 			       buildQualifiedGameName(engineId, gameId).c_str());
-		} else if (ConfMan.hasGameDomain(v->preferredTarget)) {
+		} else if (ConfMan.hasGameDomain(v.preferredTarget)) {
 			// TODO Better check for game already added?
 			printf("Found %s, but has already been added, skipping\n",
-			       buildQualifiedGameName(v->engineId, v->gameId).c_str());
+			       buildQualifiedGameName(v.engineId, v.gameId).c_str());
 		} else {
-			Common::String target = EngineMan.createTargetForGame(*v);
+			Common::String target = EngineMan.createTargetForGame(v);
 			count++;
 
 			// Display added game info
 			printf("Game Added: \n  Target:   %s\n  GameID:   %s\n  Name:     %s\n  Language: %s\n  Platform: %s\n",
 			       target.c_str(),
-			       buildQualifiedGameName(v->engineId, v->gameId).c_str(),
-			       v->description.c_str(),
-			       Common::getLanguageDescription(v->language),
-			       Common::getPlatformDescription(v->platform)
+			       buildQualifiedGameName(v.engineId, v.gameId).c_str(),
+			       v.description.c_str(),
+			       Common::getLanguageDescription(v.language),
+			       Common::getPlatformDescription(v.platform)
 			);
 		}
 	}
@@ -1394,8 +1607,8 @@ static int recAddGames(const Common::FSNode &dir, const Common::String &engineId
 	if (recursive) {
 		Common::FSList files;
 		if (dir.getChildren(files, Common::FSNode::kListDirectoriesOnly)) {
-			for (Common::FSList::const_iterator file = files.begin(); file != files.end(); ++file) {
-				count += recAddGames(*file, engineId, gameId, recursive);
+			for (const auto &file : files) {
+				count += recAddGames(file, engineId, gameId, recursive);
 			}
 		}
 	}
@@ -1436,13 +1649,9 @@ static void calcMD5(Common::FSNode &path, int32 length) {
 static void calcMD5Mac(Common::Path &filePath, int32 length) {
 	// We need to split the path into the file name and a SearchSet
 	Common::SearchSet dir;
-	char nativeSeparator = '/';
-#ifdef WIN32
-	nativeSeparator = '\\';
-#endif
-	Common::FSNode dirNode(filePath.getParent().toString(nativeSeparator));
-	dir.addDirectory(dirNode.getPath(), dirNode);
-	Common::String fileName = filePath.getLastComponent().toString();
+	Common::FSNode dirNode(filePath.getParent());
+	dir.addDirectory(dirNode);
+	Common::Path fileName = filePath.getLastComponent();
 
 	Common::MacResManager macResMan;
 	// FIXME: There currently isn't any way to tell the Mac resource
@@ -1450,11 +1659,11 @@ static void calcMD5Mac(Common::Path &filePath, int32 length) {
 	// and constructs a file name out of that. While usually a desirable
 	// thing, it's not ideal here.
 	if (!macResMan.open(fileName, dir)) {
-		printf("Mac resource file '%s' not found or could not be open\n", filePath.toString(nativeSeparator).c_str());
+		printf("Mac resource file '%s' not found or could not be open\n", filePath.toString(Common::Path::kNativeSeparator).c_str());
 	} else {
 		Common::ScopedPtr<Common::SeekableReadStream> dataFork(Common::MacResManager::openFileOrDataFork(fileName, dir));
 		if (!macResMan.hasResFork() && !dataFork) {
-			printf("'%s' has neither data not resource fork\n", macResMan.getBaseFileName().toString().c_str());
+			printf("'%s' has neither data not resource fork\n", macResMan.getBaseFileName().toString(Common::Path::kNativeSeparator).c_str());
 		} else {
 			bool tail = false;
 			if (length < 0) {// Tail md5 is requested
@@ -1467,7 +1676,7 @@ static void calcMD5Mac(Common::Path &filePath, int32 length) {
 				Common::String md5 = macResMan.computeResForkMD5AsString(length, tail);
 				if (length != 0 && length < (int32)macResMan.getResForkDataSize())
 					md5 += Common::String::format(" (%s %d bytes)", tail ? "last" : "first", length);
-				printf("%s (resource): %s, %llu bytes\n", macResMan.getBaseFileName().toString().c_str(), md5.c_str(), (unsigned long long)macResMan.getResForkDataSize());
+				printf("%s (resource): %s, %llu bytes\n", macResMan.getBaseFileName().toString(Common::Path::kNativeSeparator).c_str(), md5.c_str(), (unsigned long long)macResMan.getResForkDataSize());
 			}
 			if (dataFork) {
 				if (tail && dataFork->size() > length)
@@ -1475,14 +1684,14 @@ static void calcMD5Mac(Common::Path &filePath, int32 length) {
 				Common::String md5 = Common::computeStreamMD5AsString(*dataFork, length);
 				if (length != 0 && length < dataFork->size())
 					md5 += Common::String::format(" (%s %d bytes)", tail ? "last" : "first", length);
-				printf("%s (data): %s, %llu bytes\n", macResMan.getBaseFileName().toString().c_str(), md5.c_str(), (unsigned long long)dataFork->size());
+				printf("%s (data): %s, %llu bytes\n", macResMan.getBaseFileName().toString(Common::Path::kNativeSeparator).c_str(), md5.c_str(), (unsigned long long)dataFork->size());
 			}
 		}
 		macResMan.close();
 	}
 }
 
-static bool addGames(const Common::String &path, const Common::String &engineId, const Common::String &gameId, bool recursive) {
+static bool addGames(const Common::Path &path, const Common::String &engineId, const Common::String &gameId, bool recursive) {
 	//Current directory
 	Common::FSNode dir(path);
 	int added = recAddGames(dir, engineId, gameId, recursive);
@@ -1502,14 +1711,13 @@ static void runDetectorTest() {
 	// whether the result agrees with the settings of the target.
 
 	const Common::ConfigManager::DomainMap &domains = ConfMan.getGameDomains();
-	Common::ConfigManager::DomainMap::const_iterator iter = domains.begin();
 	int success = 0, failure = 0;
-	for (iter = domains.begin(); iter != domains.end(); ++iter) {
-		Common::String name(iter->_key);
-		Common::String gameid(iter->_value.getVal("gameid"));
-		Common::String path(iter->_value.getVal("path"));
+	for (const auto &domain : domains) {
+		Common::String name(domain._key);
+		Common::String gameid(domain._value.getVal("gameid"));
+		Common::Path path(Common::Path::fromConfig(domain._value.getVal("path")));
 		printf("Looking at target '%s', gameid '%s', path '%s' ...\n",
-				name.c_str(), gameid.c_str(), path.c_str());
+				name.c_str(), gameid.c_str(), path.toString(Common::Path::kNativeSeparator).c_str());
 		if (path.empty()) {
 			printf(" ... no path specified, skipping\n");
 			continue;
@@ -1529,9 +1737,8 @@ static void runDetectorTest() {
 		DetectedGames candidates = detectionResults.listRecognizedGames();
 
 		bool gameidDiffers = false;
-		DetectedGames::const_iterator x;
-		for (x = candidates.begin(); x != candidates.end(); ++x) {
-			gameidDiffers |= !gameid.equalsIgnoreCase(x->gameId);
+		for (const auto &candidate : candidates) {
+			gameidDiffers |= !gameid.equalsIgnoreCase(candidate.gameId);
 		}
 
 		if (candidates.empty()) {
@@ -1552,12 +1759,12 @@ static void runDetectorTest() {
 			success++;
 		}
 
-		for (x = candidates.begin(); x != candidates.end(); ++x) {
+		for (auto &candidate : candidates) {
 			printf("    gameid '%s', desc '%s', language '%s', platform '%s'\n",
-				   x->gameId.c_str(),
-				   x->description.c_str(),
-				   Common::getLanguageDescription(x->language),
-				   Common::getPlatformDescription(x->platform));
+				   candidate.gameId.c_str(),
+				   candidate.description.c_str(),
+				   Common::getLanguageDescription(candidate.language),
+				   Common::getPlatformDescription(candidate.platform));
 		}
 	}
 	int total = domains.size();
@@ -1582,7 +1789,7 @@ void upgradeTargets() {
 		Common::ConfigManager::Domain &dom = iter->_value;
 		Common::String name(iter->_key);
 		Common::String gameid(dom.getVal("gameid"));
-		Common::String path(dom.getVal("path"));
+		Common::Path path(Common::Path::fromConfig(iter->_value.getVal("path")));
 		printf("Looking at target '%s', gameid '%s' ...\n",
 				name.c_str(), gameid.c_str());
 		if (path.empty()) {
@@ -1621,12 +1828,11 @@ void upgradeTargets() {
 		}
 		if (candidates.size() > 1) {
 			// Scan over all candidates, check if there is a unique match for gameid, language and platform
-			DetectedGames::iterator x;
 			int matchesFound = 0;
-			for (x = candidates.begin(); x != candidates.end(); ++x) {
-				if (x->gameId == gameid && x->language == lang && x->platform == plat) {
+			for (auto &candidate : candidates) {
+				if (candidate.gameId == gameid && candidate.language == lang && candidate.platform == plat) {
 					matchesFound++;
-					g = &(*x);
+					g = &(candidate);
 				}
 			}
 			if (matchesFound != 1) {
@@ -1707,48 +1913,69 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		}
 	}
 
+	// For commands that normally exit, check if --no-exit was specified
+	bool cmdDoExit = settings.getValOrDefault("exit", "true") == "true";
+
 	// Handle commands passed via the command line (like --list-targets and
 	// --list-games). This must be done after the config file and the plugins
 	// have been loaded.
 	if (command == "list-targets") {
-		listTargets();
-		return true;
+		listTargets(settings["engine"]);
+		return cmdDoExit;
 	} else if (command == "list-all-debugflags") {
 		listAllEngineDebugFlags();
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-debugflags") {
 		listDebugFlags(settings["list-debugflags"]);
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-games") {
 		listGames(settings["engine"]);
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-all-games") {
 		listAllGames(settings["engine"]);
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-engines") {
 		listEngines();
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-all-engines") {
 		listAllEngines();
-		return true;
+		return cmdDoExit;
+	} else if (command == "dump-all-detection-entries") {
+		dumpAllDetectionEntries();
+		return cmdDoExit;
+	} else if (command == "stats") {
+		printStatistics(settings["engine"]);
+		return cmdDoExit;
 #ifdef ENABLE_EVENTRECORDER
 	} else if (command == "list-records") {
 		err = listRecords(settings["game"]);
-		return true;
+		return cmdDoExit;
 #endif
 	} else if (command == "list-saves") {
 		err = listSaves(settings["game"]);
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-themes") {
 		listThemes();
-		return true;
+		return cmdDoExit;
 	} else if (command == "list-audio-devices") {
 		listAudioDevices();
-		return true;
+		return cmdDoExit;
 	} else if (command == "version") {
 		printf("%s\n", gScummVMFullVersion);
+#ifdef SDL_BACKEND
+#ifdef USE_SDL3
+		int sdlLinkedVersion = SDL_GetVersion();
+		printf("Using SDL backend with SDL %d.%d.%d\n", SDL_VERSIONNUM_MAJOR(sdlLinkedVersion), SDL_VERSIONNUM_MINOR(sdlLinkedVersion), SDL_VERSIONNUM_MICRO(sdlLinkedVersion));
+#elif defined(USE_SDL2)
+		SDL_version sdlLinkedVersion;
+		SDL_GetVersion(&sdlLinkedVersion);
+		printf("Using SDL backend with SDL %d.%d.%d\n", sdlLinkedVersion.major, sdlLinkedVersion.minor, sdlLinkedVersion.patch);
+#else
+		printf("Using SDL backend with SDL %d.%d.%d\n", SDL_Linked_Version()->major, SDL_Linked_Version()->minor, SDL_Linked_Version()->patch);
+#endif
+#endif
 		printf("Features compiled in: %s\n", gScummVMFeatures);
-		return true;
+		return cmdDoExit;
 	} else if (command == "help") {
 #ifndef DISABLE_HELP_STRINGS
 		printf(HELP_STRING1, s_appName);
@@ -1788,7 +2015,7 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 
 		printf(HELP_STRING4);
 #endif
-		return true;
+		return cmdDoExit;
 	} else if (command == "auto-detect") {
 		bool resursive = settings["recursive"] == "true";
 		// If auto-detects fails (returns an empty ID) return true to close ScummVM.
@@ -1797,23 +2024,26 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		if (resursive) {
 			printf("ERROR: Autodetection not supported with --recursive; are you sure you didn't want --detect?\n");
 			err = Common::kUnknownError;
-			return true;
+			return cmdDoExit;
 			// There is not a particularly good technical reason for this.
 			// From an UX point of view, however, it might get confusing.
 			// Consider removing this if consensus says otherwise.
 		} else {
-			command = detectGames(settings["path"], gameOption.engineId, gameOption.gameId, resursive);
+			Common::Path path(Common::Path::fromConfig(settings["path"]));
+			command = detectGames(path, gameOption.engineId, gameOption.gameId, resursive);
 			if (command.empty()) {
 				err = Common::kNoGameDataFoundError;
-				return true;
+				return cmdDoExit;
 			}
 		}
 	} else if (command == "detect") {
-		detectGames(settings["path"], gameOption.engineId, gameOption.gameId, settings["recursive"] == "true");
-		return true;
+		Common::Path path(Common::Path::fromConfig(settings["path"]));
+		detectGames(path, gameOption.engineId, gameOption.gameId, settings["recursive"] == "true");
+		return cmdDoExit;
 	} else if (command == "add") {
-		addGames(settings["path"], gameOption.engineId, gameOption.gameId, settings["recursive"] == "true");
-		return true;
+		Common::Path path(Common::Path::fromConfig(settings["path"]));
+		addGames(path, gameOption.engineId, gameOption.gameId, settings["recursive"] == "true");
+		return cmdDoExit;
 	} else if (command == "md5" || command == "md5mac") {
 		Common::String filename = settings.getValOrDefault("md5-path", "scummvm");
 		// Assume '/' separator except on Windows if the path contain at least one `\`
@@ -1831,7 +2061,7 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		if (command == "md5" && settings.contains("md5-engine")) {
 			Common::String engineID = settings["md5-engine"];
 
-			const Plugin *plugin = EngineMan.findPlugin(engineID);
+			const Plugin *plugin = EngineMan.findDetectionPlugin(engineID);
 			if (!plugin) {
 				warning("'%s' is an invalid engine ID. Use the --list-engines command to list supported engine IDs", engineID.c_str());
 				return true;
@@ -1850,16 +2080,16 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		} else
 			calcMD5Mac(Filename, md5Length);
 
-		return true;
+		return cmdDoExit;
 #ifdef DETECTOR_TESTING_HACK
 	} else if (command == "test-detector") {
 		runDetectorTest();
-		return true;
+		return cmdDoExit;
 #endif
 #ifdef UPGRADE_ALL_TARGETS_HACK
 	} else if (command == "upgrade-targets") {
 		upgradeTargets();
-		return true;
+		return cmdDoExit;
 #endif
 	}
 
@@ -1888,12 +2118,14 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 	// Finally, store the command line settings into the config manager.
 	static const char * const sessionSettings[] = {
 		"config",
+		"logfile",
 		"initial-cfg",
 		"fullscreen",
 		"gfx-mode",
 		"stretch-mode",
 		"scaler",
 		"scale-factor",
+		"shader",
 		"filtering",
 		"gui-theme",
 		"themepath",
@@ -1917,21 +2149,53 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		nullptr
 	};
 
-	for (Common::StringMap::const_iterator x = settings.begin(); x != settings.end(); ++x) {
-		Common::String key(x->_key);
-		Common::String value(x->_value);
+	// Skip some settings that should only be used for the command-line commands
+	static const char * const skipSettings[] = {
+		"recursive",
+		"exit",
+		"md5-engine",
+		"md5-length",
+		"md5-path",
+		"list-debugflags",
+		nullptr
+	};
+
+	for (const auto &x : settings) {
+		Common::String key(x._key);
+		Common::String value(x._value);
+
+		bool skip = false;
+		for (auto skipKey = skipSettings; *skipKey && !skip; ++skipKey)
+			skip = (x._key == *skipKey);
+		if (skip)
+			continue;
 
 		// Replace any "-" in the key by "_" (e.g. change "save-slot" to "save_slot").
-		for (Common::String::iterator c = key.begin(); c != key.end(); ++c)
-			if (*c == '-')
-				*c = '_';
+		for (auto &c : key)
+			if (c == '-')
+				c = '_';
 
 		// Store it into ConfMan.
 		bool useSessionDomain = false;
 		for (auto sessionKey = sessionSettings; *sessionKey && !useSessionDomain; ++sessionKey)
-			useSessionDomain = (x->_key == *sessionKey);
+			useSessionDomain = (x._key == *sessionKey);
 		ConfMan.set(key, value, useSessionDomain ? Common::ConfigManager::kSessionDomain : Common::ConfigManager::kTransientDomain);
 	}
+
+	// In non-release builds, if themepath and extrapath are not defined yet, add them to the session path so that it works out
+	// of the box when building and running in tree.
+#if !defined(RELEASE_BUILD) && !defined(WIN32)
+	#define ADD_DEFAULT_PATH(key, path) \
+		if (!ConfMan.hasKey(key)) { \
+			Common::FSNode node(path); \
+			if (node.exists() && node.isDirectory() && node.isReadable()) \
+				ConfMan.setPath(key, path, Common::ConfigManager::kSessionDomain); \
+		}
+
+	ADD_DEFAULT_PATH("themepath", "gui/themes/")
+	ADD_DEFAULT_PATH("extrapath", "dists/engine-data/")
+	ADD_DEFAULT_PATH("soundfontpath", "dists/soundfonts/")
+#endif
 
 	return false;
 }

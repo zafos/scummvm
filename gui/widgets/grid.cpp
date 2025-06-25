@@ -49,8 +49,11 @@ void GridItemWidget::setActiveEntry(GridItemInfo &entry) {
 void GridItemWidget::updateThumb() {
 	const Graphics::ManagedSurface *gfx = _grid->filenameToSurface(_activeEntry->thumbPath);
 	_thumbGfx.free();
-	if (gfx)
+	if (gfx) {
+		// TODO: Use a reference instead of copying the surface
 		_thumbGfx.copyFrom(*gfx);
+		_thumbAlpha = _thumbGfx.detectAlpha();
+	}
 }
 
 void GridItemWidget::update() {
@@ -119,30 +122,43 @@ void GridItemWidget::drawWidget() {
 			r.translate(0, kLineHeight);
 		}
 	} else {
-		g_gui.theme()->drawSurface(Common::Point(_x, _y), _thumbGfx, true);
+		g_gui.theme()->drawManagedSurface(Common::Point(_x + _grid->_thumbnailMargin, _y + _grid->_thumbnailMargin), _thumbGfx, _thumbAlpha);
 	}
 
+	Graphics::AlphaType alphaType;
+
 	// Draw Platform Icon
-	const Graphics::ManagedSurface *platGfx = _grid->platformToSurface(_activeEntry->platform);
+	const Graphics::ManagedSurface *platGfx = _grid->platformToSurface(_activeEntry->platform, alphaType);
 	if (platGfx) {
 		Common::Point p(_x + thumbWidth - platGfx->w, _y + thumbHeight - platGfx->h);
-		g_gui.theme()->drawSurface(p, *platGfx, true);
+		g_gui.theme()->drawManagedSurface(p, *platGfx, alphaType);
 	}
 
 	// Draw Flag
-	const Graphics::ManagedSurface *flagGfx = _grid->languageToSurface(_activeEntry->language);
+	const Graphics::ManagedSurface *flagGfx = _grid->languageToSurface(_activeEntry->language, alphaType);
 	if (flagGfx) {
 		// SVG and PNG can resize differently so it's better to use thumbWidth as reference to
 		// ensure all flags are aligned
 		Common::Point p(_x + thumbWidth - (thumbWidth / 5), _y + 5);
-		g_gui.theme()->drawSurface(p, *flagGfx, true);
+		g_gui.theme()->drawManagedSurface(p, *flagGfx, alphaType);
 	}
 
 	// Draw Demo Overlay
-	const Graphics::ManagedSurface *demoGfx = _grid->demoToSurface(_activeEntry->extra);
+	const Graphics::ManagedSurface *demoGfx = _grid->demoToSurface(_activeEntry->extra, alphaType);
 	if (demoGfx) {
 		Common::Point p(_x, _y);
-		g_gui.theme()->drawSurface(p, *demoGfx, true);
+		g_gui.theme()->drawManagedSurface(p, *demoGfx, alphaType);
+	}
+
+	bool validEntry = _activeEntry->validEntry;
+
+	// Darken thumbnail if path is unreachable
+	if (!validEntry) {
+		const Graphics::ManagedSurface *darkenGfx = _grid->disabledThumbnail();
+		if (darkenGfx) {
+			Common::Point p(_x, _y);
+			g_gui.theme()->drawManagedSurface(p, *darkenGfx, Graphics::ALPHA_FULL);
+		}
 	}
 
 	// Draw Title
@@ -154,9 +170,13 @@ void GridItemWidget::drawWidget() {
 				titleLines[1].deleteLastChar();
 			titleLines[1] += Common::U32String("...");
 		}
+		// Display text in alternate color if the path is unreachable
+		// Should be ok using kStateDisabled, but the list widget uses FontColorAlternate so let's stick to that
+		GUI::ThemeEngine::FontColor color = validEntry ? GUI::ThemeEngine::kFontColorNormal : GUI::ThemeEngine::kFontColorAlternate;
 		Common::Rect r(_x, _y + thumbHeight, _x + thumbWidth, _y + thumbHeight + kLineHeight);
 		for (uint k = 0; k < MIN(2U, titleLines.size()); ++k) {
-			g_gui.theme()->drawText(r, titleLines[k], GUI::ThemeEngine::kStateEnabled, Graphics::kTextAlignCenter);
+			g_gui.theme()->drawText(r, titleLines[k], GUI::ThemeEngine::kStateEnabled, Graphics::kTextAlignCenter, GUI::ThemeEngine::kTextInversionNone,
+									0, true, ThemeEngine::kFontStyleBold, color);
 			r.translate(0, kLineHeight);
 		}
 	}
@@ -192,6 +212,44 @@ void GridWidget::toggleGroup(int groupID) {
 	sortGroups();
 	// TODO: Replace reflowLayout with only the necessary sequence of steps
 	reflowLayout();
+}
+
+void GridWidget::loadClosedGroups(const Common::U32String &groupName) {
+	// Recalls what groups were closed from the config
+	if (ConfMan.hasKey("group_" + groupName, ConfMan.kApplicationDomain)) {
+		const Common::String &val = ConfMan.get("group_" + groupName, ConfMan.kApplicationDomain);
+		Common::StringTokenizer hiddenGroups(val);
+
+		for (Common::String tok = hiddenGroups.nextToken(); tok.size(); tok = hiddenGroups.nextToken()) {
+			// See if the hidden group is in our group headers still, if so, hide it
+			for (Common::U32StringArray::size_type i = 0; i < _groupHeaders.size(); ++i) {
+				if (_groupHeaders[i] == tok || (tok == "unnamed" && _groupHeaders[i].size() == 0)) {
+					_groupExpanded[i] = false;
+					break;
+				}
+			}
+		}
+		sortGroups();
+		// TODO: Replace reflowLayout with only the necessary sequence of steps
+		// reflowLayout();
+	}
+}
+
+void GridWidget::saveClosedGroups(const Common::U32String &groupName) {
+	// Save the hidden groups to the config
+	Common::String hiddenGroups;
+	for (Common::U32StringArray::size_type i = 0; i < _groupHeaders.size(); ++i) {
+		if (!_groupExpanded[i]) {
+			if (_groupHeaders[i].size()) {
+				hiddenGroups += _groupHeaders[i];
+			} else {
+				hiddenGroups += "unnamed";
+			}
+			hiddenGroups += ' ';
+		}
+	}
+	ConfMan.set("group_" + groupName, hiddenGroups, ConfMan.kApplicationDomain);
+	ConfMan.flushToDisk();
 }
 
 void GridItemWidget::handleMouseDown(int x, int y, int button, int clickCount) {
@@ -231,10 +289,6 @@ GridItemTray::GridItemTray(GuiObject *boss, int x, int y, int w, int h, int entr
 	_editButton = new PicButtonWidget(this, trayPaddingX + buttonWidth + buttonSpacingX, trayPaddingY + buttonHeight + buttonSpacingY,
 									  buttonWidth, buttonHeight,
 									  _("Edit"), kEditButtonCmd);
-
-	_playButton->useThemeTransparency(true);
-	_loadButton->useThemeTransparency(true);
-	_editButton->useThemeTransparency(true);
 }
 
 void GridItemTray::reflowLayout() {
@@ -271,7 +325,12 @@ void GridItemTray::handleMouseDown(int x, int y, int button, int clickCount) {
 	if ((x < 0 || x > _w) || (y > _h || y < -(_grid->_gridItemHeight))) {
 		// Close on clicking outside
 		close();
-	} else if (y < 0 && clickCount >= 2) {
+	}
+}
+
+void GridItemTray::handleMouseUp(int x, int y, int button, int clickCount) {
+	Dialog::handleMouseUp(x, y, button, clickCount);
+	if (y < 0 && clickCount >= 2) {
 		// Run on double clicking thumbnail
 		close();
 		sendCommand(kItemDoubleClickedCmd, _entryID);
@@ -295,14 +354,15 @@ void GridItemTray::handleMouseMoved(int x, int y, int button) {
 // Load an image file by String name, provide additional render dimensions for SVG images.
 // TODO: Add BMP support, and add scaling of non-vector images.
 Graphics::ManagedSurface *loadSurfaceFromFile(const Common::String &name, int renderWidth = 0, int renderHeight = 0) {
+	Common::Path path(name);
 	Graphics::ManagedSurface *surf = nullptr;
 	if (name.hasSuffix(".png")) {
 #ifdef USE_PNG
 		const Graphics::Surface *srcSurface = nullptr;
 		Image::PNGDecoder decoder;
 		g_gui.lockIconsSet();
-		if (g_gui.getIconsSet().hasFile(name)) {
-			Common::SeekableReadStream *stream = g_gui.getIconsSet().createReadStreamForMember(name);
+		if (g_gui.getIconsSet().hasFile(path)) {
+			Common::SeekableReadStream *stream = g_gui.getIconsSet().createReadStreamForMember(path);
 			if (!decoder.loadStream(*stream)) {
 				g_gui.unlockIconsSet();
 				warning("Error decoding PNG");
@@ -314,7 +374,8 @@ Graphics::ManagedSurface *loadSurfaceFromFile(const Common::String &name, int re
 			if (!srcSurface) {
 				warning("Failed to load surface : %s", name.c_str());
 			} else if (srcSurface->format.bytesPerPixel != 1) {
-				surf = new Graphics::ManagedSurface(srcSurface);
+				surf = new Graphics::ManagedSurface();
+				surf->copyFrom(*srcSurface);
 			}
 		} else {
 			debug(5, "GridWidget: Cannot read file '%s'", name.c_str());
@@ -325,16 +386,10 @@ Graphics::ManagedSurface *loadSurfaceFromFile(const Common::String &name, int re
 #endif
 	} else if (name.hasSuffix(".svg")) {
 		g_gui.lockIconsSet();
-		if (g_gui.getIconsSet().hasFile(name)) {
-			Common::SeekableReadStream *stream = g_gui.getIconsSet().createReadStreamForMember(name);
-			Graphics::SVGBitmap *image = nullptr;
-			image = new Graphics::SVGBitmap(stream);
-
+		if (g_gui.getIconsSet().hasFile(path)) {
+			Common::SeekableReadStream *stream = g_gui.getIconsSet().createReadStreamForMember(path);
+			surf = new Graphics::SVGBitmap(stream, renderWidth, renderHeight);
 			delete stream;
-
-			surf = new Graphics::ManagedSurface(renderWidth, renderHeight, *image->getPixelFormat());
-			image->render(*surf, renderWidth, renderHeight);
-			delete image;
 		} else {
 			debug(5, "GridWidget: Cannot read file '%s'", name.c_str());
 		}
@@ -356,10 +411,13 @@ GridWidget::GridWidget(GuiObject *boss, const Common::String &name)
 	_platformIconWidth = 0;
 	_extraIconHeight = 0;
 	_extraIconWidth = 0;
+	_disabledIconOverlay = nullptr;
+
 	_minGridXSpacing = 0;
 	_minGridYSpacing = 0;
 	_isTitlesVisible = 0;
 	_scrollBarWidth = 0;
+	_thumbnailMargin = 0;
 
 	_scrollWindowPaddingX = 0;
 	_scrollWindowPaddingY = 0;
@@ -394,11 +452,15 @@ GridWidget::~GridWidget() {
 	unloadSurfaces(_languageIcons);
 	unloadSurfaces(_extraIcons);
 	unloadSurfaces(_loadedSurfaces);
+	delete _disabledIconOverlay;
 	_gridItems.clear();
 	_dataEntryList.clear();
 	_headerEntryList.clear();
 	_sortedEntryList.clear();
 	_visibleEntryList.clear();
+	_platformIconsAlpha.clear();
+	_languageIconsAlpha.clear();
+	_extraIconsAlpha.clear();
 }
 
 template<typename T>
@@ -415,22 +477,29 @@ const Graphics::ManagedSurface *GridWidget::filenameToSurface(const Common::Stri
 	return _loadedSurfaces[name];
 }
 
-const Graphics::ManagedSurface *GridWidget::languageToSurface(Common::Language languageCode) {
+const Graphics::ManagedSurface *GridWidget::languageToSurface(Common::Language languageCode, Graphics::AlphaType &alphaType) {
 	if (languageCode == Common::UNK_LANG)
 		return nullptr;
+	alphaType = _languageIconsAlpha[languageCode];
 	return _languageIcons[languageCode];
 }
 
-const Graphics::ManagedSurface *GridWidget::platformToSurface(Common::Platform platformCode) {
+const Graphics::ManagedSurface *GridWidget::platformToSurface(Common::Platform platformCode, Graphics::AlphaType &alphaType) {
 	if (platformCode == Common::kPlatformUnknown)
 		return nullptr;
+	alphaType = _platformIconsAlpha[platformCode];
 	return _platformIcons[platformCode];
 }
 
-const Graphics::ManagedSurface *GridWidget::demoToSurface(const Common::String extraString) {
+const Graphics::ManagedSurface *GridWidget::demoToSurface(const Common::String &extraString, Graphics::AlphaType &alphaType) {
 	if (! extraString.contains("Demo") )
 		return nullptr;
+	alphaType = _extraIconsAlpha[0];
 	return _extraIcons[0];
+}
+
+const Graphics::ManagedSurface *GridWidget::disabledThumbnail() {
+	return _disabledIconOverlay;
 }
 
 void GridWidget::setEntryList(Common::Array<GridItemInfo> *list) {
@@ -548,15 +617,13 @@ void GridWidget::sortGroups() {
 	calcInnerHeight();
 	markGridAsInvalid();
 
-	_scrollBar->checkBounds(_scrollBar->_currentPos);
-	_scrollPos = _scrollBar->_currentPos;
+	scrollBarRecalc();
 
 	if (calcVisibleEntries()) {
 		reloadThumbnails();
 	}
 
 	assignEntriesToItems();
-	scrollBarRecalc();
 	// FIXME: Temporary solution to clear/display the background ofthe scrollbar when list
 	// grows too small or large during group toggle. We shouldn't have to redraw the top dialog,
 	// but not doing so the background of scrollbar isn't cleared.
@@ -631,6 +698,8 @@ void GridWidget::setGroupHeaderFormat(const Common::U32String &prefix, const Com
 }
 
 void GridWidget::reloadThumbnails() {
+	const int thumbnailWidth = MAX(_thumbnailWidth - 2 * _thumbnailMargin, 0);
+	const int thumbnailHeight = MAX(_thumbnailHeight - 2 * _thumbnailMargin, 0);
 	for (Common::Array<GridItemInfo *>::iterator iter = _visibleEntryList.begin(); iter != _visibleEntryList.end(); ++iter) {
 		GridItemInfo *entry = *iter;
 		if (entry->thumbPath.empty())
@@ -646,16 +715,22 @@ void GridWidget::reloadThumbnails() {
 					surf = loadSurfaceFromFile(path);
 				} else {
 					const Graphics::ManagedSurface *scSurf = _loadedSurfaces[path];
-					_loadedSurfaces[entry->thumbPath] = new Graphics::ManagedSurface(*scSurf);
+					// TODO: Use SharedPtr instead of duplicating the surface
+					Graphics::ManagedSurface *thSurf = new Graphics::ManagedSurface();
+					thSurf->copyFrom(*scSurf);
+					_loadedSurfaces[entry->thumbPath] = thSurf;
 				}
 			}
 
 			if (surf) {
-				const Graphics::ManagedSurface *scSurf(scaleGfx(surf, _thumbnailWidth, _thumbnailHeight, true));
+				const Graphics::ManagedSurface *scSurf(scaleGfx(surf, thumbnailWidth, thumbnailHeight, true));
 				_loadedSurfaces[entry->thumbPath] = scSurf;
 
 				if (path != entry->thumbPath) {
-					_loadedSurfaces[path] = new Graphics::ManagedSurface(*scSurf);
+					// TODO: Use SharedPtr instead of duplicating the surface
+					Graphics::ManagedSurface *thSurf = new Graphics::ManagedSurface();
+					thSurf->copyFrom(*scSurf);
+					_loadedSurfaces[path] = thSurf;
 				}
 
 				if (surf != scSurf) {
@@ -674,6 +749,7 @@ void GridWidget::loadFlagIcons() {
 		Graphics::ManagedSurface *gfx = loadSurfaceFromFile(path, _flagIconWidth, _flagIconHeight);
 		if (gfx) {
 			_languageIcons[l->id] = gfx;
+			_languageIconsAlpha[l->id] = gfx->detectAlpha();
 			continue;
 		} // if no .svg flag is available, search for a .png
 		path = Common::String::format("icons/flags/%s.png", l->code);
@@ -681,6 +757,7 @@ void GridWidget::loadFlagIcons() {
 		if (gfx) {
 			const Graphics::ManagedSurface *scGfx = scaleGfx(gfx, _flagIconWidth, _flagIconHeight, true);
 			_languageIcons[l->id] = scGfx;
+			_languageIconsAlpha[l->id] = gfx->detectAlpha();
 			if (gfx != scGfx) {
 				gfx->free();
 				delete gfx;
@@ -699,6 +776,7 @@ void GridWidget::loadPlatformIcons() {
 		if (gfx) {
 			const Graphics::ManagedSurface *scGfx = scaleGfx(gfx, _platformIconWidth, _platformIconHeight, true);
 			_platformIcons[l->id] = scGfx;
+			_platformIconsAlpha[l->id] = scGfx->detectAlpha();
 			if (gfx != scGfx) {
 				gfx->free();
 				delete gfx;
@@ -713,12 +791,14 @@ void GridWidget::loadExtraIcons() {  // for now only the demo icon is available
 	Graphics::ManagedSurface *gfx = loadSurfaceFromFile("icons/extra/demo.svg", _extraIconWidth, _extraIconHeight);
 	if (gfx) {
 		_extraIcons[0] = gfx;
+		_extraIconsAlpha[0] = gfx->detectAlpha();
 		return;
 	} // if no .svg file is available, search for a .png
 	gfx = loadSurfaceFromFile("icons/extra/demo.png");
 	if (gfx) {
 		const Graphics::ManagedSurface *scGfx = scaleGfx(gfx, _extraIconWidth, _extraIconHeight, true);
 		_extraIcons[0] = scGfx;
+		_extraIconsAlpha[0] = scGfx->detectAlpha();
 		if (gfx != scGfx) {
 			gfx->free();
 			delete gfx;
@@ -808,6 +888,41 @@ void GridWidget::assignEntriesToItems() {
 	}
 }
 
+int GridWidget::getItemPos(int item) {
+	int pos = 0;
+
+	for (uint i = 0; i < _sortedEntryList.size(); i++) {
+		if (_sortedEntryList[i]->entryID == item) {
+			return pos;
+		} else if (!_sortedEntryList[i]->isHeader) {
+			pos++;
+		}
+	}
+
+	return -1;
+}
+
+int GridWidget::getNewSel(int index) {
+	if (_sortedEntryList.size() == 0) {
+		return -1;
+	}
+
+	// Find the index-th item in the grid
+	for (uint i = 0; i < _sortedEntryList.size(); i++) {
+		if (index == 0 && _sortedEntryList[i]->isHeader == 0) {
+			return _sortedEntryList[i]->entryID;
+		} else if (_sortedEntryList[i]->isHeader == 0) {
+			index--;
+		}
+	}
+
+	if (index == 0) {
+		return _sortedEntryList[_sortedEntryList.size() - 1]->entryID;
+	} else {
+		return -1;
+	}
+}
+
 void GridWidget::handleMouseWheel(int x, int y, int direction) {
 	_scrollBar->handleMouseWheel(x, y, direction);
 	_scrollPos = _scrollBar->_currentPos;
@@ -860,8 +975,8 @@ void GridWidget::calcInnerHeight() {
 				}
 			}
 			x = _scrollWindowPaddingX;
-			_sortedEntryList[k]->x = x;;
-			_sortedEntryList[k]->y = y;;
+			_sortedEntryList[k]->x = x;
+			_sortedEntryList[k]->y = y;
 			x = _scrollWindowPaddingX + _gridXSpacing;
 			++row;
 			y += _sortedEntryList[k]->h + _gridYSpacing;
@@ -916,6 +1031,11 @@ void GridWidget::reflowLayout() {
 	Widget::reflowLayout();
 	destroyItems();
 
+	// Recompute thumbnail size
+	int oldThumbnailHeight = _thumbnailHeight;
+	int oldThumbnailWidth = _thumbnailWidth;
+	int oldThumbnailMargin = _thumbnailMargin;
+
 	_scrollWindowHeight = _h;
 	_scrollWindowWidth = _w;
 
@@ -925,14 +1045,11 @@ void GridWidget::reflowLayout() {
 	_minGridYSpacing = int(g_gui.xmlEval()->getVar("Globals.Grid.YSpacing") * g_gui.getScaleFactor() + .5f);
 	_isTitlesVisible = g_gui.xmlEval()->getVar("Globals.Grid.ShowTitles");
 	_scrollBarWidth = g_gui.xmlEval()->getVar("Globals.Scrollbar.Width", 0);
+	_thumbnailMargin = g_gui.xmlEval()->getVar("Globals.Grid.ThumbnailMargin", 0);
 
 	_scrollWindowPaddingX = _minGridXSpacing;
 	_scrollWindowPaddingY = _minGridYSpacing;
 	_gridYSpacing = _minGridYSpacing;
-
-	// Recompute thumbnail size
-	int oldThumbnailHeight = _thumbnailHeight;
-	int oldThumbnailWidth = _thumbnailWidth;
 
 	int availableWidth = _scrollWindowWidth - (2 * _scrollWindowPaddingX) - _scrollBarWidth;
 	_thumbnailWidth = availableWidth / _itemsPerRow - _minGridXSpacing;
@@ -949,15 +1066,26 @@ void GridWidget::reflowLayout() {
 	_extraIconWidth = _thumbnailWidth;
 	_extraIconHeight = _thumbnailHeight;
 
-	if ((oldThumbnailHeight != _thumbnailHeight) || (oldThumbnailWidth != _thumbnailWidth)) {
+	if ((oldThumbnailHeight != _thumbnailHeight) ||
+		(oldThumbnailWidth != _thumbnailWidth) ||
+		(oldThumbnailMargin != _thumbnailMargin)) {
 		unloadSurfaces(_extraIcons);
 		unloadSurfaces(_platformIcons);
 		unloadSurfaces(_languageIcons);
 		unloadSurfaces(_loadedSurfaces);
+		_platformIconsAlpha.clear();
+		_languageIconsAlpha.clear();
+		_extraIconsAlpha.clear();
+		delete _disabledIconOverlay;
 		reloadThumbnails();
 		loadFlagIcons();
 		loadPlatformIcons();
 		loadExtraIcons();
+
+		Graphics::ManagedSurface *gfx = new Graphics::ManagedSurface(_thumbnailWidth, _thumbnailHeight, g_system->getOverlayFormat());
+		uint32 disabledThumbnailColor = gfx->format.ARGBToColor(153, 0, 0, 0);  // 60% opacity black
+		gfx->fillRect(Common::Rect(0, 0, _thumbnailWidth, _thumbnailHeight), disabledThumbnailColor);
+		_disabledIconOverlay = gfx;
 	}
 
 	_trayHeight = kLineHeight * 3;
@@ -981,12 +1109,6 @@ void GridWidget::reflowLayout() {
 	}
 	scrollBarRecalc();
 	markAsDirty();
-}
-
-void GridWidget::openTray(int x, int y, int entryId) {
-	GridItemTray *tray = new GridItemTray(this, x - _gridXSpacing / 3, y, _gridItemWidth + 2 * (_gridXSpacing / 3), _trayHeight, entryId, this);
-	tray->runModal();
-	delete tray;
 }
 
 void GridWidget::openTrayAtSelected() {

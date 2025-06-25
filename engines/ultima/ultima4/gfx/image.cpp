@@ -36,18 +36,23 @@ Image::Image() : _surface(nullptr), _disposeAfterUse(DisposeAfterUse::NO),
 		_paletted(false) {
 }
 
-Image *Image::create(int w, int h, bool paletted, Image::Type type) {
+Image *Image::create(int w, int h) {
 	Image *im = new Image();
-	im->create(w, h, paletted);
+	im->createInternal(w, h, Graphics::PixelFormat::createFormatCLUT8());
 
 	return im;
 }
 
-void Image::create(int w, int h, bool paletted) {
-	_paletted = paletted;
-	_surface = new Graphics::ManagedSurface(w, h, paletted ?
-		Graphics::PixelFormat::createFormatCLUT8() :
-		Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0));
+Image *Image::create(int w, int h, const Graphics::PixelFormat &format) {
+	Image *im = new Image();
+	im->createInternal(w, h, format);
+
+	return im;
+}
+
+void Image::createInternal(int w, int h, const Graphics::PixelFormat &format) {
+	_paletted = format.isCLUT8();
+	_surface = new Graphics::ManagedSurface(w, h, format);
 	_disposeAfterUse = DisposeAfterUse::YES;
 }
 
@@ -64,12 +69,12 @@ Image *Image::createScreenImage() {
 	return screen;
 }
 
-Image *Image::duplicate(Image *image) {
+Image *Image::duplicate(Image *image, const Graphics::PixelFormat &format) {
 	bool alphaOn = image->isAlphaOn();
-	Image *im = create(image->width(), image->height(), false, HARDWARE);
+	Image *im = create(image->width(), image->height(), format);
 
-//    if (image->isIndexed())
-//        im->setPaletteFromImage(image);
+	if (im->isIndexed())
+		im->setPaletteFromImage(image);
 
 	/* Turn alpha off before blitting to non-screen surfaces */
 	if (alphaOn)
@@ -90,27 +95,17 @@ Image::~Image() {
 		delete _surface;
 }
 
-void Image::setPalette(const RGBA *colors, unsigned n_colors) {
+void Image::setPalette(const byte *colors, unsigned n_colors) {
 	assertMsg(_paletted, "imageSetPalette called on non-paletted image");
-
-	byte *pal = new byte[n_colors * 3];
-	byte *palP = pal;
-	for (unsigned i = 0; i < n_colors; i++, palP += 3) {
-		palP[0] = colors[i].r;
-		palP[1] = colors[i].g;
-		palP[2] = colors[i].b;
-	}
-
-	_surface->setPalette(pal, 0, n_colors);
-	delete[] pal;
+	_surface->setPalette(colors, 0, n_colors);
 }
 
 void Image::setPaletteFromImage(const Image *src) {
 	assertMsg(_paletted && src->_paletted, "imageSetPaletteFromImage called on non-indexed image");
 
-	uint8 srcPal[PALETTE_COUNT * 3];
-	src->_surface->grabPalette(srcPal, 0, PALETTE_COUNT);
-	_surface->setPalette(srcPal, 0, PALETTE_COUNT);
+	uint8 srcPal[Graphics::PALETTE_COUNT * 3];
+	src->_surface->grabPalette(srcPal, 0, Graphics::PALETTE_COUNT);
+	_surface->setPalette(srcPal, 0, Graphics::PALETTE_COUNT);
 }
 
 RGBA Image::getPaletteColor(int index) {
@@ -234,7 +229,7 @@ void Image::alphaOff() {
 
 void Image::putPixel(int x, int y, int r, int g, int b, int a) {
 	uint32 color = getColor(r, g, b, a);
-	putPixelIndex(x, y, color);
+	_surface->setPixel(x, y, color);
 }
 
 uint Image::getColor(byte r, byte g, byte b, byte a) {
@@ -299,11 +294,9 @@ void Image::performTransparencyHack(uint colorValue, uint numFrames,
 		}
 	}
 	int ox, oy;
-	for (Common::List<Common::Pair<uint, uint> >::iterator xy = opaqueXYs.begin();
-	        xy != opaqueXYs.end();
-	        ++xy) {
-		ox = xy->first;
-		oy = xy->second;
+	for (const auto &xy : opaqueXYs) {
+		ox = xy.first;
+		oy = xy.second;
 		int span = int(haloWidth);
 		int x_start = MAX(0, ox - span);
 		int x_finish = MIN(int(_surface->w), ox + span + 1);
@@ -332,28 +325,7 @@ void Image::setTransparentIndex(uint index) {
 }
 
 void Image::putPixelIndex(int x, int y, uint index) {
-	int bpp;
-	byte *p;
-
-	bpp = _surface->format.bytesPerPixel;
-	p = (byte *)_surface->getBasePtr(x, y);
-
-	switch (bpp) {
-	case 1:
-		*p = index;
-		break;
-
-	case 2:
-		*((uint16 *)p) = index;
-		break;
-
-	case 4:
-		*reinterpret_cast<uint32 *>(p) = index;
-		break;
-
-	default:
-		error("Unsupported format");
-	}
+	_surface->setPixel(x, y, index);
 }
 
 void Image::fillRect(int x, int y, int w, int h, int r, int g, int b, int a) {
@@ -365,7 +337,7 @@ void Image::getPixel(int x, int y, uint &r, uint &g, uint &b, uint &a) const {
 	uint index;
 	byte r1, g1, b1, a1;
 
-	getPixelIndex(x, y, index);
+	index = _surface->getPixel(x, y);
 
 	if (_surface->format.bytesPerPixel == 1) {
 		uint8 pal[1 * 3];
@@ -384,26 +356,7 @@ void Image::getPixel(int x, int y, uint &r, uint &g, uint &b, uint &a) const {
 }
 
 void Image::getPixelIndex(int x, int y, uint &index) const {
-	int bpp = _surface->format.bytesPerPixel;
-
-	byte *p = (byte *)_surface->getBasePtr(x, y);
-
-	switch (bpp) {
-	case 1:
-		index = *p;
-		break;
-
-	case 2:
-		index = *reinterpret_cast<uint16 *>(p);
-		break;
-
-	case 4:
-		index = *reinterpret_cast<uint32 *>(p);
-		break;
-
-	default:
-		error("Unsupported format");
-	}
+	index = _surface->getPixel(x, y);
 }
 
 Graphics::ManagedSurface *Image::getSurface(Image *d) const {

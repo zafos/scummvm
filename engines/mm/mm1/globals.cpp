@@ -19,10 +19,12 @@
  *
  */
 
+#include "common/engine_data.h"
 #include "engines/engine.h"
 #include "graphics/fonts/ttf.h"
 #include "mm/mm1/globals.h"
-#include "mm/shared/utils/engine_data.h"
+#include "mm/mm1/mm1.h"
+#include "mm/shared/utils/strings.h"
 #include "graphics/fontman.h"
 
 namespace MM {
@@ -36,13 +38,25 @@ Globals::Globals() {
 }
 
 Globals::~Globals() {
+	delete _monsters;
 	g_globals = nullptr;
+}
+
+void Globals::createBlankButton() {
+	// Get the Escape glyph we'll use as a base
+	Shared::Xeen::SpriteResource escSprite;
+	escSprite.load("esc.icn");
+	_blankButton.create(20, 20);
+	_blankButton.clear(255);
+	_blankButton.setTransparentColor(255);
+	escSprite.draw(&_blankButton, 0, Common::Point(0, 0));
+	_blankButton.fillRect(Common::Rect(2, 2, 18, 18), 0x9f);
 }
 
 bool Globals::load(bool isEnhanced) {
 	// Initialise engine data for the game
 	Common::U32String errMsg;
-	if (!load_engine_data("mm1", 1, 0, errMsg)) {
+	if (!Common::load_engine_data("mm.dat", "mm1", 1, 0, errMsg)) {
 		GUIErrorMessage(errMsg);
 		return false;
 	}
@@ -53,7 +67,8 @@ bool Globals::load(bool isEnhanced) {
 	if (!_font.load("font.bmp"))
 		return false;
 
-	if (!_monsters.load() || !_items.load())
+	_monsters = new Monsters();
+	if (!_monsters->load() || !_items.load())
 		return false;
 
 	// Load roster
@@ -64,6 +79,18 @@ bool Globals::load(bool isEnhanced) {
 		_confirmIcons.load("confirm.icn");
 		_globalSprites.load("global.icn");
 		_tileSprites.load("town.til");
+		_escSprites.load("esc.icn");
+
+		createBlankButton();
+
+		{
+			// Load the Xeen game screen background
+			Common::File f;
+			if (!f.open("back.raw"))
+				error("Could not load background");
+			_gameBackground.create(320, 200);
+			f.read(_gameBackground.getPixels(), 320 * 200);
+		}
 
 		{
 			Common::File f;
@@ -95,8 +122,37 @@ bool Globals::load(bool isEnhanced) {
 	return true;
 }
 
+Common::String Globals::operator[](const Common::String &name) const {
+	bool isMapStr = name.hasPrefix("maps.map");
+
+	if (g_engine->isEnhanced()) {
+		if (isMapStr) {
+			// Map strings support having alternate versions in Enhanced version
+			Common::String altName = Common::String::format("maps.emap%s",
+				name.c_str() + 8);
+			if (_strings.contains(altName))
+				return _strings[altName];
+		}
+
+		if (name.hasPrefix("dialogs.")) {
+			Common::String altName = Common::String::format("enh%s", name.c_str());
+			if (_strings.contains(altName))
+				return _strings[altName];
+		}
+	}
+
+	assert(_strings.contains(name));
+	Common::String result = _strings[name];
+
+	if (g_engine->isEnhanced() && name.hasPrefix("maps."))
+		result = searchAndReplace(result, "\n", " ");
+
+	return result;
+}
+
 void Globals::synchronize(Common::Serializer &s) {
 	s.syncAsByte(_startingTown);
+	s.syncAsByte(_minimapOn);
 
 	// Sync the state information
 	_party.synchronize(s);

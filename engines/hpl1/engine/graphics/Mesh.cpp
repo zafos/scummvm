@@ -367,7 +367,7 @@ void cMesh::CreateNodeBodies(iPhysicsBody **apRootBodyPtr, Common::Array<iPhysic
 			iCollideShape *pShape = CreateCollideShapeFromCollider(pColl, apPhysicsWorld);
 			vShapes.push_back(pShape);
 
-			/*cMatrixf mtxOffset = */pShape->GetOffset();
+			/*cMatrixf mtxOffset = */ pShape->GetOffset();
 			// Log("Created shape size: %s at %s. Mtx: %s\n",pShape->GetSize().ToString().c_str(),
 			//					pShape->GetOffset().GetTranslation().ToString().c_str(),
 			//					mtxOffset.ToString().c_str());
@@ -568,7 +568,7 @@ void cMesh::CreateJointsAndBodies(Common::Array<iPhysicsBody *> *apBodyVec, cMes
 					// if(pSubEntity->GetParent())
 					//	Log("Node parent: %s\n",static_cast<cNode3D*>(pSubEntity->GetParent())->GetName());
 
-					// The scale should allready been removed.
+					// The scale should already been removed.
 					/*cMatrixf mtxScale = cMath::MatrixScale(pSubMesh->GetModelScale());
 					mtxSub = cMath::MatrixMul(mtxSub, cMath::MatrixInverse(mtxScale));*/
 
@@ -693,6 +693,12 @@ int cMesh::GetColliderNum() {
 }
 
 iCollideShape *cMesh::CreateCollideShapeFromCollider(cMeshCollider *pCollider, iPhysicsWorld *apWorld) {
+	// WORKAROUND: Bug #14570: "HPL1: helmet stuck inside a locker"
+	// Collider creation and updating changed between the version of the Newton physics library we are using and the original version. The changes are probably in dgBody::UpdateCollisionMatrix
+	// (or in one of the functions called inside of it), called when at the creation of the helmet's PhysicsBodyNewton and after modifying the body's transformation matrix later in the loading process.
+	if (GetName() == "iron_mine_helmet.dae") {
+		return apWorld->CreateBoxShape(pCollider->mvSize - cVector3f(0.04f, 0.0f, 0.04f), &pCollider->m_mtxOffset);
+	}
 	switch (pCollider->mType) {
 	case eCollideShapeType_Box:
 		return apWorld->CreateBoxShape(pCollider->mvSize, &pCollider->m_mtxOffset);

@@ -59,22 +59,21 @@ extern KeyInput ags_keycode_from_scummvm(const Common::Event &event, bool old_ke
 extern bool ags_keyevent_ready();
 // Queries for the next key event in buffer; returns uninitialized data if none was queued
 extern Common::Event ags_get_next_keyevent();
-// Tells if the key is currently down, provided AGS key;
-// Returns positive value if it's down, 0 if it's not, negative value if the key code is not supported.
+// Tells if the key is currently down, provided AGS key.
 // NOTE: for particular script codes this function returns positive if either of two keys are down.
 extern int ags_iskeydown(eAGSKeyCode ags_key);
 // Simulates key press with the given AGS key
-extern void ags_simulate_keypress(eAGSKeyCode ags_key);
+extern void ags_simulate_keypress(eAGSKeyCode ags_key, bool old_keyhandle);
 
 
 // Mouse input handling
 //
 // Tells if the mouse button is currently down
 extern bool ags_misbuttondown(eAGSMouseButton but);
-// Returns mouse button code
+// Returns last "clicked" mouse button
 extern eAGSMouseButton ags_mgetbutton();
-// Returns recent relative mouse movement
-extern void ags_mouse_get_relxy(int &x, int &y);
+// Returns recent relative mouse movement; resets accumulated values
+extern void ags_mouse_acquire_relxy(int &x, int &y);
 // Updates mouse cursor position in game
 extern void ags_domouse();
 // Returns -1 for wheel down and +1 for wheel up

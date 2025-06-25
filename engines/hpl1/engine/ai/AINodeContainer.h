@@ -31,9 +31,9 @@
 #include "hpl1/engine/math/MathTypes.h"
 #include "hpl1/engine/system/SystemTypes.h"
 
-#include "hpl1/engine/physics/PhysicsWorld.h"
-#include "common/list.h"
 #include "common/array.h"
+#include "common/list.h"
+#include "hpl1/engine/physics/PhysicsWorld.h"
 
 namespace hpl {
 
@@ -92,7 +92,7 @@ typedef tAINodeVec::iterator tAINodeVecIt;
 typedef Common::List<cAINode *> tAINodeList;
 typedef tAINodeList::iterator tAINodeListIt;
 
-typedef Hpl1::Std::map<tString, cAINode *> tAINodeMap;
+typedef Common::StableMap<tString, cAINode *> tAINodeMap;
 typedef tAINodeMap::iterator tAINodeMapIt;
 
 //--------------------------------
@@ -252,8 +252,8 @@ public:
 	float GetMaxHeight() const { return mfMaxHeight; }
 
 	/**
-	 * When calculating if there is a free path between two nodes. Is the node postion the center of the collider.
-	 * If not the position is the feet postion.
+	 * When calculating if there is a free path between two nodes. Is the node position the center of the collider.
+	 * If not the position is the feet position.
 	 */
 	void SetNodeIsAtCenter(bool abX) { mbNodeIsAtCenter = abX; }
 	bool GetNodeIsAtCenter() { return mbNodeIsAtCenter; }
@@ -298,6 +298,6 @@ private:
 	float mfMaxHeight;
 };
 
-}     // namespace hpl
+} // namespace hpl
 
 #endif // HPL_AI_NODE_CONTAINER_H

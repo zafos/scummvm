@@ -55,7 +55,7 @@ Console::Console(WintermuteEngine *vm) : GUI::Debugger(), _engineRef(vm) {
 	registerCmd(TOP_CMD, WRAP_METHOD(Console, Cmd_Top));
 }
 
-Console::~Console(void) {
+Console::~Console() {
 }
 
 bool Console::Cmd_Help(int argc, const char **argv) {
@@ -99,7 +99,7 @@ void Console::printUsage(const Common::String &command) {
 	} else if (command.equals(SET_CMD)) {
 		debugPrintf("Usage: %s <name> = <value> to set <name> to <value>\n", command.c_str());
 	} else {
-		debugPrintf("No help about this command, sorry.");
+		debugPrintf("No help about this command, sorry.\n");
 	}
 }
 
@@ -259,13 +259,14 @@ bool Console::Cmd_List(int argc, const char **argv) {
 
 bool Console::Cmd_Print(int argc, const char **argv) {
 	if (argc == 2) {
-		Error error = Error(SUCCESS, OK, 0);
+		Error *error = nullptr;
 		Common::String temp = CONTROLLER->readValue(argv[1], &error);
-		if (error.getErrorLevel() == SUCCESS) {
+		if (error == nullptr) {
 			debugPrintf("%s = %s \n", argv[1], temp.c_str());
 			return true;
 		} else {
-			printError(argv[0], error);
+			printError(argv[0], *error);
+			delete error;
 			return true;
 		}
 	} else {
@@ -322,17 +323,14 @@ bool Console::Cmd_DumpFile(int argc, const char **argv) {
 	}
 
 	Common::DumpFile *outFile = new Common::DumpFile();
-	outFile->open(outFileName);
+	outFile->open(Common::Path(outFileName, Common::Path::kNativeSeparator));
 
-	byte *data = new byte[inFile->size()];
-	inFile->read(data, inFile->size());
-	outFile->write(data, inFile->size());
+	outFile->writeStream(inFile);
 	outFile->finalize();
 	outFile->close();
-	delete[] data;
 
 	delete outFile;
-	delete inFile;
+	fileManager->closeFile(inFile);
 
 	debugPrintf("Resource file '%s' dumped to file '%s'\n", argv[1], argv[2]);
 	return true;
@@ -343,8 +341,8 @@ bool Console::Cmd_SourcePath(int argc, const char **argv) {
 		debugPrintf("Usage: %s <source path>\n", argv[0]);
 		return true;
 	} else {
-		if (CONTROLLER->setSourcePath(Common::String(argv[1])).getErrorCode() == OK) {
-			debugPrintf("Source path set to '%s'\n", CONTROLLER->getSourcePath().c_str());
+		if (CONTROLLER->setSourcePath(Common::Path(argv[1], Common::Path::kNativeSeparator)).getErrorCode() == OK) {
+			debugPrintf("Source path set to '%s'\n", CONTROLLER->getSourcePath().toString(Common::Path::kNativeSeparator).c_str());
 		} else {
 			debugPrintf("Error setting source path. Note that \"\" is illegal.");
 		}

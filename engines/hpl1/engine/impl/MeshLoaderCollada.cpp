@@ -29,9 +29,9 @@
 
 #include "hpl1/engine/graphics/LowLevelGraphics.h"
 #include "hpl1/engine/graphics/VertexBuffer.h"
-#include "hpl1/engine/system/low_level_system.h"
 #include "hpl1/engine/system/String.h"
 #include "hpl1/engine/system/System.h"
+#include "hpl1/engine/system/low_level_system.h"
 
 #include "hpl1/engine/scene/ColliderEntity.h"
 #include "hpl1/engine/scene/Light3DPoint.h"
@@ -214,7 +214,7 @@ static cColladaNode *GetNodeFromController(const tString &asGeomId,
 				asGeomId.c_str(), sControlId.c_str());
 
 	if (sControlId == "") {
-		Warning("No controller refered to the geometry!\n");
+		Warning("No controller referred to the geometry!\n");
 		return NULL;
 	}
 
@@ -493,12 +493,12 @@ cMesh *cMeshLoaderCollada::LoadMesh(const tString &asFile, tMeshLoadFlag aFlags)
 					vOffset = vOffset * pNode->mvScale;
 					// Log("Centre is not a correct location! Offset: %s\n",vOffset.ToString().c_str());
 
-					// Local postion add
+					// Local position add
 					/*cMatrixf mtxTrans = cMath::MatrixTranslate(vOffset);
 					pCollider->m_mtxOffset = cMath::MatrixMul( pNode->m_mtxWorldTransform,
 																mtxTrans);*/
 
-					// World postion add
+					// World position add
 					pCollider->m_mtxOffset = pNode->m_mtxWorldTransform;
 					cVector3f vRotOffset = cMath::MatrixMul(pCollider->m_mtxOffset.GetRotation(),
 															vOffset);
@@ -929,7 +929,7 @@ cMesh *cMeshLoaderCollada::LoadMesh(const tString &asFile, tMeshLoadFlag aFlags)
 			if (pTrack == NULL)
 				continue;
 			if (pSkeleton) {
-				//cBone *pBone = pSkeleton->GetBoneByName(pTrack->GetName());
+				// cBone *pBone = pSkeleton->GetBoneByName(pTrack->GetName());
 				int lBoneIdx = pSkeleton->GetBoneIndexByName(pTrack->GetName());
 				pTrack->SetNodeIndex(lBoneIdx);
 			} else {
@@ -1089,7 +1089,7 @@ cAnimation *cMeshLoaderCollada::LoadAnimation(const tString &asFile) {
 			if (pTrack == NULL)
 				continue;
 			if (pSkeleton) {
-				//cBone *pBone = pSkeleton->GetBoneByName(pTrack->GetName());
+				// cBone *pBone = pSkeleton->GetBoneByName(pTrack->GetName());
 				int lBoneIdx = pSkeleton->GetBoneIndexByName(pTrack->GetName());
 				pTrack->SetNodeIndex(lBoneIdx);
 			} else {
@@ -1397,6 +1397,21 @@ cMeshEntity *cMeshLoaderCollada::CreateStaticMeshEntity(cColladaNode *apNode, cW
 			pVtxBuffer = CreateVertexBuffer(*apGeom, eVertexBufferUsageType_Static);
 			pVtxBuffer->Transform(apNode->m_mtxWorldTransform);
 		}
+		// WORKAROUND: Bug #14571: "HPL1: sliding door does not move"
+		// The original version of the Newton Dynamics library created incorrect colliders for the wall that allowed the door to move correctly.
+		// The newer version fixes that, tilting the door (which should slide upwards) forward, making it unable to move.
+		// Modifying the door collider did not solve the issue as the player would get partially blocked if they entered from the wrong direction.
+		// Position 22 is the y coordinate of the wall vertex that intersects the door, and the value is taken from another vertex position in the list.
+		if (apNode->msName == "room4_wall2") {
+			pVtxBuffer->GetArray(eVertexFlag_Position)[22] = -64.470757f;
+		}
+
+		// WORKAROUND: Bug #14572: "HPL1: crash after breaking the ice in level "Lake Utuqaq""
+		// The object below has an empty mesh that generates an invalid collider, which causes a crash when the Newton library
+		// tries to resolve a collision between the object and another physics body called "ice4_broken_pieceShape3".
+		if (apNode->msName == "Shape01") {
+			return nullptr;
+		}
 
 		iCollideShape *pShape = apWorld->GetPhysicsWorld()->CreateMeshShape(pVtxBuffer);
 		iPhysicsBody *pBody = apWorld->GetPhysicsWorld()->CreateBody(apNode->msName, pShape);
@@ -1407,6 +1422,7 @@ cMeshEntity *cMeshLoaderCollada::CreateStaticMeshEntity(cColladaNode *apNode, cW
 			// Log("Created body %s!\n",pBody->GetName().c_str());
 		} else {
 			Log("Body creation failed!\n");
+			return nullptr;
 		}
 
 		// Check if it blocks light
@@ -1753,7 +1769,7 @@ void cMeshLoaderCollada::AddSceneObjects(cColladaNode *apNode, cWorld3D *apWorld
 				Error("Too few params in billboard entity entity '%s'\n", apNode->msName.c_str());
 			} else {
 				cVector2f vSize(apNode->mvScale.x, apNode->mvScale.y);
-				//float fOffset = apNode->mvScale.z;
+				// float fOffset = apNode->mvScale.z;
 
 				tString sName = vParams[vParams.size() - 1];
 				tString sFile = "";
@@ -1804,7 +1820,7 @@ void cMeshLoaderCollada::AddSceneObjects(cColladaNode *apNode, cWorld3D *apWorld
 					sName = vParams[1];
 					sType = cString::Sub(apNode->msName, 4 + (int)sName.size() + 1);
 					pPS = apWorld->CreateParticleSystem(sName, sType, apNode->mvScale,
-																		   apNode->m_mtxWorldTransform);
+														apNode->m_mtxWorldTransform);
 
 					if (pPS == NULL) {
 						Error("Couldn't load particle system '%s' with type '%s'\n",

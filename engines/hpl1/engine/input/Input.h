@@ -28,25 +28,25 @@
 #ifndef HPL_INPUT_H
 #define HPL_INPUT_H
 
+#include "common/list.h"
 #include "hpl1/engine/game/Updateable.h"
 #include "hpl1/engine/input/InputTypes.h"
 #include "hpl1/engine/system/SystemTypes.h"
-#include "common/list.h"
-#include "hpl1/std/map.h"
-#include "hpl1/std/multimap.h"
+#include "common/stablemap.h"
+#include "common/multimap.h"
 
 namespace hpl {
 
-class iKeyboard;
-class iMouse;
-class iLowLevelInput;
+class Keyboard;
+class Mouse;
+class LowLevelInput;
 class iInputDevice;
 class iAction;
 
-typedef Hpl1::Std::map<tString, iAction *> tActionMap;
+typedef Common::StableMap<tString, iAction *> tActionMap;
 typedef tActionMap::iterator tActionMapIt;
 
-typedef Hpl1::Std::multimap<tString, iAction *> tActionMultiMap;
+typedef Common::MultiMap<tString, iAction *> tActionMultiMap;
 typedef tActionMultiMap::iterator tActionMultiMapIt;
 
 typedef Common::List<iInputDevice *> tInputDeviceList;
@@ -54,7 +54,7 @@ typedef tInputDeviceList::iterator tInputDeviceListIt;
 
 class cInput : public iUpdateable {
 public:
-	cInput(iLowLevelInput *apLowLevelInput);
+	cInput(LowLevelInput *apLowLevelInput);
 	~cInput();
 
 	/**
@@ -99,13 +99,13 @@ public:
 	 *
 	 * \return currently used keyboard
 	 */
-	iKeyboard *GetKeyboard();
+	Keyboard *GetKeyboard();
 
 	/**
 	 *
 	 * \return currently used mouse
 	 */
-	iMouse *GetMouse();
+	Mouse *GetMouse();
 
 	/**
 	 * Get action from map.
@@ -133,16 +133,16 @@ public:
 	 */
 	iAction *InputToAction(const tString &asName);
 
-	iLowLevelInput *GetLowLevel() { return mpLowLevelInput; }
+	LowLevelInput *GetLowLevel() { return mpLowLevelInput; }
 
 private:
 	tActionMap m_mapActions;
 	tInputDeviceList mlstInputDevices;
 
-	iLowLevelInput *mpLowLevelInput;
+	LowLevelInput *mpLowLevelInput;
 
-	iMouse *mpMouse;
-	iKeyboard *mpKeyboard;
+	Mouse *mpMouse;
+	Keyboard *mpKeyboard;
 };
 } // namespace hpl
 

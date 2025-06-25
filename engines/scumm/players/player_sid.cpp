@@ -19,12 +19,12 @@
  *
  */
 
-#ifndef DISABLE_SID
-
 #include "engines/engine.h"
 #include "scumm/players/player_sid.h"
 #include "scumm/scumm.h"
 #include "audio/mixer.h"
+
+#ifdef USE_SID_AUDIO
 
 namespace Scumm {
 
@@ -1007,6 +1007,7 @@ void Player_SID::releaseResourceBySound(int resID) { // $5088
 
 void Player_SID::readVec6Data(int x, int *offset, uint8 *songFilePtr, int chanResID) { // $4E99
 	//vec5[x] = songFilePtr;
+	assert(x < ARRAYSIZE(vec6));
 	vec6[x] = songFilePtr[*offset];
 	*offset += 2;
 	_soundQueue[x] = chanResID;
@@ -1380,4 +1381,4 @@ int Player_SID::getMusicTimer() {
 
 } // End of namespace Scumm
 
-#endif
+#endif // USE_SID_AUDIO

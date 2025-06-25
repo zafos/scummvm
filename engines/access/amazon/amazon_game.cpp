@@ -473,7 +473,7 @@ void AmazonEngine::drawHelpText(const Common::String &msg) {
 	_events->showCursor();
 }
 
-void AmazonEngine::drawHelp(const Common::String str) {
+void AmazonEngine::drawHelp(const Common::String &str) {
 	_events->hideCursor();
 	if (_useItem == 0) {
 		_buffer2.copyBuffer(_screen);
@@ -665,6 +665,9 @@ void AmazonEngine::startChapter(int chapter) {
 			_scripts->cmdRetPos();
 		}
 	}
+
+	delete _establish;
+	_establish = nullptr;
 }
 
 

@@ -20,7 +20,6 @@
  */
 
 #include "common/language.h"
-#include "common/gui_options.h"
 #include "common/str.h"
 #include "common/algorithm.h"
 
@@ -54,6 +53,7 @@ namespace Common {
 
 const LanguageDescription g_languages[] = {
 	{ "ar",    "ar", "Arabic", AR_ARB }, // Modern Standard Arabic
+	{ "bg", "bg_BG", "Bulgarian", BG_BUL },
 	{ "ca", "ca_ES", "Catalan", CA_ESP },
 	{ "zh",    "zh", "Chinese", ZH_ANY }, // Generic Chinese (when only one game version exist)
 	{ "cn", "zh_CN", "Chinese (Simplified)", ZH_CHN },
@@ -76,6 +76,7 @@ const LanguageDescription g_languages[] = {
 	{ "it", "it_IT", "Italian", IT_ITA },
 	{ "ja", "ja_JP", "Japanese", JA_JPN },
 	{ "ko", "ko_KR", "Korean", KO_KOR },
+	{ "lt", "lt_LT", "Lithuanian", LT_LTU },
 	{ "lv", "lv_LV", "Latvian", LV_LVA },
 	{ "nb", "nb_NO", "Norwegian (Bokm\xC3\xA5l)", NB_NOR },
 	{ "fa", "fa_IR", "Persian", FA_IRN },
@@ -86,10 +87,12 @@ const LanguageDescription g_languages[] = {
 	{ "sr", "sr_RS", "Serbian", SR_SRB },
 	{ "sk", "sk_SK", "Slovak", SK_SVK },
 	{ "es", "es_ES", "Spanish", ES_ESP },
-	{ "se", "sv_SE", "Swedish", SE_SWE },
+	{ "eu", "eu_ES", "Basque", EU_ESP },
+	{ "sv", "sv_SE", "Swedish", SV_SWE },
 	{ "tr", "tr_TR", "Turkish", TR_TUR },
 	{ "uk", "uk_UA", "Ukrainian", UA_UKR },
 	{ nullptr, nullptr, nullptr, UNK_LANG }
+	// Note: if fixing a value here, adjust g_obsoleteLanguages below
 };
 
 const LanguageDescription g_obsoleteLanguages[] = {
@@ -99,6 +102,7 @@ const LanguageDescription g_obsoleteLanguages[] = {
 	{	 "jp", "ja_JP", "Japanese", JA_JPN },
 	{	 "kr", "ko_KR", "Korean", KO_KOR },
 	{	 "nz",    "zh", "Chinese", ZH_ANY },
+	{	 "se", "sv_SE", "Swedish", SV_SWE },
 	{ "zh-cn", "zh_CN", "Chinese (Simplified)", ZH_CHN },
 	{ nullptr, nullptr, nullptr, UNK_LANG }
 };
@@ -185,9 +189,9 @@ List<String> getLanguageList() {
 	for (const LanguageDescription *l = g_languages; l->code; ++l)
 		list.push_back(l->code);
 
-	 Common::sort(list.begin(), list.end());
+	Common::sort(list.begin(), list.end());
 
-	 return list;
+	return list;
 }
 
 } // End of namespace Common

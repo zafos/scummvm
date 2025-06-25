@@ -23,6 +23,7 @@
  *
  * USED IN:
  * Gahan Wilson's Ultimate Haunted House
+ * Wellen, Wracks und Wassermaenner
  *
  *************************************/
 
@@ -43,29 +44,30 @@
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/jwxini.h"
-
 
 namespace Director {
 
-const char *JourneyWareXINIXObj::xlibName = "INI";
-const char *JourneyWareXINIXObj::fileNames[] = {
-   "JWXINI",
-   nullptr
+const char *const JourneyWareXINIXObj::xlibName = "INI";
+const XlibFileDesc JourneyWareXINIXObj::fileNames[] = {
+	{ "JWXINI",	nullptr },
+	{ "INI",	"www" },	// "Wellen, Wracks und Wassermaenner" names it INI.DLL
+	{ nullptr,	nullptr },
 };
 
-static MethodProto xlibMethods[] = {
-    { "new",						JourneyWareXINIXObj::m_new,							0,	0,	400 },	// D4
-    { "GetPrivateProfileInt",		JourneyWareXINIXObj::m_GetPrivateProfileInt,		4,	4,	400 },	// D4
-    { "GetPrivateProfileString", 	JourneyWareXINIXObj::m_GetPrivateProfileString,		5,	5,	400 },	// D4
-    { "GetProfileInt",				JourneyWareXINIXObj::m_GetProfileInt,				3,	3,	400 },	// D4
-	{ "GetProfileString", 			JourneyWareXINIXObj::m_GetProfileString,			4,	4,	400 },	// D4
-	{ "WritePrivateProfileString", 	JourneyWareXINIXObj::m_WritePrivateProfileString,	4,	4,	400 },	// D4
-	{ "WriteProfileString", 		JourneyWareXINIXObj::m_WriteProfileString,			3,	3,	400 },	// D4
-    { nullptr, nullptr, 0, 0, 0 }
+static const MethodProto xlibMethods[] = {
+	{"new", 						JourneyWareXINIXObj::m_new, 0, 0, 400}, // D4
+	{"GetPrivateProfileInt", 		JourneyWareXINIXObj::m_GetPrivateProfileInt, 4, 4, 400}, // D4
+	{"GetPrivateProfileString", 	JourneyWareXINIXObj::m_GetPrivateProfileString, 5, 5, 400}, // D4
+	{"GetProfileInt", 				JourneyWareXINIXObj::m_GetProfileInt, 3, 3, 400}, // D4
+	{"GetProfileString", 			JourneyWareXINIXObj::m_GetProfileString, 4, 4, 400}, // D4
+	{"WritePrivateProfileString", 	JourneyWareXINIXObj::m_WritePrivateProfileString, 4, 4, 400}, // D4
+	{"WriteProfileString", 			JourneyWareXINIXObj::m_WriteProfileString, 3, 3, 400}, // D4
+	{nullptr, nullptr, 0, 0, 0}
 };
 
-void JourneyWareXINIXObj::open(int type) {
+void JourneyWareXINIXObj::open(ObjectType type, const Common::Path &path) {
    if (type == kXObj) {
 	   JourneyWareXINIXObject::initMethods(xlibMethods);
 	   JourneyWareXINIXObject *xobj = new JourneyWareXINIXObject(kXObj);
@@ -73,21 +75,20 @@ void JourneyWareXINIXObj::open(int type) {
    }
 }
 
-void JourneyWareXINIXObj::close(int type) {
+void JourneyWareXINIXObj::close(ObjectType type) {
    if (type == kXObj) {
 	   JourneyWareXINIXObject::cleanupMethods();
 	   g_lingo->_globalvars[xlibName] = Datum();
    }
 }
 
-
-JourneyWareXINIXObject::JourneyWareXINIXObject(ObjectType ObjectType) :Object<JourneyWareXINIXObject>("JourneyWareXINIXObj") {
+JourneyWareXINIXObject::JourneyWareXINIXObject(ObjectType ObjectType) :Object<JourneyWareXINIXObject>("INI") {
    _objType = ObjectType;
 }
 
 void JourneyWareXINIXObj::m_new(int nargs) {
-   g_lingo->printSTUBWithArglist("JWXIni::new", nargs);
-   g_lingo->push(g_lingo->_state->me);
+	g_lingo->printSTUBWithArglist("JWXIni::new", nargs);
+	g_lingo->push(g_lingo->_state->me);
 }
 
 void JourneyWareXINIXObj::m_GetPrivateProfileInt(int nargs) {
@@ -126,17 +127,7 @@ void JourneyWareXINIXObj::m_GetProfileString(int nargs) {
 	g_lingo->push(Datum(defaultValue)); // TODO: We only return the default for now
 }
 
-void JourneyWareXINIXObj::m_WritePrivateProfileString(int nargs) {
-	g_lingo->printSTUBWithArglist("JWXIni::WritePrivateProfileString", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0)); // TODO
-}
-
-void JourneyWareXINIXObj::m_WriteProfileString(int nargs) {
-	g_lingo->printSTUBWithArglist("JWXIni::WriteProfileString", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum(0)); // TODO
-}
-
+XOBJSTUB(JourneyWareXINIXObj::m_WritePrivateProfileString, 0)
+XOBJSTUB(JourneyWareXINIXObj::m_WriteProfileString, 0)
 
 } // End of namespace Director

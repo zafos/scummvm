@@ -31,7 +31,8 @@
 #include "ultima/ultima8/usecode/intrinsics.h"
 #include "ultima/ultima8/misc/common_types.h"
 #include "ultima/ultima8/games/game_info.h"
-#include "ultima/ultima8/graphics/render_surface.h"
+#include "ultima/ultima8/gfx/render_surface.h"
+#include "ultima/ultima8/metaengine.h"
 #include "ultima/detection.h"
 
 namespace Ultima {
@@ -55,7 +56,6 @@ class Mouse;
 class AvatarMoverProcess;
 class Texture;
 class AudioMixer;
-class FileSystem;
 class ConfigFileManager;
 struct GameInfo;
 
@@ -75,7 +75,6 @@ private:
 	const UltimaGameDescription *_gameDescription;
 
 	// minimal system
-	FileSystem *_fileSystem;
 	ConfigFileManager *_configFileMan;
 
 	static Ultima8Engine *_instance;
@@ -105,7 +104,7 @@ private:
 	InverterGump *_inverterGump;
 	AvatarMoverProcess *_avatarMoverProcess;
 
-	// Various dependancy flags
+	// Various dependency flags
 	// Timing stuff
 	int32 _lerpFactor;       //!< Interpolation factor for this frame (0-256)
 	bool _inBetweenFrame;    //!< Set true if we are doing an inbetween frame
@@ -121,8 +120,8 @@ private:
 
 	bool _avatarInStasis;    //!< If this is set to true, Avatar can't move,
 	//!< nor can Avatar start more usecode
-	bool _paintEditorItems;  //!< If true, paint items with the SI_EDITOR flag
-	bool _showTouching;          //!< If true, highlight items touching Avatar
+	bool _showEditorItems;   //!< If true, paint items with the SI_EDITOR flag
+	bool _showTouching;      //!< If true, highlight items touching Avatar
 	int32 _timeOffset;
 	bool _hasCheated;
 	bool _cheatsEnabled;
@@ -132,16 +131,10 @@ private:
 	bool _cruStasis; //!< A slightly different kind of stasis for Crusader that stops some keyboard events
 private:
 	/**
-	 * Does engine deinitialization
-	 */
-	void deinitialize();
-
-	/**
 	 * Shows the Pentagram splash screen
 	 */
 	void showSplashScreen();
 
-private:
 	//! write savegame info (time, ..., game-specifics)
 	void writeSaveInfo(Common::WriteStream *ws);
 
@@ -160,9 +153,6 @@ private:
 	//! Does a Full reset of the Engine (including shutting down Video)
 //	void fullReset();
 
-	// called depending upon command line arguments
-	void GraphicSysInit(); // starts/restarts the graphics subsystem
-
 	void handleDelayedEvents();
 
 	bool pollEvent(Common::Event &event);
@@ -170,18 +160,16 @@ protected:
 	// Engine APIs
 	Common::Error run() override;
 
-	bool initialize();
+	Common::Error initialize();
+	void deinitialize();
 
 	void pauseEngineIntern(bool pause) override;
-
-	/**
-	 * Returns the data archive folder and version that's required
-	 */
-	bool isDataRequired(Common::String &folder, int &majorVersion, int &minorVersion);
 
 public:
 	Ultima8Engine(OSystem *syst, const Ultima::UltimaGameDescription *gameDesc);
 	~Ultima8Engine() override;
+
+	void initializePath(const Common::FSNode &gamePath) override;
 
 	static Ultima8Engine *get_instance() {
 		return _instance;
@@ -190,9 +178,6 @@ public:
 	bool hasFeature(EngineFeature f) const override;
 
 	Common::Language getLanguage() const;
-
-	Common::Error startup();
-	void shutdown();
 
 	bool setupGame();
 	Common::Error startupGame();
@@ -212,6 +197,9 @@ public:
 
 	Common::Error runGame();
 	virtual void handleEvent(const Common::Event &event);
+
+	void handleActionDown(KeybindingAction action);
+	void handleActionUp(KeybindingAction action);
 
 	void paint();
 
@@ -248,20 +236,18 @@ public:
 	bool isAvatarInStasis() const {
 		return _avatarInStasis;
 	}
-	void toggleAvatarInStasis() {
-		_avatarInStasis = !_avatarInStasis;
+	bool isAvatarControlled() const;
+	bool isShowEditorItems() const {
+		return _showEditorItems;
 	}
-	bool isPaintEditorItems() const {
-		return _paintEditorItems;
-	}
-	void togglePaintEditorItems() {
-		_paintEditorItems = !_paintEditorItems;
+	void setShowEditorItems(bool flag) {
+		_showEditorItems = flag;
 	}
 	bool isShowTouchingItems() const {
 		return _showTouching;
 	}
-	void toggleShowTouchingItems() {
-		_showTouching = !_showTouching;
+	void setShowTouchingItems(bool flag) {
+		_showTouching = flag;
 	}
 
 	bool isCrusaderTeleporting() const {
@@ -320,12 +306,12 @@ public:
 	/**
 	 * Returns true if a savegame can be loaded
 	 */
-	bool canLoadGameStateCurrently() override { return true; }
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override { return true; }
 
 	/**
 	 * Returns true if the game can be saved
 	 */
-	bool canSaveGameStateCurrently() override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	/**
 	 * Load a game

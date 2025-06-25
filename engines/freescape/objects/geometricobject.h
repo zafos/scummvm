@@ -26,6 +26,7 @@
 #define FREESCAPE_GEOMETRICOBJECT_H
 
 #include "freescape/language/instruction.h"
+#include "freescape/objects/group.h"
 #include "freescape/objects/object.h"
 
 namespace Freescape {
@@ -44,26 +45,34 @@ public:
 		const Math::Vector3d &origin,
 		const Math::Vector3d &size,
 		Common::Array<uint8> *colours,
-		Common::Array<uint16> *ordinates,
+		Common::Array<uint8> *ecolours,
+		Common::Array<float> *ordinates,
 		FCLInstructionVector conditionInstructions,
 		Common::String conditionSource = "");
 	virtual ~GeometricObject();
 	void setOrigin(Math::Vector3d origin) override;
+	void offsetOrigin(Math::Vector3d origin_);
+	void restoreOrdinates();
 
 	Object *duplicate() override;
 	void scale(int factor) override;
 	void computeBoundingBox();
 	bool collides(const Math::AABB &boundingBox);
-	void draw(Freescape::Renderer *gfx) override;
+	void draw(Freescape::Renderer *gfx, float offset = 0.0) override;
 	bool isDrawable() override;
 	bool isPlanar() override;
+	bool _cyclingColors;
+
+	bool isLineButNotStraight();
 
 	Common::String _conditionSource;
 	FCLInstructionVector _condition;
 
 private:
 	Common::Array<uint8> *_colours;
-	Common::Array<uint16> *_ordinates;
+	Common::Array<uint8> *_ecolours;
+	Common::Array<float> *_ordinates;
+	Common::Array<float> *_initialOrdinates;
 };
 
 } // End of namespace Freescape

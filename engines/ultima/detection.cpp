@@ -33,7 +33,7 @@ static const PlainGameDescriptor ULTIMA_GAMES[] = {
 #ifndef RELEASE_BUILD
 	{ "ultima1", "Ultima I: The First Age of Darkness" }, 
 #endif
-	{ "ultima4", "Ultima IV:  Quest of the Avatar" },
+	{ "ultima4", "Ultima IV: Quest of the Avatar" },
 	{ "ultima4_enh", "Ultima IV: Quest of the Avatar - Enhanced" },
 	{ "ultima6", "Ultima VI: The False Prophet" },
 	{ "ultima6_enh", "Ultima VI: The False Prophet - Enhanced" },
@@ -57,14 +57,16 @@ const DebugChannelDef UltimaMetaEngineDetection::debugFlagList[] = {
 	{Ultima::kDebugActor, "Actor", "Actor debug level"},
 	{Ultima::kDebugObject, "Object", "Object debug level"},
 	{Ultima::kDebugCollision, "Collision", "Collision debug level"},
+	{Ultima::kDebugImGui, "imgui", "Imgui debug output"},
 	DEBUG_CHANNEL_END
 };
 
 UltimaMetaEngineDetection::UltimaMetaEngineDetection() : AdvancedMetaEngineDetection(Ultima::GAME_DESCRIPTIONS,
-	        sizeof(Ultima::UltimaGameDescription), Ultima::ULTIMA_GAMES) {
+	        Ultima::ULTIMA_GAMES) {
 	static const char *const DIRECTORY_GLOBS[2] = { "usecode", 0 };
 	_maxScanDepth = 2;
 	_directoryGlobs = DIRECTORY_GLOBS;
+	_flags = kADFlagMatchFullPaths;
 }
 
 REGISTER_PLUGIN_STATIC(ULTIMA_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, UltimaMetaEngineDetection);

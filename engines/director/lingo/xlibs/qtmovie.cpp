@@ -25,40 +25,39 @@
  * L-Zone (Mac II)
  *
  *************************************/
+
 /*
-  QTMovie OpenMovie, windowType, fileName, location, options...
-*/
+ * QTMovie OpenMovie, windowType, fileName, location, options...
+ */
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/qtmovie.h"
 
 
 namespace Director {
 
-const char *QTMovie::xlibName = "QTMovie";
-const char *QTMovie::fileNames[] = {
-	"QTMovie",
-	nullptr
+const char *const QTMovie::xlibName = "QTMovie";
+const XlibFileDesc QTMovie::fileNames[] = {
+	{ "QTMovie",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static BuiltinProto builtins[] = {
+static const BuiltinProto builtins[] = {
 	{ "QTMovie", QTMovie::m_qtmovie, 3, 6, 300, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
-void QTMovie::open(int type) {
+void QTMovie::open(ObjectType type, const Common::Path &path) {
 	g_lingo->initBuiltIns(builtins);
 }
 
-void QTMovie::close(int type) {
+void QTMovie::close(ObjectType type) {
 	g_lingo->cleanupBuiltIns(builtins);
 }
 
-void QTMovie::m_qtmovie(int nargs) {
-	g_lingo->printSTUBWithArglist("QTMovie::m_qtmovie", nargs);
-	g_lingo->dropStack(nargs);
-}
+XOBJSTUBNR(QTMovie::m_qtmovie)
 
 } // End of namespace Director

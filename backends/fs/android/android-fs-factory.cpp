@@ -19,8 +19,6 @@
  *
  */
 
-#if defined(__ANDROID__)
-
 #include "backends/platform/android/jni-android.h"
 
 #include "backends/fs/android/android-fs-factory.h"
@@ -53,10 +51,14 @@ AbstractFSNode *AndroidFilesystemFactory::makeFileNodePath(const Common::String 
 		return makeRootFileNode();
 	}
 
-	// No need to take SAF add mode here as it's called only for paths and we won't accept /saf path to make a new SAF
-
 	// If SAF works, it was a SAF URL
 	if (_withSAF) {
+		// Accept /saf as it can be used to create the tree in DumpFile
+		if (path == AddSAFFakeNode::SAF_ADD_FAKE_PATH) {
+			// Not a SAF mount point
+			return new AddSAFFakeNode(true);
+		}
+
 		AbstractFSNode *node = AndroidSAFFilesystemNode::makeFromPath(path);
 		if (node) {
 			return node;
@@ -90,7 +92,7 @@ void AndroidFilesystemFactory::getSAFTrees(AbstractFSList &list, bool allowSAFad
 	}
 
 	if (allowSAFadd) {
-		list.push_back(new AddSAFFakeNode());
+		list.push_back(new AddSAFFakeNode(false));
 	}
 
 }
@@ -127,5 +129,3 @@ bool AndroidFilesystemFactory::Config::isDrive(const Common::String &path) const
 	}
 	return false;
 }
-
-#endif

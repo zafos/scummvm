@@ -23,6 +23,7 @@
 #include "mm/mm1/views_enh/game.h"
 #include "mm/mm1/globals.h"
 #include "mm/mm1/metaengine.h"
+#include "mm/mm1/mm1.h"
 
 namespace MM {
 namespace MM1 {
@@ -31,16 +32,8 @@ namespace ViewsEnh {
 Game::Game() : TextView("Game"),
 		_view(this),
 		_commands(this),
-		_messages(this),
 		_party(this) {
 	_view.setBounds(Common::Rect(8, 15, 224, 130));
-
-	// Load the Xeen background
-	Common::File f;
-	if (!f.open("back.raw"))
-		error("Could not load background");
-	_bg.create(320, 200);
-	f.read(_bg.getPixels(), 320 * 200);
 }
 
 bool Game::msgFocus(const FocusMessage &msg) {
@@ -54,23 +47,63 @@ bool Game::msgUnfocus(const UnfocusMessage &msg) {
 }
 
 void Game::draw() {
-	if (_needsRedraw) {
-		Graphics::ManagedSurface s = getSurface();
-		s.blitFrom(_bg);
-	}
+	Graphics::ManagedSurface s = getSurface();
+	s.blitFrom(g_globals->_gameBackground);
 
 	UIElement::draw();
 }
 
 bool Game::msgKeypress(const KeypressMessage &msg) {
+	switch (msg.keycode) {
+	case Common::KEYCODE_F5:
+		if (g_engine->canSaveGameStateCurrently())
+			g_engine->saveGameDialog();
+		break;
+	case Common::KEYCODE_F7:
+		if (g_engine->canLoadGameStateCurrently())
+			g_engine->loadGameDialog();
+		break;
+	default:
+		break;
+	}
+
 	return true;
 }
 
 bool Game::msgAction(const ActionMessage &msg) {
 	switch (msg._action) {
+	case KEYBIND_BASH:
+		send("Bash", GameMessage("SHOW"));
+		break;
+	case KEYBIND_MAP:
+		if (g_maps->_currentMap->mappingAllowed())
+			addView("MapPopup");
+		else
+			send(InfoMessage(STRING["enhdialogs.map.disabled"]));
+		return true;
+	case KEYBIND_MENU:
+		g_engine->openMainMenuDialog();
+		return true;
+	case KEYBIND_PROTECT:
+		addView("Protect");
+		return true;
+	case KEYBIND_QUICKREF:
+		addView("QuickRef");
+		return true;
+	case KEYBIND_REST:
+		addView("Rest");
+		return true;
+	case KEYBIND_SEARCH:
+		send("Search", GameMessage("SHOW"));
+		break;
 	case KEYBIND_SPELL:
 		addView("CastSpell");
 		return true;
+	case KEYBIND_UNLOCK:
+		send("Unlock", GameMessage("SHOW"));
+		break;
+	//case KEYBIND_ORDER:
+	// Enhanced mode uses Exchange button from Char Info view
 	default:
 		break;
 	}

@@ -32,7 +32,7 @@
 
 #include "hpl1/engine/gui/GuiTypes.h"
 #include "hpl1/engine/system/SystemTypes.h"
-#include "hpl1/std/map.h"
+#include "common/stablemap.h"
 
 namespace hpl {
 
@@ -49,23 +49,23 @@ class iGuiMaterial;
 
 //------------------------------------------------
 
-typedef Hpl1::Std::map<tString, cGuiSet *> tGuiSetMap;
+typedef Common::StableMap<tString, cGuiSet *> tGuiSetMap;
 typedef tGuiSetMap::iterator tGuiSetMapIt;
 
 //-------------------------------------
 
-typedef Hpl1::Std::map<tString, cGuiSkin *> tGuiSkinMap;
+typedef Common::StableMap<tString, cGuiSkin *> tGuiSkinMap;
 typedef tGuiSkinMap::iterator tGuiSkinMapIt;
 
 //-------------------------------------
 
-typedef Hpl1::Std::map<tString, eGuiSkinGfx> tGuiSkinGfxMap;
+typedef Common::StableMap<tString, eGuiSkinGfx> tGuiSkinGfxMap;
 typedef tGuiSkinGfxMap::iterator tGuiSkinGfxMapIt;
 
-typedef Hpl1::Std::map<tString, eGuiSkinFont> tGuiSkinFontMap;
+typedef Common::StableMap<tString, eGuiSkinFont> tGuiSkinFontMap;
 typedef tGuiSkinFontMap::iterator tGuiSkinFontMapIt;
 
-typedef Hpl1::Std::map<tString, eGuiSkinAttribute> tGuiSkinAttributeMap;
+typedef Common::StableMap<tString, eGuiSkinAttribute> tGuiSkinAttributeMap;
 typedef tGuiSkinAttributeMap::iterator tGuiSkinAttributeMapIt;
 
 //------------------------------------------------
@@ -128,7 +128,7 @@ public:
 	bool SendMouseClickUp(eGuiMouseButton aButton);
 	bool SendMouseDoubleClick(eGuiMouseButton aButton);
 
-	bool SendKeyPress(const cKeyPress &keyPress);
+	bool SendKeyPress(Common::KeyState keyPress);
 
 	// bool SentArrowKey(eGuiArrowKey aDir);
 
@@ -160,6 +160,6 @@ private:
 	unsigned long mlLastRenderTime;
 };
 
-}     // namespace hpl
+} // namespace hpl
 
 #endif // HPL_GUI_H

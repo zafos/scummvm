@@ -20,14 +20,18 @@
  */
 
 #include "director/director.h"
+#include "director/debugger.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-code.h"
 #include "director/lingo/lingo-object.h"
 #include "director/cast.h"
-#include "director/movie.h"
+#include "director/castmember/castmember.h"
+#include "director/channel.h"
 #include "director/frame.h"
+#include "director/movie.h"
 #include "director/score.h"
 #include "director/sprite.h"
+#include "director/types.h"
 #include "director/window.h"
 
 namespace Director {
@@ -51,19 +55,20 @@ struct EventHandlerType {
 	{ kEventStepFrame,			"stepFrame"},
 	{ kEventExitFrame,			"exitFrame" },			//			D4
 
-	{ kEventActivateWindow,		"activateWindow" },
-	{ kEventDeactivateWindow,	"deactivateWindow" },
-	{ kEventMoveWindow,			"moveWindow" },
-	{ kEventResizeWindow,		"resizeWindow" },
-	{ kEventOpenWindow,			"openWindow" },
-	{ kEventCloseWindow,		"closeWindow" },
+	{ kEventActivateWindow,		"activateWindow" },		//				D5
+	{ kEventDeactivateWindow,	"deactivateWindow" },	//				D5
+	{ kEventMoveWindow,			"moveWindow" },			//				D5
+	{ kEventResizeWindow,		"resizeWindow" },		//				D5
+	{ kEventOpenWindow,			"openWindow" },			//				D5
+	{ kEventCloseWindow,		"closeWindow" },		//				D5
+	{ kEventZoomWindow,			"zoomWindow" },			//				D5
 
 	{ kEventKeyUp,				"keyUp" },				//			D4
 	{ kEventKeyDown,			"keyDown" },			// D2 w		D4 (as when from D2)
 	{ kEventMouseUp,			"mouseUp" },			// D2 w	D3
 	{ kEventMouseDown,			"mouseDown" },			// D2 w	D3
-	{ kEventRightMouseDown,		"rightMouseDown" },
-	{ kEventRightMouseUp,		"rightMouseUp" },
+	{ kEventRightMouseDown,		"rightMouseDown" },		//				D5
+	{ kEventRightMouseUp,		"rightMouseUp" },		//				D5
 	{ kEventMouseEnter,			"mouseEnter" },
 	{ kEventMouseLeave,			"mouseLeave" },
 	{ kEventMouseUpOutSide,		"mouseUpOutSide" },
@@ -91,7 +96,7 @@ ScriptType Lingo::event2script(LEvent ev) {
 		switch (ev) {
 		//case kEventStartMovie: // We are precompiling it now
 		//	return kMovieScript;
-		case kEventEnterFrame:
+		case kEventExitFrame:
 			return kScoreScript;
 		default:
 			return kNoneScript;
@@ -108,7 +113,110 @@ void Movie::setPrimaryEventHandler(LEvent event, const Common::String &code) {
 	mainArchive->replaceCode(code, kEventScript, event);
 }
 
-void Movie::queueSpriteEvent(Common::Queue<LingoEvent> &queue, LEvent event, int eventId, int spriteId) {
+void Movie::resolveScriptEvent(LingoEvent &event) {
+	// Resolve the script details of an event.
+	// This must be done at execution time, as it relies on
+	// e.g. the current frame, the current arrangement of sprites...
+	uint16 spriteId = 0;
+	if (event.mousePos != Common::Point(-1, -1)) {
+		// Fetch the sprite underneath the mouse cursor.
+
+		// D3 doesn't have both mouse up and down.
+		// But we still want to know if the mouse is down for press effects.
+		// Since we don't have mouse up and down before D3, then we use ActiveSprite
+		if (g_director->getVersion() < 400)
+			spriteId = _score->getActiveSpriteIDFromPos(event.mousePos);
+		else
+			spriteId = _score->getMouseSpriteIDFromPos(event.mousePos);
+		_currentActiveSpriteId = _score->getActiveSpriteIDFromPos(event.mousePos); // the clickOn
+		_currentMouseSpriteId = _score->getMouseSpriteIDFromPos(event.mousePos);
+	}
+	// Very occasionally, we want to specify an event with a channel ID
+	// rather than infer it from the position. Allow it to override.
+	if (event.channelId == 0) {
+		event.channelId = spriteId;
+	}
+
+	// mouseDown/mouseUp events will have one of each of the source types queued.
+	// run these steps at the very beginning (i.e. before the first source type).
+	if (event.eventHandlerSourceType == kPrimaryHandler) {
+		if ((event.event == kEventMouseDown) || (event.event == kEventRightMouseDown)) {
+			if (!event.channelId && _isBeepOn) {
+				g_lingo->func_beep(1);
+			}
+
+			if (event.channelId > 0) {
+				if (_score->_channels[event.channelId]->_sprite->shouldHilite()) {
+					_currentHiliteChannelId = event.channelId;
+					g_director->_wm->_hilitingWidget = true;
+					g_director->getCurrentWindow()->setDirty(true);
+					g_director->getCurrentWindow()->addDirtyRect(_score->_channels[_currentHiliteChannelId]->getBbox());
+				}
+
+				CastMember *cast = getCastMember(_score->_channels[event.channelId]->_sprite->_castId);
+				if (cast && cast->_type == kCastButton)
+					_mouseDownWasInButton = true;
+
+				if (_score->_channels[event.channelId]->_sprite->_moveable) {
+					_draggingSpriteOffset = _score->_channels[event.channelId]->getPosition() - event.mousePos;
+					_currentDraggedChannel = _score->_channels[event.channelId];
+				}
+
+				// In the case of clicking the mouse, it is possible for a mouseDown action to
+				// change the cast member underneath. on mouseUp should always load the cast
+				// script for the original cast member, not the new one.
+				_currentMouseDownCastID = _score->_channels[event.channelId]->_sprite->_castId;
+
+			} else {
+				_currentHiliteChannelId = 0;
+				_mouseDownWasInButton = false;
+				_draggingSpriteOffset = Common::Point(0, 0);
+				_currentDraggedChannel = nullptr;
+				_currentMouseDownCastID = CastMemberID();
+			}
+
+		} else if ((event.event == kEventMouseUp) || (event.event == kEventRightMouseUp)) {
+			if (_currentHiliteChannelId && _score->_channels[_currentHiliteChannelId]) {
+				g_director->getCurrentWindow()->setDirty(true);
+				g_director->getCurrentWindow()->addDirtyRect(_score->_channels[_currentHiliteChannelId]->getBbox());
+			}
+			g_director->_wm->_hilitingWidget = false;
+
+			_currentDraggedChannel = nullptr;
+
+			// If this is a button cast member, and the last mouse down event was in a button
+			// (any button), flip this button's hilite flag.
+			// Now you might think, "Wait, we don't flip this flag in the mouseDown event.
+			// And why any button??? This doesn't make any sense."
+			// No, it doesn't make sense, but it's what Director does.
+			if (_mouseDownWasInButton && event.channelId) {
+				CastMember *cast = getCastMember(_score->_channels[event.channelId]->_sprite->_castId);
+				if (cast && cast->_type == kCastButton)
+					cast->_hilite = !cast->_hilite;
+			}
+			_currentHiliteChannelId = 0;
+			_mouseDownWasInButton = false;
+			g_director->loadSlowdownCooloff();
+		}
+	}
+
+	switch (event.eventHandlerSourceType) {
+	case kPrimaryHandler:
+		// Run the primary event handler.
+		// Note that this isn't a "real" cast member ID, it's just the enum
+		// of the type of event, so it can be crammed into the script context
+		// index. kEventScript is a script type reserved for the primary event
+		// handlers (e.g. the mouseDownScript, the mouseUpScript), so there will
+		// be no collision with script cast members like ScoreScripts.
+		{
+			CastMemberID scriptId(event.event, DEFAULT_CAST_LIB);
+			if (getScriptContext(kEventScript, scriptId)) {
+				event.event = kEventGeneric;
+				event.scriptType = kEventScript;
+				event.scriptId = scriptId;
+			}
+		}
+		break;
 	/* When the mouseDown or mouseUp occurs over a sprite, the message
 	 * goes first to the sprite script, then to the script of the cast
 	 * member, to the frame script and finally to the movie scripts.
@@ -118,97 +226,147 @@ void Movie::queueSpriteEvent(Common::Queue<LingoEvent> &queue, LEvent event, int
 	 *
 	 * When more than one movie script [...]
 	 * [D4 docs] */
+	case kSpriteHandler:
+		{
+			if (!event.channelId)
+				return;
+			Frame *currentFrame = _score->_currentFrame;
+			assert(currentFrame != nullptr);
+			Sprite *sprite = _score->getSpriteById(event.channelId);
 
-	Frame *currentFrame = _score->_frames[_score->getCurrentFrame()];
-	assert(currentFrame != nullptr);
-	Sprite *sprite = _score->getSpriteById(spriteId);
-
-	// Sprite (score) script
-	if (sprite->_scriptId.member) {
-		ScriptContext *script = getScriptContext(kScoreScript, sprite->_scriptId);
-		if (script) {
-			if (script->_eventHandlers.contains(event)) {
-				// D4-style event handler
-				queue.push(LingoEvent(event, eventId, kScoreScript, sprite->_scriptId, false, spriteId));
-			} else if (script->_eventHandlers.contains(kEventGeneric)) {
-				// D3-style sprite script, not contained in a handler
-				// If sprite is immediate, its script is run on mouseDown, otherwise on mouseUp
-				if ((event == kEventMouseDown && sprite->_immediate) || (event == kEventMouseUp && !sprite->_immediate)) {
-					queue.push(LingoEvent(kEventGeneric, eventId, kScoreScript, sprite->_scriptId, false, spriteId));
+			// Sprite (score) script
+			if (sprite && sprite->_scriptId.member) {
+				ScriptContext *script = getScriptContext(kScoreScript, sprite->_scriptId);
+				if (script) {
+					if (script->_eventHandlers.contains(event.event)) {
+						// D4-style event handler
+						event.scriptType = kScoreScript;
+						event.scriptId = sprite->_scriptId;
+					} else if (script->_eventHandlers.contains(kEventGeneric)) {
+						// D3-style sprite script, not contained in a handler
+						// If sprite is immediate, its script is run on mouseDown, otherwise on mouseUp
+						if ((event.event == kEventMouseDown && sprite->_immediate) || (event.event == kEventMouseUp && !sprite->_immediate)) {
+							event.event = kEventGeneric;
+							event.scriptType = kScoreScript;
+							event.scriptId = sprite->_scriptId;
+						}
+						return; // FIXME: Do not execute the cast script if there is a D3-style sprite script
+					}
 				}
-				return; // Do not execute the cast script if there is a D3-style sprite script
 			}
 		}
-	}
+		break;
+	case kCastHandler:
+		{
+			// Cast script
+			// A strange quirk; if we're in a mouseDown event, Director will test
+			// at runtime to find out whatever is under the mouse and use that.
+			// If we're in a mouseUp event, Director will use whatever was
+			// discovered -at the very beginning- of the mouseDown event chain.
+			// This means e.g. the cast member can be swapped out from underneath in
+			// the mouseDown sprite script and the event passed down, which
+			// will mean the old cast member cast script does not get a mouseDown
+			// call, but it -does- get a mouseUp call.
+			// A bit unhinged, but we have a test that proves Director does this,
+			// so we have to do it too.
+			CastMemberID targetCast = _currentMouseDownCastID;
+			if ((event.event == kEventMouseDown) || (event.event == kEventRightMouseDown)) {
+				if (!event.channelId)
+					return;
+				Sprite *sprite = _score->getSpriteById(event.channelId);
+				targetCast = sprite->_castId;
+			}
 
-	// Cast script
-	ScriptContext *script = getScriptContext(kCastScript, sprite->_castId);
-	if (script && script->_eventHandlers.contains(event)) {
-		queue.push(LingoEvent(event, eventId, kCastScript, sprite->_castId, false, spriteId));
-	}
-}
-
-void Movie::queueFrameEvent(Common::Queue<LingoEvent> &queue, LEvent event, int eventId) {
-	/* [in D4] the enterFrame, exitFrame, idle and timeout messages
-	 * are sent to a frame script and then a movie script.	If the
-	 * current frame has no frame script when the event occurs, the
-	 * message goes to movie scripts.
-	 * [p.81 of D4 docs]
-	 */
-
-	// if (event == kEventPrepareFrame || event == kEventIdle) {
-	// 	entity = score->getCurrentFrame();
-	// } else {
-
-	assert(_score->_frames[_score->getCurrentFrame()] != nullptr);
-	CastMemberID scriptId = _score->_frames[_score->getCurrentFrame()]->_actionId;
-	if (!scriptId.member)
-		return;
-
-	ScriptContext *script = getScriptContext(kScoreScript, scriptId);
-	if (!script)
-		return;
-
-	if (event == kEventEnterFrame && script->_eventHandlers.contains(kEventGeneric)) {
-		queue.push(LingoEvent(kEventGeneric, eventId, kScoreScript, scriptId, false, 0));
-	} else if (script->_eventHandlers.contains(event)) {
-		queue.push(LingoEvent(event, eventId, kScoreScript, scriptId, false, 0));
-	}
-}
-
-void Movie::queueMovieEvent(Common::Queue<LingoEvent> &queue, LEvent event, int eventId) {
-	/* If more than one movie script handles the same message, Lingo
-	 * searches the movie scripts according to their order in the cast
-	 * window [p.81 of D4 docs]
-	 */
-
-	// FIXME: shared cast movie scripts could come before main movie ones
-	LingoArchive *mainArchive = getMainLingoArch();
-	for (ScriptContextHash::iterator it = mainArchive->scriptContexts[kMovieScript].begin();
-			it != mainArchive->scriptContexts[kMovieScript].end(); ++it) {
-		if (it->_value->_eventHandlers.contains(event)) {
-			queue.push(LingoEvent(event, eventId, kMovieScript, CastMemberID(it->_key, 0), false));
-			return;
+			ScriptContext *script = getScriptContext(kCastScript, targetCast);
+			if (script && script->_eventHandlers.contains(event.event)) {
+				event.scriptType = kCastScript;
+				event.scriptId = targetCast;
+			}
 		}
-	}
-	LingoArchive *sharedArchive = getSharedLingoArch();
-	if (sharedArchive) {
-		for (ScriptContextHash::iterator it = sharedArchive->scriptContexts[kMovieScript].begin();
-				it != sharedArchive->scriptContexts[kMovieScript].end(); ++it) {
-			if (it->_value->_eventHandlers.contains(event)) {
-				queue.push(LingoEvent(event, eventId, kMovieScript, CastMemberID(it->_key, 0), false));
+		break;
+	case kFrameHandler:
+		{
+			/* [in D4] the enterFrame, exitFrame, idle and timeout messages
+			 * are sent to a frame script and then a movie script.	If the
+			 * current frame has no frame script when the event occurs, the
+			 * message goes to movie scripts.
+			 * [p.81 of D4 docs]
+			 */
+
+			if (_score->_currentFrame == nullptr)
+				return;
+
+			CastMemberID scriptId = _score->_currentFrame->_mainChannels.actionId;
+			if (!scriptId.member)
+				return;
+
+			ScriptContext *script = getScriptContext(kScoreScript, scriptId);
+			if (!script)
+				return;
+
+			if (script->_eventHandlers.contains(event.event)) {
+				event.scriptType = kScoreScript;
+				event.scriptId = scriptId;
 				return;
 			}
+
+			// Scopeless statements (ie one lined lingo commands) are executed at exitFrame
+			// A score script can have both scopeless and scoped lingo. (eg. porting from D3.1 to D4)
+			// In the event of both being specified in the ScoreScript, the scopeless handler is ignored.
+
+			if (event.event == kEventExitFrame && script->_eventHandlers.contains(kEventGeneric) &&
+				!(script->_eventHandlers.contains(kEventExitFrame) || script->_eventHandlers.contains(kEventEnterFrame))) {
+				event.event = kEventGeneric;
+				event.scriptType = kScoreScript;
+				event.scriptId = scriptId;
+			}
 		}
+		break;
+	case kMovieHandler:
+		{
+			/* If more than one movie script handles the same message, Lingo
+			 * searches the movie scripts according to their order in the cast
+			 * window [p.81 of D4 docs]
+			 */
+
+			// FIXME: shared cast movie scripts could come before main movie ones
+			// Movie scripts are fixed, so it's fine to look them up in advance.
+			for (auto &cast : _casts) {
+				LingoArchive *archive = cast._value->_lingoArchive;
+				for (auto &it : archive->scriptContexts[kMovieScript]) {
+					if (it._value->_eventHandlers.contains(event.event)) {
+						event.scriptType = kMovieScript;
+						event.scriptId = CastMemberID(it._key, cast._key);
+						return;
+					}
+				}
+			}
+			LingoArchive *sharedArchive = getSharedLingoArch();
+			if (sharedArchive) {
+				for (auto &it : sharedArchive->scriptContexts[kMovieScript]) {
+					if (it._value->_eventHandlers.contains(event.event)) {
+						event.scriptType = kMovieScript;
+						event.scriptId = CastMemberID(it._key, DEFAULT_CAST_LIB);
+						return;
+					}
+				}
+			}
+		}
+		break;
+	default:
+		break;
 	}
 }
 
-void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targetId) {
-	int eventId = _nextEventId++;
+void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targetId, Common::Point pos) {
 	if (_nextEventId < 0)
 		_nextEventId = 0;
+	_nextEventId++;
+	int eventId = _nextEventId;
 
 	int oldQueueSize = queue.size();
+
+	uint16 channelId = 0;
 
 	/* When an event occurs the message [...] is first sent to a
 	 * primary event handler: [... if exists it is executed] and the
@@ -224,22 +382,31 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 	switch (event) {
 	case kEventMouseDown:
 	case kEventMouseUp:
+	case kEventRightMouseDown:
+	case kEventRightMouseUp:
 	case kEventKeyUp:
 	case kEventKeyDown:
 	case kEventTimeout:
 		{
-			CastMemberID scriptID = CastMemberID(event, 0);
-			if (getScriptContext(kEventScript, scriptID)) {
-				queue.push(LingoEvent(kEventGeneric, eventId, kEventScript, scriptID, true));
-			}
+			// Queue a call to the the primary event handler.
+			// As per above, by default this will pass through to any subsequent handlers,
+			// unless the script calls "dontPassEvent".
+			queue.push(LingoEvent(event, eventId, kPrimaryHandler, true, pos));
 		}
 		break;
 	case kEventMenuCallback:
 		{
-			CastMemberID scriptID = CastMemberID(targetId, 0);
+			CastMemberID scriptID = CastMemberID(targetId, DEFAULT_CAST_LIB);
 			if (getScriptContext(kEventScript, scriptID)) {
-				queue.push(LingoEvent(kEventGeneric, eventId, kEventScript, scriptID, true));
+				queue.push(LingoEvent(kEventGeneric, eventId, kEventScript, true, scriptID, pos));
 			}
+		}
+		break;
+	// For mouseEnter/mouseLeave events, we want to specify exactly what sprite channel to resolve to.
+	case kEventMouseEnter:
+	case kEventMouseLeave:
+		if (targetId != 0) {
+			channelId = targetId;
 		}
 		break;
 	default:
@@ -251,13 +418,12 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 		switch(event) {
 		case kEventMouseUp:
 		case kEventMouseDown:
-			if (targetId) {
-				queueSpriteEvent(queue, event, eventId, targetId);
-			}
+			queue.push(LingoEvent(event, eventId, kSpriteHandler, false, pos));
+			queue.push(LingoEvent(event, eventId, kCastHandler, false, pos));
 			break;
 
-		case kEventEnterFrame:
-			queueFrameEvent(queue, event, eventId);
+		case kEventExitFrame:
+			queue.push(LingoEvent(event, eventId, kFrameHandler, false, pos));
 			break;
 
 		case kEventIdle:
@@ -265,7 +431,7 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 		case kEventStartMovie:
 		case kEventStepMovie:
 		case kEventStopMovie:
-			queueMovieEvent(queue, event, eventId);
+			queue.push(LingoEvent(event, eventId, kMovieHandler, false, pos));
 			break;
 
 		// no-op; only handled by the primary event handler above
@@ -290,17 +456,20 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 		case kEventKeyDown:
 		case kEventMouseUp:
 		case kEventMouseDown:
+		case kEventRightMouseUp:
+		case kEventRightMouseDown:
 		case kEventBeginSprite:
-			if (targetId) {
-				queueSpriteEvent(queue, event, eventId, targetId);
-			}
+		case kEventMouseEnter:
+		case kEventMouseLeave:
+			queue.push(LingoEvent(event, eventId, kSpriteHandler, false, pos, channelId));
+			queue.push(LingoEvent(event, eventId, kCastHandler, false, pos, channelId));
 			// fall through
 
 		case kEventIdle:
 		case kEventEnterFrame:
 		case kEventExitFrame:
 		case kEventTimeout:
-			queueFrameEvent(queue, event, eventId);
+			queue.push(LingoEvent(event, eventId, kFrameHandler, false, pos, channelId));
 			// fall through
 
 		case kEventStartUp:
@@ -308,7 +477,7 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 		case kEventStepMovie:
 		case kEventStopMovie:
 		case kEventPrepareMovie:
-			queueMovieEvent(queue, event, eventId);
+			queue.push(LingoEvent(event, eventId, kMovieHandler, false, pos, channelId));
 			break;
 
 		default:
@@ -321,19 +490,22 @@ void Movie::queueEvent(Common::Queue<LingoEvent> &queue, LEvent event, int targe
 	}
 }
 
-void Movie::queueUserEvent(LEvent event, int targetId) {
-	queueEvent(_userEventQueue, event, targetId);
+void Movie::queueInputEvent(LEvent event, int targetId, Common::Point pos) {
+	queueEvent(_inputEventQueue, event, targetId, pos);
 }
 
 void Movie::processEvent(LEvent event, int targetId) {
 	Common::Queue<LingoEvent> queue;
 	queueEvent(queue, event, targetId);
-	_vm->setCurrentMovie(this);
-	_lingo->processEvents(queue);
+	_vm->setCurrentWindow(this->getWindow());
+	_lingo->processEvents(queue, false);
 }
 
-void Lingo::processEvents(Common::Queue<LingoEvent> &queue) {
-	int lastEventId = -1;
+void Lingo::processEvents(Common::Queue<LingoEvent> &queue, bool isInputEvent) {
+	if (isInputEvent && _currentInputEvent.type != VOIDSYM) {
+		// only one input event should be in flight at a time.
+		return;
+	}
 	Movie *movie = _vm->getCurrentMovie();
 	Score *sc = movie->getScore();
 
@@ -343,31 +515,71 @@ void Lingo::processEvents(Common::Queue<LingoEvent> &queue) {
 		if (sc->_playState == kPlayStopped && el.event != kEventStopMovie)
 			continue;
 
-		if (lastEventId == el.eventId && !_passEvent)
+		// fetch the sprite ID, script ID to call, etc if not present.
+		movie->resolveScriptEvent(el);
+
+		if (el.scriptType == kNoneScript) {
+			debugC(9, kDebugEvents, "Lingo::processEvents: no matching script for event (%s, %s, %s, %d), continuing",
+				_eventHandlerTypes[el.event], scriptType2str(el.scriptType), el.scriptId.asString().c_str(), el.channelId
+			);
 			continue;
+		}
+
+		int lastEventId = movie->_lastEventId.getValOrDefault(el.event, 0);
+		if (lastEventId && lastEventId == el.eventId && !_passEvent) {
+			debugC(5, kDebugEvents, "Lingo::processEvents: swallowed event (%s, %s, %s, %d) because _passEvent was false",
+				_eventHandlerTypes[el.event], scriptType2str(el.scriptType), el.scriptId.asString().c_str(), el.channelId
+			);
+			continue;
+		}
 
 		_passEvent = el.passByDefault;
-		processEvent(el.event, el.scriptType, el.scriptId, el.channelId);
-		lastEventId = el.eventId;
+
+		debugC(5, kDebugEvents, "Lingo::processEvents: starting event script (%s, %s, %s, %d)",
+			_eventHandlerTypes[el.event], scriptType2str(el.scriptType), el.scriptId.asString().c_str(), el.channelId
+		);
+		bool completed = processEvent(el.event, el.scriptType, el.scriptId, el.channelId);
+		movie->_lastEventId[el.event] = el.eventId;
+
+		if (isInputEvent && !completed) {
+			debugC(5, kDebugEvents, "Lingo::processEvents: context frozen on an input event, stopping");
+			LingoState *state = g_director->getCurrentWindow()->getLastFrozenLingoState();
+			if (state) {
+				_currentInputEvent = state->callstack.front()->sp;
+			}
+			break;
+		}
+
 	}
 }
 
-void Lingo::processEvent(LEvent event, ScriptType st, CastMemberID scriptId, int channelId) {
+bool Lingo::processEvent(LEvent event, ScriptType st, CastMemberID scriptId, int channelId) {
 	_currentChannelId = channelId;
 
 	if (!_eventHandlerTypes.contains(event))
 		error("processEvent: Unknown event %d", event);
 
 	ScriptContext *script = g_director->getCurrentMovie()->getScriptContext(st, scriptId);
+	int nargs = 0;
 
 	if (script && script->_eventHandlers.contains(event)) {
 		debugC(1, kDebugEvents, "Lingo::processEvent(%s, %s, %s): executing event handler", _eventHandlerTypes[event], scriptType2str(st), scriptId.asString().c_str());
 		g_debugger->eventHook(event);
-		LC::call(script->_eventHandlers[event], 0, false);
-		execute();
+
+		// Normally event handlers are called with no arguments, however RolloverToolkit expects
+		// the first argument to be the sprite number.
+		if ((event == kEventMouseEnter && script->_eventHandlers[event].name->equalsIgnoreCase("startRollover")) ||
+			(event == kEventMouseLeave && script->_eventHandlers[event].name->equalsIgnoreCase("endRollover"))) {
+			push(Datum(channelId));
+			nargs = 1;
+		}
+
+		LC::call(script->_eventHandlers[event], nargs, false);
+		return execute();
 	} else {
 		debugC(9, kDebugEvents, "Lingo::processEvent(%s, %s, %s): no handler", _eventHandlerTypes[event], scriptType2str(st), scriptId.asString().c_str());
 	}
+	return true;
 }
 
 } // End of namespace Director

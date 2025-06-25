@@ -19,35 +19,42 @@
  *
  */
 
-/* Memory is a Mac only XObject.
+/*************************************
+ *
+ * USED IN:
+ * Chop Suey (Win)
+ * Comedians (Mac)
+ *
+ *************************************/
+
+/*
+ * Memory is a Mac only XObject.
  *
  * Implemented as a no-op, since ScummVM doesn't need to handle memory clears.
  *
  *
-	-- Memory XObject
-	-- December 18th, 1992
-	-- Written by Scott Kildall
-	-- 1992 by Macromedia, Inc
-	-- All rights reserved
-	--
-	I mNew
-	X mClear
-	X mCompact
-	X mPurge
-	I mAvailBytes
-	I mAvailBlock
-	I mStackSpace
-	I mGetVM
-	I mGetAddressing
-	I mGetCache
-	XI mSetCache
-	I mGetPhysicalRAM
-	I mGetMMU
-	I mGetLogicalPage
-	I mGetLogicalRAM
-	I mGetLowMemory
-
-	USED BY: Chop Suey (win)
+ * -- Memory XObject
+ * -- December 18th, 1992
+ * -- Written by Scott Kildall
+ * -- 1992 by Macromedia, Inc
+ * -- All rights reserved
+ * --
+ * I mNew
+ * X mClear
+ * X mCompact
+ * X mPurge
+ * I mAvailBytes
+ * I mAvailBlock
+ * I mStackSpace
+ * I mGetVM
+ * I mGetAddressing
+ * I mGetCache
+ * XI mSetCache
+ * I mGetPhysicalRAM
+ * I mGetMMU
+ * I mGetLogicalPage
+ * I mGetLogicalRAM
+ * I mGetLowMemory
  */
 
 #include "director/director.h"
@@ -58,14 +65,14 @@
 
 namespace Director {
 
-const char *MemoryXObj::xlibName = "Memory";
-const char *MemoryXObj::fileNames[] = {
-	"Memory XObj",
-	"Memory",
-	nullptr
+const char *const MemoryXObj::xlibName = "Memory";
+const XlibFileDesc MemoryXObj::fileNames[] = {
+	{ "Memory XObj",	nullptr },
+	{ "Memory",			nullptr },
+	{ nullptr,			nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",					MemoryXObj::m_new,			0,	0,	300 },	// D3
 	{ "Clear",					MemoryXObj::m_clear,		0,	0,	300 },	// D3
 	{ "Purge",					MemoryXObj::m_purge,		0,	0,	400 },	// D4
@@ -73,7 +80,7 @@ static MethodProto xlibMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void MemoryXObj::open(int type) {
+void MemoryXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		MemoryXObject::initMethods(xlibMethods);
 		MemoryXObject *xobj = new MemoryXObject(kXObj);
@@ -81,7 +88,7 @@ void MemoryXObj::open(int type) {
 	}
 }
 
-void MemoryXObj::close(int type) {
+void MemoryXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		MemoryXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -89,7 +96,7 @@ void MemoryXObj::close(int type) {
 }
 
 
-MemoryXObject::MemoryXObject(ObjectType ObjectType) :Object<MemoryXObject>("MemoryXObj") {
+MemoryXObject::MemoryXObject(ObjectType ObjectType) :Object<MemoryXObject>("Memory") {
 	_objType = ObjectType;
 }
 
@@ -104,7 +111,7 @@ void MemoryXObj::m_purge(int nargs) {
 }
 
 void MemoryXObj::m_getVM(int nargs) {
-	g_lingo->push(Datum(0)); // At least Chop Suey Win requires 0 bytes Virtual Memory for running
+	g_lingo->push(Datum(0)); // Chop Suey (Win) and Comedians (Mac) require Virtual Memory to be disabled
 }
 
 } // End of namespace Director

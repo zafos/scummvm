@@ -81,7 +81,7 @@ void FontSubtitles::loadResources() {
 	_scale = getPosition().width() / (float) getOriginalPosition().width();
 
 #ifdef USE_FREETYPE2
-	Common::String ttfFile;
+	const char *ttfFile;
 	if (_fontFace == "Arial Narrow") {
 		// Use the TTF font provided by the game if TTF support is available
 		ttfFile = "arir67w.ttf";
@@ -97,10 +97,9 @@ void FontSubtitles::loadResources() {
 
 	Common::SeekableReadStream *s = SearchMan.createReadStreamForMember(ttfFile);
 	if (s) {
-		_font = Graphics::loadTTFFont(*s, _fontSize * _scale);
-		delete s;
+		_font = Graphics::loadTTFFont(s, DisposeAfterUse::YES, _fontSize * _scale);
 	} else {
-		warning("Unable to load the subtitles font '%s'", ttfFile.c_str());
+		warning("Unable to load the subtitles font '%s'", ttfFile);
 	}
 #endif
 }
@@ -360,8 +359,8 @@ bool MovieSubtitles::loadSubtitles(int32 id) {
 
 	// Load the movie
 	Common::SeekableReadStream *movieStream = movie.getData();
-	_bink.setDefaultHighColorFormat(Texture::getRGBAPixelFormat());
 	_bink.loadStream(movieStream);
+	_bink.setOutputPixelFormat(Texture::getRGBAPixelFormat());
 	_bink.start();
 
 	return true;

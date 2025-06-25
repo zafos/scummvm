@@ -45,18 +45,23 @@ bool ItemsArray::load() {
 		Common::String line = f.readLine();
 		assert(line.size() > 20 && line[0] == '"' && line[15] == '"');
 
-		item._name = Common::String(line.c_str() + 1, line.c_str() + 14);
+		item._name = Common::String(line.c_str() + 1, line.c_str() + 15);
 		line = Common::String(line.c_str() + 16);
+		while (item._name.lastChar() == ' ')
+			item._name.deleteLastChar();
 
 		item._disablements = getNextValue(line);
-		item._equipMode = (EquipMode)getNextValue(line);
-		item._val10 = getNextValue(line);
-		item._effectId = getNextValue(line);
-		item._spellId = getNextValue(line);
+		item._constBonus_id = getNextValue(line);
+		item._constBonus_value = getNextValue(line);
+		item._tempBonus_id = getNextValue(line);
+
+        	if (item._tempBonus_id != 0xff) {item._tempBonus_value =  getNextValue(line);}
+        	else {item._spellId = getNextValue(line);}       
+
 		item._maxCharges = getNextValue(line);
 		item._cost = getNextValue(line);
-		item._val16 = getNextValue(line);
-		item._val17 = getNextValue(line);
+		item._damage = getNextValue(line);
+		item._AC_Dmg = getNextValue(line);
 	}
 
 	return true;
@@ -65,8 +70,6 @@ bool ItemsArray::load() {
 Item *ItemsArray::getItem(byte index) const {
 	assert(index > 0);
 	g_globals->_currItem = (*this)[index - 1];
-	g_globals->_currItem._name = STRING[Common::String::format(
-		"stats.items.%d", (int)index)];
 
 	return &g_globals->_currItem;
 }

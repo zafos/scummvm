@@ -26,37 +26,38 @@
  *
  *************************************/
 /*
-  -- Picter, a simple demo XObject, v1.0
-  I           mNew
-  XIII        mGpal, h, l, s
-  XIIIIII     mLine, y1, y2, y3, y4, y5, c
-  II          mGetDate, value
-  X           mClear
-*/
+ * -- Picter, a simple demo XObject, v1.0
+ * I           mNew
+ * XIII        mGpal, h, l, s
+ * XIIIIII     mLine, y1, y2, y3, y4, y5, c
+ * II          mGetDate, value
+ * X           mClear
+ */
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/barakeobj.h"
 
 
 namespace Director {
 
-const char *BarakeObj::xlibName = "BarakeObj";
-const char *BarakeObj::fileNames[] = {
-	"BarakeObj",
-	0
+const char *const BarakeObj::xlibName = "BarakeObj";
+const XlibFileDesc BarakeObj::fileNames[] = {
+	{ "BarakeObj",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",			BarakeObj::m_new,		0,	0,	400 },	// D4
 	{ "Clear",			BarakeObj::m_clear,		0,	0,	400 },	// D4
 	{ "Gpal",			BarakeObj::m_gpal,		3,	3,	400 },	// D4
 	{ "Line",			BarakeObj::m_line,		6,	6,	400 },	// D4
-    { nullptr, nullptr, 0, 0, 0 }
+	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void BarakeObj::open(int type) {
+void BarakeObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		BarakeObject::initMethods(xlibMethods);
 		BarakeObject *xobj = new BarakeObject(kXObj);
@@ -64,7 +65,7 @@ void BarakeObj::open(int type) {
 	}
 }
 
-void BarakeObj::close(int type) {
+void BarakeObj::close(ObjectType type) {
 	if (type == kXObj) {
 		BarakeObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -83,14 +84,7 @@ void BarakeObj::m_new(int nargs) {
 void BarakeObj::m_clear(int nargs) {
 }
 
-void BarakeObj::m_gpal(int nargs) {
-	g_lingo->printSTUBWithArglist("BarakeObj::Gpal", nargs);
-	g_lingo->dropStack(nargs);
-}
-
-void BarakeObj::m_line(int nargs) {
-	g_lingo->printSTUBWithArglist("BarakeObj::Line", nargs);
-	g_lingo->dropStack(nargs);
-}
+XOBJSTUBNR(BarakeObj::m_gpal)
+XOBJSTUBNR(BarakeObj::m_line)
 
 } // End of namespace Director

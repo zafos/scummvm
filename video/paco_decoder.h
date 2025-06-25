@@ -25,6 +25,7 @@
 #include "audio/audiostream.h"
 #include "common/list.h"
 #include "common/rect.h"
+#include "graphics/palette.h"
 #include "video/video_decoder.h"
 
 namespace Common {
@@ -76,6 +77,7 @@ protected:
 		int getFrameCount() const override { return _frameCount; }
 		virtual const Graphics::Surface *decodeNextFrame() override;
 		virtual void handleFrame(Common::SeekableReadStream *fileStream, uint32 chunkSize, int curFrame);
+		virtual void handleEOC() { _curFrame += 1; };
 		void handlePalette(Common::SeekableReadStream *fileStream);
 		const byte *getPalette() const override;
 		bool hasDirtyPalette() const override { return _dirtyPalette; }
@@ -87,8 +89,7 @@ protected:
 
 	protected:
 		Graphics::Surface *_surface;
-
-		byte *_palette;
+		Graphics::Palette _palette;
 
 		mutable bool _dirtyPalette;
 

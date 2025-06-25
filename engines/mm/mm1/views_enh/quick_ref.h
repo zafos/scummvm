@@ -47,7 +47,7 @@ public:
 	void draw() override;
 };
 
-} // namespace Views
+} // namespace ViewsEnh
 } // namespace MM1
 } // namespace MM
 

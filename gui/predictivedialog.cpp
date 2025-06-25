@@ -105,8 +105,7 @@ PredictiveDialog::PredictiveDialog() : Dialog("Predictive") {
 #ifndef DISABLE_FANCY_THEMES
 	if (g_gui.xmlEval()->getVar("Globals.Predictive.ShowDeletePic") == 1 && g_gui.theme()->supportsImages()) {
 		_button[kDelAct] = new PicButtonWidget(this, "Predictive.Delete", _("Delete char"), kDelCmd);
-		((PicButtonWidget *)_button[kDelAct])->useThemeTransparency(true);
-		((PicButtonWidget *)_button[kDelAct])->setGfx(g_gui.theme()->getImageSurface(ThemeEngine::kImageDelButton));
+		((PicButtonWidget *)_button[kDelAct])->setGfxFromTheme(ThemeEngine::kImageDelButton);
 	} else
 #endif
 		_button[kDelAct] = new ButtonWidget(this, "Predictive.Delete" , _("<") , Common::U32String(), kDelCmd);
@@ -182,8 +181,7 @@ void PredictiveDialog::reflowLayout() {
 
 	if (g_gui.xmlEval()->getVar("Globals.Predictive.ShowDeletePic") == 1 && g_gui.theme()->supportsImages()) {
 		_button[kDelAct] = new PicButtonWidget(this, "Predictive.Delete", _("Delete char"), kDelCmd);
-		((PicButtonWidget *)_button[kDelAct])->useThemeTransparency(true);
-		((PicButtonWidget *)_button[kDelAct])->setGfx(g_gui.theme()->getImageSurface(ThemeEngine::kImageDelButton));
+		((PicButtonWidget *)_button[kDelAct])->setGfxFromTheme(ThemeEngine::kImageDelButton);
 	} else {
 		_button[kDelAct] = new ButtonWidget(this, "Predictive.Delete" , _("<") , Common::U32String(), kDelCmd);
 	}
@@ -856,7 +854,7 @@ void PredictiveDialog::addWord(Dict &dict, const Common::String &word, const Com
 					Common::strlcpy(ptr, word.c_str(), word.size() + 1);
 				}
 			} else {
-				// if we didnt find line in predictive dialog, we should copy to user dictionary
+				// if we didn't find line in predictive dialog, we should copy to user dictionary
 				// code + word
 				Common::String tmp;
 				tmp = tmpCode + word;
@@ -986,7 +984,7 @@ void PredictiveDialog::loadAllDictionary(Dict &dict) {
 
 	if (dict.nameDict == "predictive_dictionary") {
 		Common::File *inFile = new Common::File();
-		if (!inFile->open(ConfMan.get(dict.nameDict))) {
+		if (!inFile->open(ConfMan.getPath(dict.nameDict))) {
 			warning("Predictive Dialog: cannot read file: %s", dict.defaultFilename.c_str());
 			delete inFile;
 			return;
@@ -1007,7 +1005,6 @@ void PredictiveDialog::pressEditText() {
 	Common::strlcat(_predictiveResult, _currentWord.c_str(), sizeof(_predictiveResult));
 	_editText->setEditString(Common::convertToU32String(_predictiveResult));
 	//_editText->setCaretPos(_prefix.size() + _currentWord.size());
-	_editText->markAsDirty();
 }
 
 } // namespace GUI

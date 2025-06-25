@@ -33,6 +33,9 @@
 #include "common/util.h"
 #include "audio/mixer.h"
 
+#include "backends/keymapper/action.h"
+#include "backends/keymapper/keymapper.h"
+
 #include "agos/vga.h"
 #include "agos/detection.h"
 
@@ -60,14 +63,46 @@ struct Surface;
 class FontSJIS;
 }
 
+namespace Audio {
+class SeekableAudioStream;
+}
+
 namespace AGOS {
 
 enum {
-	kDebugOpcode = 1 << 0,
-	kDebugVGAOpcode = 1 << 1,
-	kDebugSubroutine = 1 << 2,
-	kDebugVGAScript = 1 << 3,
-	kDebugImageDump = 1 << 4
+	kDebugOpcode = 1,
+	kDebugVGAOpcode,
+	kDebugSubroutine,
+	kDebugVGAScript,
+	kDebugImageDump,
+};
+
+enum AGOSAction {
+	kActionNone,
+	kActionWalkForward,
+	kActionTurnBack,
+	kActionTurnLeft,
+	kActionTurnRight,
+	kActionMusicDown,
+	kActionMusicUp,
+	kActionExitCutscene,
+	kActionToggleMusic,
+	kActionToggleFastMode,
+	kActionToggleSwitchCharacter,
+	kActionToggleSubtitle,
+	kActionToggleSpeech,
+	kActionToggleHitboxName,
+	kActionToggleSoundEffects,
+	kActionToggleBackgroundSound,
+	kActionToggleFightMode,
+	kActionShowObjects,
+	kActionTextSpeedFast,
+	kActionTextSpeedMedium,
+	kActionTextSpeedSlow,
+	kActionSpeed_GTYPEPP,
+	kActionKeyYes,
+	kActionKeyNo,
+	kActionPause
 };
 
 uint fileReadItemID(Common::SeekableReadStream *in);
@@ -279,6 +314,8 @@ protected:
 
 	const GameSpecificSettings *gss;
 
+	AGOSAction _action;
+	Common::JoystickState _joyaction;
 	Common::KeyState _keyPressed;
 
 	Common::File *_gameFile;
@@ -586,6 +623,8 @@ protected:
 	int _vgaTickCounter;
 
 	Audio::SoundHandle _modHandle;
+	Audio::SoundHandle _digitalMusicHandle;
+	Audio::SeekableAudioStream *_digitalMusicStream = nullptr;
 
 	Sound *_sound;
 
@@ -733,7 +772,7 @@ protected:
 	const byte *getLocalStringByID(uint16 stringId);
 	uint getNextStringID();
 
-	void addTimeEvent(uint16 timeout, uint16 subroutineId);
+	void addTimeEvent(int32 timeout, uint16 subroutineId);
 	void delTimeEvent(TimeEvent *te);
 
 	Item *findInByClass(Item *i, int16 m);
@@ -1298,11 +1337,12 @@ protected:
 	void windowScroll(WindowBlock *window);
 	virtual void windowDrawChar(WindowBlock *window, uint x, uint y, byte chr);
 
-	// Loads the MIDI data for the specified track. The forceSimon2Gm parameter
-	// forces loading the MIDI data from the GM data set and activates GM to
-	// MT-32 instrument remapping. This is useful only for a specific
+	// Loads the MIDI data for the specified track. The forceSimon2GmData
+	// parameter forces loading the MIDI data from the GM data set.
+	// The useSimon2Remapping parameter activates GM to MT-32 instrument
+	// remapping. These parameters are useful only for a specific
 	// workaround (see AGOSEngine_Simon2::playMusic for more details).
-	void loadMusic(uint16 track, bool forceSimon2Gm = false);
+	void loadMusic(uint16 track, bool forceSimon2GmData = false, bool useSimon2Remapping = false);
 	void playModule(uint16 music);
 	virtual void playMusic(uint16 music, uint16 track);
 	void stopMusic();
@@ -1332,6 +1372,7 @@ protected:
 	int countSaveGames();
 
 	virtual Common::String genSaveName(int slot) const;
+	void enterSaveLoadScreen(bool entering);
 };
 
 class AGOSEngine_PN : public AGOSEngine {
@@ -1479,6 +1520,8 @@ protected:
 	int _linembr;
 	uint8 *_linebase;
 	uint8 *_workptr;
+
+	bool _keymapEnabled;
 
 	uint16 getptr(uint32 pos);
 	uint32 getlong(uint32 pos);

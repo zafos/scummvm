@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/str.h"
@@ -48,7 +54,8 @@ Hotspots::Hotspot::Hotspot(uint16 i,
 	funcEnter = enter;
 	funcLeave = leave;
 	funcPos   = pos;
-	script    = nullptr;
+	scriptFuncPos = nullptr;
+	scriptFuncLeave = nullptr;
 }
 
 void Hotspots::Hotspot::clear() {
@@ -62,7 +69,8 @@ void Hotspots::Hotspot::clear() {
 	funcEnter = 0;
 	funcLeave = 0;
 	funcPos   = 0;
-	script    = nullptr;
+	scriptFuncPos = nullptr;
+	scriptFuncLeave = nullptr;
 }
 
 Hotspots::Type Hotspots::Hotspot::getType() const {
@@ -254,7 +262,8 @@ uint16 Hotspots::add(const Hotspot &hotspot) {
 		spot.id = id;
 
 		// Remember the current script
-		spot.script = _vm->_game->_script;
+		spot.scriptFuncPos = _vm->_game->_script;
+		spot.scriptFuncLeave = _vm->_game->_script;
 
 		debugC(1, kDebugHotspots, "Adding hotspot %03d: Coord:%3d+%3d+%3d+%3d - id:%04X, key:%04X, flag:%04X - fcts:%5d, %5d, %5d",
 				i, spot.left, spot.top, spot.right, spot.bottom,
@@ -304,7 +313,7 @@ void Hotspots::recalculate(bool force) {
 		// Setting the needed script
 		Script *curScript = _vm->_game->_script;
 
-		_vm->_game->_script = spot.script;
+		_vm->_game->_script = spot.scriptFuncPos;
 		if (!_vm->_game->_script)
 			_vm->_game->_script = curScript;
 
@@ -326,6 +335,16 @@ void Hotspots::recalculate(bool force) {
 		if ((_vm->_draw->_renderFlags & RENDERFLAG_CAPTUREPOP) && (left != -1)) {
 			left += _vm->_draw->_backDeltaX;
 			top  += _vm->_draw->_backDeltaY;
+		}
+
+		if (_vm->_draw->_needAdjust != 2 && _vm->_draw->_needAdjust != 10) {
+			_vm->_draw->adjustCoords(0, &left, &top);
+			if ((spot.flags & 15) < 3)
+				_vm->_draw->adjustCoords(2, &width, &height);
+			else {
+				height &= 0xFFFFFFFE;
+				_vm->_draw->adjustCoords(2, nullptr, &height);
+			}
 		}
 
 		// Clamping
@@ -527,8 +546,14 @@ void Hotspots::leave(uint16 index) {
 	    (spot.getState() == (kStateFilled | kStateType2)))
 		WRITE_VAR(17, spot.id & 0x0FFF);
 
-	if (spot.funcLeave != 0)
+	if (spot.funcLeave != 0) {
+		Script *curScript = _vm->_game->_script;
+		if (_vm->getGameType() == kGameTypeAdibou2) {
+			_vm->_game->_script = spot.scriptFuncLeave;
+		}
 		call(spot.funcLeave);
+		_vm->_game->_script = curScript;
+	}
 }
 
 int16 Hotspots::windowCursor(int16 &dx, int16 &dy) const {
@@ -710,6 +735,15 @@ uint16 Hotspots::check(uint8 handleMouse, int16 delay, uint16 &id, uint16 &index
 		_currentKey   = 0;
 		_currentId    = 0;
 		_currentIndex = 0;
+	}
+
+	if (_vm->getGameType() == kGameTypeAdibou2 &&
+			_currentKey != 0 &&
+			(_hotspots[_currentIndex].id != _currentId ||
+			_hotspots[_currentIndex].key != _currentKey)) {
+		_currentKey = 0;
+		_currentIndex = 0;
+		_currentId = 0;
 	}
 
 	id    = 0;
@@ -1271,6 +1305,17 @@ void Hotspots::evaluateNew(uint16 i, uint16 *ids, InputDesc *inputs,
 	}
 	type &= 0x7F;
 
+	if (_vm->getGameType() == kGameTypeAdibou1 &&
+		left == 0xFFFF - 5 &&
+		(_vm->isCurrentTot("L61EXO-7.tot") || _vm->isCurrentTot("L61EXO-9.tot"))) {
+		// WORKAROUND: In those "find matching cards" games, hotspots of cards already found
+		// are normally removed by setting their x coordinate to 0xFFFF. However, sometimes
+		// the hotspot pos() function subtracts an additional 5 from x, which results in the
+		// hotspot not being properly removed (and clicking on it leads to a crash).
+		// TODO: the original executable somehow avoids this problem.
+		left = 0xFFFF;
+	}
+
 	// Draw a border around the hotspot
 	if (_vm->_draw->_renderFlags & RENDERFLAG_BORDERHOTSPOTS) {
 		Surface &surface = *_vm->_draw->_spritesArray[_vm->_draw->_destSurface];
@@ -1301,6 +1346,18 @@ void Hotspots::evaluateNew(uint16 i, uint16 *ids, InputDesc *inputs,
 		top  += _vm->_draw->_backDeltaY;
 	}
 
+	if (left != 0xFFFF) {
+		_vm->_draw->adjustCoords(0, &left, &top);
+		if ((type & 0x3F) >= 20 || (type & 0x3F) < 3)
+			_vm->_draw->adjustCoords(0, &width, &height);
+		else {
+			if (_vm->_draw->_needAdjust != 2 && _vm->_draw->_needAdjust != 10)
+				height &= 0xFFFE;
+
+			_vm->_draw->adjustCoords(0, &height, 0);
+		}
+	}
+
 	right  = left + width  - 1;
 	bottom = top  + height - 1;
 
@@ -1321,6 +1378,7 @@ void Hotspots::evaluateNew(uint16 i, uint16 *ids, InputDesc *inputs,
 				spot.enable();
 				spot.funcEnter = _vm->_game->_script->pos();
 				spot.funcLeave = _vm->_game->_script->pos();
+				spot.scriptFuncLeave = _vm->_game->_script;
 			}
 		}
 
@@ -1329,7 +1387,7 @@ void Hotspots::evaluateNew(uint16 i, uint16 *ids, InputDesc *inputs,
 		return;
 	}
 
-	int16 key   = 0;
+	uint16 key   = 0;
 	int16 flags = 0;
 	Font *font = nullptr;
 	uint32 funcEnter = 0, funcLeave = 0;

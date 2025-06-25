@@ -28,9 +28,6 @@
  * The Standard MIDI File version of MidiParser.
  */
 class MidiParser_SMF : public MidiParser {
-protected:
-	byte *_buffer;
-	int8 _noteChannelToTrack[16];
 
 protected:
 	/**
@@ -49,7 +46,6 @@ protected:
 
 public:
 	MidiParser_SMF(int8 source = -1);
-	~MidiParser_SMF();
 
 	bool loadMusic(byte *data, uint32 size) override;
 

@@ -46,12 +46,12 @@ struct Point {
 	int16 x;	/*!< The horizontal position of the point. */
 	int16 y;	/*!< The vertical position of the point. */
 
-	Point() : x(0), y(0) {}
+	constexpr Point() : x(0), y(0) {}
 
 	/**
 	 * Create a point with position defined by @p x1 and @p y1.
 	 */
-	Point(int16 x1, int16 y1) : x(x1), y(y1) {}
+	constexpr Point(int16 x1, int16 y1) : x(x1), y(y1) {}
 	/**
 	 * Determine whether the position of two points is the same.
 	 */
@@ -145,11 +145,27 @@ struct Rect {
 	int16 top, left;		/*!< The point at the top left of the rectangle (part of the Rect). */
 	int16 bottom, right;	/*!< The point at the bottom right of the rectangle (not part of the Rect). */
 
-	Rect() : top(0), left(0), bottom(0), right(0) {}
+	constexpr Rect() : top(0), left(0), bottom(0), right(0) {}
 	/**
 	 * Create a rectangle with the top-left corner at position (0, 0) and the given width @p w and height @p h.
 	 */
-	Rect(int16 w, int16 h) : top(0), left(0), bottom(h), right(w) {}
+	constexpr Rect(int16 w, int16 h) : top(0), left(0), bottom(h), right(w) {}
+	/**
+	 * Create a rectangle with the top-left corner at the position @p topLeft
+	 * and the bottom-right corner at the position @p bottomRight.
+	 *
+	 * The @p topLeft x value must be greater or equal @p bottomRight x and
+	 * @p topLeft y must be greater or equal @p bottomRight y.
+	 */
+	Rect(const Point &topLeft, const Point &bottomRight) : top(topLeft.y), left(topLeft.x), bottom(bottomRight.y), right(bottomRight.x) {
+		assert(isValidRect());
+	}
+	/**
+	 * Create a rectangle with the top-left corner at the position @p topLeft
+	 * and the given width @p w and height @p h.
+	 */
+	constexpr Rect(const Point &topLeft, int16 w, int16 h) : top(topLeft.y), left(topLeft.x), bottom(topLeft.y + h), right(topLeft.x + w) {
+	}
 	/**
 	 * Create a rectangle with the top-left corner at the given position (x1, y1)
 	 * and the bottom-right corner at the position (x2, y2).
@@ -172,8 +188,9 @@ struct Rect {
 	 */
 	bool operator!=(const Rect &rhs) const { return !equals(rhs); }
 
-	int16 width() const { return right - left; }  /*!< Return the width of a rectangle. */
-	int16 height() const { return bottom - top; } /*!< Return the height of a rectangle. */
+	Common::Point origin() const { return Common::Point(left, top); } /*!< Return the origin of a rectangle. */
+	int16 width() const { return right - left; }                      /*!< Return the width of a rectangle. */
+	int16 height() const { return bottom - top; }                     /*!< Return the height of a rectangle. */
 
 	void setWidth(int16 aWidth) {   /*!< Set the width to @p aWidth value. */
 		right = left + aWidth;
@@ -279,7 +296,7 @@ struct Rect {
 	}
 
 	/**
-	 * Clip this rectangle with another rectangle @p r.
+	 * Clip this rectangle to within the bounds of another rectangle @p r.
 	 */
 	void clip(const Rect &r) {
 		assert(isValidRect());
@@ -354,6 +371,13 @@ struct Rect {
 		debug(debuglevel, "%s %d, %d, %d, %d", caption, left, top, right, bottom);
 	}
 
+	 /**
+	 * Print debug messages related to this class.
+	 */
+	void debugPrintC(int debuglevel, uint32 debugChannel, const char *caption = "Rect:") const {
+		debugC(debuglevel, debugChannel, "%s %d, %d, %d, %d", caption, left, top, right, bottom);
+	}
+
 	/**
 	 * Create a rectangle around the given center.
 	 * @note The center point is rounded up and left when given an odd width and height.
@@ -364,8 +388,17 @@ struct Rect {
 	}
 
 	/**
+	* Return a Point indicating the centroid of the rectangle
+	* @note The center point is rounded up and left when width and/or height are odd
+	*/
+	Point center() const {
+		return Point((left + right) / 2, (bottom + top) / 2);
+	}
+
+	/**
 	 * Given target surface with size clip, this function ensures that
-	 * blit arguments @p dst and @p rect are within the @p clip rectangle.
+	 * blit arguments @p dst and @p rect are within the @p clip rectangle,
+	 * shrinking them as necessary.
 	 * @param dst  Blit destination coordinates.
 	 * @param rect Blit source rectangle.
 	 * @param clip Clip rectangle (size of destination surface).

@@ -25,7 +25,7 @@
 #include "audio/audiostream.h"
 #include "audio/decoders/adpcm.h"
 #include "common/bitstream.h"
-#include "common/huffman.h"
+#include "common/compression/huffman.h"
 #include "common/stream.h"
 #include "common/system.h"
 #include "common/textconsole.h"
@@ -189,6 +189,7 @@ void PSXStreamDecoder::readNextPacket() {
 	Common::SeekableReadStream *sector = 0;
 	byte *partialFrame = 0;
 	int sectorsRead = 0;
+	int64 prevPos = _stream->pos();
 
 	while (_stream->pos() < _stream->size()) {
 		sector = readSector();
@@ -211,6 +212,12 @@ void PSXStreamDecoder::readNextPacket() {
 				if (!_videoTrack) {
 					_videoTrack = new PSXVideoTrack(sector, _speed, _frameCount);
 					addTrack(_videoTrack);
+
+					// If no video track is initialized, we are called
+					// by loadStream(). Stop here, and start rendering
+					// the track from the next call.
+					_stream->seek(prevPos);
+					return;
 				}
 
 				sector->seek(28);
@@ -340,17 +347,21 @@ Audio::AudioStream *PSXStreamDecoder::PSXAudioTrack::getAudioStream() const {
 }
 
 
-PSXStreamDecoder::PSXVideoTrack::PSXVideoTrack(Common::SeekableReadStream *firstSector, CDSpeed speed, int frameCount) : _nextFrameStartTime(0, speed), _frameCount(frameCount) {
+PSXStreamDecoder::PSXVideoTrack::PSXVideoTrack(Common::SeekableReadStream *firstSector, CDSpeed speed, int frameCount) : _nextFrameStartTime(0, speed), _frameCount(frameCount), _surface(nullptr) {
 	assert(firstSector);
 
 	firstSector->seek(40);
-	uint16 width = firstSector->readUint16LE();
-	uint16 height = firstSector->readUint16LE();
-	_surface = new Graphics::Surface();
-	_surface->create(width, height, g_system->getScreenFormat());
+	_width = firstSector->readUint16LE();
+	_height = firstSector->readUint16LE();
 
-	_macroBlocksW = (width + 15) / 16;
-	_macroBlocksH = (height + 15) / 16;
+	_pixelFormat = g_system->getScreenFormat();
+
+	// Default to a 32bpp format, if in 8bpp mode
+	if (_pixelFormat.bytesPerPixel == 1)
+		_pixelFormat = Graphics::PixelFormat(4, 8, 8, 8, 8, 8, 16, 24, 0);
+
+	_macroBlocksW = (_width + 15) / 16;
+	_macroBlocksH = (_height + 15) / 16;
 	_yBuffer = new byte[_macroBlocksW * _macroBlocksH * 16 * 16];
 	_cbBuffer = new byte[_macroBlocksW * _macroBlocksH * 8 * 8];
 	_crBuffer = new byte[_macroBlocksW * _macroBlocksH * 8 * 8];
@@ -363,8 +374,10 @@ PSXStreamDecoder::PSXVideoTrack::PSXVideoTrack(Common::SeekableReadStream *first
 }
 
 PSXStreamDecoder::PSXVideoTrack::~PSXVideoTrack() {
-	_surface->free();
-	delete _surface;
+	if (_surface) {
+		_surface->free();
+		delete _surface;
+	}
 
 	delete[] _yBuffer;
 	delete[] _cbBuffer;
@@ -383,6 +396,11 @@ const Graphics::Surface *PSXStreamDecoder::PSXVideoTrack::decodeNextFrame() {
 }
 
 void PSXStreamDecoder::PSXVideoTrack::decodeFrame(Common::BitStreamMemoryStream *frame, uint sectorCount) {
+	if (!_surface) {
+		_surface = new Graphics::Surface();
+		_surface->create(_width, _height, _pixelFormat);
+	}
+
 	// A frame is essentially an MPEG-1 intra frame
 
 	Common::BitStreamMemory16LEMSB bits(frame);

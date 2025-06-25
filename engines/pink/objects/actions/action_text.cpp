@@ -23,7 +23,7 @@
 #include "common/substream.h"
 #include "common/unicode-bidi.h"
 
-#include "graphics/transparent_surface.h"
+#include "graphics/paletteman.h"
 
 #include "pink/archive.h"
 #include "pink/screen.h"
@@ -100,14 +100,24 @@ void ActionText::start() {
 	screen->getWndManager()._language = language;
 	switch(language) {
 	case Common::DA_DNK:
+		// fall through
 	case Common::ES_ESP:
+		// fall through
 	case Common::FR_FRA:
+		// fall through
 	case Common::PT_BRA:
+		// fall through
+	case Common::DE_DEU:
+		// fall through
+	case Common::IT_ITA:
+		// fall through
+	case Common::NL_NLD:
 		_text = Common::String(str).decode(Common::kWindows1252);
 		break;
 
 	case Common::FI_FIN:
-	case Common::SE_SWE:
+		// fall through
+	case Common::SV_SWE:
 		_text = Common::String(str).decode(Common::kWindows1257);
 		break;
 
@@ -126,7 +136,10 @@ void ActionText::start() {
 		_text = Common::String(str).decode(Common::kWindows1251);
 		break;
 
+	case Common::EN_GRB:
+		// fall through
 	case Common::EN_ANY:
+		// fall through
 	default:
 		_text = Common::String(str);
 		break;

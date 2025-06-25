@@ -38,23 +38,44 @@
 #include "director/lingo/lingo-object.h"
 #include "director/lingo/xlibs/flushxobj.h"
 
+/*************************************
+ *
+ * USED IN:
+ * majestic-mac
+ *
+ *************************************/
+
+/*
+ *  8-- FlushEvents: an XObject to call toolbox FlushEvents().-- By Scott Kelley , sakelley@ucsd.edu, 6/2/93?-- Copyright
+ *  1993 The Regents of the University of California;-- Freely distributable. No warranties. Ask before selling!
+ * --5--  mNew creates a new instance of the Flush XObject.@--  Note that the object contains internal variables which allow>--  a unique masking operation to be built for each object, or:--  mFlushEvents can pass masks to FlushEvents() directly.
+ * I   mNew
+ * --?--  mFlushEvents is identical to the toolbox call FlushEvents()%XII mFlushEvents, eventMask, stopMask
+ * --?--  mClearMask clears the object's internal masks. Note that if<--  you never call this, the object starts with a default of9--  flushing everything (i.e. FlushEvent(everyEvent,0)  )
+ * X   mClearMask
+ * --<--  mAddToMask adds the specified event mask to the object's8--  internal masks (i.e. OR's it with the existing mask)!XII mAddToMask eventMask,stopMask
+ * --6--  mFlush calls FlushEvents() with the internal masks
+ * X   mFlush
+ * --"--  mDispose gets rid of an object2X   mDispose       -- dispose of an instance of u * s
+ */
 
 namespace Director {
 
-const char *FlushXObj::xlibNames[] = {
+const char *const FlushXObj::xlibNames[] = {
 	"FlushXObj",
 	"Johnny",
 	nullptr,
 };
-const char *FlushXObj::fileNames[] = {
-	"FlushEvents",
-	"FlushXObj",
-	"Johnny",
-	"Toilet",
-	nullptr
+const XlibFileDesc FlushXObj::fileNames[] = {
+	{ "FlushEvents",	nullptr },
+	{ "FlushXObj",		nullptr },
+	{ "Johnny",			nullptr },
+	{ "Johnny.XObj",	nullptr },
+	{ "Toilet",			nullptr },
+	{ nullptr,			nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",				FlushXObj::m_new,				 0, 0,	300 },	// D3
 	{ "AddToMask",			FlushXObj::m_addToMask,			 2, 2,	400 },	// D4
 	{ "ClearMask",			FlushXObj::m_clearMask,			 0, 0,	400 },	// D4
@@ -63,7 +84,7 @@ static MethodProto xlibMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void FlushXObj::open(int type) {
+void FlushXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		FlushXObject::initMethods(xlibMethods);
 		FlushXObject *xobj = new FlushXObject(kXObj);
@@ -73,7 +94,7 @@ void FlushXObj::open(int type) {
 	}
 }
 
-void FlushXObj::close(int type) {
+void FlushXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		FlushXObject::cleanupMethods();
 		for (uint i = 0; xlibNames[i]; i++) {

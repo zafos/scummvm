@@ -42,16 +42,15 @@
 #include "common/error.h"
 #include "common/stream.h"
 #include "common/system.h"
+#include "common/archive.h"
 #include "common/textconsole.h"
 #include "common/translation.h"
 #include "audio/musicplugin.h"
 #include "audio/mpu401.h"
 #include "audio/softsynth/emumidi.h"
 #include "gui/message.h"
-#if defined(IPHONE_IOS7) && defined(IPHONE_SANDBOXED)
-#include "backends/platform/ios7/ios7_common.h"
-#endif
-#ifdef __ANDROID__
+#include "backends/fs/fs-factory.h"
+#ifdef ANDROID_BACKEND
 #include "backends/fs/android/android-fs-factory.h"
 #endif
 
@@ -113,6 +112,8 @@ protected:
 
 public:
 	MidiDriver_FluidSynth(Audio::Mixer *mixer);
+
+	static Common::Path getSoundFontPath(bool *exists = nullptr);
 
 	int open() override;
 	void close() override;
@@ -279,6 +280,55 @@ static long SoundFontMemLoader_tell(void *handle) {
 
 #endif // USE_FLUIDLITE
 
+Common::Path MidiDriver_FluidSynth::getSoundFontPath(bool *exists) {
+	Common::Path path = ConfMan.getPath("soundfont");
+	if (path.empty()) {
+		if (exists)
+			*exists = false;
+		return path;
+	}
+
+	Common::FSNode fileNode(path);
+	if (fileNode.exists()) {
+		if (exists)
+			*exists = true;
+		// Return the full system path to the soundfont
+		return Common::Path(g_system->getFilesystemFactory()->getSystemFullPath(path.toString(Common::Path::kNativeSeparator)), Common::Path::kNativeSeparator);
+	}
+
+	// Then check with soundfontpath
+	if (ConfMan.hasKey("soundfontpath")) {
+		Common::FSNode dirNode(ConfMan.getPath("soundfontpath"));
+		if (dirNode.exists() && dirNode.isDirectory()) {
+			fileNode = dirNode.getChild(path.baseName());
+			if (fileNode.exists()) {
+				if (exists)
+					*exists = true;
+				return fileNode.getPath();
+			}
+		}
+	}
+
+	// Finally look for it with SearchMan
+	Common::ArchiveMemberDetailsList files;
+	SearchMan.listMatchingMembers(files, path);
+	for (Common::ArchiveMemberDetails file : files) {
+		Common::FSDirectory* dir = dynamic_cast<Common::FSDirectory*>(SearchMan.getArchive(file.arcName));
+		if (!dir)
+			continue;
+		fileNode = dir->getFSNode().getChild(file.arcMember->getPathInArchive().toString(Common::Path::kNativeSeparator));
+		if (fileNode.exists()) {
+			if (exists)
+				*exists = true;
+			return fileNode.getPath();
+		}
+	}
+
+	if (exists)
+		*exists = false;
+	return path;
+}
+
 int MidiDriver_FluidSynth::open() {
 	if (_isOpen)
 		return MERR_ALREADY_OPEN;
@@ -297,18 +347,18 @@ int MidiDriver_FluidSynth::open() {
 	const bool isUsingInMemorySoundFontData = false;
 #endif
 
-	if (!isUsingInMemorySoundFontData && !ConfMan.hasKey("soundfont")) {
+	if (!isUsingInMemorySoundFontData && ConfMan.get("soundfont").empty()) {
 		GUI::MessageDialog dialog(_("FluidSynth requires a 'soundfont' setting. Please specify it in ScummVM GUI on MIDI tab. Music is off."));
 		dialog.runModal();
 		return MERR_DEVICE_NOT_AVAILABLE;
 	}
 
-#if defined(__ANDROID__) && defined(FS_HAS_STREAM_SUPPORT)
+#if defined(ANDROID_BACKEND) && defined(FS_HAS_STREAM_SUPPORT)
 	// In Android, when using SAF we need to wrap IO to make it work
 	// We can only do this with FluidSynth 2.0
 	if (!isUsingInMemorySoundFontData &&
 			AndroidFilesystemFactory::instance().hasSAF()) {
-		Common::FSNode fsnode(ConfMan.get("soundfont"));
+		Common::FSNode fsnode(getSoundFontPath());
 		_engineSoundFontData = fsnode.createReadStream();
 		isUsingInMemorySoundFontData = _engineSoundFontData != nullptr;
 	}
@@ -374,7 +424,7 @@ int MidiDriver_FluidSynth::open() {
 
 		double reverbRoomSize = (double)ConfMan.getInt("fluidsynth_reverb_roomsize") / 100.0;
 		double reverbDamping = (double)ConfMan.getInt("fluidsynth_reverb_damping") / 100.0;
-		int reverbWidth = ConfMan.getInt("fluidsynth_reverb_width");
+		double reverbWidth = ConfMan.getInt("fluidsynth_reverb_width") / 10.0;
 		double reverbLevel = (double)ConfMan.getInt("fluidsynth_reverb_level") / 100.0;
 
 #if FS_API_VERSION >= 0x0202
@@ -438,15 +488,8 @@ int MidiDriver_FluidSynth::open() {
 	} else
 #endif // FS_HAS_STREAM_SUPPORT
 	{
-#if defined(IPHONE_IOS7) && defined(IPHONE_SANDBOXED)
-		// HACK: Due to the sandbox on non-jailbroken iOS devices, we need to deal
-		// with the chroot filesystem. All the path selected by the user are
-		// relative to the Document directory. So, we need to adjust the path to
-		// reflect that.
-		soundfont = iOS7_getDocumentsDir() + ConfMan.get("soundfont");
-#else
-		soundfont = ConfMan.get("soundfont");
-#endif
+//		soundfont = ConfMan.get("soundfont");
+		soundfont = getSoundFontPath().toString(Common::Path::kNativeSeparator);
 	}
 
 	_soundFont = fluid_synth_sfload(_synth, soundfont.c_str(), 1);
@@ -562,6 +605,7 @@ public:
 	}
 
 	MusicDevices getDevices() const override;
+	bool checkDevice(MidiDriver::DeviceHandle, int flags, bool quiet) const override;
 	Common::Error createInstance(MidiDriver **mididriver, MidiDriver::DeviceHandle = 0) const override;
 };
 
@@ -569,6 +613,17 @@ MusicDevices FluidSynthMusicPlugin::getDevices() const {
 	MusicDevices devices;
 	devices.push_back(MusicDevice(this, "", MT_GM));
 	return devices;
+}
+
+bool FluidSynthMusicPlugin::checkDevice(MidiDriver::DeviceHandle, int flags, bool quiet) const {
+#ifdef FS_HAS_STREAM_SUPPORT
+	if (flags & MDCK_SUPPLIED_SOUND_FONT)
+		return true;
+#endif
+
+	bool exists = false;
+	Common::Path sfPath = MidiDriver_FluidSynth::getSoundFontPath(&exists);
+	return !sfPath.empty() && exists;
 }
 
 Common::Error FluidSynthMusicPlugin::createInstance(MidiDriver **mididriver, MidiDriver::DeviceHandle) const {

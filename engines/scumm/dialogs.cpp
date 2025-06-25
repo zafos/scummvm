@@ -20,6 +20,7 @@
  */
 
 #include "common/config-manager.h"
+#include "common/gui_options.h"
 #include "common/savefile.h"
 #include "common/system.h"
 #include "common/events.h"
@@ -31,6 +32,8 @@
 
 #include "gui/gui-manager.h"
 #include "gui/widget.h"
+#include "gui/widgets/edittext.h"
+#include "gui/widgets/popup.h"
 #include "gui/ThemeEval.h"
 
 #include "scumm/dialogs.h"
@@ -41,6 +44,10 @@
 
 #ifndef DISABLE_HELP
 #include "scumm/help.h"
+#endif
+
+#ifdef USE_ENET
+#include "scumm/he/net/net_defines.h"
 #endif
 
 using Graphics::kTextAlignCenter;
@@ -188,7 +195,8 @@ static const ResString string_map_table_v6[] = {
 	{0, "Heap %dK"},
 	{0, "Recalibrating Joystick"},
 	{0, "Joystick Mode"}, // SAMNMAX Floppy
-	{0, "Mouse Mode"}
+	{0, "Mouse Mode"},
+	{0, "Heap %dK, ems %dK"} // Floppy versions
 };
 
 #pragma mark -
@@ -440,18 +448,21 @@ const char *InfoDialog::getPlainEngineString(int stringno, bool forceHardcodedSt
 		return nullptr;
 
 	if (_vm->_game.version == 8) {
+		assert(stringno - 1 < ARRAYSIZE(string_map_table_v8));
 		return string_map_table_v8[stringno - 1].string;
 	} else if (_vm->_game.version == 7) {
+		assert(stringno - 1 < ARRAYSIZE(string_map_table_v7));
 		result = (const char *)_vm->getStringAddressVar(string_map_table_v7[stringno - 1].num);
 
 		if (!result) {
 			result = string_map_table_v7[stringno - 1].string;
 		}
 	} else if (_vm->_game.version == 6) {
+		assert(stringno - 1 < ARRAYSIZE(string_map_table_v6));
 		result = (const char *)_vm->getStringAddressVar(string_map_table_v6[stringno - 1].num);
 
 		if (!result) {
-			if (stringno >= 22 && stringno <= 27 && _vm->_game.id == GID_TENTACLE && _vm->_enableEnhancements && strcmp(_vm->_game.variant, "Floppy")) {
+			if (stringno >= 22 && stringno <= 27 && _vm->_game.id == GID_TENTACLE && _vm->enhancementEnabled(kEnhTextLocFixes) && strcmp(_vm->_game.variant, "Floppy")) {
 				result = getStaticResString(_vm->_language, stringno - 1).string;
 			} else {
 				result = string_map_table_v6[stringno - 1].string;
@@ -500,7 +511,7 @@ void decodeV2String(Common::Language lang, Common::String &str) {
 	case Common::RU_RUS:
 		map = mapRU;
 		break;
-	case Common::SE_SWE:
+	case Common::SV_SWE:
 		map = mapSE;
 		break;
 	default:
@@ -570,7 +581,7 @@ const Common::U32String InfoDialog::queryResString(int stringno) {
 
 const ResString &InfoDialog::getStaticResString(Common::Language lang, int stringno) {
 	// The string parts are only needed for v1/2. So we need to provide only the
-	// language varieties that exist for these. I have added the langugage I found
+	// language varieties that exist for these. I have added the languages I found
 	// in scumm-md5.h. I guess we could actually ditch the first 3 lines...
 	static const ResString strMap1[][6] = {
 		{	// English
@@ -633,7 +644,7 @@ const ResString &InfoDialog::getStaticResString(Common::Language lang, int strin
 
 	// Added in SCUMM4. Only the numbers are used, so there
 	// is no need to provide language specific strings; there are
-	// some exceptions for which there's only an hardcoded English
+	// some exceptions for which there's only a hardcoded English
 	// string.
 	static const ResString strMap2[] = {
 		{7, ("Save")},
@@ -750,7 +761,7 @@ const ResString &InfoDialog::getStaticResString(Common::Language lang, int strin
 	bool useHardcodedV3QuitPrompt = stringno == 5 && _vm->_game.version == 3 && _vm->_game.id != GID_LOOM;
 	bool useFixedDottMenuStrings = stringno >= 21 && stringno <= 26 && _vm->_game.id == GID_TENTACLE;
 
-	// I have added the langugages I found in scumm-md5.h for v1/2 games...
+	// I have added the languages I found in scumm-md5.h for v1/2 games...
 	int langIndex = 0;
 	switch (lang) {
 	case Common::FR_FRA:
@@ -768,7 +779,7 @@ const ResString &InfoDialog::getStaticResString(Common::Language lang, int strin
 	case Common::RU_RUS:
 		langIndex = useFixedDottMenuStrings ? 0 : 5;
 		break;
-	case Common::SE_SWE:
+	case Common::SV_SWE:
 		langIndex = useFixedDottMenuStrings ? 0 : 6;
 		break;
 	case Common::JA_JPN:
@@ -780,11 +791,14 @@ const ResString &InfoDialog::getStaticResString(Common::Language lang, int strin
 	}
 
 	if (useHardcodedV3QuitPrompt) {
+		assert(langIndex < ARRAYSIZE(hardcodedV3QuitPrompt));
 		return hardcodedV3QuitPrompt[langIndex];
 	}
 
 	if (useFixedDottMenuStrings) {
 		stringno -= 21;
+		assert(langIndex < ARRAYSIZE(fixedDottMenuStrings));
+		assert(stringno < ARRAYSIZE(fixedDottMenuStrings[0]));
 		return fixedDottMenuStrings[langIndex][stringno];
 	}
 
@@ -808,6 +822,9 @@ const ResString &InfoDialog::getStaticResString(Common::Language lang, int strin
 			return altStr;
 		}
 	}
+
+	assert(langIndex < ARRAYSIZE(strMap1));
+	assert(stringno < ARRAYSIZE(strMap1[0]));
 	return strMap1[langIndex][stringno];
 }
 
@@ -1039,18 +1056,151 @@ void LoomTownsDifficultyDialog::handleCommand(GUI::CommandSender *sender, uint32
 
 // Game options widgets
 
-// Normally this would be added as a static game settings widget, but I see no
-// way to get both the dynamic and the static one, so we have to duplicate it
-// here.
+void ScummOptionsContainerWidget::load() {
+	int32 enhancementsFlags = (int32)ConfMan.getInt("enhancements", _domain);
 
-GUI::CheckboxWidget *ScummOptionsContainerWidget::createEnhancementsCheckbox(GuiObject *boss, const Common::String &name) {
-	return new GUI::CheckboxWidget(boss, name, _("Enable game-specific enhancements"), _("Allow ScummVM to make small enhancements to the game, usually based on other versions of the same game."));
+	for (uint i = 0; i < _enhancementsCheckboxes.size(); i++) {
+		int32 targetFlags = 0;
+		enhancementsFlags &= ~kEnhGameBreakingBugFixes; // Always active, so don't worry about it!
+
+		if (_enhancementsCheckboxes[i]) {
+			switch (_enhancementsCheckboxes[i]->getCmd()) {
+			case kEnhancementGroup1Cmd:
+				targetFlags |= kEnhGrp1;
+				break;
+			case kEnhancementGroup2Cmd:
+				targetFlags |= kEnhGrp2;
+				break;
+			case kEnhancementGroup3Cmd:
+				targetFlags |= kEnhGrp3;
+				break;
+			case kEnhancementGroup4Cmd:
+				targetFlags |= kEnhGrp4;
+				break;
+			default:
+				break;
+			}
+
+			_enhancementsCheckboxes[i]->setState(enhancementsFlags & targetFlags);
+		}
+	}
+}
+
+bool ScummOptionsContainerWidget::save() {
+	int32 enhancementsFlags = kEnhGameBreakingBugFixes; // Always active!
+
+	for (uint i = 0; i < _enhancementsCheckboxes.size(); i++) {
+		if (_enhancementsCheckboxes[i]) {
+			switch (_enhancementsCheckboxes[i]->getCmd()) {
+			case kEnhancementGroup1Cmd:
+				if (_enhancementsCheckboxes[i]->getState()) {
+					enhancementsFlags |= kEnhGrp1;
+				} else {
+					enhancementsFlags &= ~kEnhGrp1;
+				}
+				break;
+
+			case kEnhancementGroup2Cmd:
+				if (_enhancementsCheckboxes[i]->getState()) {
+					enhancementsFlags |= kEnhGrp2;
+				} else {
+					enhancementsFlags &= ~kEnhGrp2;
+				}
+				break;
+
+			case kEnhancementGroup3Cmd:
+				if (_enhancementsCheckboxes[i]->getState()) {
+					enhancementsFlags |= kEnhGrp3;
+				} else {
+					enhancementsFlags &= ~kEnhGrp3;
+				}
+				break;
+
+			case kEnhancementGroup4Cmd:
+				if (_enhancementsCheckboxes[i]->getState()) {
+					enhancementsFlags |= kEnhGrp4;
+				} else {
+					enhancementsFlags &= ~kEnhGrp4;
+				}
+				break;
+
+			default:
+				break;
+			}
+		}
+	}
+
+	ConfMan.setInt("enhancements", enhancementsFlags, _domain);
+
+	return true;
+}
+
+void ScummOptionsContainerWidget::createEnhancementsWidget(GuiObject *boss, const Common::String &name) {
+	GUI::StaticTextWidget *text = new GUI::StaticTextWidget(boss, name + ".enhancementsLabel", _("Enhancements:"));
+	text->setAlign(Graphics::TextAlign::kTextAlignStart);
+
+	// I18N: Game enhancements groups
+	GUI::CheckboxWidget *enh1 = new GUI::CheckboxWidget(boss, name + ".enhancementGroup1",
+		_("Fix original bugs"),
+		_("Fixes bugs which were present in the original release, and noticeable graphical/audio glitches."),
+		kEnhancementGroup1Cmd);
+	GUI::CheckboxWidget *enh2 = new GUI::CheckboxWidget(boss, name + ".enhancementGroup2",
+		_("Audio-visual improvements"),
+		_("Makes adjustments not related to bugs for certain audio and graphics elements (e.g. version consistency changes)."),
+		kEnhancementGroup2Cmd);
+	GUI::CheckboxWidget *enh3 = new GUI::CheckboxWidget(boss, name + ".enhancementGroup3",
+		_("Restored content"),
+		_("Restores dialogs, graphics, and audio elements which were originally cut in the original release."),
+		kEnhancementGroup3Cmd);
+	GUI::CheckboxWidget *enh4 = new GUI::CheckboxWidget(boss, name + ".enhancementGroup4",
+		_("Modern UI/UX adjustments"),
+		_("Activates some modern comforts; e.g it removes the fake sound loading screen in Sam&Max, and makes early save menus snappier."),
+		kEnhancementGroup4Cmd);
+
+	_enhancementsCheckboxes.push_back(enh1);
+	_enhancementsCheckboxes.push_back(enh2);
+	_enhancementsCheckboxes.push_back(enh3);
+	_enhancementsCheckboxes.push_back(enh4);
+}
+
+GUI::ThemeEval &ScummOptionsContainerWidget::addEnhancementsLayout(GUI::ThemeEval &layouts) const {
+	// Do not open/close layout: this is handled outside!
+	layouts.addPadding(0, 0, 8, 8)
+		.addSpace(10)
+		.addWidget("enhancementsLabel", "OptionsLabel")
+		.addWidget("enhancementGroup1", "Checkbox")
+		.addWidget("enhancementGroup2", "Checkbox")
+		.addWidget("enhancementGroup3", "Checkbox")
+		.addWidget("enhancementGroup4", "Checkbox");
+
+	return layouts;
 }
 
 GUI::CheckboxWidget *ScummOptionsContainerWidget::createOriginalGUICheckbox(GuiObject *boss, const Common::String &name) {
 	return new GUI::CheckboxWidget(boss, name,
 		_("Enable the original GUI and Menu"),
 		_("Allow the game to use the in-engine graphical interface and the original save/load menu. Use it together with the \"Ask for confirmation on exit\" for a more complete experience.")
+	);
+}
+
+GUI::CheckboxWidget *ScummOptionsContainerWidget::createGammaCorrectionCheckbox(GuiObject *boss, const Common::String &name) {
+	return new GUI::CheckboxWidget(boss, name,
+		_("Enable gamma correction"),
+		_("Brighten the graphics to simulate a Macintosh monitor.")
+	);
+}
+
+GUI::CheckboxWidget *ScummOptionsContainerWidget::createSegaShadowModeCheckbox(GuiObject *boss, const Common::String &name) {
+	return new GUI::CheckboxWidget(boss, name,
+		_("Simulate Sega colors"),
+		_("Instead of using the colors defined in the game, simulate colors used on actual Sega hardware. These are significantly darker, though it's unclear if that was intended or not.")
+	);
+}
+
+GUI::CheckboxWidget *ScummOptionsContainerWidget::createCopyProtectionCheckbox(GuiObject *boss, const Common::String &name) {
+	return new GUI::CheckboxWidget(boss, name,
+		_("Enable copy protection"),
+		_("Enable any copy protection that would otherwise be bypassed by default.")
 	);
 }
 
@@ -1066,6 +1216,93 @@ void ScummOptionsContainerWidget::updateAdjustmentSlider(GUI::SliderWidget *slid
 
 	value->setLabel(Common::String::format("%s%d.%02d", sign, adjustment / 100, adjustment % 100));
 
+}
+
+// SCUMM game settings
+
+ScummGameOptionsWidget::ScummGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain, const ExtraGuiOptions &options) :
+		ScummOptionsContainerWidget(boss, name, "ScummGameOptionsDialog", domain), _options(options) {
+	for (uint i = 0; i < _options.size(); i++) {
+		GUI::CheckboxWidget *checkbox = nullptr;
+		if (strcmp(_options[i].configOption, "enhancements") == 0) {
+			createEnhancementsWidget(widgetsBoss(), _dialogLayout);
+		} else {
+			Common::String id = Common::String::format("%d", i + 1);
+
+			checkbox = new GUI::CheckboxWidget(widgetsBoss(),
+				_dialogLayout + ".customOption" + id + "Checkbox", _(_options[i].label), _(_options[i].tooltip));
+
+			if (strcmp(_options[i].configOption, "smooth_scroll") == 0) {
+				_smoothScrollCheckbox = checkbox;
+				_smoothScrollCheckbox->setCmd(kSmoothScrollCmd);
+			} else if (strcmp(_options[i].configOption, "semi_smooth_scroll") == 0) {
+				_semiSmoothScrollCheckbox = checkbox;
+			}
+		}
+		_checkboxes.push_back(checkbox);
+	}
+}
+
+void ScummGameOptionsWidget::load() {
+	ScummOptionsContainerWidget::load();
+
+	for (uint i = 0; i < _options.size(); i++) {
+		if (!_checkboxes[i])
+			continue;
+
+		bool isChecked = _options[i].defaultState;
+		if (ConfMan.hasKey(_options[i].configOption, _domain))
+			isChecked = ConfMan.getBool(_options[i].configOption, _domain);
+		_checkboxes[i]->setState(isChecked);
+	}
+
+	if (_smoothScrollCheckbox && _semiSmoothScrollCheckbox)
+		_semiSmoothScrollCheckbox->setEnabled(_smoothScrollCheckbox->getState());
+}
+
+bool ScummGameOptionsWidget::save() {
+	ScummOptionsContainerWidget::save();
+
+	for (uint i = 0; i < _options.size(); i++) {
+		if (_checkboxes[i])
+			ConfMan.setBool(_options[i].configOption, _checkboxes[i]->isEnabled() && _checkboxes[i]->getState(), _domain);
+	}
+
+	return true;
+}
+
+void ScummGameOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const {
+	layouts.addDialog(layoutName, overlayedLayout);
+	layouts.addLayout(GUI::ThemeLayout::kLayoutVertical).addPadding(0, 0, 0, 0);
+
+	bool hasEnhancements = false;
+
+	for (uint i = 0; i < _options.size(); i++) {
+		if (strcmp(_options[i].configOption, "enhancements") != 0) {
+			Common::String id = Common::String::format("%d", i + 1);
+			layouts.addWidget("customOption" + id + "Checkbox", "Checkbox");
+		} else
+			hasEnhancements = true;
+	}
+
+	if (hasEnhancements) {
+		addEnhancementsLayout(layouts);
+	}
+
+	layouts.closeLayout().closeDialog();
+}
+
+void ScummGameOptionsWidget::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
+	switch (cmd) {
+	case kSmoothScrollCmd: {
+		if (_semiSmoothScrollCheckbox)
+			_semiSmoothScrollCheckbox->setEnabled(data != 0);
+		break;
+	}
+	default:
+		GUI::OptionsContainerWidget::handleCommand(sender, cmd, data);
+		break;
+	}
 }
 
 // EGA Loom Overture settings
@@ -1094,11 +1331,14 @@ LoomEgaGameOptionsWidget::LoomEgaGameOptionsWidget(GuiObject *boss, const Common
 
 	_overtureTicksValue->setFlags(GUI::WIDGET_CLEARBG);
 
-	_enableEnhancementsCheckbox = createEnhancementsCheckbox(widgetsBoss(), "LoomEgaGameOptionsDialog.EnableEnhancements");
+	createEnhancementsWidget(widgetsBoss(), "LoomEgaGameOptionsDialog");
 	_enableOriginalGUICheckbox = createOriginalGUICheckbox(widgetsBoss(), "LoomEgaGameOptionsDialog.EnableOriginalGUI");
+	_enableCopyProtectionCheckbox = createCopyProtectionCheckbox(widgetsBoss(), "LoomEgaGameOptionsDialog.EnableCopyProtection");
 }
 
 void LoomEgaGameOptionsWidget::load() {
+	ScummOptionsContainerWidget::load();
+
 	int loomOvertureTicks = 0;
 
 	if (ConfMan.hasKey("loom_overture_ticks", _domain))
@@ -1107,14 +1347,16 @@ void LoomEgaGameOptionsWidget::load() {
 	_overtureTicksSlider->setValue(loomOvertureTicks);
 	updateOvertureTicksValue();
 
-	_enableEnhancementsCheckbox->setState(ConfMan.getBool("enable_enhancements", _domain));
 	_enableOriginalGUICheckbox->setState(ConfMan.getBool("original_gui", _domain));
+	_enableCopyProtectionCheckbox->setState(ConfMan.getBool("copy_protection", _domain));
 }
 
 bool LoomEgaGameOptionsWidget::save() {
+	ScummOptionsContainerWidget::save();
+
 	ConfMan.setInt("loom_overture_ticks", _overtureTicksSlider->getValue(), _domain);
-	ConfMan.setBool("enable_enhancements", _enableEnhancementsCheckbox->getState(), _domain);
 	ConfMan.setBool("original_gui", _enableOriginalGUICheckbox->getState(), _domain);
+	ConfMan.setBool("copy_protection", _enableCopyProtectionCheckbox->getState(), _domain);
 	return true;
 }
 
@@ -1125,12 +1367,13 @@ void LoomEgaGameOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Commo
 			.addLayout(GUI::ThemeLayout::kLayoutVertical, 4)
 				.addPadding(0, 0, 10, 0)
 				.addWidget("EnableOriginalGUI", "Checkbox")
-				.addWidget("EnableEnhancements", "Checkbox")
-			.closeLayout()
+				.addWidget("EnableCopyProtection", "Checkbox");
+	addEnhancementsLayout(layouts)
+		.closeLayout()
 			.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 				.addPadding(0, 0, 10, 0)
 				.addWidget("OvertureTicksLabel", "OptionsLabel")
-				.addWidget("OvertureTicks", "WideSlider")
+				.addWidget("OvertureTicks", "Slider")
 				.addWidget("OvertureTicksValue", "ShortOptionsLabel")
 			.closeLayout()
 		.closeLayout()
@@ -1138,7 +1381,6 @@ void LoomEgaGameOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Commo
 }
 
 void LoomEgaGameOptionsWidget::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
-
 	switch (cmd) {
 	case kOvertureTicksChanged:
 		updateOvertureTicksValue();
@@ -1153,6 +1395,117 @@ void LoomEgaGameOptionsWidget::updateOvertureTicksValue() {
 	int ticks = DEFAULT_LOOM_OVERTURE_TRANSITION + _overtureTicksSlider->getValue();
 
 	_overtureTicksValue->setLabel(Common::String::format("%d:%02d.%d", ticks / 600, (ticks % 600) / 10, ticks % 10));
+}
+
+// Options for various Mac games
+MacGameOptionsWidget::MacGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain, int gameId, const Common::String &extra) :
+	ScummOptionsContainerWidget(boss, name, "MacGameOptionsWidget", domain) {
+	GUI::StaticTextWidget *text = new GUI::StaticTextWidget(widgetsBoss(), "MacGameOptionsWidget.SndQualityLabel", _("Music Quality:"));
+	text->setAlign(Graphics::TextAlign::kTextAlignEnd);
+
+	_sndQualitySlider = new GUI::SliderWidget(widgetsBoss(), "MacGameOptionsWidget.SndQuality", gameId == GID_MONKEY ?
+		_("Select music quality. The original lets you choose this from the Game menu.") :
+		_("Select music quality. The original determines the basic setup by hardware detection and speed tests, "
+			"but also allows changes through the Game menu to some degree."), kQualitySliderUpdate);
+	_sndQualitySlider->setMinValue(gameId == GID_LOOM ? 0 : 6);
+	_sndQualitySlider->setMaxValue(9);
+	_sndQualityValue = new GUI::StaticTextWidget(widgetsBoss(), "MacGameOptionsWidget.SndQualityValue", Common::U32String());
+	_sndQualityValue->setFlags(GUI::WIDGET_CLEARBG);
+	updateQualitySlider();
+	createEnhancementsWidget(widgetsBoss(), "MacGameOptionsWidget");
+	_enableOriginalGUICheckbox = createOriginalGUICheckbox(widgetsBoss(), "MacGameOptionsWidget.EnableOriginalGUI");
+	_enableGammaCorrectionCheckbox = createGammaCorrectionCheckbox(widgetsBoss(), "MacGameOptionsWidget.EnableGammaCorrection");
+
+	if (gameId == GID_MONKEY || gameId == GID_MONKEY2 || (gameId == GID_INDY4 && extra == "Floppy"))
+		_enableCopyProtectionCheckbox = createCopyProtectionCheckbox(widgetsBoss(), "MacGameOptionsWidget.EnableCopyProtection");
+}
+
+void MacGameOptionsWidget::load() {
+	ScummOptionsContainerWidget::load();
+
+	_quality = 0;
+
+	if (ConfMan.hasKey("mac_snd_quality", _domain))
+		_quality = ConfMan.getInt("mac_snd_quality", _domain);
+
+	// Migrate old bool setting...
+	if (_quality == 0 && ConfMan.hasKey("mac_v3_low_quality_music", _domain)) {
+		if (ConfMan.getBool("mac_v3_low_quality_music"))
+			_quality = 1;
+	}
+	ConfMan.removeKey("mac_v3_low_quality_music", _domain);
+
+	_sndQualitySlider->setValue(_quality);
+	updateQualitySlider();
+	_enableOriginalGUICheckbox->setState(ConfMan.getBool("original_gui", _domain));
+	_enableGammaCorrectionCheckbox->setState(ConfMan.getBool("gamma_correction", _domain));
+
+	if (_enableCopyProtectionCheckbox)
+		_enableCopyProtectionCheckbox->setState(ConfMan.getBool("copy_protection", _domain));
+}
+
+bool MacGameOptionsWidget::save() {
+	bool res = ScummOptionsContainerWidget::save();
+	ConfMan.setInt("mac_snd_quality", _quality, _domain);
+	ConfMan.setBool("original_gui", _enableOriginalGUICheckbox->getState(), _domain);
+	ConfMan.setBool("gamma_correction", _enableGammaCorrectionCheckbox->getState(), _domain);
+
+	if (_enableCopyProtectionCheckbox)
+		ConfMan.setBool("copy_protection", _enableCopyProtectionCheckbox->getState(), _domain);
+
+	return res;
+}
+
+void MacGameOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const {
+	layouts.addDialog(layoutName, overlayedLayout)
+		.addLayout(GUI::ThemeLayout::kLayoutVertical, 5)
+			.addPadding(0, 0, 0, 0)
+			.addLayout(GUI::ThemeLayout::kLayoutVertical, 4)
+				.addPadding(0, 0, 10, 0)
+				.addWidget("EnableOriginalGUI", "Checkbox")
+				.addWidget("EnableGammaCorrection", "Checkbox");
+
+	if (_enableCopyProtectionCheckbox)
+		layouts.addWidget("EnableCopyProtection", "Checkbox");
+
+	addEnhancementsLayout(layouts)
+			.closeLayout()
+			.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
+				.addPadding(0, 0, 0, 0)
+				.addWidget("SndQualityLabel", "OptionsLabel")
+				.addLayout(GUI::ThemeLayout::kLayoutVertical, 10, GUI::ThemeLayout::kItemAlignStretch)
+					.addPadding(0, 0, 0, 0)
+					.addWidget("SndQuality", "Slider")
+					.addWidget("SndQualityValue", "OptionsLabel")
+				.closeLayout()
+			.closeLayout()
+		.closeLayout()
+		.closeDialog();
+}
+
+void MacGameOptionsWidget::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
+	switch (cmd) {
+	case kQualitySliderUpdate:
+		updateQualitySlider();
+		break;
+	default:
+		GUI::OptionsContainerWidget::handleCommand(sender, cmd, data);
+		break;
+	}
+}
+
+void MacGameOptionsWidget::updateQualitySlider() {
+	_quality = _sndQualitySlider->getValue();
+	static const char *const descr1[] = { _s("auto"), _s("Low"), _s("Medium"), _s("High") };
+	static const char *const descr2[] = { _s("auto"), _s("Good"), _s("Better"), _s("Best") };
+	static const char *const pattern[] = { _s("Hardware Rating: %s   -   "), _s("Quality Selection: %s") };
+
+	Common::String pt1(Common::String::format(pattern[1], descr2[_quality == _sndQualitySlider->getMinValue() ? 0 : ((_quality - 1) % 3) + 1]));
+	if (_sndQualitySlider->getMinValue() == 0)
+		pt1.insertString(Common::String::format(pattern[0], descr1[_quality == _sndQualitySlider->getMinValue() ? 0 : ((_quality - 1) / 3) + 1]), 0);
+
+	Common::U32String label(pt1);
+	_sndQualityValue->setLabel(label);
 }
 
 // VGA Loom Playback Adjustment settings
@@ -1177,11 +1530,13 @@ LoomVgaGameOptionsWidget::LoomVgaGameOptionsWidget(GuiObject *boss, const Common
 
 	_playbackAdjustmentValue->setFlags(GUI::WIDGET_CLEARBG);
 
-	_enableEnhancementsCheckbox = createEnhancementsCheckbox(widgetsBoss(), "LoomVgaGameOptionsDialog.EnableEnhancements");
+	createEnhancementsWidget(widgetsBoss(), "LoomVgaGameOptionsDialog");
 	_enableOriginalGUICheckbox = createOriginalGUICheckbox(widgetsBoss(), "LoomVgaGameOptionsDialog.EnableOriginalGUI");
 }
 
 void LoomVgaGameOptionsWidget::load() {
+	ScummOptionsContainerWidget::load();
+
 	int playbackAdjustment = 0;
 
 	if (ConfMan.hasKey("loom_playback_adjustment", _domain))
@@ -1190,13 +1545,12 @@ void LoomVgaGameOptionsWidget::load() {
 	_playbackAdjustmentSlider->setValue(playbackAdjustment);
 	updatePlaybackAdjustmentValue();
 
-	_enableEnhancementsCheckbox->setState(ConfMan.getBool("enable_enhancements", _domain));
 	_enableOriginalGUICheckbox->setState(ConfMan.getBool("original_gui", _domain));
 }
 
 bool LoomVgaGameOptionsWidget::save() {
+	ScummOptionsContainerWidget::save();
 	ConfMan.setInt("loom_playback_adjustment", _playbackAdjustmentSlider->getValue(), _domain);
-	ConfMan.setBool("enable_enhancements", _enableEnhancementsCheckbox->getState(), _domain);
 	ConfMan.setBool("original_gui", _enableOriginalGUICheckbox->getState(), _domain);
 	return true;
 }
@@ -1207,13 +1561,13 @@ void LoomVgaGameOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Commo
 			.addPadding(0, 0, 0, 0)
 			.addLayout(GUI::ThemeLayout::kLayoutVertical, 4)
 				.addPadding(0, 0, 10, 0)
-				.addWidget("EnableOriginalGUI", "Checkbox")
-				.addWidget("EnableEnhancements", "Checkbox")
+				.addWidget("EnableOriginalGUI", "Checkbox");
+	addEnhancementsLayout(layouts)
 			.closeLayout()
 			.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 				.addPadding(0, 0, 10, 0)
 				.addWidget("PlaybackAdjustmentLabel", "OptionsLabel")
-				.addWidget("PlaybackAdjustment", "WideSlider")
+				.addWidget("PlaybackAdjustment", "Slider")
 				.addWidget("PlaybackAdjustmentValue", "ShortOptionsLabel")
 			.closeLayout()
 		.closeLayout()
@@ -1240,7 +1594,12 @@ void LoomVgaGameOptionsWidget::updatePlaybackAdjustmentValue() {
 
 MI1CdGameOptionsWidget::MI1CdGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain) :
 		ScummOptionsContainerWidget(boss, name, "MI1CdGameOptionsDialog", domain) {
-	Common::String extra = ConfMan.get("extra", domain);
+	Common::Platform platform = Common::parsePlatform(ConfMan.get("platform", _domain));
+
+	_enableOriginalGUICheckbox = createOriginalGUICheckbox(widgetsBoss(), "MI1CdGameOptionsDialog.EnableOriginalGUI");
+
+	if (platform == Common::kPlatformSegaCD)
+		_enableSegaShadowModeCheckbox = createSegaShadowModeCheckbox(widgetsBoss(), "MI1CdGameOptionsDialog.EnableSegaShadowMode");
 
 	GUI::StaticTextWidget *text = new GUI::StaticTextWidget(widgetsBoss(), "MI1CdGameOptionsDialog.IntroAdjustmentLabel", _("Intro Adjust:"));
 
@@ -1268,11 +1627,15 @@ MI1CdGameOptionsWidget::MI1CdGameOptionsWidget(GuiObject *boss, const Common::St
 
 	_outlookAdjustmentValue->setFlags(GUI::WIDGET_CLEARBG);
 
-	_enableEnhancementsCheckbox = createEnhancementsCheckbox(widgetsBoss(), "MI1CdGameOptionsDialog.EnableEnhancements");
-	_enableOriginalGUICheckbox = createOriginalGUICheckbox(widgetsBoss(), "MI1CdGameOptionsDialog.EnableOriginalGUI");
+	createEnhancementsWidget(widgetsBoss(), "MI1CdGameOptionsDialog");
 }
 
 void MI1CdGameOptionsWidget::load() {
+	ScummOptionsContainerWidget::load();
+
+	if (_enableSegaShadowModeCheckbox)
+		_enableSegaShadowModeCheckbox->setState(ConfMan.getBool("enable_sega_shadow_mode", _domain));
+
 	int introAdjustment = 0;
 	int outlookAdjustment = 0;
 
@@ -1287,37 +1650,46 @@ void MI1CdGameOptionsWidget::load() {
 	_outlookAdjustmentSlider->setValue(outlookAdjustment);
 	updateOutlookAdjustmentValue();
 
-	_enableEnhancementsCheckbox->setState(ConfMan.getBool("enable_enhancements", _domain));
 	_enableOriginalGUICheckbox->setState(ConfMan.getBool("original_gui", _domain));
 }
 
 bool MI1CdGameOptionsWidget::save() {
+	ScummOptionsContainerWidget::save();
+
+	if (_enableSegaShadowModeCheckbox)
+		ConfMan.setBool("enable_sega_shadow_mode", _enableSegaShadowModeCheckbox->getState(), _domain);
+
 	ConfMan.setInt("mi1_intro_adjustment", _introAdjustmentSlider->getValue(), _domain);
 	ConfMan.setInt("mi1_outlook_adjustment", _outlookAdjustmentSlider->getValue(), _domain);
-	ConfMan.setBool("enable_enhancements", _enableEnhancementsCheckbox->getState(), _domain);
 	ConfMan.setBool("original_gui", _enableOriginalGUICheckbox->getState(), _domain);
 	return true;
 }
 
 void MI1CdGameOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const {
+	Common::Platform platform = Common::parsePlatform(ConfMan.get("platform", _domain));
+
 	layouts.addDialog(layoutName, overlayedLayout)
 		.addLayout(GUI::ThemeLayout::kLayoutVertical, 5)
 			.addPadding(0, 0, 0, 0)
 			.addLayout(GUI::ThemeLayout::kLayoutVertical, 4)
 				.addPadding(0, 0, 10, 0)
-				.addWidget("EnableOriginalGUI", "Checkbox")
-				.addWidget("EnableEnhancements", "Checkbox")
+				.addWidget("EnableOriginalGUI", "Checkbox");
+
+	if (platform == Common::kPlatformSegaCD)
+		layouts.addWidget("EnableSegaShadowMode", "Checkbox");
+
+	addEnhancementsLayout(layouts)
 			.closeLayout()
 			.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 				.addPadding(0, 0, 12, 0)
 				.addWidget("IntroAdjustmentLabel", "OptionsLabel")
-				.addWidget("IntroAdjustment", "WideSlider")
+				.addWidget("IntroAdjustment", "Slider")
 				.addWidget("IntroAdjustmentValue", "ShortOptionsLabel")
 			.closeLayout()
 			.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
 				.addPadding(0, 0, 0, 0)
 				.addWidget("OutlookAdjustmentLabel", "OptionsLabel")
-				.addWidget("OutlookAdjustment", "WideSlider")
+				.addWidget("OutlookAdjustment", "Slider")
 				.addWidget("OutlookAdjustmentValue", "ShortOptionsLabel")
 			.closeLayout()
 		.closeLayout()
@@ -1346,5 +1718,173 @@ void MI1CdGameOptionsWidget::updateIntroAdjustmentValue() {
 void MI1CdGameOptionsWidget::updateOutlookAdjustmentValue() {
 	updateAdjustmentSlider(_outlookAdjustmentSlider, _outlookAdjustmentValue);
 }
+
+#ifdef USE_ENET
+// HE Network Play Adjustment settings
+
+HENetworkGameOptionsWidget::HENetworkGameOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain, const Common::String &&gameid) :
+	ScummOptionsContainerWidget(boss, name, "HENetworkGameOptionsDialog", domain), _gameid(Common::move(gameid)) {
+	Common::String extra = ConfMan.get("extra", domain);
+
+	// Add back the "Load modded audio" option.
+	_audioOverride = nullptr;
+	const Common::String guiOptionsString = ConfMan.get("guioptions", domain);
+	const Common::String guiOptions = parseGameGUIOptions(guiOptionsString);
+	if (guiOptions.contains(GAMEOPTION_AUDIO_OVERRIDE))
+		_audioOverride = new GUI::CheckboxWidget(widgetsBoss(), "HENetworkGameOptionsDialog.AudioOverride", _("Load modded audio"), _("Replace music, sound effects, and speech clips with modded audio files, if available."));
+
+	GUI::StaticTextWidget *text = new GUI::StaticTextWidget(widgetsBoss(), "HENetworkGameOptionsDialog.SessionServerLabel", _("Multiplayer Server:"));
+	text->setAlign(Graphics::TextAlign::kTextAlignEnd);
+
+	if (_gameid == "football" || _gameid == "baseball2001") {
+		// Lobby configuration (Do not include LAN settings)
+#ifdef USE_LIBCURL
+		text->setLabel(_("Online Server:"));
+		_lobbyServerAddr = new GUI::EditTextWidget(widgetsBoss(), "HENetworkGameOptionsDialog.LobbyServerAddress", Common::U32String(""), _("Address of the server to connect to for online play.  It must start with either \"https://\" or \"http://\" schemas."));
+		_serverResetButton = addClearButton(widgetsBoss(), "HENetworkGameOptionsDialog.ServerReset", kResetServersCmd);
+		_enableCompetitiveMods = new GUI::CheckboxWidget(widgetsBoss(), "HENetworkGameOptionsDialog.EnableCompetitiveMods", _("Enable online competitive mods"), _("Enables custom-made modifications intended for online competitive play."));
+#endif
+	} else {
+		// Network configuration (Include LAN settings)
+		_enableSessionServer = new GUI::CheckboxWidget(widgetsBoss(), "HENetworkGameOptionsDialog.EnableSessionServer", _("Enable connection to Multiplayer Server"), _("Toggles the connection to the server that allows hosting and joining online multiplayer games over the Internet."), kEnableSessionCmd);
+		_enableLANBroadcast = new GUI::CheckboxWidget(widgetsBoss(), "HENetworkGameOptionsDialog.EnableLANBroadcast", _("Host games over LAN"), _("Allows the game sessions to be discovered over your local area network."));
+
+		if (_gameid == "moonbase") {
+			// I18N: Moonbase Console is a program name
+			_generateRandomMaps = new GUI::CheckboxWidget(widgetsBoss(), "HENetworkGameOptionsDialog.GenerateRandomMaps", _("Generate random maps"), _("Allow random map generation (Based from Moonbase Console)."));
+		}
+
+		_sessionServerAddr = new GUI::EditTextWidget(widgetsBoss(), "HENetworkGameOptionsDialog.SessionServerAddress", Common::U32String(""), _("Address of the server to connect to for hosting and joining online game sessions."));
+
+		_serverResetButton = addClearButton(widgetsBoss(), "HENetworkGameOptionsDialog.ServerReset", kResetServersCmd);
+	}
+
+	// Display network version
+	_networkVersion = new GUI::StaticTextWidget(widgetsBoss(), "HENetworkGameOptionsDialog.NetworkVersion", Common::String::format("Multiplayer Version: %s", NETWORK_VERSION));
+}
+
+void HENetworkGameOptionsWidget::load() {
+	if (_audioOverride) {
+		bool audioOverride = true;
+		if (ConfMan.hasKey("audio_override", _domain))
+			audioOverride = ConfMan.getBool("audio_override", _domain);
+		_audioOverride->setState(audioOverride);
+	}
+	if (_gameid == "football" || _gameid == "baseball2001") {
+#ifdef USE_LIBCURL
+		Common::String lobbyServerAddr = "https://multiplayer.scummvm.org:9130";
+		bool enableCompetitiveMods = false;
+
+		if (ConfMan.hasKey("lobby_server", _domain))
+			lobbyServerAddr = ConfMan.get("lobby_server", _domain);
+		_lobbyServerAddr->setEditString(lobbyServerAddr);
+		if (ConfMan.hasKey("enable_competitive_mods", _domain))
+			enableCompetitiveMods = ConfMan.getBool("enable_competitive_mods", _domain);
+		_enableCompetitiveMods->setState(enableCompetitiveMods);
+#endif
+	} else {
+		bool enableSessionServer = true;
+		bool enableLANBroadcast = true;
+		bool generateRandomMaps = false;
+		Common::String sessionServerAddr = "multiplayer.scummvm.org";
+
+		if (ConfMan.hasKey("enable_session_server", _domain))
+			enableSessionServer = ConfMan.getBool("enable_session_server", _domain);
+		_enableSessionServer->setState(enableSessionServer);
+
+		if (ConfMan.hasKey("enable_lan_broadcast", _domain))
+			enableLANBroadcast = ConfMan.getBool("enable_lan_broadcast", _domain);
+		_enableLANBroadcast->setState(enableLANBroadcast);
+
+		if (ConfMan.hasKey("session_server", _domain))
+			sessionServerAddr = ConfMan.get("session_server", _domain);
+		_sessionServerAddr->setEditString(sessionServerAddr);
+		_sessionServerAddr->setEnabled(enableSessionServer);
+
+		if (_gameid == "moonbase") {
+			if (ConfMan.hasKey("generate_random_maps", _domain))
+				generateRandomMaps = ConfMan.getBool("generate_random_maps", _domain);
+			_generateRandomMaps->setState(generateRandomMaps);
+		}
+	}
+}
+
+bool HENetworkGameOptionsWidget::save() {
+	if (_audioOverride)
+		ConfMan.setBool("audio_override", _audioOverride->getState(), _domain);
+	if (_gameid == "football" || _gameid == "baseball2001") {
+#ifdef USE_LIBCURL
+		ConfMan.set("lobby_server", _lobbyServerAddr->getEditString(), _domain);
+		ConfMan.setBool("enable_competitive_mods", _enableCompetitiveMods->getState(), _domain);
+#endif
+	} else {
+		ConfMan.setBool("enable_session_server", _enableSessionServer->getState(), _domain);
+		ConfMan.setBool("enable_lan_broadcast", _enableLANBroadcast->getState(), _domain);
+		ConfMan.set("session_server", _sessionServerAddr->getEditString(), _domain);
+		if (_gameid == "moonbase")
+			ConfMan.setBool("generate_random_maps", _generateRandomMaps->getState(), _domain);
+	}
+	return true;
+}
+
+void HENetworkGameOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const {
+	if (_gameid == "football" || _gameid == "baseball2001") {
+#ifdef USE_LIBCURL
+		layouts.addDialog(layoutName, overlayedLayout)
+			.addLayout(GUI::ThemeLayout::kLayoutVertical, 5)
+				.addPadding(0, 0, 12, 0)
+				.addWidget("AudioOverride", "Checkbox")
+				.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
+					.addPadding(0, 0, 12, 0)
+					.addWidget("SessionServerLabel", "OptionsLabel")
+					.addWidget("LobbyServerAddress", "EditTextWidget")
+					.addWidget("ServerReset", "", 15, 15)
+				.closeLayout()
+				.addWidget("EnableCompetitiveMods", "Checkbox")
+				.addWidget("NetworkVersion", "")
+			.closeLayout()
+		.closeDialog();
+#endif
+	} else {
+		layouts.addDialog(layoutName, overlayedLayout)
+			.addLayout(GUI::ThemeLayout::kLayoutVertical, 5)
+				.addPadding(0, 0, 12, 0)
+				.addWidget("EnableSessionServer", "Checkbox")
+				.addWidget("EnableLANBroadcast", "Checkbox")
+				.addWidget("GenerateRandomMaps", "Checkbox")
+				.addLayout(GUI::ThemeLayout::kLayoutHorizontal, 12)
+					.addPadding(0, 0, 12, 0)
+					.addWidget("SessionServerLabel", "OptionsLabel")
+					.addWidget("SessionServerAddress", "EditTextWidget")
+					.addWidget("ServerReset", "", 15, 15)
+				.closeLayout()
+				.addWidget("NetworkVersion", "")
+			.closeLayout()
+		.closeDialog();
+	}
+}
+
+void HENetworkGameOptionsWidget::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 data) {
+
+	switch (cmd) {
+	case kEnableSessionCmd:
+		_sessionServerAddr->setEnabled(_enableSessionServer->getState());
+		g_gui.scheduleTopDialogRedraw();
+		break;
+	case kResetServersCmd:
+		if (_gameid == "football" || _gameid == "baseball2001") {
+			_lobbyServerAddr->setEditString(Common::U32String("https://multiplayer.scummvm.org:9130"));
+		} else {
+			_enableSessionServer->setState(true);
+			_sessionServerAddr->setEditString(Common::U32String("multiplayer.scummvm.org"));
+		}
+		g_gui.scheduleTopDialogRedraw();
+		break;
+	default:
+		GUI::OptionsContainerWidget::handleCommand(sender, cmd, data);
+		break;
+	}
+}
+#endif
 
 } // End of namespace Scumm

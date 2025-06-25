@@ -145,6 +145,7 @@ enum GlobalVar {
 	kGlobalVarCurrentRoom    = 2,
 	kGlobalVarSpeed          = 3,  // SCI16
 	kGlobalVarQuit           = 4,
+	kGlobalVarCast           = 5,
 	kGlobalVarSounds         = 8,
 	kGlobalVarPlanes         = 10, // SCI32
 	kGlobalVarCurrentRoomNo  = 11,
@@ -373,12 +374,6 @@ ExecStack *send_selector(EngineState *s, reg_t send_obj, reg_t work_obj,
  * @param[in] s			The state to use
  */
 void run_vm(EngineState *s);
-
-/**
- * Debugger functionality
- * @param[in] s					The state at which debugging should take place
- */
-void script_debug(EngineState *s);
 
 /**
  * Looks up a selector and returns its type and value

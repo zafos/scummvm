@@ -22,6 +22,7 @@
 #ifndef TETRAEDGE_TE_TE_IMAGE_H
 #define TETRAEDGE_TE_TE_IMAGE_H
 
+#include "common/fs.h"
 #include "common/ptr.h"
 #include "common/stream.h"
 #include "common/types.h"
@@ -33,6 +34,8 @@
 #include "tetraedge/te/te_palette.h"
 #include "tetraedge/te/te_vector2s32.h"
 #include "tetraedge/te/te_resource.h"
+
+#include "tetraedge/tetraedge.h"
 
 namespace Tetraedge {
 
@@ -74,8 +77,8 @@ public:
 	void fill(byte r, byte g, byte b, byte a);
 	void getBuff(uint x, uint y, byte *pout, uint w, uint h);
 	bool isExtensionSupported(const Common::Path &path);
-	bool load(const Common::FSNode &node);
-	bool load(Common::ReadStream &stream, const Common::Path &path);
+	bool load(const TetraedgeFSNode &node);
+	bool load(Common::SeekableReadStream &stream, const Common::String &type);
 	bool save(const Common::Path &path, enum SaveType type);
 	int serialize(Common::WriteStream &stream);
 	TeVector2s32 bufSize() const {

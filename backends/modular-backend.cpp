@@ -52,11 +52,6 @@ bool ModularGraphicsBackend::getFeatureState(Feature f) {
 	return _graphicsManager->getFeatureState(f);
 }
 
-GraphicsManager *ModularGraphicsBackend::getGraphicsManager() {
-	assert(_graphicsManager);
-	return (GraphicsManager *)_graphicsManager;
-}
-
 const OSystem::GraphicsMode *ModularGraphicsBackend::getSupportedGraphicsModes() const {
 	return _graphicsManager->getSupportedGraphicsModes();
 }
@@ -73,7 +68,19 @@ int ModularGraphicsBackend::getGraphicsMode() const {
 	return _graphicsManager->getGraphicsMode();
 }
 
-bool ModularGraphicsBackend::setShader(const Common::String &fileName) {
+#if defined(USE_IMGUI)
+void ModularGraphicsBackend::setImGuiCallbacks(const ImGuiCallbacks &callbacks) {
+	_graphicsManager->setImGuiCallbacks(callbacks);
+}
+void *ModularGraphicsBackend::getImGuiTexture(const Graphics::Surface &image, const byte *palette, int palCount) {
+	return _graphicsManager->getImGuiTexture(image, palette, palCount);
+}
+void ModularGraphicsBackend::freeImGuiTexture(void *texture) {
+	_graphicsManager->freeImGuiTexture(texture);
+}
+#endif
+
+bool ModularGraphicsBackend::setShader(const Common::Path &fileName) {
 	return _graphicsManager->setShader(fileName);
 }
 
@@ -91,6 +98,10 @@ bool ModularGraphicsBackend::setStretchMode(int mode) {
 
 int ModularGraphicsBackend::getStretchMode() const {
 	return _graphicsManager->getStretchMode();
+}
+
+bool ModularGraphicsBackend::setRotationMode(Common::RotationMode rotation) {
+	return _graphicsManager->setRotationMode(rotation);
 }
 
 uint ModularGraphicsBackend::getDefaultScaler() const {
@@ -173,6 +184,10 @@ void ModularGraphicsBackend::fillScreen(uint32 col) {
 	_graphicsManager->fillScreen(col);
 }
 
+void ModularGraphicsBackend::fillScreen(const Common::Rect &r, uint32 col) {
+	_graphicsManager->fillScreen(r, col);
+}
+
 void ModularGraphicsBackend::updateScreen() {
 #ifdef ENABLE_EVENTRECORDER
 	g_system->getMillis();		// force event recorder to update the tick count
@@ -185,6 +200,10 @@ void ModularGraphicsBackend::updateScreen() {
 #ifdef ENABLE_EVENTRECORDER
 	g_eventRec.postDrawOverlayGui();
 #endif
+}
+
+void ModularGraphicsBackend::presentBuffer() {
+	_graphicsManager->presentBuffer();
 }
 
 void ModularGraphicsBackend::setShakePos(int shakeXOffset, int shakeYOffset) {

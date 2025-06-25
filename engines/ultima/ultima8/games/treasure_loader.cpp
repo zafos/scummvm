@@ -40,18 +40,13 @@ void TreasureLoader::loadDefaults() {
 
 	// load default treasure types
 	lootkeyvals = config->listKeyValues("game", "treasure");
-	KeyMap::const_iterator defaultiter;
-
-	for (defaultiter = lootkeyvals.begin();
-	        defaultiter != lootkeyvals.end(); ++defaultiter) {
+	for (const auto &i : lootkeyvals) {
 		TreasureInfo ti;
-		const istring &key = defaultiter->_key;
-		const Std::string &val = defaultiter->_value;
-		bool ok = internalParse(val, ti, true);
+		bool ok = internalParse(i._value, ti, true);
 		if (ok) {
-			_defaultTreasure[key] = ti;
+			_defaultTreasure[i._key] = ti;
 		} else {
-			warning("Failed to parse treasure type '%s': %s", key.c_str(), val.c_str());
+			warning("Failed to parse treasure type '%s': %s", i._key.c_str(), i._value.c_str());
 		}
 	}
 }
@@ -205,11 +200,13 @@ bool TreasureLoader::parseUIntRange(const Std::string &val,
 	Std::string::size_type pos = val.find('-');
 	if (pos == 0 || pos == Std::string::npos || pos + 1 >= val.size())
 		return false;
-	int t1, t2;
+	int t1 = 0;
+	int t2 = 0;
 	bool ok = true;
-	ok &= parseInt(val.substr(0, pos), t1);
-	ok &= parseInt(val.substr(pos + 1), t2);
-	if (ok && t1 <= t2 && t1 >= 0 && t2 >= 0) {
+	ok = ok && parseInt(val.substr(0, pos), t1);
+	ok = ok && parseInt(val.substr(pos + 1), t2);
+	ok = ok && (t1 <= t2 && t1 >= 0 && t2 >= 0);
+	if (ok) {
 		min = t1;
 		max = t2;
 	}

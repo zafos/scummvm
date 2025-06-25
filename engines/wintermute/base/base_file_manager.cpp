@@ -31,6 +31,7 @@
 #include "engines/wintermute/base/file/base_savefile_manager_file.h"
 #include "engines/wintermute/base/file/base_save_thumb_file.h"
 #include "engines/wintermute/base/file/base_package.h"
+#include "engines/wintermute/base/base.h"
 #include "engines/wintermute/base/base_engine.h"
 #include "engines/wintermute/wintermute.h"
 #include "common/algorithm.h"
@@ -97,20 +98,20 @@ byte *BaseFileManager::readWholeFile(const Common::String &filename, uint32 *siz
 	Common::SeekableReadStream *file = openFile(filename);
 	if (!file) {
 		if (mustExist) {
-			debugC(kWintermuteDebugFileAccess | kWintermuteDebugLog, "Error opening file '%s'", filename.c_str());
+			debugC(kWintermuteDebugFileAccess, "Error opening file '%s'", filename.c_str());
 		}
 		return nullptr;
 	}
 
 	buffer = new byte[file->size() + 1];
 	if (buffer == nullptr) {
-		debugC(kWintermuteDebugFileAccess | kWintermuteDebugLog, "Error allocating buffer for file '%s' (%d bytes)", filename.c_str(), (int)file->size() + 1);
+		debugC(kWintermuteDebugFileAccess, "Error allocating buffer for file '%s' (%d bytes)", filename.c_str(), (int)file->size() + 1);
 		closeFile(file);
 		return nullptr;
 	}
 
 	if (file->read(buffer, (uint32)file->size()) != (uint32)file->size()) {
-		debugC(kWintermuteDebugFileAccess | kWintermuteDebugLog, "Error reading file '%s'", filename.c_str());
+		debugC(kWintermuteDebugFileAccess, "Error reading file '%s'", filename.c_str());
 		closeFile(file);
 		delete[] buffer;
 		return nullptr;
@@ -159,7 +160,7 @@ bool BaseFileManager::initPaths() {
 	// Removed: Config-based file-path choice.
 
 	// package files paths
-	const Common::FSNode gameData(ConfMan.get("path"));
+	const Common::FSNode gameData(ConfMan.getPath("path"));
 	addPath(PATH_PACKAGE, gameData);
 
 	Common::FSNode dataSubFolder = gameData.getChild("data");
@@ -192,7 +193,7 @@ bool BaseFileManager::registerPackages(const Common::FSList &fslist) {
 
 //////////////////////////////////////////////////////////////////////////
 bool BaseFileManager::registerPackages() {
-	debugC(kWintermuteDebugFileAccess | kWintermuteDebugLog, "Scanning packages");
+	debugC(kWintermuteDebugFileAccess, "Scanning packages");
 
 	// We need game flags to perform some game-specific hacks.
 	uint32 flags = BaseEngine::instance().getFlags();
@@ -201,11 +202,14 @@ bool BaseFileManager::registerPackages() {
 	// and that has to be like that to support the detection-scheme.
 	Common::FSList files;
 	for (Common::FSList::const_iterator it = _packagePaths.begin(); it != _packagePaths.end(); ++it) {
-		debugC(kWintermuteDebugFileAccess, "Should register folder: %s %s", it->getPath().c_str(), it->getName().c_str());
+		debugC(kWintermuteDebugFileAccess, "Should register folder: %s %s", it->getPath().toString(Common::Path::kNativeSeparator).c_str(), it->getName().c_str());
 		if (!it->getChildren(files, Common::FSNode::kListFilesOnly)) {
 			warning("getChildren() failed for path: %s", it->getName().c_str());
 		}
 		for (Common::FSList::const_iterator fileIt = files.begin(); fileIt != files.end(); ++fileIt) {
+			if (!fileIt)
+				continue;
+
 			// To prevent any case sensitivity issues we make the filename
 			// all lowercase here. This makes the code slightly prettier
 			// than the equivalent of using equalsIgnoreCase.
@@ -316,12 +320,12 @@ bool BaseFileManager::registerPackages() {
 					continue;
 				}
 			}
-			debugC(kWintermuteDebugFileAccess, "Registering %s %s", fileIt->getPath().c_str(), fileIt->getName().c_str());
+			debugC(kWintermuteDebugFileAccess, "Registering %s %s", fileIt->getPath().toString(Common::Path::kNativeSeparator).c_str(), fileIt->getName().c_str());
 			registerPackage((*fileIt), fileName, searchSignature);
 		}
 	}
 
-//	debugC(kWintermuteDebugFileAccess | kWintermuteDebugLog, "  Registered %d files in %d package(s)", _files.size(), _packages.size());
+//	debugC(kWintermuteDebugFileAccess, "  Registered %d files in %d package(s)", _files.size(), _packages.size());
 
 	return STATUS_OK;
 }
@@ -358,7 +362,7 @@ Common::SeekableReadStream *BaseFileManager::openPkgFile(const Common::String &f
 			upcName.setChar('\\', (uint32)i);
 		}
 	}
-	Common::ArchiveMemberPtr entry = _packages.getMember(upcName);
+	Common::ArchiveMemberPtr entry = _packages.getMember(Common::Path(upcName, '\\'));
 	if (!entry) {
 		return nullptr;
 	}
@@ -377,9 +381,13 @@ uint32 BaseFileManager::getPackageVersion(const Common::String &filename) {
 
 //////////////////////////////////////////////////////////////////////////
 bool BaseFileManager::hasFile(const Common::String &filename) {
-	Common::String backwardSlashesPath = filename;
-	// correct slashes
-	Common::replace(backwardSlashesPath.begin(), backwardSlashesPath.end(), '/', '\\');
+	Common::String backslashPath(filename);
+	for (uint32 i = 0; i < backslashPath.size(); i++) {
+		if (backslashPath[(int32)i] == '/') {
+			backslashPath.setChar('\\', (uint32)i);
+		}
+	}
+	Common::Path path(backslashPath, '\\');
 
 	if (scumm_strnicmp(filename.c_str(), "savegame:", 9) == 0) {
 		BasePersistenceManager pm(BaseEngine::instance().getGameTargetName());
@@ -395,10 +403,10 @@ bool BaseFileManager::hasFile(const Common::String &filename) {
 	if (diskFileExists(filename)) {
 		return true;
 	}
-	if (_packages.hasFile(backwardSlashesPath)) {
+	if (_packages.hasFile(path)) {
 		return true;    // We don't bother checking if the file can actually be opened, something bigger is wrong if that is the case.
 	}
-	if (!_detectionMode && _resources->hasFile(filename)) {
+	if (!_detectionMode && _resources->hasFile(path)) {
 		return true;
 	}
 	return false;
@@ -406,7 +414,7 @@ bool BaseFileManager::hasFile(const Common::String &filename) {
 
 //////////////////////////////////////////////////////////////////////////
 int BaseFileManager::listMatchingPackageMembers(Common::ArchiveMemberList &list, const Common::String &pattern) {
-	return _packages.listMatchingMembers(list, pattern);
+	return _packages.listMatchingMembers(list, Common::Path(pattern));
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -469,12 +477,7 @@ Common::SeekableReadStream *BaseFileManager::openFileRaw(const Common::String &f
 		if (!BaseEngine::instance().getGameRef()) {
 			error("Attempt to load filename: %s without BaseEngine-object, this is unsupported", filename.c_str());
 		}
-		BaseSaveThumbFile *saveThumbFile = new BaseSaveThumbFile();
-		if (DID_SUCCEED(saveThumbFile->open(filename))) {
-			ret = saveThumbFile->getMemStream();
-		}
-		delete saveThumbFile;
-		return ret;
+		return openThumbFile(filename);
 	}
 
 	ret = openSfmFile(filename);
@@ -493,7 +496,7 @@ Common::SeekableReadStream *BaseFileManager::openFileRaw(const Common::String &f
 	}
 
 	if (!_detectionMode) {
-		ret = _resources->createReadStreamForMember(filename);
+		ret = _resources->createReadStreamForMember(Common::Path(filename));
 	}
 	if (ret) {
 		return ret;

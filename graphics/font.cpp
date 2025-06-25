@@ -106,7 +106,7 @@ int getStringWidthImpl(const Font &font, const StringType &str) {
 }
 
 template<class SurfaceType, class StringType>
-void drawStringImpl(const Font &font, SurfaceType *dst, const StringType &str, int x, int y, int w, uint32 color, TextAlign align, int deltax) {
+void drawStringImpl(const Font &font, SurfaceType *dst, const StringType &str, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool alpha) {
 	// The logic in getBoundingImpl is the same as we use here. In case we
 	// ever change something here we will need to change it there too.
 	assert(dst != 0);
@@ -129,8 +129,12 @@ void drawStringImpl(const Font &font, SurfaceType *dst, const StringType &str, i
 		Common::Rect charBox = font.getBoundingBox(cur);
 		if (x + charBox.right > rightX)
 			break;
-		if (x + charBox.right >= leftX)
-			font.drawChar(dst, cur, x, y, color);
+		if (x + charBox.right >= leftX) {
+			if (alpha)
+				font.drawAlphaChar(dst, cur, x, y, color);
+			else
+				font.drawChar(dst, cur, x, y, color);
+		}
 
 		x += font.getCharWidth(cur);
 	}
@@ -139,32 +143,37 @@ void drawStringImpl(const Font &font, SurfaceType *dst, const StringType &str, i
 template<class StringType>
 struct WordWrapper {
 	Common::Array<StringType> &lines;
+	Common::Array<bool> &lineContinuation;
 	int actualMaxLineWidth;
 
-	WordWrapper(Common::Array<StringType> &l) : lines(l), actualMaxLineWidth(0) {
+	WordWrapper(Common::Array<StringType> &l, Common::Array<bool> &lC) : lines(l), lineContinuation(lC), actualMaxLineWidth(0) {
 	}
 
-	void add(StringType &line, int &w) {
+	void add(StringType &line, bool &wordContinuation, int &w) {
 		if (actualMaxLineWidth < w)
 			actualMaxLineWidth = w;
 
 		lines.push_back(line);
+		lineContinuation.push_back(wordContinuation);
 
 		line.clear();
+		wordContinuation = false;
 		w = 0;
 	}
 
 	void clear() {
 		lines.clear();
+		lineContinuation.clear();
 		actualMaxLineWidth = 0;
 	}
 };
 
 template<class StringType>
-int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Common::Array<StringType> &lines, int initWidth, uint32 mode) {
-	WordWrapper<StringType> wrapper(lines);
+int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Common::Array<StringType> &lines, Common::Array<bool> &lineContinuation, int initWidth, uint32 mode) {
+	WordWrapper<StringType> wrapper(lines, lineContinuation);
 	StringType line;
 	StringType tmpStr;
+	bool wordContinuation = false;
 	int lineWidth = initWidth;
 	int tmpWidth = 0;
 	int fullTextWidthEWL = initWidth; // this replaces new line characters (if any) with single spaces - it is used in Even Width Lines mode
@@ -260,7 +269,9 @@ int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Comm
 			const int currentCharWidth = font.getCharWidth(c);
 			const int w = currentCharWidth + font.getKerningOffset(last, c);
 			last = c;
-			const bool wouldExceedWidth = (lineWidth + tmpWidth + w > targetMaxLineWidth);
+			const bool wouldExceedWidth =
+				(lineWidth + tmpWidth + w > targetMaxLineWidth) &&
+				!(mode & kWordWrapAllowTrailingWhitespace && Common::isSpace(c));
 
 			// If this char is a whitespace, then it represents a potential
 			// 'wrap point' where wrapping could take place. Everything that
@@ -276,7 +287,7 @@ int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Comm
 				// If we encounter a line break (\n), or if the new space would
 				// cause the line to overflow: start a new line
 				if (((mode & kWordWrapOnExplicitNewLines) && c == '\n') || wouldExceedWidth) {
-					wrapper.add(line, lineWidth);
+					wrapper.add(line, wordContinuation, lineWidth);
 					continue;
 				}
 			}
@@ -288,7 +299,7 @@ int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Comm
 				// If line is empty, then we are looking at a word
 				// which exceeds the maximum line width.
 				if (lineWidth > 0) {
-					wrapper.add(line, lineWidth);
+					wrapper.add(line, wordContinuation, lineWidth);
 					// Trim left side
 					while (tmpStr.size() && Common::isSpace(tmpStr[0])) {
 						tmpStr.deleteChar(0);
@@ -306,7 +317,8 @@ int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Comm
 						continue;
 					}
 				} else {
-					wrapper.add(tmpStr, tmpWidth);
+					wordContinuation = true;
+					wrapper.add(tmpStr, wordContinuation, tmpWidth);
 				}
 			}
 
@@ -318,7 +330,7 @@ int wordWrapTextImpl(const Font &font, const StringType &str, int maxWidth, Comm
 		line += tmpStr;
 		lineWidth += tmpWidth;
 		if (lineWidth > 0) {
-			wrapper.add(line, lineWidth);
+			wrapper.add(line, wordContinuation, lineWidth);
 		}
 	} while ((mode & kWordWrapEvenWidthLines)
 	         && (targetMaxLineWidth > maxWidth));
@@ -461,19 +473,40 @@ void Font::drawChar(ManagedSurface *dst, uint32 chr, int x, int y, uint32 color)
 	dst->addDirtyRect(charBox);
 }
 
+void Font::drawAlphaChar(Surface *dst, uint32 chr, int x, int y, uint32 color) const {
+	// Generic implementation for 1bpp fonts. Fonts with alpha blending
+	// should override this function.
+
+	uint32 aMask = (0xFF >> dst->format.aLoss) << dst->format.aShift;
+
+	Common::Rect charBox = getBoundingBox(chr);
+	charBox.translate(x, y);
+	dst->fillRect(charBox, color & ~aMask);
+
+	drawChar(dst, chr, x, y, color | aMask);
+}
+
+void Font::drawAlphaChar(ManagedSurface *dst, uint32 chr, int x, int y, uint32 color) const {
+	drawAlphaChar(dst->surfacePtr(), chr, x, y, color);
+
+	Common::Rect charBox = getBoundingBox(chr);
+	charBox.translate(x, y);
+	dst->addDirtyRect(charBox);
+}
+
 void Font::drawString(Surface *dst, const Common::String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
 	Common::String renderStr = useEllipsis ? handleEllipsis(*this, str, w) : str;
-	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax);
+	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax, false);
 }
 
 void Font::drawString(Surface *dst, const Common::U32String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
 	Common::U32String renderStr = useEllipsis ? handleEllipsis(*this, str, w) : str;
-	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax);
+	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax, false);
 }
 
 void Font::drawString(ManagedSurface *dst, const Common::String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
 	Common::String renderStr = useEllipsis ? handleEllipsis(*this, str, w) : str;
-	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax);
+	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax, false);
 
 	if (w != 0) {
 		dst->addDirtyRect(getBoundingBox(str, x, y, w, align, deltax, useEllipsis));
@@ -482,7 +515,35 @@ void Font::drawString(ManagedSurface *dst, const Common::String &str, int x, int
 
 void Font::drawString(ManagedSurface *dst, const Common::U32String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
 	Common::U32String renderStr = useEllipsis ? handleEllipsis(*this, str, w) : str;
-	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax);
+	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax, false);
+
+	if (w != 0) {
+		dst->addDirtyRect(getBoundingBox(str, x, y, w, align, useEllipsis));
+	}
+}
+
+void Font::drawAlphaString(Surface *dst, const Common::String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
+	Common::String renderStr = useEllipsis ? handleEllipsis(*this, str, w) : str;
+	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax, true);
+}
+
+void Font::drawAlphaString(Surface *dst, const Common::U32String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
+	Common::U32String renderStr = useEllipsis ? handleEllipsis(*this, str, w) : str;
+	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax, true);
+}
+
+void Font::drawAlphaString(ManagedSurface *dst, const Common::String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
+	Common::String renderStr = useEllipsis ? handleEllipsis(*this, str, w) : str;
+	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax, true);
+
+	if (w != 0) {
+		dst->addDirtyRect(getBoundingBox(str, x, y, w, align, deltax, useEllipsis));
+	}
+}
+
+void Font::drawAlphaString(ManagedSurface *dst, const Common::U32String &str, int x, int y, int w, uint32 color, TextAlign align, int deltax, bool useEllipsis) const {
+	Common::U32String renderStr = useEllipsis ? handleEllipsis(*this, str, w) : str;
+	drawStringImpl(*this, dst, renderStr, x, y, w, color, align, deltax, true);
 
 	if (w != 0) {
 		dst->addDirtyRect(getBoundingBox(str, x, y, w, align, useEllipsis));
@@ -490,11 +551,17 @@ void Font::drawString(ManagedSurface *dst, const Common::U32String &str, int x, 
 }
 
 int Font::wordWrapText(const Common::String &str, int maxWidth, Common::Array<Common::String> &lines, int initWidth, uint32 mode) const {
-	return wordWrapTextImpl(*this, str, maxWidth, lines, initWidth, mode);
+	Common::Array<bool> dummyLineContinuation;
+	return wordWrapTextImpl(*this, str, maxWidth, lines, dummyLineContinuation, initWidth, mode);
 }
 
 int Font::wordWrapText(const Common::U32String &str, int maxWidth, Common::Array<Common::U32String> &lines, int initWidth, uint32 mode) const {
-	return wordWrapTextImpl(*this, str, maxWidth, lines, initWidth, mode);
+	Common::Array<bool> dummyLineContinuation;
+	return wordWrapTextImpl(*this, str, maxWidth, lines, dummyLineContinuation, initWidth, mode);
+}
+
+int Font::wordWrapText(const Common::U32String &str, int maxWidth, Common::Array<Common::U32String> &lines, Common::Array<bool> &lineContinuation, int initWidth, uint32 mode) const {
+	return wordWrapTextImpl(*this, str, maxWidth, lines, lineContinuation, initWidth, mode);
 }
 
 TextAlign convertTextAlignH(TextAlign alignH, bool rtl) {
@@ -506,6 +573,61 @@ TextAlign convertTextAlignH(TextAlign alignH, bool rtl) {
 	default:
 		return alignH;
 	}
+}
+
+#define wholedivide(x, y)	(((x)+((y)-1))/(y))
+
+static void countupScore(int *dstGray, int x, int y, int bbw, int bbh, float scale) {
+	int newbbw = bbw * scale;
+	int newbbh = bbh * scale;
+	int x_ = x * newbbw;
+	int y_ = y * newbbh;
+	int x1 = x_ + newbbw;
+	int y1 = y_ + newbbh;
+
+	int newxbegin = x_ / bbw;
+	int newybegin = y_ / bbh;
+	int newxend = wholedivide(x1, bbw);
+	int newyend = wholedivide(y1, bbh);
+
+	for (int newy = newybegin; newy < newyend; newy++) {
+		for (int newx = newxbegin; newx < newxend; newx++) {
+			int newX = newx * bbw;
+			int newY = newy * bbh;
+			int newX1 = newX + bbw;
+			int newY1 = newY + bbh;
+			dstGray[newy * newbbw + newx] += (MIN(x1, newX1) - MAX(x_, newX)) *
+											 (MIN(y1, newY1) - MAX(y_, newY));
+		}
+	}
+}
+
+static void magnifyGray(Surface *src, int *dstGray, int width, int height, float scale) {
+	for (uint16 y = 0; y < height; y++) {
+		for (uint16 x = 0; x < width; x++) {
+			if (*((byte *)src->getBasePtr(x, y)) == 1)
+				countupScore(dstGray, x, y, width, height, scale);
+		}
+	}
+}
+
+void Font::scaleSingleGlyph(Surface *scaleSurface, int *grayScaleMap, int grayScaleMapSize, int width, int height, int xOffset, int yOffset, int grayLevel, int chr, int srcheight, int srcwidth, float scale) const {
+
+	scaleSurface->fillRect(Common::Rect(scaleSurface->w, scaleSurface->h), 0);
+	drawChar(scaleSurface, chr, xOffset, yOffset, 1);
+	memset(grayScaleMap, 0, grayScaleMapSize * sizeof(int));
+	magnifyGray(scaleSurface, grayScaleMap, srcwidth, srcheight, scale);
+	int *grayPtr = grayScaleMap;
+	for (int y = 0; y < height; y++) {
+		byte *dst = (byte *)scaleSurface->getBasePtr(0, y);
+		for (int x = 0; x < width; x++, grayPtr++, dst++) {
+			if (*grayPtr > grayLevel)
+				*dst = 1;
+			else
+				*dst = 0;
+		}
+	}
+
 }
 
 } // End of namespace Graphics

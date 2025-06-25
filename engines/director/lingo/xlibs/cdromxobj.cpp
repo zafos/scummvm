@@ -19,157 +19,166 @@
  *
  */
 
+/*************************************
+ *
+ * USED IN:
+ * The Apartment 2.0
+ * Cellofania
+ *
+ *************************************/
+
 /*
-  --AppleAudioCD, CDAudio, 1.0, 4/3/90
-  --
-  --© 1989, 1990 MacroMind, Inc.
-  -- by Jeff Tanner
-  --
-  ------------------------------------------------------
-  ------------------------------------------------------
-  --  An Apple CD SC Player must be mounted
-  --      in order for this XObject to operate properly.
-  --      The easiest way to check for mounting is to
-  --      check the desktop for the CD icon.
-  ------------------------------------------------------
-  ------------------------------------------------------
-  -- This XObject recognizes only the first player in the SCSI chain .
-  ------------------------------------------------------
-  ------------------------------------------------------
-  --=METHODS=--
-  X   mNew --Creates a new instance of the XObject.
-  X   mDispose --Disposes of the instance.
-  S   mName --Returns name of the XObject.
-  ------------------------------------------------------
-  ------------------------------------------------------
-  -- PLAY CD METHODS:
-  S   mPlay --Plays current track from the beginning.
-  SI mPlayTrack, trackNum --Plays the specified track from the beginning.
-  SS   mPlayName, trackName --Plays by track name.
-  --      Note: The full pathname is unnecessary.
-  --      The track names for tracks 1 - 9 are
-  --          "TRACK<space><space>trackNum" and for tracks 10 to 99 are
-  --          "TRACK<space>trackNum".
-  SIII mPlayAbsTime, minute, second, frame --Starts play at absolute time position on current CD-ROM.
-  --
-  SIIIIII mPlaySegment, startMin, startSec, startFrm, stopMin, stopSec, stopFrm
-  --          < startMin, startSec, startFrm > - Start time
-  --          < stopMin, stopSec, stopFrm > - Stop time
-  SII  mAskPlay, leftDialog, topDialog        --With a file dialog box,
-  --                                  selects an Audio track to play.
-  --          < leftDialog, topDialog > - Where to place the file dialog box
-  ------------------------------------------------------
-  S   mStepFwd --Steps forward one track and Plays.
-  S   mStepBwd --Steps back one track and Plays.
-  --
-  S    mPause --Pauses the player.
-  --      When this method is called a second time,
-  --      the player will continue in normal play mode.
-  S    mContinue --Continues the mode prior to calling mPause.
-  --
-  S    mStop                              --Stops play.
-  SI   mStopTrack, trackNum               --Stops when the selected track finishes playing.
-  SIII mStopAbsTime, minute, second, frame --Stops play at a specified absolute time position.
-  S    mRemoveStop -- Removes stop conditions.
-  --          Stop conditions are set with these methods:
-  --                  mPlaySegment
-  --                  mStopTrack
-  --                  mStopAbsTime
-  --
-  S    mEject --Ejects CD-ROM from drive.
-  --
-  ------------------------------------------------------
-  ------------------------------------------------------
-  -- STATUS METHODS:
-  S    mStatus --Returns status of Audio CD player.
-  --      Returns message strings:
-  --          Audio play in progress
-  --          Audio pause in operation
-  --          Audio muting on
-  --          Audio play operation completed
-  --          Error occurred during audio play
-  --          Not currently playing
-  --
-  S    mPlayMode      --Returns a play mode from audio track.
-  --      The play mode describes how to play the audio track.
-  --      Returns message strings:
-  --          Muting on (no audio)
-  --          Right channel through right channel only
-  --          Left channel through right channel only
-  --          Left and right channels through right channel only
-  --          Right channel through left channel only
-  --          Right channel through left and right channel
-  --          Right channel through left channel,
-  --              Left channel through right channel
-  --          Right channel through left channel,
-  --              Left and right channels through right channel
-  --          Left channel through left channel only
-  --          Left channel through left channel,
-  --              Right channel through right channel (Stereo)
-  --          Left channel through left and right channel
-  --          Left channel through left channel,
-  --              Left and right channels through right channel
-  --          Left and right channels through left channel only
-  --          Left and right channels through left channel,
-  --              Right channel through right channel
-  --          Left and right channels through left channel,
-  --              Left channel through right channel
-  --          Left and right channels through
-  --              both left channel and right channel (Mono)
-  --
-  S    mCurrentFormat         --Returns the format of the current track.
-  --      Returns message strings:
-  --          2 audio channels without preemphasis
-  --          2 audio channels with preemphasis
-  --          4 audio channels without preemphasis
-  --          4 audio channels with preemphasis
-  --          Data track
-  --
-  ------------------------------------------------------
-  ------------------------------------------------------
-  --
-  I    mCurrentTrack --Returns number of the current track.
-  S    mCurrentTime  --Returns the current absolute time (min:sec:frm).
-  --
-  I    mFirstTrack  -- Returns first track number on current CD-ROM.
-  I    mLastTrack  -- Returns last track number on current CD-ROM.
-  S    mTotalTime -- Returns total time on current CD-ROM (min:sec:frm)
-  ------------------------------------------------------
-  ------------------------------------------------------
-  -- SCANNING METHODS:
-  -- Starting at a specific time:
-  --   min, sec, and frm parameters are to indicate
-  --      the absolute time to start scan.
-  --   monitorP - if true, it will stop scan moment mouse
-  --      is released, and continue playing at current position.
-  --      However, this will inhibit all other events.
-  --      Otherwise use mStopScan method.
-  SIIII mScanFwd min, sec, frm, monitorP -- Fast forward scan
-  SIIII mScanBwd min, sec, frm, monitorP -- Fast reverse scan
-  --
-  S   mStopScan --Stops scan and continues playing at current position.
-  --
-  --  End description of AppleAudioCD XObject methods.
-  ------------------------------------------------------
-  ------------------------------------------------------
+ * --AppleAudioCD, CDAudio, 1.0, 4/3/90
+ * --
+ * --© 1989, 1990 MacroMind, Inc.
+ * -- by Jeff Tanner
+ * --
+ * ------------------------------------------------------
+ * ------------------------------------------------------
+ * --  An Apple CD SC Player must be mounted
+ * --      in order for this XObject to operate properly.
+ * --      The easiest way to check for mounting is to
+ * --      check the desktop for the CD icon.
+ * ------------------------------------------------------
+ * ------------------------------------------------------
+ * -- This XObject recognizes only the first player in the SCSI chain .
+ * ------------------------------------------------------
+ * ------------------------------------------------------
+ * --=METHODS=--
+ * X   mNew --Creates a new instance of the XObject.
+ * X   mDispose --Disposes of the instance.
+ * S   mName --Returns name of the XObject.
+ * ------------------------------------------------------
+ * ------------------------------------------------------
+ * -- PLAY CD METHODS:
+ * S   mPlay --Plays current track from the beginning.
+ * SI mPlayTrack, trackNum --Plays the specified track from the beginning.
+ * SS   mPlayName, trackName --Plays by track name.
+ * --      Note: The full pathname is unnecessary.
+ * --      The track names for tracks 1 - 9 are
+ * --          "TRACK<space><space>trackNum" and for tracks 10 to 99 are
+ * --          "TRACK<space>trackNum".
+ * SIII mPlayAbsTime, minute, second, frame --Starts play at absolute time position on current CD-ROM.
+ * --
+ * SIIIIII mPlaySegment, startMin, startSec, startFrm, stopMin, stopSec, stopFrm
+ * --          < startMin, startSec, startFrm > - Start time
+ * --          < stopMin, stopSec, stopFrm > - Stop time
+ * SII  mAskPlay, leftDialog, topDialog        --With a file dialog box,
+ * --                                  selects an Audio track to play.
+ * --          < leftDialog, topDialog > - Where to place the file dialog box
+ * ------------------------------------------------------
+ * S   mStepFwd --Steps forward one track and Plays.
+ * S   mStepBwd --Steps back one track and Plays.
+ * --
+ * S    mPause --Pauses the player.
+ * --      When this method is called a second time,
+ * --      the player will continue in normal play mode.
+ * S    mContinue --Continues the mode prior to calling mPause.
+ * --
+ * S    mStop                              --Stops play.
+ * SI   mStopTrack, trackNum               --Stops when the selected track finishes playing.
+ * SIII mStopAbsTime, minute, second, frame --Stops play at a specified absolute time position.
+ * S    mRemoveStop -- Removes stop conditions.
+ * --          Stop conditions are set with these methods:
+ * --                  mPlaySegment
+ * --                  mStopTrack
+ * --                  mStopAbsTime
+ * --
+ * S    mEject --Ejects CD-ROM from drive.
+ * --
+ * ------------------------------------------------------
+ * ------------------------------------------------------
+ * -- STATUS METHODS:
+ * S    mStatus --Returns status of Audio CD player.
+ * --      Returns message strings:
+ * --          Audio play in progress
+ * --          Audio pause in operation
+ * --          Audio muting on
+ * --          Audio play operation completed
+ * --          Error occurred during audio play
+ * --          Not currently playing
+ * --
+ * S    mPlayMode      --Returns a play mode from audio track.
+ * --      The play mode describes how to play the audio track.
+ * --      Returns message strings:
+ * --          Muting on (no audio)
+ * --          Right channel through right channel only
+ * --          Left channel through right channel only
+ * --          Left and right channels through right channel only
+ * --          Right channel through left channel only
+ * --          Right channel through left and right channel
+ * --          Right channel through left channel,
+ * --              Left channel through right channel
+ * --          Right channel through left channel,
+ * --              Left and right channels through right channel
+ * --          Left channel through left channel only
+ * --          Left channel through left channel,
+ * --              Right channel through right channel (Stereo)
+ * --          Left channel through left and right channel
+ * --          Left channel through left channel,
+ * --              Left and right channels through right channel
+ * --          Left and right channels through left channel only
+ * --          Left and right channels through left channel,
+ * --              Right channel through right channel
+ * --          Left and right channels through left channel,
+ * --              Left channel through right channel
+ * --          Left and right channels through
+ * --              both left channel and right channel (Mono)
+ * --
+ * S    mCurrentFormat         --Returns the format of the current track.
+ * --      Returns message strings:
+ * --          2 audio channels without preemphasis
+ * --          2 audio channels with preemphasis
+ * --          4 audio channels without preemphasis
+ * --          4 audio channels with preemphasis
+ * --          Data track
+ * --
+ * ------------------------------------------------------
+ * ------------------------------------------------------
+ * --
+ * I    mCurrentTrack --Returns number of the current track.
+ * S    mCurrentTime  --Returns the current absolute time (min:sec:frm).
+ * --
+ * I    mFirstTrack  -- Returns first track number on current CD-ROM.
+ * I    mLastTrack  -- Returns last track number on current CD-ROM.
+ * S    mTotalTime -- Returns total time on current CD-ROM (min:sec:frm)
+ * ------------------------------------------------------
+ * ------------------------------------------------------
+ * -- SCANNING METHODS:
+ * -- Starting at a specific time:
+ * --   min, sec, and frm parameters are to indicate
+ * --      the absolute time to start scan.
+ * --   monitorP - if true, it will stop scan moment mouse
+ * --      is released, and continue playing at current position.
+ * --      However, this will inhibit all other events.
+ * --      Otherwise use mStopScan method.
+ * SIIII mScanFwd min, sec, frm, monitorP -- Fast forward scan
+ * SIIII mScanBwd min, sec, frm, monitorP -- Fast reverse scan
+ * --
+ * S   mStopScan --Stops scan and continues playing at current position.
+ * --
+ * --  End description of AppleAudioCD XObject methods.
+ * ------------------------------------------------------
+ * ------------------------------------------------------
  */
 
 #include "backends/audiocd/audiocd.h"
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/cdromxobj.h"
 
 namespace Director {
 
-const char *CDROMXObj::xlibName = "AppleAudioCD";
-const char *CDROMXObj::fileNames[] = {
-	"CD-ROM XObj",
-	"AppleAudioCD",
-	nullptr
+const char *const CDROMXObj::xlibName = "AppleAudioCD";
+const XlibFileDesc CDROMXObj::fileNames[] = {
+	{ "CD-ROM XObj",	nullptr },
+	{ "AppleAudioCD",	nullptr },
+	{ nullptr,			nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",			CDROMXObj::m_new,			 0, 0,	200 },	// D2
 	{ "Name",			CDROMXObj::m_name,		 	 0, 0,	200 },	// D2
 	{ "Play",			CDROMXObj::m_play,		 	 0, 0,	200 },	// D2
@@ -201,7 +210,7 @@ static MethodProto xlibMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void CDROMXObj::open(int type) {
+void CDROMXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		CDROMXObject::initMethods(xlibMethods);
 		CDROMXObject *xobj = new CDROMXObject(kXObj);
@@ -209,7 +218,7 @@ void CDROMXObj::open(int type) {
 	}
 }
 
-void CDROMXObj::close(int type) {
+void CDROMXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		CDROMXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -258,7 +267,7 @@ void CDROMXObj::m_playTrack(int nargs) {
 	CDROMXObject *me = static_cast<CDROMXObject *>(g_lingo->_state->me.u.obj);
 
 	int track = g_lingo->pop().asInt();
-	g_director->_system->getAudioCDManager()->play(track, -1, 0, 0);
+	g_director->_system->getAudioCDManager()->play(track - 1, -1, 0, 0);
 	me->_cdda_status = g_director->_system->getAudioCDManager()->getStatus();
 }
 
@@ -281,17 +290,22 @@ void CDROMXObj::m_playName(int nargs) {
 		warning("CDROMXObj::m_playName: track number failed to parse (provided string was %s)", track.c_str());
 	}
 
-	g_director->_system->getAudioCDManager()->play(trackNumI, -1, 0, 0);
+	g_director->_system->getAudioCDManager()->play(trackNumI - 1, -1, 0, 0);
 	me->_cdda_status = g_director->_system->getAudioCDManager()->getStatus();
 }
 
 void CDROMXObj::m_playAbsTime(int nargs) {
+	CDROMXObject *me = static_cast<CDROMXObject *>(g_lingo->_state->me.u.obj);
+
 	Datum min = g_lingo->pop();
 	Datum sec = g_lingo->pop();
 	Datum frac = g_lingo->pop();
-	// Can't implement this without implementing a full CD TOC, since
-	// it doesn't interact with songs at the "track" level.
-	debug(5, "STUB: CDROMXObj::m_playAbsTime Request to play starting at %i:%i.%i", min.asInt(), sec.asInt(), frac.asInt());
+
+	int startFrame = (min.asInt() * 60 * 75) + (sec.asInt() * 75) + frac.asInt();
+	debug(5, "CDROMXObj::m_playAbsTime: playing at frame %i", startFrame);
+	g_director->_system->getAudioCDManager()->playAbsolute(startFrame, -1, 0);
+	me->_cdda_status = g_director->_system->getAudioCDManager()->getStatus();
+
 	g_lingo->push(Datum());
 }
 
@@ -308,11 +322,7 @@ void CDROMXObj::m_playSegment(int nargs) {
 	g_lingo->push(Datum());
 }
 
-void CDROMXObj::m_askPlay(int nargs) {
-	g_lingo->printSTUBWithArglist("CDROMXObj::m_askPlay", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
+XOBJSTUBV(CDROMXObj::m_askPlay)
 
 void CDROMXObj::m_stepFwd(int nargs) {
 	CDROMXObject *me = static_cast<CDROMXObject *>(g_lingo->_state->me.u.obj);
@@ -464,51 +474,18 @@ void CDROMXObj::m_currentTrack(int nargs) {
 	g_lingo->push(Datum(me->_cdda_status.track));
 }
 
-void CDROMXObj::m_currentTime(int nargs) {
-	g_lingo->printSTUBWithArglist("CDROMXObj::m_currentTime", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
+XOBJSTUBV(CDROMXObj::m_currentTime)
 
 // The next few methods depend on full TOC implementation, so they
 // can't be implemented right now.
-void CDROMXObj::m_firstTrack(int nargs) {
-	g_lingo->printSTUBWithArglist("CDROMXObj::m_firstTrack", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void CDROMXObj::m_lastTrack(int nargs) {
-	g_lingo->printSTUBWithArglist("CDROMXObj::m_lastTrack", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void CDROMXObj::m_totalTime(int nargs) {
-	g_lingo->printSTUBWithArglist("CDROMXObj::m_totalTime", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
+XOBJSTUBV(CDROMXObj::m_firstTrack)
+XOBJSTUBV(CDROMXObj::m_lastTrack)
+XOBJSTUBV(CDROMXObj::m_totalTime)
 
 // The scan methods depend on absolute timing, so they also require
 // a full TOC.
-void CDROMXObj::m_scanFwd(int nargs) {
-	g_lingo->printSTUBWithArglist("CDROMXObj::m_scanFwd", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void CDROMXObj::m_scanBwd(int nargs) {
-	g_lingo->printSTUBWithArglist("CDROMXObj::m_scanBwd", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void CDROMXObj::m_stopScan(int nargs) {
-	g_lingo->printSTUBWithArglist("CDROMXObj::m_stopScan", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
+XOBJSTUBV(CDROMXObj::m_scanFwd)
+XOBJSTUBV(CDROMXObj::m_scanBwd)
+XOBJSTUBV(CDROMXObj::m_stopScan)
 
 } // End of namespace Director

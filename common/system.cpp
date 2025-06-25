@@ -24,11 +24,13 @@
 #include "common/system.h"
 #include "common/events.h"
 #include "common/fs.h"
+#include "common/file.h"
 #include "common/savefile.h"
 #include "common/str.h"
 #include "common/taskbar.h"
 #include "common/updates.h"
 #include "common/dialogs.h"
+#include "common/rotationmode.h"
 #include "common/str-enc.h"
 #include "common/textconsole.h"
 #include "common/text-to-speech.h"
@@ -36,6 +38,7 @@
 #include "backends/audiocd/default/default-audiocd.h"
 #include "backends/fs/fs-factory.h"
 #include "backends/timer/default/default-timer.h"
+#include "backends/dlc/store.h"
 
 OSystem *g_system = nullptr;
 
@@ -55,6 +58,7 @@ OSystem::OSystem() {
 	_dialogManager = nullptr;
 #endif
 	_fsFactory = nullptr;
+	_dlcStore = nullptr;
 	_backendInitialized = false;
 }
 
@@ -91,6 +95,9 @@ OSystem::~OSystem() {
 
 	delete _fsFactory;
 	_fsFactory = nullptr;
+
+	delete _dlcStore;
+	_dlcStore = nullptr;
 }
 
 void OSystem::initBackend() {
@@ -118,6 +125,56 @@ void OSystem::destroy() {
 	Common::String::releaseMemoryPoolMutex();
 	Common::releaseCJKTables();
 	delete this;
+}
+
+void OSystem::updateStartSettings(const Common::String &executable, Common::String &command, Common::StringMap &settings, Common::StringArray& additionalArgs) {
+	// If a command was explicitly passed on the command line, do not override it
+	if (!command.empty())
+		return;
+
+	bool autodetect = false;
+
+	// Check executable name
+	if (executable.equalsIgnoreCase("scummvm-auto")) {
+		warning("Will run in autodetection mode");
+		autodetect = true;
+	}
+
+	// Check for the autorun file
+	if (Common::File::exists("scummvm-autorun")) {
+		// Okay, the file exists. We open it and if it is empty, then run in the autorun mode
+		// If the file is not empty, we read command line arguments from it, one per line
+		warning("Autorun file is detected");
+
+		Common::File autorun;
+		Common::String line;
+		Common::String res;
+
+		if (autorun.open("scummvm-autorun")) {
+			while (!autorun.eos()) {
+				line = autorun.readLine();
+				if (!line.empty() && line[0] != '#') {
+					additionalArgs.push_back(line);
+					res += Common::String::format("\"%s\" ", line.c_str());
+				}
+			}
+		}
+
+		if (!res.empty())
+			warning("Autorun command: %s", res.c_str());
+		else
+			warning("Empty autorun file");
+
+		autorun.close();
+		autodetect = true;
+	}
+
+	if (autodetect && additionalArgs.empty()) {
+		warning("Running autodetection");
+		command = "auto-detect";
+		if (!settings.contains("path"))
+			settings["path"] = ".";
+	}
 }
 
 bool OSystem::setGraphicsMode(const char *name) {
@@ -162,6 +219,10 @@ bool OSystem::setStretchMode(const char *name) {
 	return false;
 }
 
+bool OSystem::setRotationMode(int rotation) {
+	return setRotationMode(Common::parseRotationMode(rotation));
+}
+
 void OSystem::fatalError() {
 	quit();
 	exit(1);
@@ -186,7 +247,7 @@ Common::WriteStream *OSystem::createConfigWriteStream() {
 #endif
 }
 
-Common::String OSystem::getDefaultConfigFileName() {
+Common::Path OSystem::getDefaultConfigFileName() {
 	return "scummvm.ini";
 }
 

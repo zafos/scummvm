@@ -55,6 +55,7 @@ namespace Common {
 
 typedef Array<uint16> MacResIDArray;
 typedef Array<uint32> MacResTagArray;
+typedef bool (* ProgressUpdateCallback)(void *, int);
 
 /**
  * Class containing the raw data bytes for a Macintosh Finder Info data block.
@@ -160,6 +161,12 @@ public:
 	static SeekableReadStream *openFileOrDataFork(const Path &fileName);
 
 	/**
+	 * Open data fork of macbinary.
+	 * @return The stream if found, 0 otherwise
+	 */
+	static SeekableReadStream *openDataForkFromMacBinary(SeekableReadStream *inStream, DisposeAfterUse::Flag disposeAfterUse = DisposeAfterUse::NO);
+
+	/**
 	 * See if a Mac data/resource fork pair exists.
 	 * @param fileName The base file name of the file
 	 * @return True if either a data fork or resource fork with this name exists
@@ -187,7 +194,7 @@ public:
 	 * @param pattern Pattern to match against. Taking String::matchPattern's
 	 *                format.
 	 */
-	static void listFiles(StringArray &files, const String &pattern);
+	static void listFiles(Array<Path> &files, const Path &pattern);
 
 	/**
 	 * Close the Mac data/resource fork pair.
@@ -195,10 +202,24 @@ public:
 	void close();
 
 	/**
-	 * Query whether or not we have a data fork present.
+	 * Query whether or not we have a resource fork present.
 	 * @return True if the resource fork is present
 	 */
 	bool hasResFork() const;
+
+	/**
+	 * Query whether or not we have a resource fork present.
+	 * @return True if the resource fork is present
+	 */
+	bool hasDataFork() const;
+
+	/**
+	 * Query whether the file is one of the Mac formats.
+	 * @return True if the file is in MacBinary format or has a resource fork
+	 */
+	bool isMacFile() const { return _mode != kResForkNone; }
+
+	int getMode() const { return _mode; }
 
 	/**
 	 * Read resource from the MacBinary file
@@ -235,18 +256,38 @@ public:
 	String getResName(uint32 typeID, uint16 resID) const;
 
 	/**
+	 * Get the length in bytes of a given resource
+	 * @param typeID FourCC of the type
+	 * @param resID Resource ID to fetch
+	 * @return The length in bytes of a given resource
+	 */
+	uint32 getResLength(uint32 typeID, uint16 resID);
+
+	/**
 	 * Get the size of the data portion of the resource fork
 	 * @return The size of the data portion of the resource fork
 	 */
 	uint32 getResForkDataSize() const;
 
+	uint32 getResForkSize() const {
+		if (!hasResFork())
+			return 0;
+		return _resForkSize;
+	}
+
+	uint32 getDataForkSize() const {
+		if (!hasDataFork())
+			return 0;
+		return _dataLength;
+	}
+
 	/**
 	 * Calculate the MD5 checksum of the resource fork
 	 * @param length The maximum length to compute for
-	 * @param tail Caluclate length from the tail
+	 * @param tail Calculate length from the tail
 	 * @return The MD5 checksum of the resource fork
 	 */
-	String computeResForkMD5AsString(uint32 length = 0, bool tail = false) const;
+	String computeResForkMD5AsString(uint32 length = 0, bool tail = false, ProgressUpdateCallback progressUpdateCallback = nullptr, void *callbackParameter = nullptr) const;
 
 	/**
 	 * Get the base file name of the data/resource fork pair
@@ -294,6 +335,15 @@ public:
 	};
 	static MacVers *parseVers(SeekableReadStream *vvers);
 
+	enum {
+		kResForkNone = 0,
+		kResForkRaw,
+		kResForkMacBinary,
+		kResForkAppleDouble
+	} _mode;
+
+	static Path constructAppleDoubleName(const Path &name);
+
 private:
 	SeekableReadStream *_stream;
 	Path _baseFileName;
@@ -315,8 +365,7 @@ private:
 
 	static bool readAndValidateMacBinaryHeader(SeekableReadStream &stream, byte (&outMacBinaryHeader)[MBI_INFOHDR]);
 
-	static Path constructAppleDoubleName(Path name);
-	static Path disassembleAppleDoubleName(Path name, bool *isAppleDouble);
+	static Path disassembleAppleDoubleName(const Path &name, bool *isAppleDouble);
 
 	static SeekableReadStream *openAppleDoubleWithAppleOrOSXNaming(Archive& archive, const Path &fileName);
 
@@ -326,13 +375,6 @@ private:
 	 * @param stream Stream object to check. Will not preserve its position.
 	 */
 	static bool isRawFork(SeekableReadStream &stream);
-
-	enum {
-		kResForkNone = 0,
-		kResForkRaw,
-		kResForkMacBinary,
-		kResForkAppleDouble
-	} _mode;
 
 	void readMap();
 

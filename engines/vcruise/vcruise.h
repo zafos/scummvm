@@ -49,25 +49,36 @@ public:
 	~VCruiseEngine() override;
 
 	bool hasFeature(EngineFeature f) const override;
-	//void syncSoundSettings() override;
+	void syncSoundSettings() override;
 
 	const VCruiseGameDescription *_gameDescription;
 
 	Common::Error saveGameStream(Common::WriteStream *stream, bool isAutosave) override;
+	Common::Error loadGameStream(Common::SeekableReadStream *stream) override;
+
 	bool canSaveAutosaveCurrently() override;
-	bool canSaveGameStateCurrently() override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	void initializePath(const Common::FSNode &gamePath) override;
+
+	bool hasDefaultSave();
+	bool hasAnySave();
+
+	Common::Error loadMostRecentSave();
 
 protected:
 	void pauseEngineIntern(bool pause) override;
 
 private:
 	void handleEvents();
+	static void staticHandleMidiTimer(void *refCon);
+	void handleMidiTimer();
 
 	Common::Rect _videoRect;
 	Common::Rect _menuBarRect;
 	Common::Rect _trayRect;
+	Common::Rect _subtitleRect;
 
 	Common::FSNode _rootFSNode;
 

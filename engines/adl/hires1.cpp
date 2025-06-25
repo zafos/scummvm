@@ -92,9 +92,9 @@ protected:
 	void showInstructions(Common::SeekableReadStream &stream);
 	void wordWrap(Common::String &str) const;
 
-	Files *_files;
+	Common::Files *_files;
 	Common::File _exe;
-	Common::Array<DataBlockPtr> _corners;
+	Common::Array<Common::DataBlockPtr> _corners;
 	Common::Array<byte> _roomDesc;
 	bool _messageDelay;
 
@@ -147,7 +147,7 @@ void HiRes1Engine::showInstructions(Common::SeekableReadStream &stream) {
 }
 
 void HiRes1Engine::runIntro() {
-	StreamPtr stream(_files->createReadStream(IDS_HR1_EXE_0));
+	Common::StreamPtr stream(_files->createReadStream(IDS_HR1_EXE_0));
 
 	// Early version have no bitmap in 'AUTO LOAD OBJ'
 	if (getGameVersion() >= GAME_VER_HR1_COARSE) {
@@ -180,7 +180,7 @@ void HiRes1Engine::runIntro() {
 		if (!_files->exists(fileName))
 			fileName = "HELLO";
 
-		StreamPtr basic(_files->createReadStream(fileName));
+		Common::StreamPtr basic(_files->createReadStream(fileName));
 
 		_display->setMode(Display::kModeText);
 		_display->home();
@@ -253,6 +253,10 @@ void HiRes1Engine::runIntro() {
 	static_cast<Display_A2 *>(_display)->loadFrameBuffer(*stream);
 	_display->renderGraphics();
 
+	// The title screen would normally be visible during loading.
+	// We add a short delay here to simulate that.
+	delay(2000);
+
 	_display->setMode(Display::kModeMixed);
 
 	if (getGameVersion() == GAME_VER_HR1_SIMI) {
@@ -269,18 +273,18 @@ void HiRes1Engine::runIntro() {
 
 void HiRes1Engine::init() {
 	if (Common::File::exists("ADVENTURE")) {
-		_files = new Files_Plain();
+		_files = new Common::Files_Plain();
 	} else {
-		Files_AppleDOS *files = new Files_AppleDOS();
+		Common::Files_AppleDOS *files = new Common::Files_AppleDOS();
 		if (!files->open(getDiskImageName(0)))
-			error("Failed to open '%s'", getDiskImageName(0).c_str());
+			error("Failed to open '%s'", getDiskImageName(0).toString(Common::Path::kNativeSeparator).c_str());
 		_files = files;
 	}
 
 	_graphics = new GraphicsMan_v1<Display_A2>(*static_cast<Display_A2 *>(_display));
 	_display->moveCursorTo(Common::Point(0, 23)); // DOS 3.3
 
-	StreamPtr stream(_files->createReadStream(IDS_HR1_EXE_1));
+	Common::StreamPtr stream(_files->createReadStream(IDS_HR1_EXE_1));
 
 	Common::StringArray exeStrings;
 	extractExeStrings(*stream, 0x1576, exeStrings);
@@ -330,7 +334,7 @@ void HiRes1Engine::init() {
 		byte block = stream->readByte();
 		Common::String name = Common::String::format("BLOCK%i", block);
 		uint16 offset = stream->readUint16LE();
-		_pictures[i] = _files->getDataBlock(name, offset);
+		_pictures[i] = _files->getDataBlock(Common::Path(name), offset);
 	}
 
 	// Load commands from executable
@@ -363,7 +367,7 @@ void HiRes1Engine::init() {
 void HiRes1Engine::initGameState() {
 	_state.vars.resize(IDI_HR1_NUM_VARS);
 
-	StreamPtr stream(_files->createReadStream(IDS_HR1_EXE_1));
+	Common::StreamPtr stream(_files->createReadStream(IDS_HR1_EXE_1));
 
 	// Load room data from executable
 	_roomDesc.clear();
@@ -423,7 +427,7 @@ void HiRes1Engine::printString(const Common::String &str) {
 
 Common::String HiRes1Engine::loadMessage(uint idx) const {
 	const char returnChar = _display->asciiToNative('\r');
-	StreamPtr stream(_messages[idx]->createReadStream());
+	Common::StreamPtr stream(_messages[idx]->createReadStream());
 	return readString(*stream, returnChar) + returnChar;
 }
 
@@ -464,26 +468,22 @@ void HiRes1Engine::printMessage(uint idx) {
 }
 
 void HiRes1Engine::drawItems() {
-	Common::List<Item>::iterator item;
-
 	uint dropped = 0;
 
-	for (item = _state.items.begin(); item != _state.items.end(); ++item) {
+	for (auto &item : _state.items) {
 		// Skip items not in this room
-		if (item->room != _state.room)
+		if (item.room != _state.room)
 			continue;
 
-		if (item->state == IDI_ITEM_DROPPED) {
+		if (item.state == IDI_ITEM_DROPPED) {
 			// Draw dropped item if in normal view
 			if (getCurRoom().picture == getCurRoom().curPicture)
-				drawItem(*item, _itemOffsets[dropped++]);
+				drawItem(item, _itemOffsets[dropped++]);
 		} else {
 			// Draw fixed item if current view is in the pic list
-			Common::Array<byte>::const_iterator pic;
-
-			for (pic = item->roomPictures.begin(); pic != item->roomPictures.end(); ++pic) {
-				if (*pic == getCurRoom().curPicture) {
-					drawItem(*item, item->position);
+			for (const auto &pic : item.roomPictures) {
+				if (pic == getCurRoom().curPicture) {
+					drawItem(item, item.position);
 					break;
 				}
 			}
@@ -493,7 +493,7 @@ void HiRes1Engine::drawItems() {
 
 void HiRes1Engine::drawItem(Item &item, const Common::Point &pos) {
 	if (item.isShape) {
-		StreamPtr stream(_corners[item.picture - 1]->createReadStream());
+		Common::StreamPtr stream(_corners[item.picture - 1]->createReadStream());
 		Common::Point p(pos);
 		_graphics->drawShape(*stream, p);
 	} else
@@ -604,7 +604,7 @@ void HiRes1Engine_VF::getInput(uint &verb, uint &noun) {
 }
 
 void HiRes1Engine_VF::runIntro() {
-	StreamPtr stream(_files->createReadStream(IDS_HR1_EXE_0));
+	Common::StreamPtr stream(_files->createReadStream(IDS_HR1_EXE_0));
 
 	stream->seek(0x1000);
 

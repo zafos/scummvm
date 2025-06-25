@@ -216,6 +216,10 @@ void WetEngine::findNextSegment(ArcadeShooting *arc) {
 						_segmentOffset = 8;
 						_segmentRepetition = 0;
 						_segmentShootSequenceOffset = 8;
+
+						MVideo video(arc->hitBoss1Video, Common::Point(0, 0), false, true, false);
+						disableCursor();
+						runIntro(video);
 					} else if (_arcadeMode == "Y3")
 						_skipLevel = true;
 				} else {
@@ -415,6 +419,7 @@ void WetEngine::runAfterArcade(ArcadeShooting *arc) {
 		byte *palette;
 		Graphics::Surface *frame = decodeFrame("c_misc/zones.smk", 12, &palette);
 		loadPalette(palette, 0, 256);
+		free(palette);
 		uint32 c = kHypnoColorGreen; // green
 		int bonusCounter = 0;
 		int scoreCounter = _score - _bonus;
@@ -442,6 +447,7 @@ void WetEngine::runAfterArcade(ArcadeShooting *arc) {
 				case Common::EVENT_RETURN_TO_LAUNCHER:
 					break;
 
+				case Common::EVENT_LBUTTONDOWN:
 				case Common::EVENT_KEYDOWN:
 					bonusCounter = _bonus;
 					drawString("scifi08.fgx", Common::String::format("%-20s = %3d pts", "BONUS", _bonus), 60, 116, 0, c);
@@ -562,6 +568,7 @@ void WetEngine::runBeforeArcade(ArcadeShooting *arc) {
 		byte *palette;
 		Graphics::Surface *frame = decodeFrame("c_misc/zones.smk", (arc->id / 10 - 1) * 2, &palette);
 		loadPalette(palette, 0, 256);
+		free(palette);
 		byte red[3] = {0xff, 0x00, 0x00};
 		for (int i = 0; i < 5; i++)
 			loadPalette((byte *) &red, 237 + i, 1);
@@ -592,6 +599,7 @@ void WetEngine::runBeforeArcade(ArcadeShooting *arc) {
 				case Common::EVENT_RETURN_TO_LAUNCHER:
 					break;
 
+				case Common::EVENT_LBUTTONDOWN:
 				case Common::EVENT_KEYDOWN:
 					if (showedBriefing) {
 						endedBriefing = true;
@@ -600,6 +608,7 @@ void WetEngine::runBeforeArcade(ArcadeShooting *arc) {
 					if (!arc->briefingVideo.empty()) {
 						Graphics::Surface *bframe = decodeFrame(arc->briefingVideo, 1, &palette);
 						loadPalette(palette, 0, 256);
+						free(palette);
 						video = new MVideo(arc->briefingVideo, Common::Point(44, 22), false, false, false);
 						runIntro(*video);
 						delete video;
@@ -634,6 +643,24 @@ void WetEngine::runBeforeArcade(ArcadeShooting *arc) {
 	if (!arc->player.empty()) {
 		_playerFrames = decodeFrames(arc->player);
 	}
+
+	if (_variant == "EarlyDemo" && (arc->id == 31 || arc->id == 41)) {
+		int cutX = 36;
+		for (int i = 0; i < int(_playerFrames.size()); i++) {
+			Graphics::Surface *frame = _playerFrames[i];
+			Graphics::Surface *newFrame = new Graphics::Surface();
+			newFrame->create(320, 200, frame->format);
+			newFrame->fillRect(Common::Rect(0, 0, 320, 200), frame->format.ARGBToColor(0, 0, 0, 0));
+			newFrame->copyRectToSurfaceWithKey(*frame, 0, 0, Common::Rect(0, 0, 320, cutX), 0);
+			newFrame->copyRectToSurfaceWithKey(*frame, 0, 200 - (frame->h - cutX - 1), Common::Rect(0, cutX, 320, frame->h - 1), 0);
+
+			frame->free();
+			delete frame;
+			_playerFrames[i] = newFrame;
+		}
+
+	}
+
 
 	if (arc->mode == "Y4" || arc->mode == "Y5")  { // These images are flipped, for some reason
 		for (Frames::iterator it = _playerFrames.begin(); it != _playerFrames.end(); ++it) {
@@ -1048,7 +1075,7 @@ void WetEngine::drawPlayer() {
 
 	int offset = 0;
 	// Ugly, but seems to be necessary
-	if (_levelId == 31)
+	if (_levelId == 31 && _variant != "EarlyDemo")
 		offset = 2;
 	else if (_levelId == 52)
 		offset = 2;
@@ -1140,6 +1167,14 @@ byte *WetEngine::getTargetColor(Common::String name, int levelId) {
 	if (entry->targetColor < 0)
 		error ("No target color specified for level %d", levelId);
 	return getPalette(entry->targetColor);
+}
+
+bool WetEngine::checkRButtonUp() {
+	return _rButtonUp;
+}
+
+void WetEngine::setRButtonUp(const bool val) {
+	_rButtonUp = val;
 }
 
 } // End of namespace Hypno

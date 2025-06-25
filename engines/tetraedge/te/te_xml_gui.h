@@ -22,8 +22,12 @@
 #ifndef TETRAEDGE_TE_TE_XML_GUI_H
 #define TETRAEDGE_TE_TE_XML_GUI_H
 
+#include "common/hash-str.h"
 #include "common/str.h"
 #include "common/path.h"
+
+#include "tetraedge/te/te_button_layout.h"
+#include "tetraedge/te/te_sprite_layout.h"
 
 namespace Tetraedge {
 
@@ -36,10 +40,15 @@ public:
 	void clear();
 
 	void load(const Common::Path &path);
+	void unload();
+
+	TeSpriteLayout *sprite(const Common::String &name);
+	TeButtonLayout *button(const Common::String &name);
+	bool group(const Common::String &name);
 
 private:
 	Common::StringMap _map;
-
+	bool _loaded;
 };
 
 } // end namespace Tetraedge

@@ -107,7 +107,6 @@ public:
 	static int32 lSET_COMPORTEMENT(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lSET_COMPORTEMENT_OBJ(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lEND_COMPORTEMENT(TwinEEngine *engine, LifeScriptContext &ctx);
-	static int32 lSET_FLAG_GAME(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lKILL_OBJ(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lSUICIDE(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lUSE_ONE_LITTLE_KEY(TwinEEngine *engine, LifeScriptContext &ctx);
@@ -136,7 +135,6 @@ public:
 	static int32 lSUB_LIFE_POINT_OBJ(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lHIT_OBJ(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lPLAY_FLA(TwinEEngine *engine, LifeScriptContext &ctx);
-	static int32 lPLAY_MIDI(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lINC_CLOVER_BOX(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lSET_USED_INVENTORY(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lADD_CHOICE(TwinEEngine *engine, LifeScriptContext &ctx);
@@ -160,8 +158,7 @@ public:
 	static int32 lFADE_RED_ALARM(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lFADE_PAL_ALARM(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lEXPLODE_OBJ(TwinEEngine *engine, LifeScriptContext &ctx);
-	static int32 lBUBBLE_ON(TwinEEngine *engine, LifeScriptContext &ctx);
-	static int32 lBUBBLE_OFF(TwinEEngine *engine, LifeScriptContext &ctx);
+
 	static int32 lASK_CHOICE_OBJ(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lSET_DARK_PAL(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lSET_NORMAL_PAL(TwinEEngine *engine, LifeScriptContext &ctx);
@@ -170,7 +167,6 @@ public:
 	static int32 lHOLOMAP_TRAJ(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lGAME_OVER(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lTHE_END(TwinEEngine *engine, LifeScriptContext &ctx);
-	static int32 lMIDI_OFF(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lPLAY_CD_TRACK(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lPROJ_ISO(TwinEEngine *engine, LifeScriptContext &ctx);
 	static int32 lPROJ_3D(TwinEEngine *engine, LifeScriptContext &ctx);

@@ -25,9 +25,10 @@
 #include "common/system.h"
 #include "common/noncopyable.h"
 #include "common/keyboard.h"
+#include "common/rotationmode.h"
 
 #include "graphics/mode.h"
-#include "graphics/palette.h"
+#include "graphics/paletteman.h"
 
 /**
  * Abstract class for graphics manager. Subclasses
@@ -48,7 +49,12 @@ public:
 	virtual int getDefaultGraphicsMode() const { return 0; }
 	virtual bool setGraphicsMode(int mode, uint flags = OSystem::kGfxModeNoFlags) { return (mode == 0); }
 	virtual int getGraphicsMode() const { return 0; }
-	virtual bool setShader(const Common::String &fileName) { return false; }
+#if defined(USE_IMGUI)
+	virtual void setImGuiCallbacks(const ImGuiCallbacks &callbacks) { }
+	virtual void *getImGuiTexture(const Graphics::Surface &image, const byte *palette, int palCount) { return nullptr; }
+	virtual void freeImGuiTexture(void *texture) { }
+#endif
+	virtual bool setShader(const Common::Path &fileName) { return false; }
 	virtual const OSystem::GraphicsMode *getSupportedStretchModes() const {
 		static const OSystem::GraphicsMode noStretchModes[] = {{"NONE", "Normal", 0}, {nullptr, nullptr, 0 }};
 		return noStretchModes;
@@ -56,6 +62,7 @@ public:
 	virtual int getDefaultStretchMode() const { return 0; }
 	virtual bool setStretchMode(int mode) { return false; }
 	virtual int getStretchMode() const { return 0; }
+	virtual bool setRotationMode(Common::RotationMode rotation) { return false; }
 	virtual uint getDefaultScaler() const { return 0; }
 	virtual uint getDefaultScaleFactor() const { return 1; }
 	virtual bool setScaler(uint mode, int factor) { return false; }
@@ -81,7 +88,9 @@ public:
 	virtual Graphics::Surface *lockScreen() = 0;
 	virtual void unlockScreen() = 0;
 	virtual void fillScreen(uint32 col) = 0;
+	virtual void fillScreen(const Common::Rect &r, uint32 col) = 0;
 	virtual void updateScreen() = 0;
+	virtual void presentBuffer() {}
 	virtual void setShakePos(int shakeXOffset, int shakeYOffset) = 0;
 	virtual void setFocusRectangle(const Common::Rect& rect) = 0;
 	virtual void clearFocusRectangle() = 0;

@@ -12847,7 +12847,7 @@ const static char* dialog_28[] = {
 	DISPLAY_MESSAGE,
 	"I know...",
 	DISPLAY_MESSAGE,
-	"I have similiar",
+	"I have similar",
 	NEW_LINE,
 	"feelings myself...",
 	DISPLAY_MESSAGE,
@@ -13652,6 +13652,7 @@ const static char* dialog_82[] = {
 	DISPLAY_MESSAGE,
 	"No police...",
 	DISPLAY_MESSAGE,
+	// FIXME: Spelling incorrect. noone should be no one. Fixing changes game data and thus may cause issues
 	"Noone will hear their screams...",
 	DISPLAY_MESSAGE,
 	ANIM_WAIT,
@@ -13782,6 +13783,7 @@ const static char* dialog_88[] = {
 	NEW_LINE,
 	"and pick up the banknote.",
 	DISPLAY_MESSAGE,
+	// FIXME: Spelling incorrect. noone should be no one. Fixing changes game data and thus may cause issues
 	"Noone has to know...",
 	DISPLAY_MESSAGE,
 	"Good bye, my friend.",
@@ -15952,7 +15954,7 @@ const static char* dialog_204[] = {
 	CHANGE_CHARACTER,
 	"I guess grandma was involved too?",
 	CHANGE_CHARACTER,
-	"No, she's from here. We payed her.",
+	"No, she's from here. We paid her.",
 	CHANGE_CHARACTER,
 	"Now that's interesting.",
 	DISPLAY_MESSAGE,

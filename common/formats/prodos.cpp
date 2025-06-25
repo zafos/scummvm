@@ -25,13 +25,13 @@ namespace Common {
 
 // --- ProDOSFile methods ---
 
-ProDOSFile::ProDOSFile(char name[15], uint8 type, uint16 tBlk, uint32 eof, uint16 bPtr, Common::File *disk)
+ProDOSFile::ProDOSFile(char name[16], uint8 type, uint16 tBlk, uint32 eof, uint16 bPtr, Common::File *disk)
 	: _type(type)
 	, _totalBlocks(tBlk)
 	, _eof(eof)
 	, _blockPtr(bPtr)
 	, _disk(disk) {
-	strncpy(_name, name, 15);
+	Common::strlcpy(_name, name, 16);
 }
 
 /* For debugging purposes, this prints the meta data of a file */
@@ -48,6 +48,14 @@ void ProDOSFile::printInfo() {
 
 Common::String ProDOSFile::getName() const {
 	return Common::String(_name);
+}
+
+Common::String ProDOSFile::getFileName() const {
+	return Common::String(_name);
+}
+
+Common::Path ProDOSFile::getPathInArchive() const {
+	return Common::Path(_name);
 }
 
 /* This method is used to get a single block of data from the disk,
@@ -162,6 +170,10 @@ Common::SeekableReadStream *ProDOSFile::createReadStream() const {
 		}
 	}
 	return new Common::MemoryReadStream(finalData, _eof, DisposeAfterUse::YES);
+}
+
+Common::SeekableReadStream *ProDOSFile::createReadStreamForAltStream(Common::AltStreamType altStreamType) const {
+	return nullptr;
 }
 
 // --- ProDOSDisk methods ---
@@ -339,7 +351,7 @@ void ProDOSDisk::getVolumeBitmap(VolHeader *h) {
 
 /* Gets the volume information and parses the filesystem, adding file objects to a map as it goes */
 
-bool ProDOSDisk::open(const Common::String filename) {
+bool ProDOSDisk::open(const Common::Path &filename) {
 	_disk.open(filename);
 	_disk.read(_loader1, kBlockSize);
 	_disk.read(_loader2, kBlockSize);
@@ -359,7 +371,7 @@ bool ProDOSDisk::open(const Common::String filename) {
 
 /* Constructor simply calls open(), and if it is successful it prints a statement */
 
-ProDOSDisk::ProDOSDisk(const Common::String filename) {
+ProDOSDisk::ProDOSDisk(const Common::Path &filename) {
 	if (open(filename)) {
 		//debug("%s has been loaded", filename.c_str());
 	}
@@ -388,9 +400,8 @@ bool ProDOSDisk::hasFile(const Common::Path &path) const {
 
 int ProDOSDisk::listMembers(Common::ArchiveMemberList &list) const {
 	int f = 0;
-	Common::HashMap<Common::String, Common::SharedPtr<ProDOSFile>>::const_iterator it;
-	for (it = _files.begin(); it != _files.end(); ++it) {
-		list.push_back(Common::ArchiveMemberList::value_type(it->_value));
+	for (const auto &file : _files) {
+		list.push_back(Common::ArchiveMemberList::value_type(file._value));
 		++f;
 	}
 	return f;

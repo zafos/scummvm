@@ -61,7 +61,7 @@ public:
 		assert(parentStream);
 	}
 
-	virtual bool eos() const { return _eos | _parentStream->eos(); }
+	virtual bool eos() const { return _eos || _parentStream->eos(); }
 	virtual bool err() const { return _parentStream->err(); }
 	virtual void clearErr() { _eos = false; _parentStream->clearErr(); }
 	virtual uint32 read(void *dataPtr, uint32 dataSize);
@@ -86,30 +86,6 @@ public:
 	virtual int64 size() const { return _end - _begin; }
 
 	virtual bool seek(int64 offset, int whence = SEEK_SET);
-};
-
-/**
- * This is a SeekableSubReadStream subclass which adds non-endian
- * read methods whose endianness is set on the stream creation.
- *
- * Manipulating the parent stream directly /will/ mess up a substream.
- * @see SubReadStream
- */
-class SeekableSubReadStreamEndian :  virtual public SeekableSubReadStream, virtual public SeekableReadStreamEndian {
-public:
-	WARN_DEPRECATED("Use SeekableReadStreamEndianWrapper with SeekableSubReadStream instead")
-	SeekableSubReadStreamEndian(SeekableReadStream *parentStream, uint32 begin, uint32 end, bool bigEndian, DisposeAfterUse::Flag disposeParentStream = DisposeAfterUse::NO)
-		: SeekableSubReadStream(parentStream, begin, end, disposeParentStream),
-		  SeekableReadStreamEndian(bigEndian),
-		  ReadStreamEndian(bigEndian) {
-	}
-
-	int64 pos() const override { return SeekableSubReadStream::pos(); }
-	int64 size() const override { return SeekableSubReadStream::size(); }
-
-	bool seek(int64 offset, int whence = SEEK_SET) override { return SeekableSubReadStream::seek(offset, whence); }
-	void hexdump(int len, int bytesPerLine = 16, int startOffset = 0) { SeekableSubReadStream::hexdump(len, bytesPerLine, startOffset); }
-	bool skip(uint32 offset) override { return SeekableSubReadStream::seek(offset, SEEK_CUR); }
 };
 
 /**

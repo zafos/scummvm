@@ -22,6 +22,7 @@
 #ifndef MTROPOLIS_RUNTIME_H
 #define MTROPOLIS_RUNTIME_H
 
+#include "common/archive.h"
 #include "common/array.h"
 #include "common/events.h"
 #include "common/language.h"
@@ -35,9 +36,11 @@
 
 #include "mtropolis/actions.h"
 #include "mtropolis/core.h"
+#include "mtropolis/coroutine_protos.h"
 #include "mtropolis/data.h"
 #include "mtropolis/debug.h"
 #include "mtropolis/hacks.h"
+#include "mtropolis/miniscript_protos.h"
 #include "mtropolis/subtitles.h"
 #include "mtropolis/vthread.h"
 
@@ -71,6 +74,7 @@ namespace MTropolis {
 
 class Asset;
 class AssetManagerInterface;
+class CoroutineManager;
 class CursorGraphic;
 class CursorGraphicCollection;
 class Element;
@@ -108,13 +112,6 @@ struct ModifierLoaderContext;
 struct PlugInModifierLoaderContext;
 struct SIModifierFactory;
 template<typename TElement, typename TElementData> class ElementFactory;
-
-enum MiniscriptInstructionOutcome {
-	kMiniscriptInstructionOutcomeContinue,					// Continue executing next instruction
-	kMiniscriptInstructionOutcomeYieldToVThreadNoRetry,		// Instruction pushed a VThread task and should be retried when the task completes
-	kMiniscriptInstructionOutcomeYieldToVThreadAndRetry,	// Instruction pushed a VThread task and completed
-	kMiniscriptInstructionOutcomeFailed,					// Instruction errored
-};
 
 #ifdef MTROPOLIS_DEBUG_ENABLE
 class DebugPrimaryTaskList;
@@ -210,7 +207,7 @@ enum DynamicValueType {
 	kObject = 14,
 	kWriteProxy = 15,
 
-	kEmpty = 16,
+	kUnspecified = 16,
 };
 
 } // End of namespace DynamicValuesTypes
@@ -397,7 +394,7 @@ struct VarReference {
 
 	uint32 guid;
 	Common::String source;
-	Common::WeakPtr<Modifier> resolution;
+	Common::WeakPtr<Modifier> resolution;	// NOTE: This may not be a variable
 
 	inline bool operator==(const VarReference &other) const {
 		return guid == other.guid && source == other.source;
@@ -424,7 +421,7 @@ struct ObjectReference {
 	inline ObjectReference() {
 	}
 
-	inline explicit ObjectReference(const Common::WeakPtr<RuntimeObject> objectPtr) : object(objectPtr) {
+	inline explicit ObjectReference(const Common::WeakPtr<RuntimeObject> &objectPtr) : object(objectPtr) {
 	}
 
 	inline bool operator==(const ObjectReference &other) const {
@@ -782,6 +779,8 @@ struct DynamicList {
 	void expandToMinimumSize(size_t sz);
 	size_t getSize() const;
 
+	void forceType(DynamicValueTypes::DynamicValueType type);
+
 	static bool dynamicValueToIndex(size_t &outIndex, const DynamicValue &value);
 
 	DynamicList &operator=(const DynamicList &other);
@@ -804,9 +803,9 @@ private:
 		static MiniscriptInstructionOutcome refAttribIndexed(MiniscriptThread *thread, DynamicValueWriteProxy &proxy, void *objectRef, uintptr ptrOrOffset, const Common::String &attrib, const DynamicValue &index);
 	};
 
-	void clear();
 	void initFromOther(const DynamicList &other);
-	bool changeToType(DynamicValueTypes::DynamicValueType type);
+	void destroyContainer();
+	bool createContainerAndSetType(DynamicValueTypes::DynamicValueType type);
 
 	DynamicValueTypes::DynamicValueType _type;
 	DynamicListContainerBase *_container;
@@ -893,6 +892,12 @@ private:
 		void construct(T &&value);
 
 		template<class T, T(ValueUnion::*TMember)>
+		void assign(const T &value);
+
+		template<class T, T(ValueUnion::*TMember)>
+		void assign(T &&value);
+
+		template<class T, T(ValueUnion::*TMember)>
 		void destruct();
 	};
 
@@ -911,6 +916,7 @@ private:
 	bool convertToTypeNoDereference(DynamicValueTypes::DynamicValueType targetType, DynamicValue &result) const;
 
 	void setFromOther(const DynamicValue &other);
+	void setFromOther(DynamicValue &&other);
 
 	DynamicValueTypes::DynamicValueType _type;
 	ValueUnion _value;
@@ -1236,17 +1242,17 @@ private:
 	Common::HashMap<uint32, Common::SharedPtr<CursorGraphic> > _cursorGraphics;
 };
 
+// The project platform is the platform that the project is running on (not the format of the project)
 enum ProjectPlatform {
 	kProjectPlatformUnknown,
 
 	kProjectPlatformWindows,
 	kProjectPlatformMacintosh,
-	KProjectPlatformCrossPlatform,
 };
 
 class ProjectDescription {
 public:
-	explicit ProjectDescription(ProjectPlatform platform);
+	ProjectDescription(ProjectPlatform platform, RuntimeVersion runtimeVersion, bool autoDetectVersion, Common::Archive *rootArchive, const Common::Path &projectRootDir);
 	~ProjectDescription();
 
 	void addSegment(int volumeID, const char *filePath);
@@ -1262,13 +1268,18 @@ public:
 	void setCursorGraphics(const Common::SharedPtr<CursorGraphicCollection> &cursorGraphics);
 	const Common::SharedPtr<CursorGraphicCollection> &getCursorGraphics() const;
 
-	void setLanguage(const Common::Language &language);
-	const Common::Language &getLanguage() const;
+	void setLanguage(Common::Language language);
+	Common::Language getLanguage() const;
 
 	ProjectPlatform getPlatform() const;
+	RuntimeVersion getRuntimeVersion() const;
+	bool isRuntimeVersionAuto() const;
+
+	Common::Archive *getRootArchive() const;
+	const Common::Path &getProjectRootDir() const;
 
 	const SubtitleTables &getSubtitles() const;
-	void getSubtitles(const SubtitleTables &subs);
+	void setSubtitles(const SubtitleTables &subs);
 
 private:
 	Common::Array<SegmentDescription> _segments;
@@ -1278,6 +1289,11 @@ private:
 	Common::Language _language;
 	SubtitleTables _subtitles;
 	ProjectPlatform _platform;
+	RuntimeVersion _runtimeVersion;
+	bool _isRuntimeVersionAuto;
+
+	Common::Archive *_rootArchive;
+	Common::Path _projectRootDir;
 };
 
 struct VolumeState {
@@ -1334,11 +1350,19 @@ private:
 	Common::SharedPtr<MessageDispatch> _msg;
 };
 
+struct ObjectParentChange {
+	explicit ObjectParentChange(const Common::WeakPtr<RuntimeObject> &object, const Common::WeakPtr<RuntimeObject> &newParent);
+
+	Common::WeakPtr<RuntimeObject> _object;
+	Common::WeakPtr<RuntimeObject> _newParent;
+};
+
 struct HighLevelSceneTransition {
 	enum Type {
-		kTypeReturn,
 		kTypeChangeToScene,
 		kTypeChangeSharedScene,
+		kTypeForceLoadScene,
+		kTypeRequestUnloadScene,
 	};
 
 	HighLevelSceneTransition(const Common::SharedPtr<Structural> &hlst_scene, Type hlst_type, bool hlst_addToDestinationScene, bool hlst_addToReturnList);
@@ -1360,11 +1384,16 @@ struct SceneTransitionEffect {
 
 class MessageDispatch {
 public:
+	enum class RootType {
+		Invalid,
+
+		Command,
+		Structural,
+		Modifier,
+	};
+
 	MessageDispatch(const Common::SharedPtr<MessageProperties> &msgProps, Structural *root, bool cascade, bool relay, bool couldBeCommand);
 	MessageDispatch(const Common::SharedPtr<MessageProperties> &msgProps, Modifier *root, bool cascade, bool relay, bool couldBeCommand);
-
-	bool isTerminated() const;
-	VThreadState continuePropagating(Runtime *runtime);
 
 	const Common::SharedPtr<MessageProperties> &getMsg() const;
 	RuntimeObject *getRootPropagator() const;
@@ -1372,43 +1401,19 @@ public:
 	bool isCascade() const;
 	bool isRelay() const;
 
+	RootType getRootType() const;
+	const Common::WeakPtr<RuntimeObject> &getRootWeakPtr() const;
+
 private:
-	struct PropagationStack {
-		union Ptr {
-			Structural *structural;
-			Modifier *modifier;
-			IModifierContainer *modifierContainer;
-		};
-
-		enum PropagationStage {
-			kStageSendToModifier,
-			kStageSendToModifierContainer,
-
-			kStageSendToStructuralSelf,
-			kStageSendToStructuralModifiers,
-			kStageSendToStructuralChildren,
-
-			kStageCheckAndSendToModifier,
-			kStageCheckAndSendToStructural,
-			kStageCheckAndSendCommand,
-
-			kStageSendCommand,
-		};
-
-		PropagationStage propagationStage;
-		size_t index;
-		Ptr ptr;
-	};
-
-	Common::Array<PropagationStack> _propagationStack;
 	Common::SharedPtr<MessageProperties> _msg;
 
 	Common::WeakPtr<RuntimeObject> _root;
 
 	bool _cascade; // Traverses structure tree
 	bool _relay;   // Fire on multiple modifiers
-	bool _terminated;
 	bool _isCommand;
+
+	RootType _rootType;
 };
 
 class KeyEventDispatch {
@@ -1549,6 +1554,7 @@ public:
 
 	virtual void onSceneTransitionSetup(Runtime *runtime, const Common::WeakPtr<Structural> &oldScene, const Common::WeakPtr<Structural> &newScene);
 	virtual void onSceneTransitionEnded(Runtime *runtime, const Common::WeakPtr<Structural> &newScene);
+	virtual void onProjectStarted(Runtime *runtime);
 };
 
 class Palette {
@@ -1556,10 +1562,14 @@ public:
 	Palette();
 	explicit Palette(const ColorRGB8 *colors);
 
+	void initDefaultPalette(int version);
+
 	const byte *getPalette() const;
 
+	static const uint kNumColors = 256;
+
 private:
-	byte _colors[256 * 3];
+	byte _colors[kNumColors * 3];
 };
 
 class Runtime {
@@ -1576,6 +1586,7 @@ public:
 	void addVolume(int volumeID, const char *name, bool isMounted);
 	bool getVolumeState(const Common::String &name, int &outVolumeID, bool &outIsMounted) const;
 
+	void addSceneReturn();
 	void addSceneStateTransition(const HighLevelSceneTransition &transition);
 
 	void setSceneTransitionEffect(bool isInDestinationScene, SceneTransitionEffect *effect);
@@ -1622,6 +1633,12 @@ public:
 
 	// Sending a message on the VThread means "immediately"
 	void sendMessageOnVThread(const Common::SharedPtr<MessageDispatch> &dispatch);
+
+	struct SendMessageOnVThreadCoroutine {
+		CORO_DEFINE_RETURN_TYPE(void);
+		CORO_DEFINE_PARAMS_2(Runtime *, runtime, Common::SharedPtr<MessageDispatch>, dispatch);
+	};
+
 	void queueMessage(const Common::SharedPtr<MessageDispatch> &dispatch);
 
 	void queueOSEvent(const Common::SharedPtr<OSEvent> &osEvent);
@@ -1635,8 +1652,6 @@ public:
 	Common::SharedPtr<Window> findTopWindow(int32 x, int32 y) const;
 
 	void setVolume(double volume);
-
-	ProjectPlatform getPlatform() const;
 
 	void onMouseDown(int32 x, int32 y, Actions::MouseButton mButton);
 	void onMouseMove(int32 x, int32 y);
@@ -1689,6 +1704,9 @@ public:
 	const Palette &getGlobalPalette() const;
 	void setGlobalPalette(const Palette &palette);
 
+	void addMouseBlocker();
+	void removeMouseBlocker();
+
 	const Common::String *resolveAttributeIDName(uint32 attribID) const;
 
 	const Common::WeakPtr<Window> &getMainWindow() const;
@@ -1699,6 +1717,12 @@ public:
 	bool isIdle() const;
 
 	const Common::SharedPtr<SubtitleRenderer> &getSubtitleRenderer() const;
+
+	void queueCloneObject(const Common::WeakPtr<RuntimeObject> &obj);
+	void queueKillObject(const Common::WeakPtr<RuntimeObject> &obj);
+	void queueChangeObjectParent(const Common::WeakPtr<RuntimeObject> &obj, const Common::WeakPtr<RuntimeObject> &newParent);
+
+	void hotLoadScene(Structural *structural);
 
 #ifdef MTROPOLIS_DEBUG_ENABLE
 	void debugSetEnabled(bool enabled);
@@ -1725,6 +1749,7 @@ private:
 		Teardown();
 
 		Common::WeakPtr<Structural> structural;
+		Common::WeakPtr<Modifier> modifier;
 		bool onlyRemoveChildren;
 	};
 
@@ -1811,10 +1836,14 @@ private:
 	static Common::SharedPtr<Structural> findDefaultSharedSceneForScene(Structural *scene);
 	void executeTeardown(const Teardown &teardown);
 	void executeLowLevelSceneStateTransition(const LowLevelSceneStateTransitionAction &transitionAction);
+	void executeHighLevelSceneReturn();
 	void executeHighLevelSceneTransition(const HighLevelSceneTransition &transition);
 	void executeCompleteTransitionToScene(const Common::SharedPtr<Structural> &scene);
 	void executeSharedScenePostSceneChangeActions();
 	void executeSceneChangeRecursiveVisibilityChange(Structural *structural, bool showing);
+	void executeChangeObjectParent(RuntimeObject *object, RuntimeObject *newParent);
+	void executeCloneObject(RuntimeObject *object);
+	void executeKillObject(RuntimeObject *object);
 
 	void recursiveAutoPlayMedia(Structural *structural);
 	void recursiveDeactivateStructural(Structural *structural);
@@ -1833,7 +1862,26 @@ private:
 	void unloadProject();
 	void refreshPlayTime();	// Updates play time to be in sync with the system clock.  Used so that events occurring after storage access don't skip.
 
-	VThreadState dispatchMessageTask(const DispatchMethodTaskData &data);
+	struct DispatchMessageCoroutine {
+		CORO_DEFINE_RETURN_TYPE(void);
+		CORO_DEFINE_PARAMS_2(Runtime *, runtime, Common::SharedPtr<MessageDispatch>, dispatch);
+	};
+
+	struct SendMessageToStructuralCoroutine {
+		CORO_DEFINE_RETURN_TYPE(void);
+		CORO_DEFINE_PARAMS_4(Runtime *, runtime, bool *, isTerminatedPtr, Structural *, structural, MessageDispatch *, dispatch);
+	};
+
+	struct SendMessageToModifierContainerCoroutine {
+		CORO_DEFINE_RETURN_TYPE(void);
+		CORO_DEFINE_PARAMS_4(Runtime *, runtime, bool *, isTerminatedPtr, IModifierContainer *, modifierContainer, MessageDispatch *, dispatch);
+	};
+
+	struct SendMessageToModifierCoroutine {
+		CORO_DEFINE_RETURN_TYPE(void);
+		CORO_DEFINE_PARAMS_4(Runtime *, runtime, bool *, isTerminatedPtr, Modifier *, modifier, MessageDispatch *, dispatch);
+	};
+
 	VThreadState dispatchKeyTask(const DispatchKeyTaskData &data);
 	VThreadState dispatchActionTask(const DispatchActionTaskData &data);
 	VThreadState consumeMessageTask(const ConsumeMessageTaskData &data);
@@ -1847,6 +1895,8 @@ private:
 	static void recursiveFindColliders(Structural *structural, size_t sceneStackDepth, Common::Array<ColliderInfo> &colliders, int32 parentOriginX, int32 parentOriginY, bool isRoot);
 	static bool sortColliderPredicate(const ColliderInfo &a, const ColliderInfo &b);
 
+	Common::ScopedPtr<ICoroutineManager> _coroManager;
+
 	Common::Array<VolumeState> _volumes;
 	Common::SharedPtr<ProjectDescription> _queuedProjectDesc;
 	Common::SharedPtr<Project> _project;
@@ -1857,6 +1907,12 @@ private:
 
 	Common::Array<Teardown> _pendingTeardowns;
 	Common::Array<LowLevelSceneStateTransitionAction> _pendingLowLevelTransitions;
+	Common::Array<Common::WeakPtr<RuntimeObject> > _pendingKills;
+	Common::Array<Common::WeakPtr<RuntimeObject> > _pendingClones;
+	Common::Array<Common::WeakPtr<Structural> > _pendingPostCloneShowChecks;
+	Common::Array<Common::WeakPtr<Structural> > _pendingShowClonedObject;
+	Common::Array<ObjectParentChange> _pendingParentChanges;
+	uint _pendingSceneReturnCount;
 	Common::Array<HighLevelSceneTransition> _pendingSceneTransitions;
 	Common::Array<SceneStackEntry> _sceneStack;
 	Common::SharedPtr<Structural> _activeMainScene;
@@ -1912,8 +1968,6 @@ private:
 
 	Common::WeakPtr<Window> _keyFocusWindow;
 
-	ProjectPlatform _platform;
-
 	Common::SharedPtr<SystemInterface> _systemInterface;
 	Common::SharedPtr<WorldManagerInterface> _worldManagerInterface;
 	Common::SharedPtr<AssetManagerInterface> _assetManagerInterface;
@@ -1946,6 +2000,8 @@ private:
 	uint32 _multiClickInterval;
 	uint _multiClickCount;
 
+	uint _numMouseBlockers;
+
 	bool _defaultVolumeState;
 
 	// True if any elements were added to the scene, removed from the scene, or reparented since last draw
@@ -1958,7 +2014,7 @@ private:
 	uint32 _collisionCheckTime;
 
 	Common::WeakPtr<VisualElement> _elementTrackedToCursor;
-	uint32 _elementCursorUpdateTime;
+	//uint32 _elementCursorUpdateTime;
 
 	Common::Array<IPostEffect *> _postEffects;
 
@@ -1978,12 +2034,16 @@ private:
 struct IModifierContainer : public IInterfaceBase {
 	virtual const Common::Array<Common::SharedPtr<Modifier> > &getModifiers() const = 0;
 	virtual void appendModifier(const Common::SharedPtr<Modifier> &modifier) = 0;
+	virtual void removeModifier(const Modifier *modifier) = 0;
 };
 
 class SimpleModifierContainer : public IModifierContainer {
 public:
 	const Common::Array<Common::SharedPtr<Modifier> > &getModifiers() const override;
 	void appendModifier(const Common::SharedPtr<Modifier> &modifier) override;
+	void removeModifier(const Modifier *modifier) override;
+
+	void clear();
 
 private:
 	Common::Array<Common::SharedPtr<Modifier> > _modifiers;
@@ -2018,6 +2078,10 @@ public:
 	virtual MiniscriptInstructionOutcome writeRefAttributeIndexed(MiniscriptThread *thread, DynamicValueWriteProxy &result, const Common::String &attrib, const DynamicValue &index);
 
 protected:
+	MiniscriptInstructionOutcome scriptSetClone(MiniscriptThread *thread, const DynamicValue &value);
+	MiniscriptInstructionOutcome scriptSetKill(MiniscriptThread *thread, const DynamicValue &value);
+	MiniscriptInstructionOutcome scriptSetParent(MiniscriptThread *thread, const DynamicValue &value);
+
 	// This is the static GUID stored in the data, it is not guaranteed
 	// to be globally unique at runtime.  In particular, cloning an object
 	// and using aliased modifiers will cause multiple objects with the same
@@ -2025,6 +2089,15 @@ protected:
 	uint32 _guid;
 	uint32 _runtimeGUID;
 	Common::WeakPtr<RuntimeObject> _selfReference;
+
+	struct ParentWriteProxyInterface {
+		static MiniscriptInstructionOutcome write(MiniscriptThread *thread, const DynamicValue &dest, void *objectRef, uintptr ptrOrOffset);
+		static MiniscriptInstructionOutcome refAttrib(MiniscriptThread *thread, DynamicValueWriteProxy &proxy, void *objectRef, uintptr ptrOrOffset, const Common::String &attrib);
+		static MiniscriptInstructionOutcome refAttribIndexed(MiniscriptThread *thread, DynamicValueWriteProxy &proxy, void *objectRef, uintptr ptrOrOffset, const Common::String &attrib, const DynamicValue &index);
+
+	private:
+		static RuntimeObject *resolveObjectParent(RuntimeObject *obj);
+	};
 };
 
 struct MessageProperties {
@@ -2113,18 +2186,30 @@ public:
 	virtual ~StructuralHooks();
 
 	virtual void onCreate(Structural *structural);
-	virtual void onSetPosition(Runtime *runtime, Structural *structural, Common::Point &pt);
+	virtual void onPostActivate(Structural *structural);
+	virtual void onSetPosition(Runtime *runtime, Structural *structural, const Common::Point &oldPt, Common::Point &pt);
+	virtual void onStopPlayingMToon(Structural *structural, bool &visible, bool &stopped, Graphics::ManagedSurface *lastSurf);
+	virtual void onHidden(Structural *structural, bool &visible);
 };
 
 class Structural : public RuntimeObject, public IModifierContainer, public IMessageConsumer, public Debuggable {
 public:
+	enum class SceneLoadState {
+		kNotAScene,
+		kSceneNotLoaded,
+		kSceneLoaded,
+	};
+
 	Structural();
 	explicit Structural(Runtime *runtime);
 	virtual ~Structural();
 
 	bool isStructural() const override;
+	SceneLoadState getSceneLoadState() const;
+	void setSceneLoadState(SceneLoadState sceneLoadState);
 
 	bool readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) override;
+	bool readAttributeIndexed(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib, const DynamicValue &index) override;
 	MiniscriptInstructionOutcome writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &result, const Common::String &attrib) override;
 
 	const Common::Array<Common::SharedPtr<Structural> > &getChildren() const;
@@ -2148,6 +2233,7 @@ public:
 
 	const Common::Array<Common::SharedPtr<Modifier> > &getModifiers() const override;
 	void appendModifier(const Common::SharedPtr<Modifier> &modifier) override;
+	void removeModifier(const Modifier *modifier) override;
 
 	bool respondsToEvent(const Event &evt) const override;
 	VThreadState consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
@@ -2155,7 +2241,12 @@ public:
 	void materializeSelfAndDescendents(Runtime *runtime, ObjectLinkingScope *outerScope);
 	void materializeDescendents(Runtime *runtime, ObjectLinkingScope *outerScope);
 
-	virtual VThreadState consumeCommand(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg);
+	struct StructuralConsumeCommandCoroutine {
+		CORO_DEFINE_RETURN_TYPE(void);
+		CORO_DEFINE_PARAMS_3(Structural *, self, Runtime *, runtime, Common::SharedPtr<MessageProperties>, msg);
+	};
+
+	virtual VThreadState asyncConsumeCommand(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg);
 
 	virtual void activate();
 	virtual void deactivate();
@@ -2164,6 +2255,11 @@ public:
 
 	void setHooks(const Common::SharedPtr<StructuralHooks> &hooks);
 	const Common::SharedPtr<StructuralHooks> &getHooks() const;
+
+	// Shallow clones only need to copy the object.  Descendent copies are done using visitInternalReferences.
+	virtual Common::SharedPtr<Structural> shallowClone() const = 0;
+
+	virtual void visitInternalReferences(IStructuralReferenceVisitor *visitor);
 
 #ifdef MTROPOLIS_DEBUG_ENABLE
 	SupportStatus debugGetSupportStatus() const override;
@@ -2174,12 +2270,15 @@ public:
 #endif
 
 protected:
+	explicit Structural(const Structural &other);
+
 	virtual ObjectLinkingScope *getPersistentStructuralScope();
 	virtual ObjectLinkingScope *getPersistentModifierScope();
 
 	MiniscriptInstructionOutcome scriptSetPaused(MiniscriptThread *thread, const DynamicValue &value);
 	MiniscriptInstructionOutcome scriptSetLoop(MiniscriptThread *thread, const DynamicValue &value);
 	MiniscriptInstructionOutcome scriptSetDebug(MiniscriptThread *thread, const DynamicValue &value);
+	MiniscriptInstructionOutcome scriptSetUnload(MiniscriptThread *thread, const DynamicValue &value);
 
 	// If you override this, you must override visitInternalReferences too.
 	virtual void linkInternalReferences(ObjectLinkingScope *outerScope);
@@ -2205,6 +2304,7 @@ protected:
 	bool _loop;
 
 	int32 _flushPriority;
+	SceneLoadState _sceneLoadState;
 
 	Common::SharedPtr<StructuralHooks> _hooks;
 
@@ -2307,7 +2407,7 @@ private:
 };
 
 struct IKeyboardEventReceiver : public IInterfaceBase {
-	virtual void onKeyboardEvent(Runtime *runtime, Common::EventType evtType, bool repeat, const Common::KeyState &keyEvt) = 0;
+	virtual void onKeyboardEvent(Runtime *runtime, const KeyboardInputEvent &keyEvt) = 0;
 };
 
 class KeyboardEventSignaller {
@@ -2315,7 +2415,7 @@ public:
 	KeyboardEventSignaller();
 	~KeyboardEventSignaller();
 
-	void onKeyboardEvent(Runtime *runtime, Common::EventType evtType, bool repeat, const Common::KeyState &keyEvt);
+	void onKeyboardEvent(Runtime *runtime, const KeyboardInputEvent &keyEvt);
 	void addReceiver(IKeyboardEventReceiver *receiver);
 	void removeReceiver(IKeyboardEventReceiver *receiver);
 
@@ -2374,7 +2474,7 @@ public:
 	explicit Project(Runtime *runtime);
 	~Project();
 
-	VThreadState consumeCommand(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
+	VThreadState asyncConsumeCommand(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
 
 	MiniscriptInstructionOutcome writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &result, const Common::String &attrib) override;
 
@@ -2402,7 +2502,7 @@ public:
 	const Common::String *findNameOfLabel(const Label &label) const;
 
 	void onPostRender();
-	void onKeyboardEvent(Runtime *runtime, const Common::EventType evtType, bool repeat, const Common::KeyState &keyEvt);
+	void onKeyboardEvent(Runtime *runtime, const KeyboardInputEvent &keyEvt);
 
 	Common::SharedPtr<SegmentUnloadSignaller> notifyOnSegmentUnload(int segmentIndex, ISegmentUnloadSignalReceiver *receiver);
 	Common::SharedPtr<KeyboardEventSignaller> notifyOnKeyboardEvent(IKeyboardEventReceiver *receiver);
@@ -2413,6 +2513,12 @@ public:
 	const Common::SharedPtr<CursorGraphicCollection> &getCursorGraphics() const;
 
 	const SubtitleTables &getSubtitles() const;
+
+	RuntimeVersion getRuntimeVersion() const;
+	ProjectPlatform getPlatform() const;
+
+	void visitInternalReferences(IStructuralReferenceVisitor *visitor) override;
+	Common::SharedPtr<Structural> shallowClone() const override;
 
 #ifdef MTROPOLIS_DEBUG_ENABLE
 	const char *debugGetTypeName() const override { return "Project"; }
@@ -2445,6 +2551,7 @@ private:
 
 		SegmentDescription desc;
 		Common::SharedPtr<Common::SeekableReadStream> rcStream;
+
 		Common::SeekableReadStream *weakStream;
 		Common::SharedPtr<SegmentUnloadSignaller> unloadSignaller;
 	};
@@ -2495,12 +2602,13 @@ private:
 
 	void assignAssets(const Common::Array<Common::SharedPtr<Asset> > &assets, const Hacks &hacks);
 
+	void initAdditionalSegments(const Common::String &projectName);
+
 	Common::Array<Segment> _segments;
 	Common::Array<StreamDesc> _streams;
 	Common::Array<LabelTree> _labelTree;
 	Common::Array<LabelSuperGroup> _labelSuperGroups;
 	Data::ProjectFormat _projectFormat;
-	bool _isBigEndian;
 
 	Common::Array<AssetDesc *> _assetsByID;
 	Common::Array<AssetDesc> _realAssets;
@@ -2526,6 +2634,14 @@ private:
 	Common::SharedPtr<KeyboardEventSignaller> _keyboardEventSignaller;
 
 	SubtitleTables _subtitles;
+
+	ProjectPlatform _platform;
+
+	Common::Archive *_rootArchive;
+	Common::Path _projectRootDir;
+
+	RuntimeVersion _runtimeVersion;
+	bool _isRuntimeVersionAutoDetect;
 };
 
 class Section : public Structural {
@@ -2533,6 +2649,9 @@ public:
 	bool load(const Data::SectionStructuralDef &data);
 
 	bool isSection() const override;
+
+	Common::SharedPtr<Structural> shallowClone() const override;
+	void visitInternalReferences(IStructuralReferenceVisitor *visitor) override;
 
 #ifdef MTROPOLIS_DEBUG_ENABLE
 	const char *debugGetTypeName() const override { return "Section"; }
@@ -2555,6 +2674,9 @@ public:
 	ObjectLinkingScope *getSceneLoadMaterializeScope();
 
 	bool isSubsection() const override;
+
+	Common::SharedPtr<Structural> shallowClone() const override;
+	void visitInternalReferences(IStructuralReferenceVisitor *visitor) override;
 
 #ifdef MTROPOLIS_DEBUG_ENABLE
 	const char *debugGetTypeName() const override { return "Subsection"; }
@@ -2584,10 +2706,17 @@ public:
 	void removeMediaCue(const MediaCueState *mediaCue);
 
 	void triggerAutoPlay(Runtime *runtime);
+	virtual void tryAutoSetName(Runtime *runtime, Project *project);
 
 	virtual bool resolveMediaMarkerLabel(const Label &label, int32 &outResolution) const;
 
+	void visitInternalReferences(IStructuralReferenceVisitor *visitor) override;
+
+	typedef StructuralConsumeCommandCoroutine ElementConsumeCommandCoroutine;
+
 protected:
+	Element(const Element &other);
+
 	uint32 _streamLocator;
 	uint16 _sectionID;
 
@@ -2614,6 +2743,7 @@ private:
 class VisualElementRenderProperties {
 public:
 	VisualElementRenderProperties();
+	VisualElementRenderProperties(const VisualElementRenderProperties &) = default;
 
 	enum InkMode {
 		kInkModeCopy = 0x0,
@@ -2677,7 +2807,7 @@ public:
 	bool isDirty() const;
 	void clearDirty();
 
-	//VisualElementRenderProperties &operator=(const VisualElementRenderProperties &other);
+	VisualElementRenderProperties &operator=(const VisualElementRenderProperties &other);
 
 private:
 	InkMode _inkMode;
@@ -2701,7 +2831,12 @@ public:
 	bool isVisual() const override;
 	virtual bool isTextLabel() const;
 
-	VThreadState consumeCommand(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
+	struct VisualElementConsumeCommandCoroutine {
+		CORO_DEFINE_RETURN_TYPE(void);
+		CORO_DEFINE_PARAMS_3(VisualElement *, self, Runtime *, runtime, Common::SharedPtr<MessageProperties>, msg);
+	};
+
+	VThreadState asyncConsumeCommand(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
 
 	bool respondsToEvent(const Event &evt) const override;
 	VThreadState consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
@@ -2754,6 +2889,8 @@ public:
 	const VisualElementRenderProperties &getRenderProperties() const;
 	const Common::WeakPtr<GraphicModifier> &getPrimaryGraphicModifier() const;
 
+	void setShading(int16 topLeftBevelShading, int16 bottomRightBevelShading, int16 interiorShading, uint32 bevelSize);
+
 	void setTransitionProperties(const VisualElementTransitionProperties &props);
 	const VisualElementTransitionProperties &getTransitionProperties() const;
 
@@ -2764,11 +2901,17 @@ public:
 	void setPalette(const Common::SharedPtr<Palette> &palette);
 	const Common::SharedPtr<Palette> &getPalette() const;
 
+	void visitInternalReferences(IStructuralReferenceVisitor *visitor) override;
+
+	void pushVisibilityChangeTask(Runtime *runtime, bool desiredVisibility);
+
 #ifdef MTROPOLIS_DEBUG_ENABLE
 	void debugInspect(IDebugInspectionReport *report) const override;
 #endif
 
 protected:
+	VisualElement(const VisualElement &other);
+
 	bool loadCommon(const Common::String &name, uint32 guid, const Data::Rect &rect, uint32 elementFlags, uint16 layer, uint32 streamLocator, uint16 sectionID);
 
 	MiniscriptInstructionOutcome scriptSetDirect(MiniscriptThread *thread, const DynamicValue &dest);
@@ -2779,16 +2922,24 @@ protected:
 	MiniscriptInstructionOutcome scriptSetCenterPositionX(MiniscriptThread *thread, const DynamicValue &dest);
 	MiniscriptInstructionOutcome scriptSetCenterPositionY(MiniscriptThread *thread, const DynamicValue &dest);
 	MiniscriptInstructionOutcome scriptSetVisibility(MiniscriptThread *thread, const DynamicValue &result);
+	MiniscriptInstructionOutcome scriptSetSize(MiniscriptThread *thread, const DynamicValue &dest);
 	MiniscriptInstructionOutcome scriptSetWidth(MiniscriptThread *thread, const DynamicValue &dest);
 	MiniscriptInstructionOutcome scriptSetHeight(MiniscriptThread *thread, const DynamicValue &dest);
 	MiniscriptInstructionOutcome scriptSetLayer(MiniscriptThread *thread, const DynamicValue &dest);
 
 	MiniscriptInstructionOutcome scriptWriteRefPositionAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib);
+	MiniscriptInstructionOutcome scriptWriteRefSizeAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib);
 	MiniscriptInstructionOutcome scriptWriteRefCenterPositionAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib);
 
 	void offsetTranslate(int32 xDelta, int32 yDelta, bool cachedOriginOnly);
+	void resize(int32 width, int32 height);
 
 	Common::Point getCenterPosition() const;
+
+	struct ChangeVisibilityCoroutine {
+		CORO_DEFINE_RETURN_TYPE(void);
+		CORO_DEFINE_PARAMS_3(VisualElement *, self, Runtime *, runtime, bool, desiredFlag);
+	};
 
 	struct ChangeFlagTaskData {
 		ChangeFlagTaskData() : desiredFlag(false), runtime(nullptr) {}
@@ -2801,12 +2952,29 @@ protected:
 
 	static VisualElement *recursiveFindItemWithLayer(VisualElement *element, int32 layer);
 
+	void renderShading(Graphics::Surface &surf) const;
+
+	static uint32 quantizeShading(uint32 mask, int16 shading);
+
+	static void renderShadingScanlineDynamic(void *data, size_t numElements, uint32 rMask, uint32 rAdd, uint32 gMask, uint32 gAdd, uint32 bMask, uint32 bAdd, bool isBrighten, byte bytesPerPixel);
+
+	template<class TElement>
+	static void renderBrightenScanline(TElement *element, size_t numElements, TElement rMask, TElement rAdd, TElement gMask, TElement gAdd, TElement bMask, TElement bAdd);
+
+	template<class TElement>
+	static void renderDarkenScanline(TElement *element, size_t numElements, TElement rMask, TElement rSub, TElement gMask, TElement gSub, TElement bMask, TElement bSub);
+
 	bool _directToScreen;
 	bool _visible;
 	bool _visibleByDefault;
 	Common::Rect _rect;
 	Common::Point _cachedAbsoluteOrigin;
 	uint16 _layer;
+
+	int16 _topLeftBevelShading;
+	int16 _bottomRightBevelShading;
+	int16 _interiorShading;
+	uint32 _bevelSize;
 
 	Common::SharedPtr<DragMotionProperties> _dragProps;
 
@@ -2828,6 +2996,8 @@ public:
 	bool isVisual() const override;
 
 	bool loadCommon(const Common::String &name, uint32 guid, uint32 elementFlags);
+
+	typedef ElementConsumeCommandCoroutine NonVisualElementConsumeCommandCoroutine;
 };
 
 struct ModifierFlags {
@@ -2973,6 +3143,10 @@ public:
 
 	virtual DynamicValueWriteProxy createWriteProxy();
 
+#ifdef MTROPOLIS_DEBUG_ENABLE
+	void debugInspect(IDebugInspectionReport *report) const override;
+#endif
+
 private:
 	VariableModifier() = delete;
 
@@ -2995,6 +3169,7 @@ enum AssetType {
 	kAssetTypeImage,
 	kAssetTypeText,
 	kAssetTypeMToon,
+	kAssetTypeAVIMovie,
 };
 
 class AssetHooks {

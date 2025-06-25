@@ -70,6 +70,7 @@ public:
 	int _mouseStatusCopy;
 	bool _mouseMoved;
 	Common::Stack<Common::KeyState> _pendingKeys;
+	Common::Stack<Common::CustomEventType> _pendingActions;
 public:
 	/**
 	 * Constructor
@@ -84,7 +85,7 @@ public:
 	/**
 	 * Loads the sprite set containing the cursors
 	 */
-	void loadCursors(const Common::String &spritesName);
+	void loadCursors(const Common::Path &spritesName);
 
 	/**
 	 * Sets the cursor
@@ -174,9 +175,19 @@ public:
 	bool isKeyPressed() const { return !_pendingKeys.empty(); }
 
 	/**
+	 * Returns true if there's any pending actions to be processed
+	 */
+	bool isActionTriggered() const { return !_pendingActions.empty(); }
+
+	/**
 	 * Gets the next pending keypress
 	 */
 	Common::KeyState getKey() { return _pendingKeys.pop(); }
+
+	/**
+	 * Gets the next pending action
+	 */
+	Common::CustomEventType getAction() { return _pendingActions.pop(); }
 };
 
 } // End of namespace MADS

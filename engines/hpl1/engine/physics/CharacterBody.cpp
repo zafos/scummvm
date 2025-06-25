@@ -611,7 +611,7 @@ void iCharacterBody::Update(float afTimeStep) {
 	}
 
 	////////////////////////////////
-	// Set the postion to the body
+	// Set the position to the body
 	mpBody->SetPosition(mvPosition);
 
 	//////////////////////////
@@ -642,7 +642,7 @@ void iCharacterBody::Update(float afTimeStep) {
 	}
 
 	/////////////////////////////////////////
-	// Update postion
+	// Update position
 	if (mbClimbing)
 		mfCheckStepClimbCount = 0;
 	else
@@ -686,10 +686,8 @@ void iCharacterBody::Update(float afTimeStep) {
 	// Check for collision.
 	// Might wanna test this for x, y and z independently.
 	mvPosition += vPosAdd;
-
 	cVector3f vNewPos;
-	// vNewPos = mvPosition;
-	if (mvLastPosition.x != mvPosition.x || mvLastPosition.z != mvLastPosition.z) {
+	if (mvLastPosition.x != mvPosition.x || mvLastPosition.z != mvPosition.z) {
 		mpWorld->CheckShapeWorldCollision(&vNewPos, mpBody->GetShape(), cMath::MatrixTranslate(mvPosition), mpBody,
 										  false, true, mpCollideCallbackPush, mbCollideCharacter);
 	} else {
@@ -784,7 +782,7 @@ void iCharacterBody::Update(float afTimeStep) {
 	}
 
 	if (mbGravityActive == false) {
-		// Set the postion to the body
+		// Set the position to the body
 		mpBody->SetPosition(mvPosition);
 
 		UpdateCamera();
@@ -825,8 +823,8 @@ void iCharacterBody::Update(float afTimeStep) {
 		mvPosition += cVector3f(mvVelolcity.x, 0, mvVelolcity.z) * afTimeStep;
 
 		vNewPos = mvPosition;
-		/*bool bCollide = */mpWorld->CheckShapeWorldCollision(&vNewPos, mpBody->GetShape(), cMath::MatrixTranslate(mvPosition),
-														  mpBody, false, true, NULL, mbCollideCharacter);
+		/*bool bCollide = */ mpWorld->CheckShapeWorldCollision(&vNewPos, mpBody->GetShape(), cMath::MatrixTranslate(mvPosition),
+															   mpBody, false, true, NULL, mbCollideCharacter);
 
 		// Set new velocity depending on collisions.
 		vLastVelocity.x = mvVelolcity.x;
@@ -1054,7 +1052,7 @@ void iCharacterBody::UpdateCamera() {
 
 		float fNum = (float)mlstCameraPos.size();
 
-		// Add all positions and devide by the number of em.
+		// Add all positions and divide by the number of them.
 		// that way we get the average
 		cVector3f vTotalPos(0, 0, 0);
 		tVector3fListIt it = mlstCameraPos.begin();
@@ -1095,7 +1093,7 @@ void iCharacterBody::UpdateEntity() {
 
 		float fNum = (float)mlstEntityPos.size();
 
-		// Add all positions and devide by the number of em.
+		// Add all positions and divide by the number of them.
 		// that way we get the average
 		cVector3f vTotalPos(0, 0, 0);
 		tVector3fListIt it = mlstEntityPos.begin();

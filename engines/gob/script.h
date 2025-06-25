@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #ifndef GOB_SCRIPT_H
@@ -80,7 +86,7 @@ public:
 	void  skipExpr(char stopToken);
 
 	// Higher-level expression parsing functions
-	char  evalExpr(int16 *pRes);
+	char  evalExpr(int32 *pRes);
 	bool  evalBool();
 	int32 evalInt();
 
@@ -117,6 +123,9 @@ public:
 	void pop(bool ret = true);
 	/** Push the current script position and branch to the specified offset. */
 	void call(uint32 offset);
+
+	/** Override a byte into the loaded script data (used for some script bugs workarounds) */
+	void writeByte(int32 offset, byte v);
 
 	// Fixed properties
 	uint8  getVersionMajor   () const;

@@ -45,13 +45,21 @@
 #define JOYSTICK_DIR	"/sys/devices/platform/joystick"
 
 static const Common::KeyTableEntry odKeyboardButtons[] = {
+	// I18N: Hardware key
 	{ "JOY_A",		Common::KEYCODE_LCTRL,		_s("A")			},
+	// I18N: Hardware key
 	{ "JOY_B",		Common::KEYCODE_LALT,		_s("B")			},
+	// I18N: Hardware key
 	{ "JOY_X",		Common::KEYCODE_SPACE,		_s("X")			},
+	// I18N: Hardware key
 	{ "JOY_Y",		Common::KEYCODE_LSHIFT,		_s("Y")			},
+	// I18N: Hardware key
 	{ "JOY_BACK",		Common::KEYCODE_ESCAPE,		_s("Select")		},
+	// I18N: Hardware key
 	{ "JOY_START",		Common::KEYCODE_RETURN,		_s("Start")		},
+	// I18N: Hardware key
 	{ "JOY_LEFT_SHOULDER",	Common::KEYCODE_TAB,		_s("L")			},
+	// I18N: Hardware key
 	{ "JOY_RIGHT_SHOULDER", Common::KEYCODE_BACKSPACE,	_s("R")			},
 	{ "JOY_UP",		Common::KEYCODE_UP,		_s("D-pad Up")	},
 	{ "JOY_DOWN",		Common::KEYCODE_DOWN,		_s("D-pad Down")	},
@@ -61,6 +69,7 @@ static const Common::KeyTableEntry odKeyboardButtons[] = {
 };
 
 static const Common::HardwareInputTableEntry odJoystickButtons[] = {
+	// I18N: Hardware key
 	{ "JOY_LEFT_TRIGGER",	Common::JOYSTICK_BUTTON_LEFT_STICK,	_s("L3")	 },
 	{ nullptr,		0,					nullptr		 }
 };
@@ -110,8 +119,8 @@ void OSystem_SDL_Opendingux::initBackend() {
 	ConfMan.registerDefault("fullscreen", true);
 #endif
 	ConfMan.registerDefault("aspect_ratio", true);
-	ConfMan.registerDefault("themepath", "./themes");
-	ConfMan.registerDefault("extrapath", "./engine-data");
+	ConfMan.registerDefault("themepath", Common::Path("./themes"));
+	ConfMan.registerDefault("extrapath", Common::Path("./engine-data"));
 	ConfMan.registerDefault("gui_theme", "builtin");
 	ConfMan.registerDefault("scale_factor", "1");
 
@@ -122,13 +131,13 @@ void OSystem_SDL_Opendingux::initBackend() {
 		ConfMan.setBool("aspect_ratio", true);
 	}
 	if (!ConfMan.hasKey("themepath")) {
-		ConfMan.set("themepath", "./themes");
+		ConfMan.setPath("themepath", "./themes");
 	}
 	if (!ConfMan.hasKey("extrapath")) {
-		ConfMan.set("extrapath", "./engine-data");
+		ConfMan.setPath("extrapath", "./engine-data");
 	}
 	if (!ConfMan.hasKey("savepath")) {
-		ConfMan.set("savepath", SAVE_PATH);
+		ConfMan.setPath("savepath", SAVE_PATH);
 	}
 	if (!ConfMan.hasKey("gui_theme")) {
 		ConfMan.set("gui_theme", "builtin");
@@ -164,12 +173,12 @@ void OSystem_SDL_Opendingux::initBackend() {
 	OSystem_SDL::initBackend();
 }
 
-Common::String OSystem_SDL_Opendingux::getDefaultConfigFileName() {
+Common::Path OSystem_SDL_Opendingux::getDefaultConfigFileName() {
 	return CONFIG_FILE;
 
 }
 
-Common::String OSystem_SDL_Opendingux::getDefaultLogFileName() {
+Common::Path OSystem_SDL_Opendingux::getDefaultLogFileName() {
 	return LOG_FILE;
 }
 
@@ -206,4 +215,3 @@ Common::HardwareInputSet *OSystem_SDL_Opendingux::getHardwareInputSet() {
 
 	return inputSet;
 }
-

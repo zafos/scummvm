@@ -54,7 +54,7 @@ bool Object3D::loadModel(const Common::String &name) {
 		_modelFileName = settings->_value._modelFileName;
 		_defaultScale = settings->_value._defaultScale;
 		_modelPtr->setTexturePath("objects/Textures");
-		bool loaded = _modelPtr->load(Common::Path("objects").join(_modelFileName).toString());
+		bool loaded = _modelPtr->load(Common::Path("objects").join(_modelFileName));
 		if (loaded) {
 			_modelPtr->setName(name);
 			_modelPtr->setScale(_defaultScale);
@@ -72,6 +72,7 @@ void Object3D::setObjectMoveDest(const TeVector3f32 &vec) {
 void Object3D::setObjectMoveTime(float time) {
 	_moveAnim._duration = time * 1000;
 	_moveAnim._callbackObj = this;
+	_moveAnim._callbackMethod = &Object3D::setCurMovePos;
 	Common::Array<float> curve;
 	curve.push_back(0.0f);
 	curve.push_back(1.0f);
@@ -92,19 +93,18 @@ void Object3D::setCurMovePos(const TeVector3f32 &vec) {
 }
 
 /*static*/
-bool Object3D::loadSettings(const Common::String &path) {
-	ObjectSettingsXmlParser parser;
-	parser.setAllowText();
-
+bool Object3D::loadSettings(const Common::Path &path) {
 	if (_objectSettings)
 		delete _objectSettings;
 	_objectSettings = new Common::HashMap<Common::String, ObjectSettings>();
-	parser.setObjectSettings(_objectSettings);
+
+	ObjectSettingsXmlParser parser(_objectSettings);
+	parser.setAllowText();
 
 	if (!parser.loadFile(path))
-		error("Object3D::loadSettings: Can't load %s", path.c_str());
+		error("Object3D::loadSettings: Can't load %s", path.toString(Common::Path::kNativeSeparator).c_str());
 	if (!parser.parse())
-		error("Object3D::loadSettings: Can't parse %s", path.c_str());
+		error("Object3D::loadSettings: Can't parse %s", path.toString(Common::Path::kNativeSeparator).c_str());
 	parser.finalize();
 
 	return true;

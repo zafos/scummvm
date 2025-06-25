@@ -28,10 +28,10 @@
 #ifndef HPL_GRAPHICSDRAWER_H
 #define HPL_GRAPHICSDRAWER_H
 
+#include "common/array.h"
+#include "common/list.h"
 #include "hpl1/engine/graphics/BackgroundImage.h"
 #include "hpl1/engine/graphics/GraphicsTypes.h"
-#include "common/list.h"
-#include "common/array.h"
 #include "hpl1/std/multiset.h"
 
 namespace hpl {
@@ -50,9 +50,9 @@ public:
 	bool mbIsColorAndSize;
 	cColor mColor;
 	cVector2f mvSize;
-	bool mbFlipH;
-	bool mbFlipV;
-	float mfAngle;
+	bool mbFlipH = false;
+	bool mbFlipV = false;
+	float mfAngle = 0;
 
 	iMaterial *GetMaterial() const;
 	float GetZ() const { return mvTransform.z; }
@@ -151,6 +151,6 @@ private:
 	tBackgroundImageMap m_mapBackgroundImages;
 };
 
-}     // namespace hpl
+} // namespace hpl
 
 #endif // HPL_GRAPHICSDRAWER_H

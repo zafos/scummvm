@@ -28,6 +28,7 @@
 #include "mm/mm.h"
 #include "mm/mm1/events.h"
 #include "mm/mm1/globals.h"
+#include "mm/mm1/sound.h"
 
 /**
  * This is the Might and Magic I engine
@@ -42,8 +43,17 @@ private:
 
 	void setupNormal();
 	bool setupEnhanced();
+protected:
+	/**
+	 * Returns true if the game should quit
+	 */
+	bool shouldQuit() const override {
+		return MMEngine::shouldQuit();
+	}
+
 public:
 	Globals _globals;
+	Sound *_sound = nullptr;
 public:
 	MM1Engine(OSystem *syst, const MightAndMagicGameDescription *gameDesc);
 	~MM1Engine() override;
@@ -57,6 +67,9 @@ public:
 		return _randomSource.getRandomNumber(maxNumber - minNumber + 1) + minNumber;
 	}
 	int getRandomNumber(int maxNumber) {
+		if (maxNumber < 2)
+			maxNumber = 2;
+
 		return getRandomNumber(1, maxNumber - 1);
 	}
 
@@ -65,14 +78,19 @@ public:
 	}
 
 	/**
+	 * Sync the sound settings
+	 */
+	void syncSoundSettings() override;
+
+	/**
 	 * Returns true if a game can be saved
 	 */
-	bool canSaveGameStateCurrently() override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	/**
 	 * Returns true if a savegame can be loaded
 	 */
-	bool canLoadGameStateCurrently() override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	/**
 	 * Saves or loads a savegame

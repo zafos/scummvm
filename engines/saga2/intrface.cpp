@@ -649,7 +649,7 @@ void CStatusLine::experationCheck() {
 		_waitAlarm.set(_lineQueue[_queueTail].frameTime);
 		_minWaitAlarm.set(_lineQueue[_queueTail].frameTime / 5);
 
-		// copy upto the buffer's size in chars
+		// copy up to the buffer's size in chars
 		Common::strlcpy(_lineBuf, _lineQueue[_queueTail].text,kBufSize);
 		_lineBuf[kBufSize - 1] = '\0';
 
@@ -1773,7 +1773,7 @@ uint16 getWeightRatio(GameObject *obj, uint16 &maxRatio, bool bReturnMaxRatio = 
 	uint16 maxWeight;
 
 	// get the mass capacity for this container
-	maxWeight = obj->massCapacity();;
+	maxWeight = obj->massCapacity();
 
 	// get the total mass this container is holding
 	weight = obj->totalContainedMass();

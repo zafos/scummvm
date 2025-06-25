@@ -39,24 +39,26 @@ void Spellbook::addButtons() {
 	addButton(&g_globals->_mainIcons, Common::Point(187, 111), 2, Common::KEYCODE_DOWN);
 	addButton(&_scrollSprites, Common::Point(100, 109), 5, KEYBIND_SELECT);
 
-	addButton(Common::Rect(40, 28, 187, 36), Common::KEYCODE_1);
-	addButton(Common::Rect(40, 37, 187, 45), Common::KEYCODE_2);
-	addButton(Common::Rect(40, 46, 187, 54), Common::KEYCODE_3);
-	addButton(Common::Rect(40, 55, 187, 63), Common::KEYCODE_4);
-	addButton(Common::Rect(40, 64, 187, 72), Common::KEYCODE_5);
-	addButton(Common::Rect(40, 73, 187, 81), Common::KEYCODE_6);
-	addButton(Common::Rect(40, 82, 187, 90), Common::KEYCODE_7);
-	addButton(Common::Rect(40, 91, 187, 99), Common::KEYCODE_8);
-	addButton(Common::Rect(40, 100, 187, 108), Common::KEYCODE_9);
-	addButton(Common::Rect(40, 109, 187, 117), Common::KEYCODE_0);
-	addButton(Common::Rect(174, 123, 198, 133), KEYBIND_ESCAPE);
-	addButton(Common::Rect(187, 35, 198, 73), Common::KEYCODE_PAGEUP);
-	addButton(Common::Rect(187, 74, 198, 112), Common::KEYCODE_PAGEDOWN);
-	addButton(Common::Rect(132, 123, 168, 133), KEYBIND_SELECT);
+	addButton(Common::Rect(5, 14, 152, 22), Common::KEYCODE_1);
+	addButton(Common::Rect(5, 23, 152, 31), Common::KEYCODE_2);
+	addButton(Common::Rect(5, 32, 152, 40), Common::KEYCODE_3);
+	addButton(Common::Rect(5, 41, 152, 49), Common::KEYCODE_4);
+	addButton(Common::Rect(5, 50, 152, 58), Common::KEYCODE_5);
+	addButton(Common::Rect(5, 59, 152, 67), Common::KEYCODE_6);
+	addButton(Common::Rect(5, 68, 152, 76), Common::KEYCODE_7);
+	addButton(Common::Rect(5, 77, 152, 85), Common::KEYCODE_8);
+	addButton(Common::Rect(5, 86, 152, 94), Common::KEYCODE_9);
+	addButton(Common::Rect(5, 95, 152, 103), Common::KEYCODE_0);
+
+	addButton(Common::Rect(139, 109, 163, 119), KEYBIND_ESCAPE);
+	addButton(Common::Rect(152, 21, 163, 59), Common::KEYCODE_PAGEUP);
+	addButton(Common::Rect(152, 60, 163, 98), Common::KEYCODE_PAGEDOWN);
+	addButton(Common::Rect(97, 109, 163, 119), KEYBIND_SELECT);
 }
 
 bool Spellbook::msgFocus(const FocusMessage &msg) {
-	PartyView::msgFocus(msg);
+	if (!isInCombat())
+		PartyView::msgFocus(msg);
 
 	// In this view we don't want 1 to 6 mapping to char selection
 	MetaEngine::setKeybindingMode(KeybindingMode::KBMODE_MENUS);
@@ -64,12 +66,22 @@ bool Spellbook::msgFocus(const FocusMessage &msg) {
 	return true;
 }
 
-bool Spellbook::canSwitchChar() const {
+bool Spellbook::msgUnfocus(const UnfocusMessage &msg) {
+	if (!isInCombat())
+		PartyView::msgUnfocus(msg);
+	return true;
+}
+
+bool Spellbook::canSwitchChar() {
 	return !g_events->isInCombat();
 }
 
 void Spellbook::draw() {
-	PartyView::draw();
+	if (isInCombat()) {
+		ScrollView::draw();
+	} else {
+		PartyView::draw();
+	}
 
 	Graphics::ManagedSurface s = getSurface();
 	const Character &c = *g_globals->_currCharacter;
@@ -100,26 +112,28 @@ void Spellbook::draw() {
 		writeString(0, yp, Common::String::format("%c", (i == 9) ? '0' : '1' + i));
 
 		const int spellIndex = _topIndex + i;
-		setTextColor((spellIndex == _selectedIndex) ? 15 : 37);
 
 		if (_count == 0) {
-			if (i == 0)
+			if (i == 0) {
+				setTextColor(37);
 				writeString(12, yp, STRING["enhdialogs.spellbook.non_caster"]);
-
+			}
 		} else if (spellIndex < _count) {
-			// Spell name
+			// Spell requirements
+			int lvl, num;
+			getSpellLevelNum(CATEGORY_SPELLS_COUNT * (_isWizard ? 1 : 0) + spellIndex, lvl, num);
+			setSpell(g_globals->_currCharacter, lvl, num);
+
+			setTextColor((spellIndex == _selectedIndex) ? 15 :
+				(canCast() ? 37 : 1));
+
+			// Spell name and requirements
 			Common::String spellName = STRING[Common::String::format(
 				"spells.%s.%d",
 				_isWizard ? "wizard" : "cleric",
 				spellIndex
 			)];
 			writeString(12, yp, spellName);
-
-			// Spell requirements
-			int lvl, num;
-			getSpellLevelNum(CATEGORY_SPELLS_COUNT * (_isWizard ? 1 : 0) + spellIndex, lvl, num);
-			setSpell(g_globals->_currCharacter, lvl, num);
-
 			writeString(152, yp, Common::String::format("%d/%d",
 				_requiredSp, _requiredGems), ALIGN_RIGHT);
 		}
@@ -159,7 +173,7 @@ bool Spellbook::msgKeypress(const KeypressMessage &msg) {
 		// Alternate alias for Select button
 		msgAction(ActionMessage(KEYBIND_SELECT));
 
-	} else {
+	} else if (!isInCombat()) {
 		return PartyView::msgKeypress(msg);
 	}
 
@@ -173,8 +187,8 @@ bool Spellbook::msgAction(const ActionMessage &msg) {
 		return true;
 
 	case KEYBIND_SELECT:
-		close();
 		spellSelected();
+		close();
 		return true;
 
 	default:
@@ -188,8 +202,10 @@ bool Spellbook::msgGame(const GameMessage &msg) {
 	if (msg._name == "UPDATE") {
 		updateChar();
 		return true;
-	} else {
+	} else if (!isInCombat()) {
 		return PartyView::msgGame(msg);
+	} else {
+		return true;
 	}
 }
 
@@ -225,13 +241,7 @@ void Spellbook::spellSelected() {
 	int spellIndex = (_isWizard ? CATEGORY_SPELLS_COUNT : 0) + _selectedIndex;
 
 	// Set the selected spell for the character
-	if (g_events->isInCombat())
-		c._combatSpell = spellIndex;
-	else
-		c._nonCombatSpell = spellIndex;
-
-	// Update the cast spell dialog with the new spell
-	send("CastSpell", GameMessage("UPDATE"));
+	c.setSpellNumber(spellIndex);
 }
 
 } // namespace Spells

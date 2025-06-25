@@ -27,8 +27,6 @@
 #include "mtropolis/runtime.h"
 #include "mtropolis/plugin/standard_data.h"
 
-class MidiDriver;
-
 namespace MTropolis {
 
 class Runtime;
@@ -36,10 +34,6 @@ class Runtime;
 namespace Standard {
 
 class StandardPlugIn;
-class MidiFilePlayer;
-class MidiNotePlayer;
-class MultiMidiPlayer;
-class MidiCombinerSource;
 
 class CursorModifier : public Modifier {
 public:
@@ -130,6 +124,7 @@ private:
 		kCueSourceIntegerRange,
 		kCueSourceVariableReference,
 		kCueSourceLabel,
+		kCueSourceString,
 
 		kCueSourceInvalid = -1,
 	};
@@ -143,13 +138,18 @@ private:
 		uint32 asVarRefGUID;
 		Label asLabel;
 		uint64 asUnset;
+		Common::String asString;
 
 		template<class T, T (CueSourceUnion::*TMember)>
 		void construct(const T &value);
 
-		template<class T, T (CueSourceUnion::*TMember)>
+		template<class T, T(CueSourceUnion::*TMember)>
 		void destruct();
 	};
+
+	MediaCueMessengerModifier(const MediaCueMessengerModifier &other);
+
+	void destructCueSource();
 
 	Common::SharedPtr<Modifier> shallowClone() const override;
 	const char *getDefaultName() const override;
@@ -203,7 +203,7 @@ private:
 	MiniscriptInstructionOutcome scriptObjectRefAttribIndexed(MiniscriptThread *thread, DynamicValueWriteProxy &proxy, const Common::String &attrib, const DynamicValue &index);
 
 	void resolve(Runtime *runtime);
-	void resolveRelativePath(RuntimeObject *obj, const Common::String &path, size_t startPos);
+	void resolveRelativePath(Runtime *runtime, RuntimeObject *obj, const Common::String &path, size_t startPos);
 	void resolveAbsolutePath(Runtime *runtime);
 
 	static bool computeObjectPath(RuntimeObject *obj, Common::String &outPath);
@@ -239,94 +239,6 @@ private:
 	Common::String _fullPath;
 	Common::String _objectPath;
 	mutable ObjectReference _object;
-};
-
-class MidiModifier : public Modifier {
-public:
-	MidiModifier();
-	~MidiModifier();
-
-	bool load(const PlugInModifierLoaderContext &context, const Data::Standard::MidiModifier &data);
-
-	bool respondsToEvent(const Event &evt) const override;
-	VThreadState consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
-	void disable(Runtime *runtime) override;
-
-	bool readAttribute(MiniscriptThread *thread, DynamicValue &result, const Common::String &attrib) override;
-	MiniscriptInstructionOutcome writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &result, const Common::String &attrib) override;
-	MiniscriptInstructionOutcome writeRefAttributeIndexed(MiniscriptThread *thread, DynamicValueWriteProxy &result, const Common::String &attrib, const DynamicValue &index) override;
-
-#ifdef MTROPOLIS_DEBUG_ENABLE
-	const char *debugGetTypeName() const override { return "MIDI Modifier"; }
-	SupportStatus debugGetSupportStatus() const override { return kSupportStatusDone; }
-#endif
-
-private:
-	struct MuteTrackProxyInterface {
-		static MiniscriptInstructionOutcome write(MiniscriptThread *thread, const DynamicValue &dest, void *objectRef, uintptr ptrOrOffset);
-		static MiniscriptInstructionOutcome refAttrib(MiniscriptThread *thread, DynamicValueWriteProxy &proxy, void *objectRef, uintptr ptrOrOffset, const Common::String &attrib);
-		static MiniscriptInstructionOutcome refAttribIndexed(MiniscriptThread *thread, DynamicValueWriteProxy &proxy, void *objectRef, uintptr ptrOrOffset, const Common::String &attrib, const DynamicValue &index);
-	};
-
-	Common::SharedPtr<Modifier> shallowClone() const override;
-	const char *getDefaultName() const override;
-
-	MiniscriptInstructionOutcome scriptSetVolume(MiniscriptThread *thread, const DynamicValue &value);
-	MiniscriptInstructionOutcome scriptSetNoteVelocity(MiniscriptThread *thread, const DynamicValue &value);
-	MiniscriptInstructionOutcome scriptSetNoteDuration(MiniscriptThread *thread, const DynamicValue &value);
-	MiniscriptInstructionOutcome scriptSetNoteNum(MiniscriptThread *thread, const DynamicValue &value);
-	MiniscriptInstructionOutcome scriptSetLoop(MiniscriptThread *thread, const DynamicValue &value);
-	MiniscriptInstructionOutcome scriptSetPlayNote(MiniscriptThread *thread, const DynamicValue &value);
-	MiniscriptInstructionOutcome scriptSetTempo(MiniscriptThread *thread, const DynamicValue &value);
-	MiniscriptInstructionOutcome scriptSetMuteTrack(MiniscriptThread *thread, const DynamicValue &value);
-
-	MiniscriptInstructionOutcome scriptSetMuteTrackIndexed(MiniscriptThread *thread, size_t trackIndex, bool muted);
-
-	uint getBoostedVolume(Runtime *runtime) const;
-
-	void playSingleNote();
-	void stopSingleNote();
-
-	struct FilePart {
-		bool loop;
-		bool overrideTempo;
-		double tempo;
-		double fadeIn;
-		double fadeOut;
-	};
-
-	struct SingleNotePart {
-		uint8 channel;
-		uint8 note;
-		uint8 velocity;
-		uint8 program;
-		double duration;
-	};
-
-	union ModeSpecificUnion {
-		FilePart file;
-		SingleNotePart singleNote;
-	};
-
-	enum Mode {
-		kModeFile,
-		kModeSingleNote,
-	};
-
-	Event _executeWhen;
-	Event _terminateWhen;
-
-	Mode _mode;
-	ModeSpecificUnion _modeSpecific;
-	uint8 _volume;	// We need this always available because scripts will try to set it and then read it even in single note mode
-
-	Common::SharedPtr<Data::Standard::MidiModifier::EmbeddedFile> _embeddedFile;
-
-	uint16 _mutedTracks;
-
-	StandardPlugIn *_plugIn;
-	MidiFilePlayer *_filePlayer;
-	MidiNotePlayer *_notePlayer;
 };
 
 class ListVariableStorage : public VariableStorage {
@@ -438,9 +350,127 @@ private:
 	const char *getDefaultName() const override;
 };
 
+class FadeModifier : public Modifier {
+public:
+	FadeModifier();
+	~FadeModifier();
+
+	bool load(const PlugInModifierLoaderContext &context, const Data::Standard::FadeModifier &data);
+
+	void disable(Runtime *runtime) override;
+
+#ifdef MTROPOLIS_DEBUG_ENABLE
+	const char *debugGetTypeName() const override { return "Fade Modifier"; }
+#endif
+
+private:
+	Common::SharedPtr<Modifier> shallowClone() const override;
+	const char *getDefaultName() const override;
+};
+
+class PrintModifier : public Modifier {
+public:
+	PrintModifier();
+	~PrintModifier();
+
+	bool respondsToEvent(const Event &evt) const override;
+	VThreadState consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
+	void disable(Runtime *runtime) override;
+
+	MiniscriptInstructionOutcome writeRefAttribute(MiniscriptThread *thread, DynamicValueWriteProxy &writeProxy, const Common::String &attrib) override;
+
+	bool load(const PlugInModifierLoaderContext &context, const Data::Standard::PrintModifier &data);
+
+#ifdef MTROPOLIS_DEBUG_ENABLE
+	const char *debugGetTypeName() const override { return "Print Modifier"; }
+	void debugInspect(IDebugInspectionReport *report) const override;
+#endif
+
+private:
+	Common::SharedPtr<Modifier> shallowClone() const override;
+	const char *getDefaultName() const override;
+
+	Event _executeWhen;
+	Common::String _filePath;
+};
+
+class NavigateModifier : public Modifier {
+public:
+	NavigateModifier();
+	~NavigateModifier();
+
+	bool load(const PlugInModifierLoaderContext &context, const Data::Standard::NavigateModifier &data);
+
+	bool respondsToEvent(const Event &evt) const override;
+	VThreadState consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
+
+	void disable(Runtime *runtime) override;
+
+#ifdef MTROPOLIS_DEBUG_ENABLE
+	const char *debugGetTypeName() const override { return "Navigate Modifier"; }
+	void debugInspect(IDebugInspectionReport *report) const override;
+#endif
+
+private:
+	Common::SharedPtr<Modifier> shallowClone() const override;
+	const char *getDefaultName() const override;
+};
+
+class OpenTitleModifier : public Modifier {
+public:
+	OpenTitleModifier();
+	~OpenTitleModifier();
+
+	bool load(const PlugInModifierLoaderContext &context, const Data::Standard::OpenTitleModifier &data);
+
+	bool respondsToEvent(const Event &evt) const override;
+	VThreadState consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
+
+	void disable(Runtime *runtime) override;
+
+#ifdef MTROPOLIS_DEBUG_ENABLE
+	const char *debugGetTypeName() const override { return "Open Title Modifier"; }
+	void debugInspect(IDebugInspectionReport *report) const override;
+#endif
+
+private:
+	Common::SharedPtr<Modifier> shallowClone() const override;
+	const char *getDefaultName() const override;
+
+	Event _executeWhen;
+	Common::String _pathOrUrl;
+	bool _addToReturnList;
+};
+
+class OpenAppModifier : public Modifier {
+public:
+	OpenAppModifier();
+	~OpenAppModifier();
+
+	bool load(const PlugInModifierLoaderContext &context, const Data::Standard::OpenAppModifier &data);
+
+	bool respondsToEvent(const Event &evt) const override;
+	VThreadState consumeMessage(Runtime *runtime, const Common::SharedPtr<MessageProperties> &msg) override;
+
+	void disable(Runtime *runtime) override;
+
+#ifdef MTROPOLIS_DEBUG_ENABLE
+	const char *debugGetTypeName() const override { return "Open App Modifier"; }
+	void debugInspect(IDebugInspectionReport *report) const override;
+#endif
+
+private:
+	Common::SharedPtr<Modifier> shallowClone() const override;
+	const char *getDefaultName() const override;
+
+	Event _executeWhen;
+	Common::String _pathOrUrl;
+	bool _addToReturnList;
+};
+
 class StandardPlugIn : public MTropolis::PlugIn {
 public:
-	explicit StandardPlugIn(bool useDynamicMidi);
+	StandardPlugIn();
 	~StandardPlugIn();
 
 	void registerModifiers(IPlugInModifierRegistrar *registrar) const override;
@@ -448,19 +478,20 @@ public:
 	const StandardPlugInHacks &getHacks() const;
 	StandardPlugInHacks &getHacks();
 
-	MultiMidiPlayer *getMidi() const;
-
 private:
 	PlugInModifierFactory<CursorModifier, Data::Standard::CursorModifier> _cursorModifierFactory;
 	PlugInModifierFactory<STransCtModifier, Data::Standard::STransCtModifier> _sTransCtModifierFactory;
 	PlugInModifierFactory<MediaCueMessengerModifier, Data::Standard::MediaCueMessengerModifier> _mediaCueModifierFactory;
 	PlugInModifierFactory<ObjectReferenceVariableModifier, Data::Standard::ObjectReferenceVariableModifier> _objRefVarModifierFactory;
-	PlugInModifierFactory<MidiModifier, Data::Standard::MidiModifier> _midiModifierFactory;
 	PlugInModifierFactory<ListVariableModifier, Data::Standard::ListVariableModifier> _listVarModifierFactory;
 	PlugInModifierFactory<SysInfoModifier, Data::Standard::SysInfoModifier> _sysInfoModifierFactory;
 	PlugInModifierFactory<PanningModifier, Data::Standard::PanningModifier> _panningModifierFactory;
+	PlugInModifierFactory<FadeModifier, Data::Standard::FadeModifier> _fadeModifierFactory;
+	PlugInModifierFactory<PrintModifier, Data::Standard::PrintModifier> _printModifierFactory;
+	PlugInModifierFactory<NavigateModifier, Data::Standard::NavigateModifier> _navigateModifierFactory;
+	PlugInModifierFactory<OpenTitleModifier, Data::Standard::OpenTitleModifier> _openTitleModifierFactory;
+	PlugInModifierFactory<OpenAppModifier, Data::Standard::OpenAppModifier> _openAppModifierFactory;
 
-	Common::SharedPtr<MultiMidiPlayer> _midi;
 	StandardPlugInHacks _hacks;
 };
 

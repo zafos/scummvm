@@ -25,6 +25,7 @@
 #include "common/scummsys.h"
 #include "common/array.h"
 #include "common/language.h"
+#include "common/path.h"
 #include "common/rect.h"
 #include "common/str-array.h"
 #include "common/stream.h"
@@ -80,7 +81,7 @@ protected:
 	 */
 	virtual void load(Common::SeekableReadStream &s);
 public:
-	Common::StringArray FILENAMES;
+	Common::Array<Common::Path> FILENAMES;
 	Common::Array< Common::Array<byte> > CHARTBL;
 	Common::Array<RoomEntry> ROOMTBL;
 	Common::Array<DeathEntry> DEATHS;

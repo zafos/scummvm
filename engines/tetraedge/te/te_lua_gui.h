@@ -77,8 +77,8 @@ public:
 	TeButtonLayout *buttonLayoutChecked(const Common::String &name);
 	TeSpriteLayout *spriteLayoutChecked(const Common::String &name);
 
-	bool load(const Common::String &subPath);
-	bool load(const Common::FSNode &node);
+	bool load(const Common::Path &subPath);
+	bool load(const TetraedgeFSNode &node);
 	void unload();
 
 	TeVariant value(const Common::String &key);
@@ -99,13 +99,13 @@ public:
 	StringMap<TeCurveAnim2<Te3DObject2, TeColor> *> &colorLinearAnimations() { return _colorLinearAnimations; }
 
 	bool loaded() const { return _loaded; }
-	const Common::String &scriptPath() const { return _scriptPath; }
+	const Common::Path &scriptPath() const { return _scriptPath; }
 
 protected:
 	bool _loaded;
 
 private:
-	Common::String _scriptPath;
+	Common::Path _scriptPath;
 
 	TeLuaContext _luaContext;
 	TeLuaScript _luaScript;

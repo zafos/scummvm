@@ -206,7 +206,7 @@ enum AnimType {
 // Nak (PL - Nakladka)
 struct Mask {
 	uint16 _state; // visible / invisible
-	int16 _flags; // turning on / turning off of an mask
+	int16 _flags; // turning on / turning off of a mask
 	int16 _x1;
 	int16 _y1;
 	int16 _x2;
@@ -261,8 +261,8 @@ struct DrawNode {
 struct DebugChannel {
 
 enum Type {
-	kScript,
-	kEngine
+	kScript = 1 << 0,
+	kEngine = 1 << 1
 };
 
 };
@@ -279,12 +279,12 @@ public:
 
 	bool hasFeature(EngineFeature f) const override;
 	void pauseEngineIntern(bool pause) override;
-	bool canSaveGameStateCurrently() override;
-	bool canLoadGameStateCurrently() override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
 	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
 	Common::Error loadGameState(int slot) override;
 
-	void playVideo(Common::String videoFilename);
+	void playVideo(const Common::Path &videoFilename);
 
 	WARN_UNUSED_RESULT static bool readSavegameHeader(Common::InSaveFile *in, SavegameHeader &header, bool skipThumbnail = true);
 	void writeSavegameHeader(Common::OutSaveFile *out, SavegameHeader &header);
@@ -380,7 +380,6 @@ public:
 	int32 _shadLineLen;
 	byte *_shadowLine;
 	void setShadowScale(int32 shadowScale);
-	static void plotShadowLinePoint(int x, int y, int color, void *data);
 
 	static const int16 kFPS = 15;
 	static const int32 kIntMax = 2147483647;

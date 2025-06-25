@@ -25,8 +25,8 @@
 #include "ultima/ultima8/ultima8.h"
 #include "ultima/ultima8/kernel/mouse.h"
 #include "ultima/ultima8/games/game_data.h"
-#include "ultima/ultima8/graphics/shape.h"
-#include "ultima/ultima8/graphics/shape_frame.h"
+#include "ultima/ultima8/gfx/shape.h"
+#include "ultima/ultima8/gfx/shape_frame.h"
 #include "ultima/ultima8/filesys/savegame.h"
 #include "ultima/ultima8/gumps/paged_gump.h"
 #include "ultima/ultima8/world/get_object.h"
@@ -139,7 +139,7 @@ void U8SaveGump::InitGump(Gump *newparent, bool take_focus) {
 				// load
 				Gump *widget = new TextWidget(xbase, entryheight + 4 + 40 * yi,
 				                              _descriptions[i], true, entryfont,
-				                              95);
+											  95, 38 - entryheight);
 				widget->InitGump(this, false);
 			}
 		}
@@ -203,7 +203,7 @@ void U8SaveGump::onMouseClick(int button, int32 mx, int32 my) {
 	}
 
 	if (!_save) {
-		// If our parent has a notifiy process, we'll put our result in it and wont actually load the game
+		// If our parent has a notifiy process, we'll put our result in it and won't actually load the game
 		GumpNotifyProcess *p = _parent ? _parent->GetNotifyProcess() : nullptr;
 		if (p) {
 			// Do nothing in this case
@@ -216,6 +216,10 @@ void U8SaveGump::onMouseClick(int button, int32 mx, int32 my) {
 
 		loadgame(index); // 'this' will be deleted here!
 	}
+}
+
+void U8SaveGump::onMouseDouble(int button, int32 mx, int32 my) {
+	onMouseClick(button, mx, my);
 }
 
 void U8SaveGump::ChildNotify(Gump *child, uint32 message) {
@@ -325,6 +329,10 @@ Gump *U8SaveGump::showLoadSaveGump(Gump *parent, bool save) {
 		gump->addPage(s);
 	}
 
+	int lastSave = ConfMan.hasKey("lastSave") ? ConfMan.getInt("lastSave") : -1;
+	if (lastSave > 0) {
+		gump->showPage((lastSave - 1) / 6);
+	}
 
 	gump->setRelativePosition(CENTER);
 

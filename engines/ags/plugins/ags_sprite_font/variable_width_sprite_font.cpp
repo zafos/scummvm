@@ -51,7 +51,8 @@ bool VariableWidthSpriteFontRenderer::SupportsExtendedCharacters(int fontNumber)
 int VariableWidthSpriteFontRenderer::GetTextWidth(const char *text, int fontNumber) {
 	int total = 0;
 	VariableWidthFont *font = getFontFor(fontNumber);
-	for (int i = 0; i < (int)strlen(text); i++) {
+	int len_text = (int)strlen(text);
+	for (int i = 0; i < len_text; i++) {
 		if (font->characters.count(text[i]) > 0) {
 			total += font->characters[text[i]].Width;
 			if (text[i] != ' ') total += font->Spacing;
@@ -62,7 +63,8 @@ int VariableWidthSpriteFontRenderer::GetTextWidth(const char *text, int fontNumb
 
 int VariableWidthSpriteFontRenderer::GetTextHeight(const char *text, int fontNumber) {
 	VariableWidthFont *font = getFontFor(fontNumber);
-	for (int i = 0; i < (int)strlen(text); i++) {
+	int len_text = (int)strlen(text);
+	for (int i = 0; i < len_text; i++) {
 		if (font->characters.count(text[i]) > 0) {
 			return font->characters[text[i]].Height;
 		}
@@ -156,19 +158,19 @@ VariableWidthFont *VariableWidthSpriteFontRenderer::getFontFor(int fontNum) {
 void VariableWidthSpriteFontRenderer::RenderText(const char *text, int fontNumber, BITMAP *destination, int x, int y, int colour) {
 	VariableWidthFont *font = getFontFor(fontNumber);
 	int totalWidth = 0;
-	for (int i = 0; i < (int)strlen(text); i++) {
+	int len_text = (int)strlen(text);
+	for (int i = 0; i < len_text; i++) {
 		char c = text[i];
 
 		BITMAP *src = _engine->GetSpriteGraphic(font->SpriteNumber);
-		Draw(src, destination, x + totalWidth, y, font->characters[c].X, font->characters[c].Y, font->characters[c].Width, font->characters[c].Height);
+		Draw(src, destination, x + totalWidth, y, font->characters[c].X, font->characters[c].Y, font->characters[c].Width, font->characters[c].Height, colour);
 		totalWidth += font->characters[c].Width;
 		if (text[i] != ' ') totalWidth += font->Spacing;
 	}
-
 }
 
 
-void VariableWidthSpriteFontRenderer::Draw(BITMAP *src, BITMAP *dest, int destx, int desty, int srcx, int srcy, int width, int height) {
+void VariableWidthSpriteFontRenderer::Draw(BITMAP *src, BITMAP *dest, int destx, int desty, int srcx, int srcy, int width, int height, int colour) {
 
 	int32 srcWidth, srcHeight, destWidth, destHeight, srcColDepth, destColDepth;
 
@@ -193,7 +195,10 @@ void VariableWidthSpriteFontRenderer::Draw(BITMAP *src, BITMAP *dest, int destx,
 	int starty = MAX(0, (-1 * desty));
 
 
-	int srca, srcr, srcg, srcb, desta, destr, destg, destb, finalr, finalg, finalb, finala, col;
+	int srca, srcr, srcg, srcb, desta, destr, destg, destb, finalr, finalg, finalb, finala, col, col_r, col_g, col_b;;
+	col_r = getr32(colour);
+	col_g = getg32(colour);
+	col_b = getb32(colour);
 
 	int srcxx = (startx + srcx) * bpp;
 	int destxx = (startx + destx) * bpp;
@@ -230,9 +235,9 @@ void VariableWidthSpriteFontRenderer::Draw(BITMAP *src, BITMAP *dest, int destx,
 					destb =  getb32(destargb);
 					desta =  geta32(destargb);
 
-					finalr = srcr;
-					finalg = srcg;
-					finalb = srcb;
+					finalr = (col_r * srcr) / 255;
+					finalg = (col_g * srcg) / 255;
+					finalb = (col_b * srcb) / 255;
 
 					finala = 255 - (255 - srca) * (255 - desta) / 255;
 					finalr = srca * finalr / finala + desta * destr * (255 - srca) / finala / 255;

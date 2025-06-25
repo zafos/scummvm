@@ -24,6 +24,7 @@
 
 #include "common/stream.h"
 #include "common/textconsole.h"
+#include "common/text-to-speech.h"
 
 namespace Drascula {
 
@@ -80,8 +81,13 @@ void DrasculaEngine::moveCursor() {
 			color_abc(kColorRed);
 	} else if (!_menuScreen && _color != kColorLightGreen)
 		color_abc(kColorLightGreen);
-	if (_hasName && !_menuScreen)
+	if (_hasName && !_menuScreen) {
+		sayText(textName, Common::TextToSpeechManager::INTERRUPT);
+
 		centerText(textName, _mouseX, _mouseY);
+	} else if (!_menuBar && !_menuScreen)
+		_previousSaid.clear();
+	
 	if (_menuScreen)
 		showMenu();
 	else if (_menuBar)
@@ -551,6 +557,11 @@ void DrasculaEngine::playFLI(const char *filefli, int vel) {
 	globalSpeed = 1000 / vel;
 	FrameSSN = 0;
 	Common::SeekableReadStream *stream = _archives.open(filefli);
+
+	if (!stream) {
+		warning("playFLI: Failed to load file '%s'", filefli);
+		return;
+	}
 	LastFrame = _system->getMillis();
 
 	while (playFrameSSN(stream) && (!term_int) && !shouldQuit()) {
@@ -588,16 +599,15 @@ int DrasculaEngine::playFrameSSN(Common::SeekableReadStream *stream) {
 			free(BufferSSN);
 			waitFrameSSN();
 
-			Graphics::Surface *screenSurf = _system->lockScreen();
-			byte *screenBuffer = (byte *)screenSurf->getPixels();
-			uint16 screenPitch = screenSurf->pitch;
-			if (FrameSSN)
+			if (FrameSSN) {
+				Graphics::Surface *screenSurf = _system->lockScreen();
+				byte *screenBuffer = (byte *)screenSurf->getPixels();
+				uint16 screenPitch = screenSurf->pitch;
 				mixVideo(screenBuffer, screenSurface, screenPitch);
-			else
-				for (int y = 0; y < 200; y++)
-					memcpy(screenBuffer+y*screenPitch, screenSurface+y*320, 320);
+				_system->unlockScreen();
+			} else
+				_system->copyRectToScreen(screenSurface, 320, 0, 0, 320, 200);
 
-			_system->unlockScreen();
 			_system->updateScreen();
 			FrameSSN++;
 		} else {
@@ -607,16 +617,15 @@ int DrasculaEngine::playFrameSSN(Common::SeekableReadStream *stream) {
 				decodeOffset(BufferSSN, screenSurface, length);
 				free(BufferSSN);
 				waitFrameSSN();
-				Graphics::Surface *screenSurf = _system->lockScreen();
-				byte *screenBuffer = (byte *)screenSurf->getPixels();
-				uint16 screenPitch = screenSurf->pitch;
-				if (FrameSSN)
+				if (FrameSSN) {
+					Graphics::Surface *screenSurf = _system->lockScreen();
+					byte *screenBuffer = (byte *)screenSurf->getPixels();
+					uint16 screenPitch = screenSurf->pitch;
 					mixVideo(screenBuffer, screenSurface, screenPitch);
-				else
-					for (int y = 0; y < 200; y++)
-						memcpy(screenBuffer+y*screenPitch, screenSurface+y*320, 320);
+					_system->unlockScreen();
+				} else
+					_system->copyRectToScreen(screenSurface, 320, 0, 0, 320, 200);
 
-				_system->unlockScreen();
 				_system->updateScreen();
 				FrameSSN++;
 			}
@@ -701,7 +710,8 @@ bool DrasculaEngine::animate(const char *animationFile, int FPS) {
 	Common::SeekableReadStream *stream = _archives.open(animationFile);
 
 	if (!stream) {
-		error("Animation file %s not found", animationFile);
+		warning("Animation file %s not found", animationFile);
+		return true;
 	}
 
 	NFrames = stream->readSint32LE();

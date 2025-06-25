@@ -19,6 +19,8 @@
  *
  */
 
+#include "common/file.h"
+
 #include "tetraedge/tetraedge.h"
 #include "tetraedge/te/te_core.h"
 #include "tetraedge/te/te_matrix4x4.h"
@@ -73,31 +75,26 @@ bool TeSpriteLayout::onParentWorldColorChanged() {
 	return false;
 }
 
-bool TeSpriteLayout::load(const Common::String &path) {
+bool TeSpriteLayout::load(const Common::Path &path) {
 	if (path.empty()) {
-		_tiledSurfacePtr = new TeTiledSurface();
+		_tiledSurfacePtr->unload();
 		return true;
 	}
 
 	TeCore *core = g_engine->getCore();
-	Common::FSNode node = core->findFile(path);
-	if (load(node)) {
-		_tiledSurfacePtr->setLoadedPath(path);
-		return true;
-	}
-	return false;
-}
+	TetraedgeFSNode spriteNode = core->findFile(path);
 
-bool TeSpriteLayout::load(const Common::FSNode &node) {
-	if (!node.exists()) {
-		_tiledSurfacePtr = new TeTiledSurface();
-		return true;
+	// The path can point to a single file, or a folder with files
+	if (!spriteNode.exists()) {
+		_tiledSurfacePtr->unload();
+		return false;
 	}
 
 	stop();
 	unload();
 
-	if (_tiledSurfacePtr->load(node)) {
+	_tiledSurfacePtr->setLoadedPath(path);
+	if (_tiledSurfacePtr->load(spriteNode)) {
 		const TeVector2s32 texSize = _tiledSurfacePtr->tiledTexture()->totalSize();
 		if (texSize._y <= 0) {
 			setRatio(1.0);
@@ -109,7 +106,8 @@ bool TeSpriteLayout::load(const Common::FSNode &node) {
 		}
 		updateMesh();
 	} else {
-		debug("Failed to load TeSpriteLayout %s", node.getPath().c_str());
+		debug("Failed to load TeSpriteLayout %s", spriteNode.toString().c_str());
+		_tiledSurfacePtr->setLoadedPath("");
 	}
 	return true;
 }
@@ -131,7 +129,7 @@ bool TeSpriteLayout::load(TeIntrusivePtr<Te3DTexture> &texture) {
 		updateMesh();
 		return true;
 	} else {
-		debug("Failed to load TeSpriteLayout from texture %s", texture->getAccessName().c_str());
+		debug("Failed to load TeSpriteLayout from texture %s", texture->getAccessName().toString(Common::Path::kNativeSeparator).c_str());
 	}
 	return false;
 }
@@ -153,7 +151,7 @@ bool TeSpriteLayout::load(TeImage &img) {
 		updateMesh();
 		return true;
 	} else {
-		debug("Failed to load TeSpriteLayout from texture %s", img.getAccessName().c_str());
+		debug("Failed to load TeSpriteLayout from texture %s", img.getAccessName().toString(Common::Path::kNativeSeparator).c_str());
 	}
 	return false;
 }

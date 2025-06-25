@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/endian.h"
@@ -127,6 +133,7 @@ Draw::Draw(GobEngine *vm) : _vm(vm) {
 	_scrollOffsetY = 0;
 
 	_pattern = 0;
+	_cursorDrawnFromScripts = false;
 }
 
 Draw::~Draw() {
@@ -296,15 +303,6 @@ void Draw::clearPalette() {
 	}
 }
 
-uint32 Draw::getColor(uint8 index) const {
-	if (!_vm->isTrueColor())
-		return index;
-
-	return _vm->getPixelFormat().RGBToColor(_vgaPalette[index].red   << 2,
-	                                        _vgaPalette[index].green << 2,
-	                                        _vgaPalette[index].blue  << 2);
-}
-
 void Draw::dirtiedRect(int16 surface,
 		int16 left, int16 top, int16 right, int16 bottom) {
 
@@ -323,9 +321,9 @@ void Draw::dirtiedRect(SurfacePtr surface,
 }
 
 void Draw::initSpriteSurf(int16 index, int16 width, int16 height,
-		int16 flags) {
+						  int16 flags, byte bpp) {
 
-	_spritesArray[index] = _vm->_video->initSurfDesc(width, height, flags);
+	_spritesArray[index] = _vm->_video->initSurfDesc(width, height, flags, bpp);
 	_spritesArray[index]->clear();
 }
 
@@ -341,7 +339,7 @@ void Draw::freeSprite(int16 index) {
 }
 
 void Draw::adjustCoords(char adjust, int16 *coord1, int16 *coord2) {
-	if (_needAdjust == 2)
+	if (_needAdjust == 2 || _needAdjust == 10)
 		return;
 
 	switch (adjust) {
@@ -496,8 +494,7 @@ void Draw::printTextCentered(int16 id, int16 left, int16 top, int16 right,
 		const char *s = str;
 		while (*s != '\0')
 			width += font.getCharWidth(*s++);
-	}
-	else
+	} else
 		width = strlen(str) * font.getCharWidth();
 
 	adjustCoords(1, &width, nullptr);
@@ -647,7 +644,7 @@ const int16 Draw::_wobbleTable[360] = {
 	 0x259E,  0x24B5,  0x23C9,  0x22DB,  0x21EA,  0x20F6,  0x1FFF,  0x1F07,  0x1E0B,
 	 0x1D0E,  0x1C0E,  0x1B0C,  0x1A07,  0x1901,  0x17F9,  0x16EF,  0x15E3,  0x14D6,
 	 0x13C6,  0x12B6,  0x11A4,  0x1090,  0x0F7B,  0x0E65,  0x0D4E,  0x0C36,  0x0B1D,
-	 0x0A03,  0x08E8,  0x07CC,  0x06B0,  0x0593,  0x0476,  0x0359,  0x023B,  0x011D
+	 0x0A03,  0x08E8,  0x07CC,  0x06B0,  0x0593,  0x0476,  0x0359,  0x023B,  0x011D,
 	-0x0000, -0x011D, -0x023B, -0x0359, -0x0476, -0x0593, -0x06B0, -0x07CC, -0x08E8,
 	-0x0A03, -0x0B1D, -0x0C36, -0x0D4E, -0x0E65, -0x0F7B, -0x1090, -0x11A4, -0x12B6,
 	-0x13C6, -0x14D6, -0x15E3, -0x16EF, -0x17F9, -0x1901, -0x1A07, -0x1B0C, -0x1C0E,

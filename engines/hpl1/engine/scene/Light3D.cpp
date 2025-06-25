@@ -641,7 +641,7 @@ void iLight3D::RenderShadow(iRenderable *apObject, cRenderSettings *apRenderSett
 
 	/////////////////////////////////////////////////////////
 	// Iterate faces and check which are facing the light.
-	cTriangleData *pTriangles = &(*pSubEntity->GetTriangleVecPtr())[0];
+	cTriangleData *pTriangles = pSubEntity->GetTriangleVecPtr()->data();
 	const int lTriNum = pSubEntity->GetTriangleNum();
 	for (int tri = 0, idx = 0; tri < lTriNum; tri++, idx += 3) {
 		cTriangleData &Tri = pTriangles[tri];
@@ -660,7 +660,7 @@ void iLight3D::RenderShadow(iRenderable *apObject, cRenderSettings *apRenderSett
 	// Iterate edges and find possible silhouette
 	// Get edge pointer, index pointer and offset
 	unsigned int *pCurrentIndexPos = &mpIndexArray[0];
-	const cTriEdge *pEdges = &(*pSubMesh->GetEdgeVecPtr())[0];
+	const cTriEdge *pEdges = pSubMesh->GetEdgeVecPtr()->data();
 	int lOffset = pSubEntity->GetVertexBuffer()->GetVertexNum();
 	// Iterate
 	const int lEdgeNum = pSubMesh->GetEdgeNum();
@@ -756,8 +756,8 @@ void iLight3D::RenderShadow(iRenderable *apObject, cRenderSettings *apRenderSett
 	if (pModelMtx || apRenderSettings->mbMatrixWasNULL == false) {
 		apRenderSettings->extrudeProgram->SetVec3f("lightPosition", vLocalLight);
 		apRenderSettings->extrudeProgram->SetMatrixf("worldViewProj",
-														  eGpuProgramMatrix_ViewProjection,
-														  eGpuProgramMatrixOp_Identity);
+													 eGpuProgramMatrix_ViewProjection,
+													 eGpuProgramMatrixOp_Identity);
 
 		// If a null matrix has been set, let other passes know.
 		if (pModelMtx)
@@ -822,8 +822,8 @@ void iLight3D::RenderShadow(iRenderable *apObject, cRenderSettings *apRenderSett
 void iLight3D::OnFlickerOff() {
 	// Particle system
 	if (msFlickerOffPS != "") {
-		/*cParticleSystem3D *pPS = */mpWorld3D->CreateParticleSystem(GetName() + "_PS",
-																 msFlickerOffPS, cVector3f(1, 1, 1), GetWorldMatrix());
+		/*cParticleSystem3D *pPS = */ mpWorld3D->CreateParticleSystem(GetName() + "_PS",
+																	  msFlickerOffPS, cVector3f(1, 1, 1), GetWorldMatrix());
 	}
 }
 
@@ -832,8 +832,8 @@ void iLight3D::OnFlickerOff() {
 void iLight3D::OnFlickerOn() {
 	// Particle system
 	if (msFlickerOnPS != "") {
-		/*cParticleSystem3D *pPS = */mpWorld3D->CreateParticleSystem(GetName() + "_PS",
-																 msFlickerOnPS, cVector3f(1, 1, 1), GetWorldMatrix());
+		/*cParticleSystem3D *pPS = */ mpWorld3D->CreateParticleSystem(GetName() + "_PS",
+																	  msFlickerOnPS, cVector3f(1, 1, 1), GetWorldMatrix());
 	}
 }
 

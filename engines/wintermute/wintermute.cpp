@@ -66,7 +66,7 @@ WintermuteEngine::WintermuteEngine(OSystem *syst, const WMEGameDescription *desc
 	// Do not initialize graphics here
 
 	// However this is the place to specify all default directories
-	const Common::FSNode gameDataDir(ConfMan.get("path"));
+	const Common::FSNode gameDataDir(ConfMan.getPath("path"));
 	//SearchMan.addSubDirectoryMatching(gameDataDir, "sound");
 
 	_game = nullptr;
@@ -104,6 +104,8 @@ Common::Error WintermuteEngine::run() {
 	_dbgController = new DebuggerController(this);
 	_debugger = new Console(this);
 	setDebugger(_debugger);
+
+	_savingEnabled = true;
 
 //	DebugMan.enableDebugChannel("enginelog");
 	debugC(1, kWintermuteDebugLog, "Engine Debug-LOG enabled");
@@ -183,7 +185,7 @@ int WintermuteEngine::init() {
 		if (dialog.runModal() != GUI::kMessageOK) {
 			delete _game;
 			_game = nullptr;
-			return false;
+			return 1;
 		}
 	}
 	#endif
@@ -251,7 +253,7 @@ int WintermuteEngine::init() {
 		_game->LOG(ret, "Error loading game file. Exiting.");
 		delete _game;
 		_game = nullptr;
-		return false;
+		return 2;
 	}
 
 	_game->_renderer->_ready = true;
@@ -262,7 +264,12 @@ int WintermuteEngine::init() {
 
 	if (ConfMan.hasKey("save_slot")) {
 		int slot = ConfMan.getInt("save_slot");
-		_game->loadGame(slot);
+		if (!_game->loadGame(slot)) {
+			_game->LOG(ret, "Error loading save game file.");
+			delete _game;
+			_game = nullptr;
+			return 2;
+		}
 	}
 
 	_game->_scEngine->attachMonitor(_dbgController);
@@ -341,12 +348,20 @@ Common::Error WintermuteEngine::saveGameState(int slot, const Common::String &de
 	return Common::kNoError;
 }
 
-bool WintermuteEngine::canSaveGameStateCurrently() {
+bool WintermuteEngine::canSaveGameStateCurrently(Common::U32String *msg) {
+	return _savingEnabled;
+}
+
+bool WintermuteEngine::canLoadGameStateCurrently(Common::U32String *msg) {
 	return true;
 }
 
-bool WintermuteEngine::canLoadGameStateCurrently() {
-	return true;
+bool WintermuteEngine::canSaveAutosaveCurrently() {
+	return _savingEnabled;
+}
+
+void WintermuteEngine::savingEnable(bool enable) {
+	_savingEnabled = enable;
 }
 
 bool WintermuteEngine::getGameInfo(const Common::FSList &fslist, Common::String &name, Common::String &caption) {

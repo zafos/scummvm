@@ -387,9 +387,8 @@ bool MidiDriver_MT32GM::isReady(int8 source) {
 
 	// For a specific source, check if there is a SysEx for that source in the
 	// queue.
-	for (Common::ListInternal::Iterator<SysExData> it = _sysExQueue.begin();
-			it != _sysExQueue.end(); it++) {
-		if (it->source == source)
+	for (auto &sysEx : _sysExQueue) {
+		if (sysEx.source == source)
 			return false;
 	}
 
@@ -973,6 +972,9 @@ void MidiDriver_MT32GM::metaEvent(int8 source, byte type, byte *data, uint16 len
 }
 
 void MidiDriver_MT32GM::stopAllNotes(bool stopSustainedNotes) {
+	if (!_driver)
+		return;
+
 	for (int i = 0; i < MIDI_CHANNEL_COUNT; ++i) {
 		if (!isOutputChannelUsed(i))
 			continue;

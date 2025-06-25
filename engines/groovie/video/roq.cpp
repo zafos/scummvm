@@ -32,16 +32,18 @@
 #include "common/substream.h"
 #include "common/textconsole.h"
 
-#include "graphics/palette.h"
 #include "image/jpeg.h"
 
-#ifdef USE_RGB_COLOR
 // Required for the YUV to RGB conversion
 #include "graphics/conversion.h"
-#endif
+
 #include "audio/audiostream.h"
 #include "audio/mixer.h"
 #include "audio/decoders/raw.h"
+
+#ifdef USE_MPEG2
+#include "video/mpegps_decoder.h"
+#endif
 
 #include "common/file.h"
 #ifdef USE_PNG
@@ -50,7 +52,7 @@
 #include "image/bmp.h"
 #endif
 
-/* copied from transparent_surface.cpp */
+/* copied from graphics/blit.h */
 #ifdef SCUMM_LITTLE_ENDIAN
 static const int kAIndex = 0;
 static const int kBIndex = 1;
@@ -66,7 +68,7 @@ static const int kRIndex = 0;
 
 namespace Groovie {
 
-// Overwrites one pixel of destination regardless of the alpha value 
+// Overwrites one pixel of destination regardless of the alpha value
 static inline void copyPixel(byte *dst, const byte *src) {
 	*(uint32 *)dst = *(const uint32 *)src;
 }
@@ -110,7 +112,17 @@ ROQPlayer::ROQPlayer(GroovieEngine *vm) :
 	_currBuf = new Graphics::Surface();
 	_prevBuf = new Graphics::Surface();
 	_overBuf = new Graphics::Surface();	// Overlay buffer. Objects move behind this layer
+
+	// Allocate new buffers
+	_currBuf->create(_bg->w, _bg->h, _vm->_pixelFormat);
+	_prevBuf->create(_bg->w, _bg->h, _vm->_pixelFormat);
+	_overBuf->create(_bg->w, _bg->h, _vm->_pixelFormat);
+	_scaleX = MIN(_syst->getWidth() / _bg->w, 2);
+	_scaleY = MIN(_syst->getHeight() / _bg->h, 2);
+
 	_restoreArea = new Common::Rect();
+
+	_videoDecoder = nullptr;
 }
 
 ROQPlayer::~ROQPlayer() {
@@ -181,6 +193,23 @@ uint16 ROQPlayer::loadInternal() {
 	debugC(6, kDebugVideo, "Groovie::ROQ: First Block param = 0x%04X", blockHeader.param);
 
 	// Verify the file signature
+#ifdef USE_MPEG2
+	if (blockHeader.type == 0) {
+		_videoDecoder = new Video::MPEGPSDecoder();
+		_videoDecoder->setSoundType(Audio::Mixer::kSFXSoundType);
+		_videoDecoder->loadStream(_file);
+
+		_videoDecoder->start();
+
+		_isFileHandled = true;
+		return 24;
+	}
+
+	delete _videoDecoder;
+	_videoDecoder = nullptr;
+	_isFileHandled = false;
+#endif
+
 	if (blockHeader.type != 0x1084) {
 		return 0;
 	}
@@ -215,6 +244,16 @@ uint16 ROQPlayer::loadInternal() {
 		warning("Groovie::ROQ: Invalid header with size=%d and param=%d", blockHeader.size, blockHeader.param);
 		return 0;
 	}
+}
+
+void ROQPlayer::waitFrame() {
+#ifdef USE_MPEG2
+	if (_videoDecoder) {
+		uint32 wait = _videoDecoder->getTimeToNextFrame();
+		_syst->delayMillis(wait);
+	} else
+#endif
+		VideoPlayer::waitFrame();
 }
 
 void ROQPlayer::clearOverlay() {
@@ -282,7 +321,7 @@ void ROQPlayer::redrawRestoreArea(int screenOffset, bool force) {
 	_restoreArea->right = 0;
 }
 
-void writeImage(const Common::String filename, Graphics::Surface &surface) {
+void writeImage(const Common::String &filename, Graphics::Surface &surface) {
 	if (surface.h == 0 || surface.w == 0) {
 		return;
 	}
@@ -294,7 +333,7 @@ void writeImage(const Common::String filename, Graphics::Surface &surface) {
 #endif
 
 	Common::DumpFile out;
-	if (!out.open(tname)) {
+	if (!out.open(Common::Path(tname))) {
 		warning("failed to write debug image to %s", tname.c_str());
 		return;
 	}
@@ -306,7 +345,7 @@ void writeImage(const Common::String filename, Graphics::Surface &surface) {
 #endif
 }
 
-void ROQPlayer::dumpAllSurfaces(const Common::String funcname) {
+void ROQPlayer::dumpAllSurfaces(const Common::String &funcname) {
 	TimeDate date;
 	int curMonth;
 	g_system->getTimeAndDate(date, true);
@@ -336,6 +375,7 @@ void ROQPlayer::buildShowBuf() {
 	if (_screen->h != 480) {
 		screenOffset = 80;
 	}
+	debugC(1, kDebugVideo, "scr: %d x %d screenOffset: %d  orig: %d, %d scale: %d %d", _screen->w, _screen->h, screenOffset, _origX, _origY, _scaleX, _scaleY);
 
 	if (_alpha) {
 		redrawRestoreArea(screenOffset, false);
@@ -362,7 +402,7 @@ void ROQPlayer::buildShowBuf() {
 		destOffset = screenOffset;
 	}
 
-	
+
 	// _origY and _origX may be negative (11th hour uses this in the chapel puzzle against Stauf)
 	int startX, startY, stopX, stopY;
 	calcStartStop(startX, stopX, _origX, _screen->w);
@@ -431,6 +471,23 @@ void ROQPlayer::buildShowBuf() {
 
 bool ROQPlayer::playFrameInternal() {
 	debugC(5, kDebugVideo, "Groovie::ROQ: Playing frame");
+
+#ifdef USE_MPEG2
+	if (_videoDecoder) {
+		if (!_videoDecoder->needsUpdate())
+			return false;	// Video has not yet ended
+
+		const Graphics::Surface *srcSurf = _videoDecoder->decodeNextFrame();
+		_currBuf->free();
+		delete _currBuf;
+		_currBuf = new Graphics::Surface();
+		if (srcSurf) {
+			_currBuf->copyFrom(*srcSurf);
+			buildShowBuf();
+		}
+		return _videoDecoder->endOfVideo();
+	}
+#endif
 
 	// Process the needed blocks until the next video frame
 	bool endframe = false;
@@ -545,7 +602,7 @@ bool ROQPlayer::processBlock() {
 	}
 
 	if (endpos != _file->pos() && !_file->eos()) {
-		warning("Groovie::ROQ: BLOCK %04x Should have ended at %ld, and has ended at %d", blockHeader.type, endpos, (int)_file->pos());
+		warning("Groovie::ROQ: BLOCK %04x Should have ended at %lld, and has ended at %lld", blockHeader.type, (long long)endpos, (long long)_file->pos());
 		warning("Ensure you've copied the files correctly according to the wiki.");
 		_file->seek(MIN(_file->pos(), endpos));
 	}
@@ -699,7 +756,7 @@ bool ROQPlayer::processBlockQuadVector(ROQBlockHeader &blockHeader) {
 		}
 		_file->skip(skipBytes);
 		if (skipBytes != 2) {
-			warning("Groovie::ROQ: Skipped %ld bytes", skipBytes);
+			warning("Groovie::ROQ: Skipped %lld bytes", (long long)skipBytes);
 		}
 	}
 	return true;
@@ -982,7 +1039,7 @@ void ROQPlayer::createAudioStream(bool stereo) {
 	g_system->getMixer()->playStream(Audio::Mixer::kSpeechSoundType, &_soundHandle, _audioStream);
 }
 
-void ROQPlayer::drawString(Graphics::Surface *surface, const Common::String text, int posx, int posy, uint32 color, bool blackBackground) {
+void ROQPlayer::drawString(Graphics::Surface *surface, const Common::String &text, int posx, int posy, uint32 color, bool blackBackground) {
 	// TODO: fix redraw
 #if 0
 	int screenOffset = 0;

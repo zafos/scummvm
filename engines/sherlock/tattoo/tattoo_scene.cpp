@@ -65,7 +65,7 @@ TattooScene::TattooScene(SherlockEngine *vm) : Scene(vm), _labWidget(vm) {
 	_labTableScene = false;
 }
 
-bool TattooScene::loadScene(const Common::String &filename) {
+bool TattooScene::loadScene(const Common::Path &filename) {
 	TattooEngine &vm = *(TattooEngine *)_vm;
 	Events &events = *_vm->_events;
 	Music &music = *_vm->_music;
@@ -142,14 +142,14 @@ void TattooScene::drawAllShapes() {
 			if (obj._quickDraw && obj._scaleVal == SCALE_THRESHOLD)
 				screen._backBuffer1.SHblitFrom(*obj._imageFrame, obj._position);
 			else
-				screen._backBuffer1.SHtransBlitFrom(*obj._imageFrame, obj._position, obj._flags & OBJ_FLIPPED, 0, obj._scaleVal);
+				screen._backBuffer1.SHtransBlitFrom(*obj._imageFrame, obj._position, obj._flags & OBJ_FLIPPED, obj._scaleVal);
 		}
 	}
 
 	// Draw the animation if it is behind the person
 	if (_activeCAnim.active() && _activeCAnim._zPlacement == BEHIND)
 		screen._backBuffer1.SHtransBlitFrom(_activeCAnim._imageFrame, _activeCAnim._position,
-			(_activeCAnim._flags & 4) >> 1, 0, _activeCAnim._scaleVal);
+			(_activeCAnim._flags & 4) >> 1, _activeCAnim._scaleVal);
 
 	screen.resetDisplayBounds();
 
@@ -196,11 +196,11 @@ void TattooScene::drawAllShapes() {
 				screen._backBuffer1.SHblitFrom(*se._shape->_imageFrame, se._shape->_position);
 			else
 				screen._backBuffer1.SHtransBlitFrom(*se._shape->_imageFrame, se._shape->_position,
-					se._shape->_flags & OBJ_FLIPPED, 0, se._shape->_scaleVal);
+					se._shape->_flags & OBJ_FLIPPED, se._shape->_scaleVal);
 		} else if (se._isAnimation) {
 			// It's an active animation
 			screen._backBuffer1.SHtransBlitFrom(_activeCAnim._imageFrame, _activeCAnim._position,
-				(_activeCAnim._flags & 4) >> 1, 0, _activeCAnim._scaleVal);
+				(_activeCAnim._flags & 4) >> 1, _activeCAnim._scaleVal);
 		} else {
 			// Drawing person
 			TattooPerson &p = *se._person;
@@ -212,7 +212,7 @@ void TattooScene::drawAllShapes() {
 			if (p._tempScaleVal == SCALE_THRESHOLD) {
 				p._tempX += adjust.x;
 				screen._backBuffer1.SHtransBlitFrom(*p._imageFrame, Common::Point(p._tempX, p._position.y / FIXED_INT_MULTIPLIER
-					- p.frameHeight() - adjust.y), p._walkSequences[p._sequenceNumber]._horizFlip, 0, p._tempScaleVal);
+					- p.frameHeight() - adjust.y), p._walkSequences[p._sequenceNumber]._horizFlip, p._tempScaleVal);
 			} else {
 				if (adjust.x) {
 					if (!p._tempScaleVal)
@@ -242,7 +242,7 @@ void TattooScene::drawAllShapes() {
 				}
 
 				screen._backBuffer1.SHtransBlitFrom(*p._imageFrame, Common::Point(p._tempX, p._position.y / FIXED_INT_MULTIPLIER
-					- p._imageFrame->sDrawYSize(p._tempScaleVal) - adjust.y), p._walkSequences[p._sequenceNumber]._horizFlip, 0, p._tempScaleVal);
+					- p._imageFrame->sDrawYSize(p._tempScaleVal) - adjust.y), p._walkSequences[p._sequenceNumber]._horizFlip, p._tempScaleVal);
 			}
 		}
 	}
@@ -256,13 +256,13 @@ void TattooScene::drawAllShapes() {
 			if (obj._quickDraw && obj._scaleVal == SCALE_THRESHOLD)
 				screen._backBuffer1.SHblitFrom(*obj._imageFrame, obj._position);
 			else
-				screen._backBuffer1.SHtransBlitFrom(*obj._imageFrame, obj._position, obj._flags & OBJ_FLIPPED, 0, obj._scaleVal);
+				screen._backBuffer1.SHtransBlitFrom(*obj._imageFrame, obj._position, obj._flags & OBJ_FLIPPED, obj._scaleVal);
 		}
 	}
 
 	// Draw the canimation if it is set as FORWARD
 	if (_activeCAnim.active() && _activeCAnim._zPlacement == FORWARD)
-		screen._backBuffer1.SHtransBlitFrom(_activeCAnim._imageFrame, _activeCAnim._position, (_activeCAnim._flags & 4) >> 1, 0, _activeCAnim._scaleVal);
+		screen._backBuffer1.SHtransBlitFrom(_activeCAnim._imageFrame, _activeCAnim._position, (_activeCAnim._flags & 4) >> 1, _activeCAnim._scaleVal);
 
 	// Draw all NO_SHAPE shapes which have their flag bits clear
 	for (uint idx = 0; idx < _bgShapes.size(); ++idx) {
@@ -803,7 +803,21 @@ int TattooScene::findBgShape(const Common::Point &pt) {
 void TattooScene::synchronize(Serializer &s) {
 	TattooEngine &vm = *(TattooEngine *)_vm;
 	TattooUserInterface &ui = *(TattooUserInterface *)_vm->_ui;
+	uint numSceneTripCounters = 0;
 	Scene::synchronize(s);
+
+	// Since save version 5: sync _sceneTripCounters
+	if (s.isSaving())
+		numSceneTripCounters = _sceneTripCounters.size();
+	s.syncAsUint32LE(numSceneTripCounters, 5);
+	if (s.isLoading())
+		_sceneTripCounters.resize(numSceneTripCounters);
+
+	for (auto &tripCounter : _sceneTripCounters) {
+		s.syncAsSint32LE(tripCounter._flag, 5);
+		s.syncAsSint32LE(tripCounter._sceneNumber, 5);
+		s.syncAsSint32LE(tripCounter._numTimes, 5);
+	}
 
 	if (s.isLoading()) {
 		// In case we were showing the intro prologue or the ending credits, stop them

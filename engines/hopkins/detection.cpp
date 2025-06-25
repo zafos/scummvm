@@ -38,15 +38,15 @@ static const PlainGameDescriptor hopkinsGames[] = {
 
 #include "hopkins/detection_tables.h"
 
-const static char *directoryGlobs[] = {
+const static char *const directoryGlobs[] = {
 	"voice",
 	"link",
 	nullptr
 };
 
-class HopkinsMetaEngineDetection : public AdvancedMetaEngineDetection {
+class HopkinsMetaEngineDetection : public AdvancedMetaEngineDetection<Hopkins::HopkinsGameDescription> {
 public:
-	HopkinsMetaEngineDetection() : AdvancedMetaEngineDetection(Hopkins::gameDescriptions, sizeof(Hopkins::HopkinsGameDescription), hopkinsGames) {
+	HopkinsMetaEngineDetection() : AdvancedMetaEngineDetection(Hopkins::gameDescriptions, hopkinsGames) {
 		_maxScanDepth = 3;
 		_directoryGlobs = directoryGlobs;
 	}

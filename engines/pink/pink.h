@@ -79,11 +79,11 @@ class Page;
 class LeadActor;
 
 enum {
-	kPinkDebugGeneral = 1 << 0,
-	kPinkDebugLoadingResources = 1 << 1,
-	kPinkDebugLoadingObjects = 1 << 2,
-	kPinkDebugScripts = 1 << 3,
-	kPinkDebugActions = 1 << 4
+	kPinkDebugGeneral = 1,
+	kPinkDebugLoadingResources,
+	kPinkDebugLoadingObjects,
+	kPinkDebugScripts,
+	kPinkDebugActions,
 };
 
 enum {
@@ -102,10 +102,10 @@ public:
 	bool hasFeature(EngineFeature f) const override;
 
 	Common::Error loadGameState(int slot) override;
-	bool canLoadGameStateCurrently() override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
-	bool canSaveGameStateCurrently() override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
 	Common::String getSaveStateName(int slot) const override {
 		return Common::String::format("%s.s%02d", _targetName.c_str(), slot);
 	}
@@ -122,6 +122,7 @@ public:
 	void changeScene();
 
 	bool isPeril() const;
+	bool isPerilDemo() const;
 
 	void setVariable(Common::String &variable, Common::String &value);
 	bool checkValueOfVariable(const Common::String &variable, const Common::String &value) const;
@@ -176,6 +177,8 @@ private:
 	PDAMgr _pdaMgr;
 
 	const ADGameDescription *_desc;
+	bool _isPeril;
+	bool _isPerilDemo;
 };
 
 WARN_UNUSED_RESULT bool readSaveHeader(Common::InSaveFile &in, SaveStateDescriptor &desc, bool skipThumbnail = true);

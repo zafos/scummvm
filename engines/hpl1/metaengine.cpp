@@ -22,14 +22,14 @@
 #include "hpl1/metaengine.h"
 #include "backends/keymapper/action.h"
 #include "backends/keymapper/keymap.h"
-#include "common/translation.h"
-#include "hpl1/detection.h"
-#include "hpl1/hpl1.h"
-#include "hpl1/graphics.h"
-#include "graphics/scaler.h"
-#include "graphics/thumbnail.h"
 #include "common/savefile.h"
 #include "common/system.h"
+#include "common/translation.h"
+#include "graphics/scaler.h"
+#include "graphics/thumbnail.h"
+#include "hpl1/detection.h"
+#include "hpl1/graphics.h"
+#include "hpl1/hpl1.h"
 
 const char *Hpl1MetaEngine::getName() const {
 	return "hpl1";
@@ -41,18 +41,13 @@ Common::Error Hpl1MetaEngine::createInstance(OSystem *syst, Engine **engine, con
 }
 
 bool Hpl1MetaEngine::hasFeature(MetaEngineFeature f) const {
-	return (f == kSavesUseExtendedFormat) ||
-		   (f == kSimpleSavesNames) ||
-		   (f == kSupportsListSaves) ||
-		   (f == kSupportsDeleteSave) ||
-		   (f == kSavesSupportMetaInfo) ||
-		   (f == kSavesSupportThumbnail) ||
+	return checkExtendedSaves(f) ||
 		   (f == kSupportsLoadingDuringStartup);
 }
 
 void Hpl1MetaEngine::getSavegameThumbnail(Graphics::Surface &thumbnail) {
 	Common::ScopedPtr<Graphics::Surface> screen = Hpl1::createViewportScreenshot();
-	Common::ScopedPtr<Graphics::Surface> scaledScreen(screen->scale( kThumbnailWidth, kThumbnailHeight2));
+	Common::ScopedPtr<Graphics::Surface> scaledScreen(screen->scale(kThumbnailWidth, kThumbnailHeight2));
 	scaledScreen->convertToInPlace(Graphics::PixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0));
 	thumbnail.copyFrom(*scaledScreen);
 	screen->free();
@@ -80,17 +75,17 @@ Common::Array<Common::Keymap *> Hpl1MetaEngine::initKeymaps(const char *target) 
 	Keymap *movement = new Keymap(Keymap::kKeymapTypeGame, "HPL1_MOVEMENT", "Movement");
 	movement->addAction(createKeyBoardAction("FORWARD", _("Forward"), "w", Common::KEYCODE_w));
 	movement->addAction(createKeyBoardAction("BACKWARD", _("Backward"), "s", Common::KEYCODE_s));
-	movement->addAction(createKeyBoardAction("LEFT", _("Strafe Left"), "a", Common::KEYCODE_a));
-	movement->addAction(createKeyBoardAction("RIGHT", _("Strafe Right"), "d", Common::KEYCODE_d));
-	movement->addAction(createKeyBoardAction("LEAN_LEFT", _("Lean Left"), "q", Common::KEYCODE_q));
-	movement->addAction(createKeyBoardAction("LEAN_RIGHT", _("Lean Right"), "e", Common::KEYCODE_e));
+	movement->addAction(createKeyBoardAction("LEFT", _("Strafe left"), "a", Common::KEYCODE_a));
+	movement->addAction(createKeyBoardAction("RIGHT", _("Strafe right"), "d", Common::KEYCODE_d));
+	movement->addAction(createKeyBoardAction("LEAN_LEFT", _("Lean left"), "q", Common::KEYCODE_q));
+	movement->addAction(createKeyBoardAction("LEAN_RIGHT", _("Lean right"), "e", Common::KEYCODE_e));
 	movement->addAction(createKeyBoardAction("RUN", _("Run"), "LSHIFT", Common::KEYCODE_LSHIFT));
 	movement->addAction(createKeyBoardAction("JUMP", _("Jump"), "SPACE", Common::KEYCODE_SPACE));
 	movement->addAction(createKeyBoardAction("CROUCH", _("Crouch"), "LCTRL", Common::KEYCODE_LCTRL));
 
 	Keymap *actions = new Keymap(Keymap::kKeymapTypeGame, "HPL1_ACTIONS", "Actions");
-	actions->addAction(createKeyBoardAction("INTERACTMODE", _("Interact Mode"), "r", Common::KEYCODE_r));
-	actions->addAction(createMouseAction("LOOK_MODE", _("Look Mode"), "MOUSE_MIDDLE", Common::EVENT_MBUTTONDOWN));
+	actions->addAction(createKeyBoardAction("INTERACTMODE", _("Interact mode"), "r", Common::KEYCODE_r));
+	actions->addAction(createMouseAction("LOOK_MODE", _("Look mode"), "MOUSE_MIDDLE", Common::EVENT_MBUTTONDOWN));
 	actions->addAction(createKeyBoardAction("HOLSTER", _("Holster"), "x", Common::KEYCODE_x));
 	actions->addAction(createMouseAction("EXAMINE", _("Examine"), "MOUSE_LEFT", Common::EVENT_LBUTTONDOWN));
 	actions->addAction(createMouseAction("INTERACT", _("Interact"), "MOUSE_RIGHT", Common::EVENT_RBUTTONDOWN));
@@ -98,7 +93,7 @@ Common::Array<Common::Keymap *> Hpl1MetaEngine::initKeymaps(const char *target) 
 	Keymap *misc = new Keymap(Keymap::kKeymapTypeGame, "HPL1_MISC", "Misc");
 	misc->addAction(createKeyBoardAction("INVENTORY", _("Inventory"), "TAB", Common::KEYCODE_TAB));
 	misc->addAction(createKeyBoardAction("NOTEBOOK", _("Notebook"), "n", Common::KEYCODE_n));
-	misc->addAction(createKeyBoardAction("PERSONAL_NOTES", _("Personal Notes"), "p", Common::KEYCODE_p));
+	misc->addAction(createKeyBoardAction("PERSONAL_NOTES", _("Personal notes"), "p", Common::KEYCODE_p));
 	misc->addAction(createKeyBoardAction("FLASHLIGHT", _("Flashlight"), "f", Common::KEYCODE_f));
 	misc->addAction(createKeyBoardAction("GLOWSTICK", _("Glowstick"), "g", Common::KEYCODE_f));
 

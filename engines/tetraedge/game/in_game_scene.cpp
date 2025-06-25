@@ -26,7 +26,7 @@
 #include "tetraedge/tetraedge.h"
 #include "tetraedge/game/application.h"
 #include "tetraedge/game/billboard.h"
-#include "tetraedge/game/game.h"
+#include "tetraedge/game/syberia_game.h"
 #include "tetraedge/game/in_game_scene.h"
 #include "tetraedge/game/in_game_scene_xml_parser.h"
 #include "tetraedge/game/character.h"
@@ -50,9 +50,6 @@
 namespace Tetraedge {
 
 /*static*/
-bool InGameScene::_collisionSlide = false;
-
-/*static*/
 const int InGameScene::MAX_FIRE = 50;
 const int InGameScene::MAX_SNOW = 250;
 const int InGameScene::MAX_SMOKE = 350;
@@ -66,7 +63,7 @@ const float InGameScene::DEPTH_MAX_FLAKE = 0.1f;
 
 
 InGameScene::InGameScene() : _character(nullptr), _charactersShadow(nullptr),
-_shadowLightNo(-1), _waitTime(-1.0f), _shadowColor(0, 0, 0, 0x80), _shadowFov(20.0f),
+_shadowLightNo(-1), _waitTime(-1.0), _shadowColor(0, 0, 0, 0x80), _shadowFov(20.0f),
 _shadowFarPlane(1000), _shadowNearPlane(1), _maskAlpha(false),
 _verticalScrollTime(1000000.0f), _verticalScrollPlaying(false) {
 }
@@ -108,34 +105,54 @@ void InGameScene::addAnchorZone(const Common::String &s1, const Common::String &
 	_anchorZones.push_back(zone);
 }
 
-bool InGameScene::addMarker(const Common::String &markerName, const Common::String &imgPath, float x, float y, const Common::String &locType, const Common::String &markerVal, float anchorX, float anchorY) {
+bool InGameScene::addMarker(const Common::String &markerName, const Common::Path &imgPath, float x, float y, const Common::String &locType, const Common::String &markerVal, float anchorX, float anchorY) {
 	const TeMarker *marker = findMarker(markerName);
 	if (!marker) {
-		Game *game = g_engine->getGame();
+		SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+		assert(game);
+		Application *app = g_engine->getApplication();
 		TeSpriteLayout *markerSprite = new TeSpriteLayout();
 		// Note: game checks paths here but seems to just use the original?
 		markerSprite->setName(markerName);
 		markerSprite->setAnchor(TeVector3f32(anchorX, anchorY, 0.0f));
-		markerSprite->load(imgPath);
+		if (!markerSprite->load(imgPath) && imgPath.baseName().hasSuffix(".anim"))
+			markerSprite->load(imgPath.append("cached"));
 		markerSprite->setSizeType(TeILayout::RELATIVE_TO_PARENT);
 		markerSprite->setPositionType(TeILayout::RELATIVE_TO_PARENT);
 		TeVector3f32 newPos;
 		if (locType == "PERCENT") {
-			Application *app = g_engine->getApplication();
-			TeVector3f32 frontLayoutSize = app->frontLayout().userSize();
-			newPos.x() = frontLayoutSize.x() * (x / 100.0);
-			newPos.y() = frontLayoutSize.y() * (y / 100.0);
+			TeVector3f32 parentSize;
+			//if (g_engine->gameType() == TetraedgeEngine::kSyberia)
+				parentSize = app->frontLayout().userSize();
+			//else
+			//	parentSize = app->getMainWindow().size();
+			newPos.x() = parentSize.x() * (x / 100.0f);
+			newPos.y() = parentSize.y() * (y / 100.0f);
 		} else {
 			newPos.x() = x / g_engine->getDefaultScreenWidth();
 			newPos.y() = y / g_engine->getDefaultScreenHeight();
 		}
 		markerSprite->setPosition(newPos);
 
-		const TeVector3f32 winSize = g_engine->getApplication()->getMainWindow().size();
+		const TeVector3f32 winSize = app->getMainWindow().size();
+		float xscale = 1.0f;
+		float yscale = 1.0f;
+
+		// Originally this is only done in Syberia 2, but
+		// should be fine to calculate in Syberia 1, as long
+		// as the root layout is loaded.
+		TeLayout *bglayout = _bgGui.layoutChecked("background");
+		TeSpriteLayout *rootlayout = Game::findSpriteLayoutByName(bglayout, "root");
+		if (rootlayout && rootlayout->_tiledSurfacePtr && rootlayout->_tiledSurfacePtr->tiledTexture()) {
+			TeVector2s32 bgSize = rootlayout->_tiledSurfacePtr->tiledTexture()->totalSize();
+			xscale = 800.0f / bgSize._x;
+			yscale = 600.0f / bgSize._y;
+		}
+
 		if (g_engine->getCore()->fileFlagSystemFlag("definition") == "SD") {
-			markerSprite->setSize(TeVector3f32(0.07f, (4.0f / ((winSize.y() / winSize.x()) * 4.0f)) * 0.07f, 0.0));
+			markerSprite->setSize(TeVector3f32(xscale * 0.07f, yscale * (4.0f / ((winSize.y() / winSize.x()) * 4.0f)) * 0.07f, 0.0));
 		} else {
-			markerSprite->setSize(TeVector3f32(0.04f, (4.0f / ((winSize.y() / winSize.x()) * 4.0f)) * 0.04f, 0.0));
+			markerSprite->setSize(TeVector3f32(xscale * 0.04f, yscale * (4.0f / ((winSize.y() / winSize.x()) * 4.0f)) * 0.04f, 0.0));
 		}
 		markerSprite->setVisible(game->markersVisible());
 		markerSprite->_tiledSurfacePtr->_frameAnim.setLoopCount(-1);
@@ -159,7 +176,7 @@ bool InGameScene::addMarker(const Common::String &markerName, const Common::Stri
 float InGameScene::angularDistance(float a1, float a2) {
 	float result = a2 - a1;
 	if (result >= -M_PI && result > M_PI) {
-		result = result + -(M_PI * 2);
+		result = result - (M_PI * 2);
 	} else {
 		result = result + (M_PI * 2);
 	}
@@ -188,10 +205,12 @@ Billboard *InGameScene::billboard(const Common::String &name) {
 	return nullptr;
 }
 
-bool InGameScene::changeBackground(const Common::String &name) {
-	Common::FSNode node = g_engine->getCore()->findFile(name);
+bool InGameScene::changeBackground(const Common::Path &name) {
+	TetraedgeFSNode node = g_engine->getCore()->findFile(name);
 	if (node.isReadable()) {
-		_bgGui.spriteLayoutChecked("root")->load(node);
+		_bgGui.spriteLayoutChecked("root")->load(name);
+		if (g_engine->gameType() == TetraedgeEngine::kSyberia2)
+			_bgGui.spriteLayoutChecked("root")->play();
 		return true;
 	}
 	return false;
@@ -223,8 +242,10 @@ void InGameScene::close() {
 	freeGeometry();
 	if (_character && _character->_model && !findKate()) {
 		models().push_back(_character->_model);
-		models().push_back(_character->_shadowModel[0]);
-		models().push_back(_character->_shadowModel[1]);
+		if (_character->_shadowModel[0]) {
+			models().push_back(_character->_shadowModel[0]);
+			models().push_back(_character->_shadowModel[1]);
+		}
 	}
 	_objects.clear();
 	for (TeFreeMoveZone *zone : _freeMoveZones)
@@ -420,7 +441,7 @@ void InGameScene::drawMask() {
 	if (!_maskAlpha)
 		rend->colorMask(false, false, false, false);
 
-	for (auto mask : _masks)
+	for (auto &mask : _masks)
 		mask->draw();
 
 	if (!_maskAlpha)
@@ -500,12 +521,17 @@ void InGameScene::freeGeometry() {
 	_loadedPath.set("");
 	_youkiManager.reset();
 	freeSceneObjects();
+	if (_character)
+		_character->setFreeMoveZone(nullptr);
+	for (Character *character : _characters)
+		character->setFreeMoveZone(nullptr);
 	for (TeFreeMoveZone *zone : _freeMoveZones)
 		delete zone;
 	_freeMoveZones.clear();
 	_bezierCurves.clear();
 	_dummies.clear();
 	cameras().clear();
+	models().clear();
 	_zoneModels.clear();
 	_masks.clear();
 	_shadowReceivingObjects.clear();
@@ -527,7 +553,8 @@ void InGameScene::freeSceneObjects() {
 		_characters[0]->deleteAllCallback();
 	}
 
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	game->unloadCharacters();
 
 	_characters.clear();
@@ -548,6 +575,9 @@ void InGameScene::freeSceneObjects() {
 	_sprites.clear();
 
 	// TODO: Clean up snows, waterCones, smokes, snowCones
+
+	_particles.clear();
+	TeParticle::deleteAll();
 
 	deleteAllCallback();
 	_markers.clear();
@@ -587,9 +617,9 @@ float InGameScene::getHeadVerticalRotation(Character *cter, const TeVector3f32 &
 	return angle;
 }
 
-Common::String InGameScene::imagePathMarker(const Common::String &name) {
+Common::Path InGameScene::imagePathMarker(const Common::String &name) {
 	if (!isMarker(name))
-		return Common::String();
+		return Common::Path();
 	Game *game = g_engine->getGame();
 	TeLayout *bg = game->forGui().layoutChecked("background");
 	for (Te3DObject2 *child : bg->childList()) {
@@ -598,7 +628,7 @@ Common::String InGameScene::imagePathMarker(const Common::String &name) {
 			return spritelayout->_tiledSurfacePtr->loadedPath();
 		}
 	}
-	return Common::String();
+	return Common::Path();
 }
 
 void InGameScene::initScroll() {
@@ -636,7 +666,7 @@ TeVector2f32 InGameScene::layerSize() {
 	return TeVector2f32(sz.x(), sz.y());
 }
 
-bool InGameScene::load(const Common::FSNode &sceneNode) {
+bool InGameScene::load(const TetraedgeFSNode &sceneNode) {
 	// Syberia 1 has loadActZones function contents inline.
 	loadActZones();
 
@@ -649,40 +679,39 @@ bool InGameScene::load(const Common::FSNode &sceneNode) {
 	}
 	_shadowLightNo = -1;
 
-	const Common::Path lightspath = getLightsFileName();
 	TeCore *core = g_engine->getCore();
-	const Common::FSNode lightsNode(core->findFile(lightspath));
+	const TetraedgeFSNode lightsNode(core->findFile(getLightsFileName()));
 	if (lightsNode.isReadable())
 		loadLights(lightsNode);
 
-	if (!sceneNode.isReadable())
+	if (!sceneNode.exists())
 		return false;
 
 	close();
 	_loadedPath = sceneNode.getPath();
-	Common::File scenefile;
-	if (!scenefile.open(sceneNode))
+	Common::ScopedPtr<Common::SeekableReadStream> scenefile(sceneNode.createReadStream());
+	if (!scenefile)
 		return false;
 
-	uint32 ncameras = scenefile.readUint32LE();
+	uint32 ncameras = scenefile->readUint32LE();
 	if (ncameras > 1024)
 		error("Improbable number of cameras %d", ncameras);
 	for (uint i = 0; i < ncameras; i++) {
 		TeIntrusivePtr<TeCamera> cam = new TeCamera();
-		deserializeCam(scenefile, cam);
+		deserializeCam(*scenefile, cam);
 		cameras().push_back(cam);
 	}
 
-	uint32 nobjects = scenefile.readUint32LE();
+	uint32 nobjects = scenefile->readUint32LE();
 	if (nobjects > 1024)
 		error("Improbable number of objects %d", nobjects);
 	for (uint i = 0; i < nobjects; i++) {
 		TeIntrusivePtr<TeModel> model = new TeModel();
-		const Common::String modelname = Te3DObject2::deserializeString(scenefile);
+		const Common::String modelname = Te3DObject2::deserializeString(*scenefile);
 		model->setName(modelname);
-		const Common::String objname = Te3DObject2::deserializeString(scenefile);
+		const Common::String objname = Te3DObject2::deserializeString(*scenefile);
 		TePickMesh2 *pickmesh = new TePickMesh2();
-		deserializeModel(scenefile, model, pickmesh);
+		deserializeModel(*scenefile, model, pickmesh);
 		if (modelname.contains("Clic")) {
 			//debug("Loaded clickMesh %s", modelname.c_str());
 			_hitObjects.push_back(model);
@@ -708,39 +737,39 @@ bool InGameScene::load(const Common::FSNode &sceneNode) {
 		}
 	}
 
-	uint32 nfreemovezones = scenefile.readUint32LE();
+	uint32 nfreemovezones = scenefile->readUint32LE();
 	if (nfreemovezones > 1024)
 		error("Improbable number of free move zones %d", nfreemovezones);
 	for (uint i = 0; i < nfreemovezones; i++) {
 		TeFreeMoveZone *zone = new TeFreeMoveZone();
-		TeFreeMoveZone::deserialize(scenefile, *zone, &_blockers, &_rectBlockers, &_actZones);
+		TeFreeMoveZone::deserialize(*scenefile, *zone, &_blockers, &_rectBlockers, &_actZones);
 		_freeMoveZones.push_back(zone);
 		zone->setVisible(false);
 	}
 
-	uint32 ncurves = scenefile.readUint32LE();
+	uint32 ncurves = scenefile->readUint32LE();
 	if (ncurves > 1024)
 		error("Improbable number of curves %d", ncurves);
 	for (uint i = 0; i < ncurves; i++) {
 		TeIntrusivePtr<TeBezierCurve> curve = new TeBezierCurve();
-		TeBezierCurve::deserialize(scenefile, *curve);
+		TeBezierCurve::deserialize(*scenefile, *curve);
 		curve->setVisible(true);
 		_bezierCurves.push_back(curve);
 	}
 
-	uint32 ndummies = scenefile.readUint32LE();
+	uint32 ndummies = scenefile->readUint32LE();
 	if (ndummies > 1024)
 		error("Improbable number of dummies %d", ndummies);
 	for (uint i = 0; i < ndummies; i++) {
 		InGameScene::Dummy dummy;
 		TeVector3f32 vec;
 		TeQuaternion rot;
-		dummy._name = Te3DObject2::deserializeString(scenefile);
-		TeVector3f32::deserialize(scenefile, vec);
+		dummy._name = Te3DObject2::deserializeString(*scenefile);
+		TeVector3f32::deserialize(*scenefile, vec);
 		dummy._position = vec;
-		TeQuaternion::deserialize(scenefile, rot);
+		TeQuaternion::deserialize(*scenefile, rot);
 		dummy._rotation = rot;
-		TeVector3f32::deserialize(scenefile, vec);
+		TeVector3f32::deserialize(*scenefile, vec);
 		dummy._scale = vec;
 		_dummies.push_back(dummy);
 	}
@@ -767,24 +796,54 @@ static Common::Path _sceneFileNameBase() {
 }
 
 bool InGameScene::loadXml(const Common::String &zone, const Common::String &scene) {
+	_maskAlpha = false;
 	_zoneName = zone;
 	_sceneName = scene;
 	_blockers.clear();
 	_rectBlockers.clear();
-	_collisionSlide = 0;
-	loadActZones();
+	TeFreeMoveZone::setCollisionSlide(false);
 	loadBlockers();
 
 	Common::Path xmlpath = _sceneFileNameBase(zone, scene).joinInPlace("Scene")
 												.appendInPlace(scene).appendInPlace(".xml");
-	Common::FSNode node = g_engine->getCore()->findFile(xmlpath);
-	InGameSceneXmlParser parser;
-	parser._scene = this;
+	TetraedgeFSNode node = g_engine->getCore()->findFile(xmlpath);
+	InGameSceneXmlParser parser(this);
 	parser.setAllowText();
-	if (!parser.loadFile(node))
-		error("InGameScene::loadXml: Can't load %s", node.getPath().c_str());
+
+	Common::String fixedbuf;
+	if (g_engine->gameType() == TetraedgeEngine::kSyberia2 && scene == "GangcarVideo") {
+		//
+		// WORKAROUND: scenes/A1_RomHaut/GangcarVideo/SceneGangcarVideo.xml
+		// in Syberia 2 has an embedded comment, which is invalid XML.
+		// Patch the contents of the file before loading.
+		//
+		Common::ScopedPtr<Common::SeekableReadStream> xmlFile(node.createReadStream());
+		if (!xmlFile)
+			error("InGameScene::loadXml: Can't open %s", node.toString().c_str());
+		const int64 bufsize = xmlFile->size();
+		char *buf = new char[bufsize+1];
+		buf[bufsize] = '\0';
+		xmlFile->read(buf, bufsize);
+		fixedbuf = Common::String(buf);
+		delete [] buf;
+		size_t offset = fixedbuf.find("<!-- <rippleMask");
+		if (offset != Common::String::npos)
+			fixedbuf.replace(offset, 4, "    ");  // replace the <! at the start
+		offset = fixedbuf.find("texture=\"R11280-1-00.png\"/> -->");
+		if (offset != Common::String::npos)
+			fixedbuf.replace(offset + 29, 3, "   "); // replace the > at the end
+		offset = fixedbuf.find("<!--<light ");
+		if (offset != Common::String::npos)
+			fixedbuf.replace(offset, 4, "    ");  // replace the <! at the start
+		parser.loadBuffer((const byte *)fixedbuf.c_str(), bufsize);
+	} else {
+		// Regular loading.
+		if (!node.loadXML(parser))
+			error("InGameScene::loadXml: Can't load %s", node.toString().c_str());
+	}
+
 	if (!parser.parse())
-		error("InGameScene::loadXml: Can't parse %s", node.getPath().c_str());
+		error("InGameScene::loadXml: Can't parse %s", node.toString().c_str());
 
 	// loadFlamme and loadSnowCustom are handled by the above.
 
@@ -796,23 +855,28 @@ bool InGameScene::loadXml(const Common::String &zone, const Common::String &scen
 	_lights.clear();
 	_shadowLightNo = -1;
 
-	const Common::Path lightspath = getLightsFileName();
 	TeCore *core = g_engine->getCore();
-	const Common::FSNode lightsNode(core->findFile(lightspath));
+	const TetraedgeFSNode lightsNode(core->findFile(getLightsFileName()));
 	if (lightsNode.isReadable())
 		loadLights(lightsNode);
 
-	// TODO: Should we set particle matrix to current cam matrix here?
-	// If we are loading a new scene it seems redundant..
 	Common::Path pxmlpath = _sceneFileNameBase(zone, scene).joinInPlace("particles.xml");
-	Common::FSNode pnode = g_engine->getCore()->findFile(pxmlpath);
+	TetraedgeFSNode pnode = g_engine->getCore()->findFile(pxmlpath);
 	if (pnode.isReadable()) {
 		ParticleXmlParser pparser;
 		pparser._scene = this;
-		if (!pparser.loadFile(pnode))
-			error("InGameScene::loadXml: Can't load %s", pnode.getPath().c_str());
+		if (!pnode.loadXML(pparser))
+			error("InGameScene::loadXml: Can't load %s", pnode.toString().c_str());
 		if (!pparser.parse())
-			error("InGameScene::loadXml: Can't parse %s", pnode.getPath().c_str());
+			error("InGameScene::loadXml: Can't parse %s", pxmlpath.toString(Common::Path::kNativeSeparator).c_str());
+	}
+
+	TeMatrix4x4 camMatrix = currentCamera() ?
+		currentCamera()->worldTransformationMatrix() : TeMatrix4x4();
+	for (auto &particle : _particles) {
+		particle->setMatrix(camMatrix);
+		particle->realTimer().start();
+		particle->update(particle->startLoop());
 	}
 
 	return true;
@@ -862,8 +926,10 @@ bool InGameScene::loadCharacter(const Common::String &name) {
 			return false;
 		}
 		models().push_back(c->_model);
-		models().push_back(c->_shadowModel[0]);
-		models().push_back(c->_shadowModel[1]);
+		if (_character->_shadowModel[0]) {
+			models().push_back(c->_shadowModel[0]);
+			models().push_back(c->_shadowModel[1]);
+		}
 		_characters.push_back(c);
 	}
 	c->_model->setVisible(true);
@@ -880,15 +946,13 @@ bool InGameScene::loadFreeMoveZone(const Common::String &name, TeVector2f32 &gri
 	return true;
 }
 
-bool InGameScene::loadLights(const Common::FSNode &node) {
-	SceneLightsXmlParser parser;
+bool InGameScene::loadLights(const TetraedgeFSNode &node) {
+	SceneLightsXmlParser parser(&_lights);
 
-	parser.setLightArray(&_lights);
-
-	if (!parser.loadFile(node))
-		error("InGameScene::loadLights: Can't load %s", node.getPath().c_str());
+	if (!node.loadXML(parser))
+		error("InGameScene::loadLights: Can't load %s", node.toString().c_str());
 	if (!parser.parse())
-		error("InGameScene::loadLights: Can't parse %s", node.getPath().c_str());
+		error("InGameScene::loadLights: Can't parse %s", node.toString().c_str());
 
 	_shadowColor = parser.getShadowColor();
 	_shadowLightNo = parser.getShadowLightNo();
@@ -898,7 +962,19 @@ bool InGameScene::loadLights(const Common::FSNode &node) {
 
 	g_engine->getRenderer()->enableAllLights();
 	for (uint i = 0; i < _lights.size(); i++) {
+		//
+		// WORKAROUND: Some lights in Syberia 2 have 0 for all attenuation
+		// values, which causes textures to all be black.  eg,
+		// scenes/A2_Sommet/25210/lights.xml, light 0.
+		// Correct them to have the default attenuation of 1, 0, 0.
+		//
+		_lights[i]->correctAttenuation();
 		_lights[i]->enable(i);
+	}
+
+	if (_shadowLightNo >= (int)_lights.size()) {
+		warning("Disabling scene shadows: invalid shadow light no.");
+		_shadowLightNo = -1;
 	}
 
 #ifdef TETRAEDGE_DEBUG_LIGHTS
@@ -914,7 +990,7 @@ bool InGameScene::loadLights(const Common::FSNode &node) {
 	return true;
 }
 
-void InGameScene::loadMarkers(const Common::FSNode &node) {
+void InGameScene::loadMarkers(const TetraedgeFSNode &node) {
 	_markerGui.load(node);
 	TeLayout *bg = _bgGui.layoutChecked("background");
 	TeSpriteLayout *root = Game::findSpriteLayoutByName(bg, "root");
@@ -943,10 +1019,13 @@ bool InGameScene::loadObjectMaterials(const Common::String &name) {
 	bool retval = false;
 	TeCore *core = g_engine->getCore();
 	for (auto &obj : _objects) {
+		// FIXME: This should probably only do something for the
+		// object where the model name matches?  It won't find the file
+		// anyway so it probably works as-is but it's a bit wrong.
 		if (obj._name.empty())
 			continue;
 
-		Common::Path mpath = _loadedPath.getParent().join(name).join(obj._name + ".png");
+		Common::Path mpath = _loadedPath.join(name).join(obj._name + ".png");
 		if (img.load(core->findFile(mpath))) {
 			Te3DTexture *tex = Te3DTexture::makeInstance();
 			tex->load(img);
@@ -957,9 +1036,9 @@ bool InGameScene::loadObjectMaterials(const Common::String &name) {
 	return retval;
 }
 
-bool InGameScene::loadObjectMaterials(const Common::String &path, const Common::String &name) {
+bool InGameScene::loadObjectMaterials(const Common::Path &path, const Common::String &name) {
 	// Seems like this is never used?
-	error("InGameScene::loadObjectMaterials(%s, %s)", path.c_str(), name.c_str());
+	error("InGameScene::loadObjectMaterials(%s, %s)", path.toString(Common::Path::kNativeSeparator).c_str(), name.c_str());
 }
 
 bool InGameScene::loadPlayerCharacter(const Common::String &name) {
@@ -972,23 +1051,39 @@ bool InGameScene::loadPlayerCharacter(const Common::String &name) {
 
 		_playerCharacterModel = _character->_model;
 
-		if (!findKate()) {
+		bool kateFound = findKate();
+
+		if (g_engine->gameType() == TetraedgeEngine::kSyberia) {
+			if (!kateFound) {
+				models().push_back(_character->_model);
+				if (_character->_shadowModel[0]) {
+					models().push_back(_character->_shadowModel[0]);
+					models().push_back(_character->_shadowModel[1]);
+				}
+			}
+		} else {
+			if (kateFound) {
+				for (uint i = 0; i < models().size(); i++) {
+					if (models()[i] == _character->_model) {
+						models().remove_at(i);
+						break;
+					}
+				}
+			}
 			models().push_back(_character->_model);
-			models().push_back(_character->_shadowModel[0]);
-			models().push_back(_character->_shadowModel[1]);
 		}
 	}
 
 	_character->_model->setVisible(true);
+	_character->setFreeMoveZone(nullptr);
 	return true;
 }
 
 bool InGameScene::loadCurve(const Common::String &name) {
-	const Common::Path path = _sceneFileNameBase().joinInPlace(name).appendInPlace(".bin");
 	TeCore *core = g_engine->getCore();
-	Common::FSNode node = core->findFile(path);
+	TetraedgeFSNode node = core->findFile(_sceneFileNameBase().joinInPlace(name).appendInPlace(".bin"));
 	if (!node.isReadable()) {
-		warning("[InGameScene::loadCurve] Can't open file : %s.", path.toString().c_str());
+		warning("[InGameScene::loadCurve] Can't open file : %s.", node.toString().c_str());
 		return false;
 	}
 	TeIntrusivePtr<TeBezierCurve> curve = new TeBezierCurve();
@@ -1000,25 +1095,24 @@ bool InGameScene::loadCurve(const Common::String &name) {
 bool InGameScene::loadDynamicLightBloc(const Common::String &name, const Common::String &texture, const Common::String &zone, const Common::String &scene) {
 	const Common::Path pdat = _sceneFileNameBase(zone, scene).joinInPlace(name).appendInPlace(".bin");
 	const Common::Path ptex = _sceneFileNameBase(zone, scene).joinInPlace(texture);
-	Common::FSNode datnode = g_engine->getCore()->findFile(pdat);
-	Common::FSNode texnode = g_engine->getCore()->findFile(ptex);
-	if (!datnode.isReadable()) {
-		warning("[InGameScene::loadDynamicLightBloc] Can't open file : %s.", pdat.toString().c_str());
+	TetraedgeFSNode datNode = g_engine->getCore()->findFile(pdat);
+	TetraedgeFSNode texNode = g_engine->getCore()->findFile(ptex);
+	if (!datNode.isReadable()) {
+		warning("[InGameScene::loadDynamicLightBloc] Can't open file : %s.", pdat.toString('/').c_str());
 		return false;
 	}
 
-	Common::File file;
-	file.open(datnode);
+	Common::ScopedPtr<Common::SeekableReadStream> file(datNode.createReadStream());
 
 	TeModel *model = new TeModel();
 	model->setMeshCount(1);
-	model->setName(datnode.getName());
+	model->setName(datNode.getPath().baseName());
 
 	// Read position/rotation/scale.
-	model->deserialize(file, *model);
+	model->deserialize(*file, *model);
 
-	uint32 verts = file.readUint32LE();
-	uint32 tricount = file.readUint32LE();
+	uint32 verts = file->readUint32LE();
+	uint32 tricount = file->readUint32LE();
 	if (verts > 100000 || tricount > 10000)
 		error("Improbable number of verts (%d) or triangles (%d)", verts, tricount);
 
@@ -1027,25 +1121,25 @@ bool InGameScene::loadDynamicLightBloc(const Common::String &name, const Common:
 
 	for (uint i = 0; i < verts; i++) {
 		TeVector3f32 vec;
-		TeVector3f32::deserialize(file, vec);
+		TeVector3f32::deserialize(*file, vec);
 		mesh->setVertex(i, vec);
 		mesh->setNormal(i, TeVector3f32(0, 0, 1));
 	}
 	for (uint i = 0; i < verts; i++) {
 		TeVector2f32 vec2;
-		TeVector2f32::deserialize(file, vec2);
+		TeVector2f32::deserialize(*file, vec2);
 		vec2.setY(1.0 - vec2.getY());
 		mesh->setTextureUV(i, vec2);
 	}
 
 	for (uint i = 0; i < tricount * 3; i++)
-		mesh->setIndex(i, file.readUint16LE());
+		mesh->setIndex(i, file->readUint16LE());
 
-	file.close();
+	file.reset();
 
-	if (texnode.isReadable()) {
+	if (texNode.exists()) {
 		TeIntrusivePtr<Te3DTexture> tex = Te3DTexture::makeInstance();
-		tex->load2(texnode, false);
+		tex->load2(texNode, false);
 		mesh->defaultMaterial(tex);
 	} else if (texture.size()) {
 		warning("loadDynamicLightBloc: Failed to load texture %s", texture.c_str());
@@ -1059,20 +1153,19 @@ bool InGameScene::loadDynamicLightBloc(const Common::String &name, const Common:
 
 bool InGameScene::loadLight(const Common::String &name, const Common::String &zone, const Common::String &scene) {
 	Common::Path datpath = _sceneFileNameBase(zone, scene).joinInPlace(name).appendInPlace(".bin");
-	Common::FSNode datnode = g_engine->getCore()->findFile(datpath);
+	TetraedgeFSNode datnode = g_engine->getCore()->findFile(datpath);
 	if (!datnode.isReadable()) {
-		warning("[InGameScene::loadLight] Can't open file : %s.", datpath.toString().c_str());
+		warning("[InGameScene::loadLight] Can't open file : %s.", datpath.toString(Common::Path::kNativeSeparator).c_str());
 		return false;
 	}
 
-	Common::File file;
-	file.open(datnode);
+	Common::ScopedPtr<Common::SeekableReadStream> file(datnode.createReadStream());
 	SceneLight light;
 	light._name = name;
-	TeVector3f32::deserialize(file, light._v1);
-	TeVector3f32::deserialize(file, light._v2);
-	light._color.deserialize(file);
-	light._f = file.readFloatLE();
+	TeVector3f32::deserialize(*file, light._v1);
+	TeVector3f32::deserialize(*file, light._v2);
+	light._color.deserialize(*file);
+	light._f = file->readFloatLE();
 
 	_sceneLights.push_back(light);
 	return true;
@@ -1080,25 +1173,23 @@ bool InGameScene::loadLight(const Common::String &name, const Common::String &zo
 
 bool InGameScene::loadMask(const Common::String &name, const Common::String &texture, const Common::String &zone, const Common::String &scene) {
 	TeCore *core = g_engine->getCore();
-	Common::Path datpath = _sceneFileNameBase(zone, scene).joinInPlace(name).appendInPlace(".bin");
-	Common::Path texpath = _sceneFileNameBase(zone, scene).joinInPlace(texture);
-	Common::FSNode datnode = core->findFile(datpath);
+	TetraedgeFSNode texnode = core->findFile(_sceneFileNameBase(zone, scene).joinInPlace(texture));
+	TetraedgeFSNode datnode = core->findFile(_sceneFileNameBase(zone, scene).joinInPlace(name).appendInPlace(".bin"));
 	if (!datnode.isReadable()) {
-		warning("[InGameScene::loadMask] Can't open file : %s.", datpath.toString().c_str());
+		warning("[InGameScene::loadMask] Can't open file : %s.", datnode.toString().c_str());
 		return false;
 	}
 	TeModel *model = new TeModel();
 	model->setMeshCount(1);
 	model->setName(name);
 
-	Common::File file;
-	file.open(datnode);
+	Common::ScopedPtr<Common::SeekableReadStream> file(datnode.createReadStream());
 
 	// Load position, rotation, size.
-	Te3DObject2::deserialize(file, *model, false);
+	Te3DObject2::deserialize(*file, *model, false);
 
-	uint32 verts = file.readUint32LE();
-	uint32 tricount = file.readUint32LE();
+	uint32 verts = file->readUint32LE();
+	uint32 tricount = file->readUint32LE();
 	if (verts > 100000 || tricount > 10000)
 		error("Improbable number of verts (%d) or triangles (%d)", verts, tricount);
 
@@ -1107,7 +1198,7 @@ bool InGameScene::loadMask(const Common::String &name, const Common::String &tex
 
 	for (uint i = 0; i < verts; i++) {
 		TeVector3f32 vec;
-		TeVector3f32::deserialize(file, vec);
+		TeVector3f32::deserialize(*file, vec);
 		mesh->setVertex(i, vec);
 		mesh->setNormal(i, TeVector3f32(0, 0, 1));
 		if (_maskAlpha) {
@@ -1117,20 +1208,19 @@ bool InGameScene::loadMask(const Common::String &name, const Common::String &tex
 
 	for (uint i = 0; i < verts; i++) {
 		TeVector2f32 vec2;
-		TeVector2f32::deserialize(file, vec2);
+		TeVector2f32::deserialize(*file, vec2);
 		vec2.setY(1.0 - vec2.getY());
 		mesh->setTextureUV(i, vec2);
 	}
 
 	// For some reason this one has the indexes in reverse order :(
 	for (uint i = 0; i < tricount * 3; i += 3) {
-		mesh->setIndex(i + 2, file.readUint16LE());
-		mesh->setIndex(i + 1, file.readUint16LE());
-		mesh->setIndex(i, file.readUint16LE());
+		mesh->setIndex(i + 2, file->readUint16LE());
+		mesh->setIndex(i + 1, file->readUint16LE());
+		mesh->setIndex(i, file->readUint16LE());
 	}
 
-	file.close();
-	Common::FSNode texnode = core->findFile(texpath);
+	file.reset();
 	TeIntrusivePtr<Te3DTexture> tex = Te3DTexture::load2(texnode, !_maskAlpha);
 
 	if (tex) {
@@ -1168,24 +1258,22 @@ bool InGameScene::loadShadowMask(const Common::String &name, const Common::Strin
 }
 
 bool InGameScene::loadShadowReceivingObject(const Common::String &name, const Common::String &zone, const Common::String &scene) {
-	Common::Path datpath = _sceneFileNameBase(zone, scene).joinInPlace(name).appendInPlace(".bin");
-	Common::FSNode datnode = g_engine->getCore()->findFile(datpath);
+	TetraedgeFSNode datnode = g_engine->getCore()->findFile(_sceneFileNameBase(zone, scene).joinInPlace(name).appendInPlace(".bin"));
 	if (!datnode.isReadable()) {
-		warning("[InGameScene::loadShadowReceivingObject] Can't open file : %s.", datpath.toString().c_str());
+		warning("[InGameScene::loadShadowReceivingObject] Can't open file : %s.", datnode.toString().c_str());
 		return false;
 	}
 	TeModel *model = new TeModel();
 	model->setMeshCount(1);
 	model->setName(name);
 
-	Common::File file;
-	file.open(datnode);
+	Common::ScopedPtr<Common::SeekableReadStream> file(datnode.createReadStream());
 
 	// Load position, rotation, size.
-	Te3DObject2::deserialize(file, *model, false);
+	Te3DObject2::deserialize(*file, *model, false);
 
-	uint32 verts = file.readUint32LE();
-	uint32 tricount = file.readUint32LE();
+	uint32 verts = file->readUint32LE();
+	uint32 tricount = file->readUint32LE();
 	if (verts > 100000 || tricount > 10000)
 		error("Improbable number of verts (%d) or triangles (%d)", verts, tricount);
 
@@ -1194,41 +1282,41 @@ bool InGameScene::loadShadowReceivingObject(const Common::String &name, const Co
 
 	for (uint i = 0; i < verts; i++) {
 		TeVector3f32 vec;
-		TeVector3f32::deserialize(file, vec);
+		TeVector3f32::deserialize(*file, vec);
 		mesh->setVertex(i, vec);
 		mesh->setNormal(i, TeVector3f32(0, 0, 1));
 	}
 
 	// Indexes in reverse order :(
 	for (uint i = 0; i < tricount * 3; i += 3) {
-		mesh->setIndex(i + 2, file.readUint16LE());
-		mesh->setIndex(i + 1, file.readUint16LE());
-		mesh->setIndex(i, file.readUint16LE());
+		mesh->setIndex(i + 2, file->readUint16LE());
+		mesh->setIndex(i + 1, file->readUint16LE());
+		mesh->setIndex(i, file->readUint16LE());
 	}
+
+	file.reset();
 
 	_shadowReceivingObjects.push_back(model);
 	return true;
 }
 
 bool InGameScene::loadZBufferObject(const Common::String &name, const Common::String &zone, const Common::String &scene) {
-	Common::Path datpath = _sceneFileNameBase(zone, scene).joinInPlace(name).appendInPlace(".bin");
-	Common::FSNode datnode = g_engine->getCore()->findFile(datpath);
+	TetraedgeFSNode datnode = g_engine->getCore()->findFile(_sceneFileNameBase(zone, scene).joinInPlace(name).appendInPlace(".bin"));
 	if (!datnode.isReadable()) {
-		warning("[InGameScene::loadZBufferObject] Can't open file : %s.", datpath.toString().c_str());
+		warning("[InGameScene::loadZBufferObject] Can't open file : %s.", datnode.toString().c_str());
 		return false;
 	}
 	TeModel *model = new TeModel();
 	model->setMeshCount(1);
 	model->setName(name);
 
-	Common::File file;
-	file.open(datnode);
+	Common::ScopedPtr<Common::SeekableReadStream> file(datnode.createReadStream());
 
 	// Load position, rotation, size.
-	Te3DObject2::deserialize(file, *model, false);
+	Te3DObject2::deserialize(*file, *model, false);
 
-	uint32 verts = file.readUint32LE();
-	uint32 tricount = file.readUint32LE();
+	uint32 verts = file->readUint32LE();
+	uint32 tricount = file->readUint32LE();
 	if (verts > 100000 || tricount > 10000)
 		error("Improbable number of verts (%d) or triangles (%d)", verts, tricount);
 
@@ -1237,14 +1325,14 @@ bool InGameScene::loadZBufferObject(const Common::String &name, const Common::St
 
 	for (uint i = 0; i < verts; i++) {
 		TeVector3f32 vec;
-		TeVector3f32::deserialize(file, vec);
+		TeVector3f32::deserialize(*file, vec);
 		mesh->setVertex(i, vec);
 		mesh->setNormal(i, TeVector3f32(0, 0, 1));
 		mesh->setColor(i, TeColor(128, 0, 255, 128));
 	}
 
 	for (uint i = 0; i < tricount * 3; i++) {
-		mesh->setIndex(i, file.readUint16LE());
+		mesh->setIndex(i, file->readUint16LE());
 	}
 
 	_zoneModels.push_back(model);
@@ -1272,7 +1360,7 @@ void InGameScene::loadBlockers() {
 
 	Common::File blockersfile;
 	if (!blockersfile.open(blockersPath)) {
-		warning("Couldn't open blockers file %s.", blockersPath.toString().c_str());
+		warning("Couldn't open blockers file %s.", blockersPath.toString(Common::Path::kNativeSeparator).c_str());
 		return;
 	}
 
@@ -1306,7 +1394,7 @@ void InGameScene::loadBlockers() {
 	}
 }
 
-void InGameScene::loadBackground(const Common::FSNode &node) {
+void InGameScene::loadBackground(const TetraedgeFSNode &node) {
 	_youkiManager.reset();
 	_bgGui.load(node);
 	TeLayout *bg = _bgGui.layout("background");
@@ -1333,7 +1421,7 @@ bool InGameScene::loadBillboard(const Common::String &name) {
 	if (b)
 		return true;
 	b = new Billboard();
-	if (b->load(name)) {
+	if (b->load(Common::Path(name))) {
 		_billboards.push_back(b);
 		return true;
 	} else {
@@ -1342,7 +1430,7 @@ bool InGameScene::loadBillboard(const Common::String &name) {
 	}
 }
 
-void InGameScene::loadInteractions(const Common::FSNode &node) {
+void InGameScene::loadInteractions(const TetraedgeFSNode &node) {
 	_hitObjectGui.load(node);
 	TeLayout *bgbackground = _bgGui.layoutChecked("background");
 	Game *game = g_engine->getGame();
@@ -1360,7 +1448,8 @@ void InGameScene::loadInteractions(const Common::FSNode &node) {
 void InGameScene::moveCharacterTo(const Common::String &charName, const Common::String &curveName, float curveOffset, float curveEnd) {
 	Character *c = character(charName);
 	if (c != nullptr && c != _character) {
-		Game *game = g_engine->getGame();
+		SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+		assert(game);
 		if (!game->_movePlayerCharacterDisabled) {
 			c->setCurveStartLocation(c->characterSettings()._cutSceneCurveDemiPosition);
 			TeIntrusivePtr<TeBezierCurve> crve = curve(curveName);
@@ -1380,8 +1469,8 @@ void InGameScene::moveCharacterTo(const Common::String &charName, const Common::
 }
 
 void InGameScene::onMainWindowSizeChanged() {
-	TeCamera *mainWinCam = g_engine->getApplication()->mainWindowCamera();
-	_viewportSize = mainWinCam->viewportSize();
+	TeVector3f32 winSize = g_engine->getApplication()->getMainWindow().size();
+	_viewportSize = TeVector2f32(winSize.x(), winSize.y());
 	Common::Array<TeIntrusivePtr<TeCamera>> &cams = cameras();
 	for (uint i = 0; i < cams.size(); i++) {
 		cams[i]->viewport(0, 0, _viewportSize.getX(), _viewportSize.getY());
@@ -1426,13 +1515,13 @@ void InGameScene::reset() {
 }
 
 TeLight *InGameScene::shadowLight() {
-	if (_shadowLightNo == -1) {
+	if (_shadowLightNo == -1 || (uint)_shadowLightNo >= _lights.size()) {
 		return nullptr;
 	}
 	return _lights[_shadowLightNo].get();
 }
 
-void InGameScene::setImagePathMarker(const Common::String &markerName, const Common::String &path) {
+void InGameScene::setImagePathMarker(const Common::String &markerName, const Common::Path &path) {
 	if (!isMarker(markerName))
 		return;
 
@@ -1514,21 +1603,24 @@ void InGameScene::unloadCharacter(const Common::String &name) {
 		if (_character->_model->anim())
 			_character->_model->anim()->stop(); // TODO: added this
 		_character->setFreeMoveZone(nullptr); // TODO: added this
-		// TODO: deleteLater() something here..
+		_character->deleteLater();
 		_character = nullptr;
 	}
+
+	// NOTE: There may be multiple characters with the same
+	// model to delete here.
 	for (uint i = 0; i < _characters.size(); i++) {
 		Character *c = _characters[i];
 		if (c && c->_model->name() == name) {
 			c->removeAnim();
 			c->deleteAnim();
 			c->deleteAllCallback();
-			// TODO: deleteLater() something here..
+			c->deleteLater();
 			if (c->_model->anim())
 				c->_model->anim()->stop(); // TODO: added this
 			c->setFreeMoveZone(nullptr); // TODO: added this
 			_characters.remove_at(i);
-			break;
+			i--;
 		}
 	}
 }
@@ -1558,7 +1650,8 @@ void InGameScene::unloadSpriteLayouts() {
 }
 
 void InGameScene::update() {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	if (_bgGui.loaded()) {
 		_bgGui.layoutChecked("background")->setZPosition(0.0f);
 	}
@@ -1578,7 +1671,19 @@ void InGameScene::update() {
 			}
 		}
 		if (_character->charLookingAt()) {
-			TeVector3f32 targetpos = _character->charLookingAt()->_model->position();
+			Character *targetc = _character->charLookingAt();
+			TeVector3f32 targetpos;
+			if (g_engine->gameType() == TetraedgeEngine::kSyberia)
+				targetpos = targetc->_model->position();
+			else
+				targetpos = targetc->_model->worldTransformationMatrix() * targetc->lastHeadBoneTrans();
+
+			//
+			// Note: The below general code for NPCs is different in Syberia 2,
+			// and uses c->charLookingAtOffset(), but the player look-at code
+			// is the same in both games and always adds 17 for "tall" characters.
+			//
+
 			if (_character->lookingAtTallThing())
 				targetpos.y() += 17;
 			TeVector2f32 headRot(getHeadHorizontalRotation(_character, targetpos),
@@ -1593,10 +1698,16 @@ void InGameScene::update() {
 		}
 	}
 	for (Character *c : _characters) {
-		if (c->charLookingAt()) {
-			TeVector3f32 targetpos = c->charLookingAt()->_model->position();
-			if (c->lookingAtTallThing())
-				targetpos.y() += 17;
+		Character *targetc = c->charLookingAt();
+		if (targetc) {
+			TeVector3f32 targetpos;
+			if (g_engine->gameType() == TetraedgeEngine::kSyberia) {
+				targetpos = targetc->_model->position();
+				if (c->lookingAtTallThing())
+					targetpos.y() += 17;
+			} else {
+				targetpos = targetc->_model->worldTransformationMatrix() * targetc->lastHeadBoneTrans();
+			}
 			TeVector2f32 headRot(getHeadHorizontalRotation(c, targetpos),
 					getHeadVerticalRotation(c, targetpos));
 			float hangle = headRot.getX() * 180.0f / M_PI;
@@ -1604,6 +1715,12 @@ void InGameScene::update() {
 				headRot.setX((float)M_PI_2);
 			else if (hangle < -90)
 				headRot.setX((float)-M_PI_2);
+
+			if (g_engine->gameType() == TetraedgeEngine::kSyberia2) {
+				if (c->lookingAtTallThing())
+					headRot.setY(c->charLookingAtOffset());
+			}
+
 			c->setHeadRotation(headRot);
 			c->setHasAnchor(true);
 		}
@@ -1619,13 +1736,13 @@ void InGameScene::update() {
 	TeScene::update();
 	_youkiManager.update();
 
-	float waitTime = _waitTimeTimer.timeFromLastTimeElapsed();
+	uint64 waitTime = _waitTimeTimer.timeFromLastTimeElapsed();
 	if (_waitTime != -1.0 && waitTime > _waitTime) {
 		_waitTime = -1.0;
 		_waitTimeTimer.stop();
 		bool resumed = false;
 		for (uint i = 0; i < game->yieldedCallbacks().size(); i++) {
-			Game::YieldedCallback &yc = game->yieldedCallbacks()[i];
+			SyberiaGame::YieldedCallback &yc = game->yieldedCallbacks()[i];
 			if (yc._luaFnName == "OnWaitFinished") {
 				TeLuaThread *thread = yc._luaThread;
 				game->yieldedCallbacks().remove_at(i);
@@ -1654,16 +1771,13 @@ void InGameScene::update() {
 		if (obj->_rotateTime >= 0) {
 			float time = MIN((float)(obj->_rotateTimer.getTimeFromStart() / 1000000.0), obj->_rotateTime);
 			TeVector3f32 rot = (obj->_rotateAmount * (time / obj->_rotateTime));
-			TeQuaternion rotq = TeQuaternion::fromEuler(rot);
+			TeQuaternion rotq = TeQuaternion::fromEulerDegrees(rot);
 			obj->model()->setRotation(obj->_rotateStart * rotq);
 		}
 	}
 }
 
 void InGameScene::updateScroll() {
-	if (g_engine->gameType() != TetraedgeEngine::kSyberia2)
-		return;
-
 	TeLayout *bg = _bgGui.layout("background");
 	if (!bg)
 		return;
@@ -1673,6 +1787,9 @@ void InGameScene::updateScroll() {
 		error("No root layout in the background");
 	_scrollOffset = TeVector2f32();
 	TeIntrusivePtr<TeTiledTexture> rootTex = root->_tiledSurfacePtr->tiledTexture();
+	// During startup root texture is not yet loaded
+	if (!rootTex)
+		return;
 	const TeVector2s32 texSize = rootTex->totalSize();
 	if (texSize._x < 801) {
 		if (texSize._y < 601) {
@@ -1749,11 +1866,11 @@ void InGameScene::updateViewport(int ival) {
 	const TeVector2f32 offset((0.5f - _scrollOffset.getX()) * _scrollScale.getX(),
 							_scrollOffset.getY() * _scrollScale.getY());
 	const TeVector3f32 winSize = g_engine->getApplication()->getMainWindow().size();
-	float aspectRatio = lsize.getX() / lsize.getY();
-	for (auto cam : cameras()) {
+	int x = (winSize.x() - lsize.getX()) / 2.0f + offset.getX();
+	int y = (winSize.y() - lsize.getY()) / 2.0f;
+	for (auto &cam : cameras()) {
+		float aspectRatio = lsize.getX() / lsize.getY();
 		//cam->setSomething(ival);
-		int x = (winSize.x() - lsize.getX()) / 2.0f + offset.getX();
-		int y = (winSize.y() - lsize.getY()) / 2.0f;
 		cam->viewport(x, y, lsize.getX(), lsize.getY());
 		if (g_engine->getApplication()->ratioStretched()) {
 			aspectRatio = (aspectRatio / (winSize.x() / winSize.y())) * 1.333333f;
@@ -1763,7 +1880,7 @@ void InGameScene::updateViewport(int ival) {
 }
 
 void InGameScene::activateMask(const Common::String &name, bool val) {
-	for (auto mask : _masks) {
+	for (auto &mask : _masks) {
 		if (mask->name() == name) {
 			mask->setVisible(val);
 			return;
@@ -1773,9 +1890,10 @@ void InGameScene::activateMask(const Common::String &name, bool val) {
 }
 
 bool InGameScene::AnimObject::onFinished() {
-	Game *game = g_engine->getGame();
+	SyberiaGame *game = dynamic_cast<SyberiaGame *>(g_engine->getGame());
+	assert(game);
 	for (uint i = 0; i < game->yieldedCallbacks().size(); i++) {
-		Game::YieldedCallback &yc = game->yieldedCallbacks()[i];
+		SyberiaGame::YieldedCallback &yc = game->yieldedCallbacks()[i];
 		if (yc._luaFnName == "OnFinishedAnim" && yc._luaParam == _name) {
 			TeLuaThread *thread = yc._luaThread;
 			game->yieldedCallbacks().remove_at(i);

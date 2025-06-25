@@ -45,18 +45,18 @@ public:
 		_movementLastFrame(0),
 		_edgesMask(0),
 		_currentFrame(0),
-		_videoFormat(0),
+		_videoFormat(kLargeVideoFormat),
 		_stickyCursorPos(-1, -1),
-		_dontWrap(kFalse) {}
+		_panningType(kPanNone),
+		_decoder(AVFDecoder::kLoadBidirectional),
+		_autoMove(false) {}
 
 	virtual ~Viewport() { _decoder.close(); _fullFrame.free(); }
 
 	void init() override;
 	void handleInput(NancyInput &input);
 
-	void loadVideo(const Common::String &filename, uint frameNr = 0, uint verticalScroll = 0, NancyFlag dontWrap = kFalse, uint16 format = 2, const Common::String &palette = Common::String());
-	void setPalette(const Common::String &paletteName);
-	void setPalette(const Common::String &paletteName, uint paletteStart, uint paletteSize);
+	void loadVideo(const Common::Path &filename, uint frameNr = 0, uint verticalScroll = 0, byte panningType = kPanNone, uint16 format = 2, const Common::Path &palette = Common::Path());
 
 	void setFrame(uint frameNr);
 	void setNextFrame();
@@ -70,8 +70,6 @@ public:
 	uint16 getCurFrame() const { return _currentFrame; }
 	uint16 getCurVerticalScroll() const { return _drawSurface.getOffsetFromOwner().y; }
 	uint16 getMaxScroll() const;
-
-	Common::Rect getBoundsByFormat(uint format) const; // used by video
 
 	Common::Rect convertViewportToScreen(const Common::Rect &viewportRect) const;
 	Common::Rect convertScreenToViewport(const Common::Rect &viewportRect) const;
@@ -88,7 +86,7 @@ protected:
 	byte _movementLastFrame;
 	Time _nextMovementTime;
 
-	NancyFlag _dontWrap;
+	byte _panningType;
 
 	AVFDecoder _decoder;
 	uint16 _currentFrame;
@@ -97,6 +95,8 @@ protected:
 	Common::Rect _format1Bounds;
 	Common::Rect _format2Bounds;
 	Common::Point _stickyCursorPos;
+
+	bool _autoMove;
 };
 
 } // End of namespace UI

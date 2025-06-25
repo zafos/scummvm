@@ -114,7 +114,7 @@ void SoundManager::loadFromStream(Common::ReadStream *stream) {
 			SoundDescResource &rec = soundDescs()[soundIndex];
 			if ((rec.flags & SF_RESTORE) != 0)
 				// Requeue the sound for playing
-				addSound(soundIndex, false);
+				addSound2(soundIndex);
 		}
 	}
 }
@@ -211,7 +211,8 @@ bool SoundManager::initCustomTimbres(bool canAbort) {
 
 		if (events.interruptableDelay(10)) {
 			if (LureEngine::getReference().shouldQuit() ||
-					(canAbort && events.type() == Common::EVENT_KEYDOWN && events.event().kbd.keycode == 27)) {
+					(canAbort && events.type() == Common::EVENT_CUSTOM_ENGINE_ACTION_START &&
+						events.event().customType == kActionEscape)) {
 				// User has quit the game or pressed Escape.
 				_mt32Driver->clearSysExQueue();
 				result = true;
@@ -439,8 +440,8 @@ bool SoundManager::fadeOut() {
 	_driver->startFade(3000, 0);
 	while (_driver->isFading()) {
 		if (events.interruptableDelay(100)) {
-			result = ((events.type() == Common::EVENT_KEYDOWN && events.event().kbd.keycode == 27) ||
-				LureEngine::getReference().shouldQuit());
+			result = ((events.type() == Common::EVENT_CUSTOM_ENGINE_ACTION_START && events.event().customType == kActionEscape)
+						|| LureEngine::getReference().shouldQuit());
 			_driver->abortFade();
 			break;
 		}
@@ -542,13 +543,14 @@ void SoundManager::musicInterface_Play(uint8 soundNumber, bool isMusic, uint8 nu
 			}
 		}
 	}
-	if (source == -1)
+	if (source == -1) {
 		warning("Insufficient sources to play sound %i", soundNumber);
-	else
+	} else {
 		_sourcesInUse[source] = true;
-	MidiMusic *sound = new MidiMusic(_driver, soundNum, isMusic,
-		loop, source, numChannels, soundStart, dataSize, volume);
-	_playingSounds.push_back(MusicList::value_type(sound));
+		MidiMusic *sound = new MidiMusic(_driver, soundNum, isMusic,
+			loop, source, numChannels, soundStart, dataSize, volume);
+		_playingSounds.push_back(MusicList::value_type(sound));
+	}
 	_soundMutex.unlock();
 }
 
@@ -801,8 +803,13 @@ void MidiMusic::setVolume(int volume) {
 
 void MidiMusic::playMusic() {
 	debugC(ERROR_DETAILED, kLureDebugSounds, "MidiMusic::PlayMusic playing sound %d", _soundNumber);
-	if (Sound.isRoland() && !_isMusic)
-		_mt32Driver->allocateSourceChannels(_source, _numChannels);
+	if (Sound.isRoland() && !_isMusic) {
+		bool result = _mt32Driver->allocateSourceChannels(_source, _numChannels);
+		if (!result) {
+			stopMusic();
+			return;
+		}
+	}
 	_parser->loadMusic(_soundData, _soundSize);
 	_parser->setTrack(0);
 	_isPlaying = true;
@@ -1042,7 +1049,7 @@ int32 MidiDriver_ADLIB_Lure::calculatePitchBend(uint8 channel, uint8 source, uin
 	return newPitchBend;
 }
 
-uint8 MidiDriver_ADLIB_Lure::calculateUnscaledVolume(uint8 channel, uint8 source, uint8 velocity, OplInstrumentDefinition &instrumentDef, uint8 operatorNum) {
+uint8 MidiDriver_ADLIB_Lure::calculateUnscaledVolume(uint8 channel, uint8 source, uint8 velocity, const OplInstrumentDefinition &instrumentDef, uint8 operatorNum) {
 	uint8 operatorVolume = instrumentDef.getOperatorDefinition(operatorNum).level & OPL_MASK_LEVEL;
 
 	// Scale the instrument definition operator volume by velocity.

@@ -67,10 +67,11 @@ static void(*_on_switchout_callback)(void) = nullptr;
 KeyInput ags_keycode_from_scummvm(const Common::Event &event, bool old_keyhandle) {
 	KeyInput ki;
 
+	snprintf(ki.Text, KeyInput::UTF8_ARR_SIZE, "%c", event.kbd.ascii);
 	ki.UChar = event.kbd.ascii;
 	ki.Key = ::AGS::g_events->scummvm_key_to_ags_key(event, ki.Mod, old_keyhandle);
 	ki.CompatKey = ::AGS::g_events->scummvm_key_to_ags_key(event, ki.Mod, true);
-	if (ki.CompatKey == eAGSKeyCodeNone)
+	if (!old_keyhandle && ki.CompatKey == eAGSKeyCodeNone)
 		ki.CompatKey = ki.Key;
 	return ki;
 }
@@ -87,7 +88,7 @@ int ags_iskeydown(eAGSKeyCode ags_key) {
 	return ::AGS::g_events->isKeyPressed(ags_key, _GP(game).options[OPT_KEYHANDLEAPI] == 0);
 }
 
-void ags_simulate_keypress(eAGSKeyCode ags_key) {
+void ags_simulate_keypress(eAGSKeyCode ags_key, bool old_keyhandle) {
 	Common::KeyCode keycode[3];
 	if (!::AGS::EventsManager::ags_key_to_scancode(ags_key, keycode))
 		return;
@@ -98,6 +99,8 @@ void ags_simulate_keypress(eAGSKeyCode ags_key) {
 	e.kbd.keycode = keycode[0];
 	e.kbd.ascii = (e.kbd.keycode >= 32 && e.kbd.keycode <= 127) ? e.kbd.keycode : 0;
 
+	::AGS::g_events->pushKeyboardEvent(e);
+	e.type = Common::EVENT_KEYUP;
 	::AGS::g_events->pushKeyboardEvent(e);
 }
 
@@ -163,7 +166,7 @@ static void on_mouse_wheel(const Common::Event &event) {
 static eAGSMouseButton mgetbutton() {
 	const int butis = mouse_button_poll();
 
-	if ((butis > 0) & (_G(butwas) > 0))
+	if ((butis > 0) && (_G(butwas) > 0))
 		return kMouseNone;  // don't allow holding button down
 
 	_G(butwas) = butis;
@@ -181,15 +184,15 @@ bool ags_misbuttondown(eAGSMouseButton but) {
 }
 
 eAGSMouseButton ags_mgetbutton() {
-	if (_G(pluginSimulatedClick) > kMouseNone) {
-		eAGSMouseButton mbut = _G(pluginSimulatedClick);
-		_G(pluginSimulatedClick) = kMouseNone;
+	if (_G(simulatedClick) > kMouseNone) {
+		eAGSMouseButton mbut = _G(simulatedClick);
+		_G(simulatedClick) = kMouseNone;
 		return mbut;
 	}
-	return mgetbutton();;
+	return mgetbutton();
 }
 
-void ags_mouse_get_relxy(int &x, int &y) {
+void ags_mouse_acquire_relxy(int &x, int &y) {
 	x = _G(mouse_accum_relx);
 	y = _G(mouse_accum_rely);
 	_G(mouse_accum_relx) = 0;
@@ -197,7 +200,7 @@ void ags_mouse_get_relxy(int &x, int &y) {
 }
 
 void ags_domouse() {
-	mgetgraphpos();
+	_GP(mouse).Poll();
 }
 
 int ags_check_mouse_wheel() {
@@ -220,11 +223,10 @@ int ags_check_mouse_wheel() {
 void ags_clear_input_state() {
 	// Clear everything related to the input field
 	::AGS::g_events->clearEvents();
-	_G(mouse_accum_relx) = 0;
-	_G(mouse_accum_rely) = 0;
 	_G(mouse_button_state) = 0;
 	_G(mouse_accum_button_state) = 0;
 	_G(mouse_clear_at_time) = AGS_Clock::now();
+	ags_clear_mouse_movement();
 }
 
 void ags_clear_input_buffer() {
@@ -232,8 +234,7 @@ void ags_clear_input_buffer() {
 	// accumulated state only helps to not miss clicks
 	_G(mouse_accum_button_state) = 0;
 	// forget about recent mouse relative movement too
-	_G(mouse_accum_relx) = 0;
-	_G(mouse_accum_rely) = 0;
+	ags_clear_mouse_movement();
 }
 
 void ags_clear_mouse_movement() {

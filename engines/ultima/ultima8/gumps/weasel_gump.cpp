@@ -22,10 +22,10 @@
 #include "ultima/ultima8/gumps/weasel_gump.h"
 #include "ultima/ultima8/gumps/weasel_dat.h"
 #include "ultima/ultima8/games/game_data.h"
-#include "ultima/ultima8/graphics/gump_shape_archive.h"
-#include "ultima/ultima8/graphics/main_shape_archive.h"
-#include "ultima/ultima8/graphics/shape.h"
-#include "ultima/ultima8/graphics/shape_frame.h"
+#include "ultima/ultima8/gfx/gump_shape_archive.h"
+#include "ultima/ultima8/gfx/main_shape_archive.h"
+#include "ultima/ultima8/gfx/shape.h"
+#include "ultima/ultima8/gfx/shape_frame.h"
 #include "ultima/ultima8/ultima8.h"
 #include "ultima/ultima8/kernel/mouse.h"
 #include "ultima/ultima8/gumps/widgets/button_widget.h"
@@ -35,7 +35,6 @@
 #include "ultima/ultima8/audio/audio_process.h"
 #include "ultima/ultima8/world/get_object.h"
 #include "ultima/ultima8/world/item_factory.h"
-#include "ultima/ultima8/filesys/file_system.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -69,13 +68,13 @@ static const int WEASEL_BTN_X[] = { 14,  76, 138,  18, 113,  20,  19,  19,  44};
 static const int WEASEL_BTN_Y[] = {213, 213, 213, 237, 237, 280, 319, 319, 368};
 static const int WEASEL_BTN_SHAPES[] = {13, 26, 14, 16, 15, 28, 27, 83, 29};
 
-static const char *FIRST_INTRO_MOVIE = "17A";
-static const char *INTRO_MOVIES[] = {"18A", "18B", "18C"};
-static const char *BUYMORE_MOVIES[] = {"21A", "21B"};
-static const char *CONFIRM_BUY_MOVIES[] = {"21A", "21B"};
-static const char *CANCELLED_PURCHASE_MOVIES[] = {"19C", "19D"};
-static const char *COMPLETED_PURCHASE_MOVIES[] = {"21C", "21D"};
-static const char *INSUFFICIENT_FUND_MOVIES[] = {"20C", "20D"};
+static const char *const FIRST_INTRO_MOVIE = "17A";
+static const char *const INTRO_MOVIES[] = {"18A", "18B", "18C"};
+static const char *const BUYMORE_MOVIES[] = {"21A", "21B"};
+static const char *const CONFIRM_BUY_MOVIES[] = {"21A", "21B"};
+static const char *const CANCELLED_PURCHASE_MOVIES[] = {"19C", "19D"};
+static const char *const COMPLETED_PURCHASE_MOVIES[] = {"21C", "21D"};
+static const char *const INSUFFICIENT_FUND_MOVIES[] = {"20C", "20D"};
 
 
 namespace {
@@ -91,7 +90,7 @@ static void _closeIfExists(Gump *gump) {
 		gump->Close();
 }
 
-static const char *_getRandomMovie(const char **movies, int nmovies) {
+static const char *_getRandomMovie(const char *const *movies, int nmovies) {
 	Common::RandomSource &rs = Ultima8Engine::get_instance()->getRandomSource();
 	int offset = rs.getRandomNumber(nmovies - 1);
 	return movies[offset];
@@ -399,9 +398,8 @@ void WeaselGump::completePurchase() {
 	Item *item = av->getFirstItemWithShape(0x4ed, true);
 	if (item)
 		item->setQuality(_credits);
-	for (Std::vector<uint16>::const_iterator iter = _purchases.begin();
-		 iter != _purchases.end(); iter++) {
-		Item *newitem = ItemFactory::createItem(*iter, 0, 0, 0, 0, mapno, 0, true);
+	for (const auto &purchase : _purchases) {
+		Item *newitem = ItemFactory::createItem(purchase, 0, 0, 0, 0, mapno, 0, true);
 		av->addItemCru(newitem, false);
 	}
 	_state = kWeaselCompletedPurchase;
@@ -474,9 +472,8 @@ void WeaselGump::abortPurchase() {
 
 int WeaselGump::purchasedCount(uint16 shape) const {
 	int count = 0;
-	for (Std::vector<uint16>::const_iterator iter = _purchases.begin();
-		 iter != _purchases.end(); iter++) {
-		 if (*iter == shape)
+	for (const auto &purchase : _purchases) {
+		 if (purchase == shape)
 			 count++;
 	}
 	return count;

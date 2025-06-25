@@ -23,6 +23,7 @@
 #include "ags/detection.h"
 #include "ags/achievements_tables.h"
 #include "ags/ags.h"
+#include "ags/globals.h"
 #include "ags/shared/util/directory.h"
 #include "ags/shared/util/file_stream.h"
 #include "ags/engine/ac/rich_game_media.h"
@@ -37,9 +38,7 @@ const char *AGSMetaEngine::getName() const {
 	return "ags";
 }
 
-Common::Error AGSMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	const AGS::AGSGameDescription *gd = (const AGS::AGSGameDescription *)desc;
-
+Common::Error AGSMetaEngine::createInstance(OSystem *syst, Engine **engine, const AGS::AGSGameDescription *gd) const {
 	*engine = new AGS::AGSEngine(syst, gd);
 	return Common::kNoError;
 }
@@ -152,12 +151,35 @@ SaveStateDescriptor AGSMetaEngine::querySaveMetaInfos(const char *target, int sl
 	return SaveStateDescriptor();
 }
 
-void AGSMetaEngine::removeSaveState(const char *target, int slot) const {
-	g_system->getSavefileManager()->removeSavefile(getSavegameFile(slot, target));
+bool AGSMetaEngine::removeSaveState(const char *target, int slot) const {
+	return g_system->getSavefileManager()->removeSavefile(getSavegameFile(slot, target));
+}
+
+int AGSMetaEngine::getAutosaveSlot() const {
+	if (!g_engine || !_G(noScummAutosave))
+		return 0;
+	else
+		return -1;
 }
 
 const Common::AchievementDescriptionList* AGSMetaEngine::getAchievementDescriptionList() const {
 	return AGS::achievementDescriptionList;
+}
+
+Common::StringArray AGSMetaEngine::getGameTranslations(const Common::String &domain) {
+	Common::Path path = ConfMan.getPath("path", domain);
+	Common::FSDirectory dir(path);
+	Common::ArchiveMemberList traFileList;
+	dir.listMatchingMembers(traFileList, "*.tra");
+	Common::StringArray traFileNames;
+
+	for (Common::ArchiveMemberList::iterator iter = traFileList.begin(); iter != traFileList.end(); ++iter) {
+		Common::String traFileName = (*iter)->getName();
+		traFileName.erase(traFileName.size() - 4); // remove .tra extension
+		traFileNames.push_back(traFileName);
+	}
+
+	return traFileNames;
 }
 
 #if PLUGIN_ENABLED_DYNAMIC(AGS)

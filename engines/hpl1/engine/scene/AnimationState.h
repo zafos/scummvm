@@ -116,13 +116,13 @@ public:
 	float GetPreviousTimePosition();
 
 	/**
-	 * Set the relative postion. 0 = start, 1 = end
+	 * Set the relative position. 0 = start, 1 = end
 	 * \param afPosition
 	 */
 	void SetRelativeTimePosition(float afPosition);
 
 	/**
-	 * Get the relative postion. 0 = start, 1 = end
+	 * Get the relative position. 0 = start, 1 = end
 	 */
 	float GetRelativeTimePosition();
 
@@ -185,6 +185,6 @@ private:
 	float mfFadeStep;
 };
 
-}     // namespace hpl
+} // namespace hpl
 
 #endif // HPL_ANIMATION_STATE_H

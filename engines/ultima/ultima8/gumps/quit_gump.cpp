@@ -22,9 +22,9 @@
 #include "ultima/ultima8/audio/audio_process.h"
 #include "ultima/ultima8/gumps/quit_gump.h"
 #include "ultima/ultima8/games/game_data.h"
-#include "ultima/ultima8/graphics/gump_shape_archive.h"
-#include "ultima/ultima8/graphics/shape.h"
-#include "ultima/ultima8/graphics/shape_frame.h"
+#include "ultima/ultima8/gfx/gump_shape_archive.h"
+#include "ultima/ultima8/gfx/shape.h"
+#include "ultima/ultima8/gfx/shape_frame.h"
 #include "ultima/ultima8/ultima8.h"
 #include "ultima/ultima8/kernel/mouse.h"
 #include "ultima/ultima8/gumps/widgets/button_widget.h"
@@ -165,7 +165,7 @@ bool QuitGump::OnKeyDown(int key, int mod) {
 
 void QuitGump::ChildNotify(Gump *child, uint32 message) {
 	ObjId cid = child->getObjId();
-	if (message == ButtonWidget::BUTTON_CLICK) {
+	if (message == ButtonWidget::BUTTON_CLICK || message == ButtonWidget::BUTTON_DOUBLE) {
 		if (cid == _yesWidget) {
 			Ultima8Engine::get_instance()->quitGame();
 		} else if (cid == _noWidget) {

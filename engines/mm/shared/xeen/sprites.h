@@ -57,7 +57,7 @@ protected:
 	Common::Array<IndexEntry> _index;
 	size_t _filesize;
 	byte *_data;
-	Common::String _filename;
+	Common::Path _filename;
 	static int _clippedBottom;
 
 	/**
@@ -69,7 +69,7 @@ protected:
 	 * Draw the sprite onto the given surface
 	 */
 	void draw(XSurface &dest, int frame, const Common::Point &destPos,
-		const Common::Rect &bounds, uint flags = 0, int scale = 0);
+		const Common::Rect &bounds, uint flags = 0, int scale = 0) const;
 
 	/**
 	 * Deep copy assuming that the current instance is clean
@@ -77,7 +77,7 @@ protected:
 	void copy(const SpriteResource &src);
 public:
 	SpriteResource();
-	SpriteResource(const Common::String &filename);
+	SpriteResource(const Common::Path &filename);
 	SpriteResource(const SpriteResource &src);
 
 	virtual ~SpriteResource();
@@ -90,7 +90,7 @@ public:
 	/**
 	 * Load a sprite resource from a given file
 	 */
-	void load(const Common::String &filename);
+	void load(const Common::Path &filename);
 
 	/**
 	 * Clears the sprite resource
@@ -107,19 +107,19 @@ public:
 	 *					1..15   -> reduces the sprite: the higher, the smaller it'll be
 	 */
 	void draw(XSurface &dest, int frame, const Common::Point &destPos,
-		uint flags = 0, int scale = 0);
+		uint flags = 0, int scale = 0) const;
 
 	/**
 	 * Draw the sprite onto the given surface
 	 * @param dest		Destination surface
 	 * @param frame		Frame number
 	 */
-	void draw(XSurface &dest, int frame);
+	void draw(XSurface &dest, int frame) const;
 
 	/**
 	 * Draw the sprite onto a given surface
 	 */
-	void draw(Graphics::ManagedSurface *dest, int frame, const Common::Point &destPos);
+	void draw(Graphics::ManagedSurface *dest, int frame, const Common::Point &destPos) const;
 
 	/**
 	 * Gets the size of a sprite

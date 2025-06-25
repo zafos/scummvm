@@ -20,7 +20,6 @@
  */
 
 #include "common/lua/lua.h"
-#include "common/math.h"
 #include "common/textconsole.h"
 #include "tetraedge/te/te_lua_gui_lua_callbacks.h"
 #include "tetraedge/te/te_layout.h"
@@ -390,7 +389,7 @@ int spriteLayoutBindings(lua_State *L) {
 	}
 
 	if (!imgFullPath.empty())
-		layout->load(imgFullPath.toString());
+		layout->load(imgFullPath);
 
 	lua_pushnil(L);
 	while (lua_next(L, -2) != 0) {
@@ -471,7 +470,7 @@ int buttonLayoutBindings(lua_State *L) {
 			} else if (!strcmp(s, "clickPassThrough")) {
 				layout->setClickPassThrough(TeLuaToBool(L, -1));
 			} else if (!strcmp(s, "validationSound")) {
-				layout->setValidationSound(TeLuaToTeString(L, -1));
+				layout->setValidationSound(Common::Path(TeLuaToTeString(L, -1)));
 			} else if (!strcmp(s, "validationSoundVolume")) {
 				layout->setValidationSoundVolume(TeLuaToF32(L, -1));
 			} else if (!strcmp(s, "consoleNoStretch")) {
@@ -603,8 +602,9 @@ int layoutPositionLinearAnimationBindings(lua_State *L) {
 			} else if (!strcmp(s, "endValue")) {
 				static const TeVector3f32 defaultEnd(0.0f, 0.0f, 0.0f);
 				anim->_endVal = TeLuaToTeVector3f32(L, -1, defaultEnd);
-			} else if (!strcmp(s, "layout")) {
+			} else if (!strcmp(s, "layout") || !strcmp(s, "pausable")) {
 				// skip.
+				// TODO: What should we do with "pausable" attribute?
 			} else if (!strcmp(s, "curve")) {
 				const Common::Array<float> curve = TeLuaToFloatArray(L, -1);
 				anim->setCurve(curve);

@@ -229,8 +229,8 @@ void TextRenderer_v7::drawString(const char *str, byte *buffer, Common::Rect &cl
 
 	clipRect.left = MAX<int>(0, ((flags & kStyleAlignCenter) ? x - maxWidth / 2 : ((flags & kStyleAlignRight) ? x - maxWidth : x)) - xAdj);
 	clipRect.right = MIN<int>(clipRect.right, clipRect.left + xAdj + maxWidth);
-	clipRect.top = y2 - (_newStyle ? 0 : 2);
-	clipRect.bottom = y + (_newStyle ? 0 : 2);
+	clipRect.top = y2 - (_newStyle ? 0 : 4);
+	clipRect.bottom = y + (_newStyle ? 0 : 4);
 }
 
 void TextRenderer_v7::drawStringWrap(const char *str, byte *buffer, Common::Rect &clipRect, int x, int y, int pitch, int16 col, TextStyleFlags flags) {
@@ -310,7 +310,9 @@ void TextRenderer_v7::drawStringWrap(const char *str, byte *buffer, Common::Rect
 				substrWidths[numSubstrings] = curWidth;
 				substrByteLength[numSubstrings] = curPos - substrStart[numSubstrings];
 				numSubstrings++;
-				substrStart[numSubstrings] = curPos + 1;
+				// extra check for PVS-Studio (we won't actually ever get close to SCUMM7_MAX_STRINGS)
+				if (numSubstrings < SCUMM7_MAX_STRINGS)
+					substrStart[numSubstrings] = curPos + 1;
 			}
 			curWidth = 0;
 		}
@@ -384,8 +386,8 @@ void TextRenderer_v7::drawStringWrap(const char *str, byte *buffer, Common::Rect
 
 	clipRect.left = MAX<int>(0, ((flags & kStyleAlignCenter) ? x - maxWidth / 2 : ((flags & kStyleAlignRight) ? x - maxWidth : x)) - xAdj);
 	clipRect.right = MIN<int>(clipRect.right, clipRect.left + xAdj + maxWidth);
-	clipRect.top = y2 - (_newStyle ? 0 : 2);
-	clipRect.bottom = y + (_newStyle ? 0 : 2);
+	clipRect.top = y2 - (_newStyle ? 0 : 4);
+	clipRect.bottom = y + (_newStyle ? 0 : 4);
 }
 
 Common::Rect TextRenderer_v7::calcStringDimensions(const char *str, int x, int y, TextStyleFlags flags) {
@@ -464,6 +466,9 @@ void ScummEngine_v7::drawBlastTexts() {
 
 		_charset->setCurID(_blastTextQueue[i].charset);
 
+		if (_game.version == 7 && _charset->getCurID() != -1)
+			memcpy(_charsetColorMap, _charsetData[_charset->getCurID()], _game.id == GID_DIG ? sizeof(_charsetColorMap) : 4);
+
 		if (bt.flags & kStyleWordWrap) {
 			bt.rect = _wrappedTextClipRect;
 
@@ -511,23 +516,6 @@ void ScummEngine_v7::restoreBlastTextsRects() {
 		return;
 
 	for (int i = 0; i < _blastTextRectsQueue; i++) {
-		// Did the camera X coordinate change (i.e. because of an override)?
-		// If so, adjust the rects.
-		// Please note this wasn't done on the original, but we handle things
-		// a little bit differently on our end, so we need to account for this
-		// case manually.
-		if (camera._cur.x != camera._last.x) {
-			int rightDiff = _blastTextQueue[i].rect.right - (camera._cur.x - camera._last.x);
-			int leftDiff = _blastTextQueue[i].rect.left - (camera._cur.x - camera._last.x);
-
-			// The nominal calculations are meant to be used for camera movements
-			// inside the same room. If this is not true, we might end up with
-			// negative rect values, so in that case the worse that can happen
-			// it's just that the rect will be as large as the screen itself.
-			_blastTextQueue[i].rect.left = (leftDiff < 0) ? 0 : leftDiff;
-			_blastTextQueue[i].rect.right = (rightDiff < 0) ? _screenWidth : rightDiff;
-		}
-
 		restoreBackground(_blastTextQueue[i].rect);
 	}
 
@@ -615,7 +603,7 @@ void ScummEngine_v7::clearSubtitleQueue() {
 	_subtitleQueuePos = 0;
 }
 
-void ScummEngine_v7::CHARSET_1() {
+void ScummEngine_v7::displayDialog() {
 	processSubtitleQueue();
 
 	bool usingOldSystem = (_game.id == GID_FT) || (_game.id == GID_DIG && _game.features & GF_DEMO);
@@ -629,7 +617,7 @@ void ScummEngine_v7::CHARSET_1() {
 
 	Actor *a = NULL;
 	if (getTalkingActor() != 0xFF)
-		a = derefActorSafe(getTalkingActor(), "CHARSET_1");
+		a = derefActorSafe(getTalkingActor(), "displayDialog");
 
 	StringTab saveStr = _string[0];
 	if (a && _string[0].overhead) {
@@ -663,8 +651,10 @@ void ScummEngine_v7::CHARSET_1() {
 		_charset->_startLeft = _charset->_left = _string[0].xpos;
 		_charset->_right = _string[0].right;
 		_charset->_center = _string[0].center;
-		memcpy(_charsetColorMap, _charsetData[_charset->getCurID()], 4);
 	}
+
+	if (_game.version == 7 && _charset->getCurID() != -1)
+		memcpy(_charsetColorMap, _charsetData[_charset->getCurID()], _game.id == GID_DIG ? sizeof(_charsetColorMap) : 4);
 
 	if (usingOldSystem && a && a->_charset) {
 		_charset->setCurID(a->_charset);
@@ -676,7 +666,7 @@ void ScummEngine_v7::CHARSET_1() {
 		return;
 
 	if ((!usingOldSystem && VAR(VAR_HAVE_MSG)) || (usingOldSystem && _haveMsg != 1)) {
-		if ((_sound->_sfxMode & 2) == 0) {
+		if ((_sound->_digiSndMode & DIGI_SND_MODE_TALKIE) == 0) {
 			stopTalk();
 		}
 		return;
@@ -729,7 +719,7 @@ void ScummEngine_v7::CHARSET_1() {
 			if (c == 13) {
 				// New line
 				if (subtitleLine != subtitleBuffer) {
-					addSubtitleToQueue(subtitleBuffer, subtitlePos, _charsetColor, _charset->getCurID(), false, false);
+					addSubtitleToQueue(subtitleBuffer, subtitlePos, _charsetColor, _charset->getCurID(), _haveActorSpeechMsg, false);
 					subtitleLine = subtitleBuffer;
 				}
 
@@ -753,7 +743,7 @@ void ScummEngine_v7::CHARSET_1() {
 		}
 
 		if (subtitleLine != subtitleBuffer) {
-			addSubtitleToQueue(subtitleBuffer, subtitlePos, _charsetColor, _charset->getCurID(), false, false);
+			addSubtitleToQueue(subtitleBuffer, subtitlePos, _charsetColor, _charset->getCurID(), _haveActorSpeechMsg, false);
 		}
 	} else {
 		_talkDelay = VAR(VAR_DEFAULT_TALK_DELAY);

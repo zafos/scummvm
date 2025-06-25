@@ -34,6 +34,7 @@
 #include "scumm/imuse/instrument.h"
 #include "scumm/resource.h"
 #include "scumm/scumm.h"
+#include "scumm/sound.h"
 
 namespace Scumm {
 
@@ -43,10 +44,11 @@ namespace Scumm {
 //
 ////////////////////////////////////////
 
-IMuseInternal::IMuseInternal(ScummEngine *vm, MidiDriverFlags sndType, uint32 initFlags) :
-	_native_mt32((initFlags & kFlagNativeMT32) || (initFlags & kFlagRolandGS)), // GS Mode emulates MT-32 on a GS device, so _native_mt32 should always be true
-	_enable_gs(initFlags & kFlagRolandGS),
-	_newSystem(initFlags & kFlagNewSystem),
+IMuseInternal::IMuseInternal(ScummEngine *vm, MidiDriverFlags sndType, bool nativeMT32) :
+	_vm(vm),
+	_native_mt32(nativeMT32),
+	_newSystem(vm && vm->_game.id == GID_SAMNMAX),
+	_dynamicChanAllocation(vm && vm->_game.id != GID_MONKEY2 && vm->_game.id != GID_INDY4), // For the non-iMuse games that (unfortunately) run on this player we need to pretend we're on the more modern version
 	_midi_adlib(nullptr),
 	_midi_native(nullptr),
 	_sysex(nullptr),
@@ -63,9 +65,11 @@ IMuseInternal::IMuseInternal(ScummEngine *vm, MidiDriverFlags sndType, uint32 in
 	_queue_cleared(0),
 	_master_volume(0),
 	_music_volume(0),
+	_music_volume_eff(0),
 	_trigger_count(0),
 	_snm_trigger_index(0),
 	_soundType(sndType),
+	_lowLevelVolumeControl(sndType == MDT_MACINTOSH),
 	_game_id(vm ? vm->_game.id : 0),
 	_mutex(vm ? vm->_mixer->mutex() : _dummyMutex) {
 	memset(_channel_volume, 0, sizeof(_channel_volume));
@@ -79,7 +83,7 @@ IMuseInternal::~IMuseInternal() {
 	// interrupt us, and then do the rest outside
 	// the mutex.
 	{
-		Common::StackLock lock(_mutex, "IMuseInternal::~IMuseInternal()");
+		Common::StackLock lock(_mutex);
 		_initialized = false;
 		stopAllSounds_internal();
 	}
@@ -122,7 +126,7 @@ byte *IMuseInternal::findStartOfSound(int sound, int ct) {
 		return ct == trFlag ? ptr + 4 : nullptr;
 
 	ptr += 4;
-	size = READ_BE_UINT32(ptr);
+	//size = READ_BE_UINT32(ptr);
 	ptr += 4;
 
 	// Okay, we're looking for one of those things: either
@@ -158,7 +162,7 @@ bool IMuseInternal::isMT32(int sound) {
 	case MKTAG('A', 'M', 'I', ' '): // MI2 Amiga
 		return false;
 
-	case MKTAG('R', 'O', 'L', ' '): // Unfortunately FOA Amiga also uses this resource type
+	case MKTAG('R', 'O', 'L', ' '): // Roland LAPC/MT-32/CM32L track, but FOA Amiga and and DOTT Demo Mac also use this resource type
 		return _soundType != MDT_AMIGA && _soundType != MDT_MACINTOSH;
 
 	case MKTAG('M', 'A', 'C', ' '): // Occurs in the Mac version of FOA and MI2
@@ -205,7 +209,7 @@ bool IMuseInternal::isMIDI(int sound) {
 	case MKTAG('A', 'M', 'I', ' '): // Amiga (return true, since the driver is initalized as native midi)
 		return true;
 
-	case MKTAG('R', 'O', 'L', ' '):
+	case MKTAG('R', 'O', 'L', ' '): // Roland LAPC/MT-32/CM32L track
 		return true;
 
 	case MKTAG('M', 'A', 'C', ' '): // Occurs in the Mac version of FOA and MI2
@@ -247,17 +251,15 @@ bool IMuseInternal::supportsPercussion(int sound) {
 	case MKTAG('A', 'M', 'I', ' '): // MI2 Amiga
 		return false;
 
-	case MKTAG('R', 'O', 'L', ' '): // Roland LAPC/MT-32/CM32L track, but also used by INDY4 Amiga
-		return _soundType != MDT_AMIGA && _soundType != MDT_MACINTOSH;
+	case MKTAG('R', 'O', 'L', ' '): // Roland LAPC/MT-32/CM32L track, but also used by INDY4 Amiga and DOTT Demo Mac (but the latter does support percussion).
+		return _soundType != MDT_AMIGA;
 
-	case MKTAG('M', 'A', 'C', ' '): // Occurs in the Mac version of FOA and MI2
-		// This is MIDI, i.e. uses MIDI style program changes, but without a
-		// special percussion channel.
+	case MKTAG('M', 'A', 'C', ' '): // Occurs in the Mac version of FOA and MI2. The early Mac imuse system doesn't support percussion.
 		return false;
 
-	case MKTAG('G', 'M', 'D', ' '):
-	case MKTAG('M', 'I', 'D', 'I'): // Occurs in Sam & Max
-		return true;
+	case MKTAG('G', 'M', 'D', ' '): // DOTT
+	case MKTAG('M', 'I', 'D', 'I'): // Sam & Max
+		return true;				// This is correct for Mac, too. The later Mac imuse system does have a percussion channel.
 
 	default:
 		break;
@@ -266,8 +268,6 @@ bool IMuseInternal::supportsPercussion(int sound) {
 	// Old style 'RO' has equivalent properties to 'ROL'
 	if (ptr[0] == 'R' && ptr[1] == 'O')
 		return true;
-	// Euphony tracks show as 'SO' and have equivalent properties to 'ADL'
-	// FIXME: Right now we're pretending it's GM.
 	if (ptr[4] == 'S' && ptr[5] == 'O')
 		return true;
 
@@ -341,9 +341,13 @@ void IMuseInternal::init_parts() {
 ////////////////////////////////////////
 
 void IMuseInternal::on_timer(MidiDriver *midi) {
-	Common::StackLock lock(_mutex, "IMuseInternal::on_timer()");
+	Common::StackLock lock(_mutex);
 	if (_paused || !_initialized)
 		return;
+
+	// CD version only
+	if (_game_id == GID_SAMNMAX && strcmp(_vm->_game.variant, "Floppy"))
+		musicVolumeReduction(midi);
 
 	if (midi == _midi_native || !_midi_native)
 		handleDeferredCommands(midi);
@@ -351,14 +355,14 @@ void IMuseInternal::on_timer(MidiDriver *midi) {
 }
 
 void IMuseInternal::pause(bool paused) {
-	Common::StackLock lock(_mutex, "IMuseInternal::pause()");
+	Common::StackLock lock(_mutex);
 	if (_paused == paused)
 		return;
-	int vol = _music_volume;
+	int vol = _music_volume_eff;
 	if (paused)
-		_music_volume = 0;
+		_music_volume_eff = 0;
 	update_volumes();
-	_music_volume = vol;
+	_music_volume_eff = vol;
 
 	// Fix for Bug #1263. The MT-32 apparently fails
 	// sometimes to respond to a channel volume message
@@ -386,7 +390,7 @@ static void syncWithSerializer(Common::Serializer &s, ImTrigger &it) {
 }
 
 void IMuseInternal::saveLoadIMuse(Common::Serializer &s, ScummEngine *scumm, bool fixAfterLoad) {
-	Common::StackLock lock(_mutex, "IMuseInternal::saveLoadIMuse()");
+	Common::StackLock lock(_mutex);
 
 	int i;
 
@@ -451,18 +455,18 @@ void IMuseInternal::saveLoadIMuse(Common::Serializer &s, ScummEngine *scumm, boo
 }
 
 bool IMuseInternal::get_sound_active(int sound) const {
-	Common::StackLock lock(_mutex, "IMuseInternal::get_sound_active()");
+	Common::StackLock lock(_mutex);
 	return getSoundStatus_internal(sound, false) != 0;
 }
 
 int32 IMuseInternal::doCommand(int numargs, int a[]) {
-	Common::StackLock lock(_mutex, "IMuseInternal::doCommand()");
+	Common::StackLock lock(_mutex);
 	return doCommand_internal(numargs, a);
 }
 
 
 uint32 IMuseInternal::property(int prop, uint32 value) {
-	Common::StackLock lock(_mutex, "IMuseInternal::property()");
+	Common::StackLock lock(_mutex);
 	switch (prop) {
 	case IMuse::PROP_TEMPO_BASE:
 		// This is a specified as a percentage of normal
@@ -481,6 +485,17 @@ uint32 IMuseInternal::property(int prop, uint32 value) {
 		_recycle_players = (value != 0);
 		break;
 
+	case IMuse::PROP_QUALITY:
+		if (_midi_native)
+			_midi_native->property(IMuse::PROP_QUALITY, value);
+		break;
+
+	case IMuse::PROP_MUSICVOLUME:
+	case IMuse::PROP_SFXVOLUME:
+		if (_midi_native && _lowLevelVolumeControl)
+			_midi_native->property(prop, value);
+		break;
+
 	default:
 		break;
 	}
@@ -491,12 +506,12 @@ uint32 IMuseInternal::property(int prop, uint32 value) {
 void IMuseInternal::addSysexHandler(byte mfgID, sysexfunc handler) {
 	// TODO: Eventually support multiple sysEx handlers and pay
 	// attention to the client-supplied manufacturer ID.
-	Common::StackLock lock(_mutex, "IMuseInternal::property()");
+	Common::StackLock lock(_mutex);
 	_sysex = handler;
 }
 
 void IMuseInternal::startSoundWithNoteOffset(int sound, int offset) {
-	Common::StackLock lock(_mutex, "IMuseInternal::startSound()");
+	Common::StackLock lock(_mutex);
 	startSound_internal(sound, offset);
 }
 
@@ -507,13 +522,21 @@ void IMuseInternal::startSoundWithNoteOffset(int sound, int offset) {
 ////////////////////////////////////////
 
 void IMuseInternal::setMusicVolume(int vol) {
-	Common::StackLock lock(_mutex, "IMuseInternal::setMusicVolume()");
+	if (_lowLevelVolumeControl) {
+		property(IMuse::PROP_MUSICVOLUME, vol);
+		return;
+	}
+
+	Common::StackLock lock(_mutex);
 	if (vol > 255)
 		vol = 255;
 	if (_music_volume == vol)
 		return;
+
 	_music_volume = vol;
-	vol = _master_volume * _music_volume / 255;
+	_music_volume_eff = _music_volume;
+
+	vol = _master_volume * _music_volume_eff / 255;
 	for (uint i = 0; i < ARRAYSIZE(_channel_volume); i++) {
 		_channel_volume_eff[i] = _channel_volume[i] * vol / 255;
 	}
@@ -521,28 +544,36 @@ void IMuseInternal::setMusicVolume(int vol) {
 		update_volumes();
 }
 
+void IMuseInternal::setSfxVolume(int vol) {
+	// This is supported only for drivers that can distinguish music from sound effects at the driver or emulator level.
+	// The imuse engine in its early version does not have volume groups. It simply (and successfully for the more relevant
+	// targets) relies on sound effects not being played through the imuse engine.
+	if (_lowLevelVolumeControl)
+		property(IMuse::PROP_SFXVOLUME, vol);
+}
+
 void IMuseInternal::startSound(int sound) {
-	Common::StackLock lock(_mutex, "IMuseInternal::startSound()");
+	Common::StackLock lock(_mutex);
 	startSound_internal(sound);
 }
 
 void IMuseInternal::stopSound(int sound) {
-	Common::StackLock lock(_mutex, "IMuseInternal::stopSound()");
+	Common::StackLock lock(_mutex);
 	stopSound_internal(sound);
 }
 
 void IMuseInternal::stopAllSounds() {
-	Common::StackLock lock(_mutex, "IMuseInternal::stopAllSounds()");
+	Common::StackLock lock(_mutex);
 	stopAllSounds_internal();
 }
 
 int IMuseInternal::getSoundStatus(int sound) const {
-	Common::StackLock lock(_mutex, "IMuseInternal::getSoundStatus()");
+	Common::StackLock lock(_mutex);
 	return getSoundStatus_internal(sound, true);
 }
 
 int IMuseInternal::getMusicTimer() {
-	Common::StackLock lock(_mutex, "IMuseInternal::getMusicTimer()");
+	Common::StackLock lock(_mutex);
 	int best_time = 0;
 	const Player *player = _players;
 	for (int i = ARRAYSIZE(_players); i; i--, player++) {
@@ -705,6 +736,18 @@ int IMuseInternal::stopAllSounds_internal() {
 }
 
 int IMuseInternal::getSoundStatus_internal(int sound, bool ignoreFadeouts) const {
+	if (_game_id != GID_MONKEY2) {
+		// The whole fadeout checking / ignoring is not present in any of the original
+		// drivers, but necessary as a WORKAROUND for a bug in Monkey Island 2 that also
+		// happens with the original interpreter (bug no. 385: "No music if room
+		// transition is too fast"). The bug is caused by sloppy scripting, but probably
+		// wouldn't ever be seen on machines of that era, when the loading time for a
+		// room change would take longer than the fadeout time.
+		// Since the code is objectively wrong and the workaround is not known to be
+		// needed elsewhere, we restrict it to Monkey Island 2.
+		ignoreFadeouts = false;
+	}
+
 	const Player *player = _players;
 	for (int i = ARRAYSIZE(_players); i; i--, player++) {
 		if (player->isActive() && (!ignoreFadeouts || !player->isFadingOut())) {
@@ -853,14 +896,20 @@ int32 IMuseInternal::doCommand_internal(int numargs, int a[]) {
 			error("doCommand(%d [%d/%d], %d, %d, %d, %d, %d, %d, %d) unsupported", a[0], param, cmd, a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
 		}
 	} else if (param == 1) {
+		Part *part = nullptr;
 		if ((1 << cmd) & 0x783FFF) {
 			player = findActivePlayer(a[1]);
 			if (!player)
 				return -1;
-			if ((1 << cmd) & (1 << 11 | 1 << 22)) {
+			if (_newSystem && cmd == 5) {
+				assert(a[3] >= 0 && a[3] <= 15);
+				part = player->getPart(a[2]);
+				if (!part)
+					return -1;
+			} else if (((1 << cmd) & (1 << 11 | 1 << 22))) {
 				assert(a[2] >= 0 && a[2] <= 15);
-				player = (Player *)player->getPart(a[2]);
-				if (!player)
+				part = player->getPart(a[2]);
+				if (!part)
 					return -1;
 			}
 		}
@@ -910,12 +959,20 @@ int32 IMuseInternal::doCommand_internal(int numargs, int a[]) {
 		case 2:
 			return player->setVolume(a[2]);
 		case 3:
-			player->setPan(a[2]);
+			if (_newSystem)
+				player->setSpeed(a[3]);
+			else
+				player->setPan(a[2]);
 			return 0;
 		case 4:
 			return player->setTranspose(a[2], a[3]);
 		case 5:
-			player->setDetune(a[2]);
+			if (_newSystem) {
+				assert(part);
+				part->volControlSensitivity(a[4]);
+			} else {
+				player->setDetune(a[2]);
+			}
 			return 0;
 		case 6:
 			// WORKAROUND for bug #2242. When playing the
@@ -946,7 +1003,8 @@ int32 IMuseInternal::doCommand_internal(int numargs, int a[]) {
 			player->clearLoop();
 			return 0;
 		case 11:
-			((Part *)player)->set_onoff(a[3] != 0);
+			assert(part);
+			part->set_onoff(a[3] != 0);
 			return 0;
 		case 12:
 			return player->setHook(a[2], a[3], a[4]);
@@ -965,7 +1023,8 @@ int32 IMuseInternal::doCommand_internal(int numargs, int a[]) {
 		case 21:
 			return -1;
 		case 22:
-			((Part *)player)->volume(a[3]);
+			assert(part);
+			part->volume(a[3]);
 			return 0;
 		case 23:
 			return query_queue(a[1]);
@@ -1014,7 +1073,7 @@ void IMuseInternal::handle_marker(uint id, byte data) {
 int IMuseInternal::get_channel_volume(uint a) {
 	if (a < 8)
 		return _channel_volume_eff[a];
-	return (_master_volume * _music_volume / 255) / 2;
+	return (_master_volume * _music_volume_eff / 255) / 2;
 }
 
 Part *IMuseInternal::allocate_part(byte pri, MidiDriver *midi) {
@@ -1098,10 +1157,10 @@ int IMuseInternal::set_volchan(int sound, int volchan) {
 		}
 		if (sameid == nullptr)
 			return -1;
-		if (num >= r)
+		if (best != nullptr && num >= r)
 			best->clear();
-		player->_vol_chan = volchan;
-		player->setVolume(player->getVolume());
+		sameid->_vol_chan = volchan;
+		sameid->setVolume(sameid->getVolume());
 		return 0;
 	}
 }
@@ -1169,12 +1228,13 @@ int IMuseInternal::query_queue(int param) {
 }
 
 int IMuseInternal::setImuseMasterVolume(uint vol) {
-	if (vol > 255)
+	// The DOTT Macintosh driver ignores the vol argument and always sets the volume to max.
+	if (vol > 255 || (_soundType == MDT_MACINTOSH && _game_id == GID_TENTACLE))
 		vol = 255;
 	if (_master_volume == vol)
 		return 0;
 	_master_volume = vol;
-	vol = _master_volume * _music_volume / 255;
+	vol = _master_volume * _music_volume_eff / 255;
 	for (uint i = 0; i < ARRAYSIZE(_channel_volume); i++) {
 		_channel_volume_eff[i] = _channel_volume[i] * vol / 255;
 	}
@@ -1299,7 +1359,7 @@ int IMuseInternal::set_channel_volume(uint chan, uint vol) {
 		return -1;
 
 	_channel_volume[chan] = vol;
-	_channel_volume_eff[chan] = _master_volume * _music_volume * vol / 255 / 255;
+	_channel_volume_eff[chan] = _master_volume * _music_volume_eff * vol / 255 / 255;
 	update_volumes();
 	return 0;
 }
@@ -1312,6 +1372,46 @@ void IMuseInternal::update_volumes() {
 		if (player->isActive())
 			player->setVolume(player->getVolume());
 	}
+}
+
+void IMuseInternal::musicVolumeReduction(MidiDriver *midi) {
+	int curVol;
+	int curEffVol;
+	int factor = 2; // The music volume variables are 0-255, and we need 0-127
+
+	if (_paused)
+		return;
+
+	_musicVolumeReductionTimer += midi->getBaseTempo();
+	while (_musicVolumeReductionTimer >= MUS_REDUCTION_TIMER_TICKS) {
+		_musicVolumeReductionTimer -= MUS_REDUCTION_TIMER_TICKS;
+		curVol = _music_volume / factor;
+
+		if (_vm->_sound->speechIsPlaying())
+			curVol = (90 * curVol) >> 7;
+
+		curEffVol = _music_volume_eff / factor;
+
+		// The reduction curve is pretty slow, but running
+		// the original through a debugger shows the same behavior...
+		if (curEffVol > curVol)
+			_music_volume_eff = (curEffVol - 1) * factor;
+
+		if (curEffVol < curVol)
+			_music_volume_eff = (curEffVol + 1) * factor;
+	}
+
+	bool volumeChanged = false;
+	for (uint i = 0; i < ARRAYSIZE(_channel_volume); i++) {
+		uint16 newChannelVolume = _channel_volume[i] * (_master_volume * _music_volume_eff / 255) / 255;
+		if (_channel_volume_eff[i] != newChannelVolume) {
+			_channel_volume_eff[i] = newChannelVolume;
+			volumeChanged = true;
+		}
+	}
+
+	if (volumeChanged)
+		update_volumes();
 }
 
 int IMuseInternal::set_volchan_entry(uint a, uint b) {
@@ -1398,8 +1498,8 @@ int IMuseInternal::get_volchan_entry(uint a) {
 	return -1;
 }
 
-IMuseInternal *IMuseInternal::create(ScummEngine *vm, MidiDriver *nativeMidiDriver, MidiDriver *adlibMidiDriver, MidiDriverFlags sndType, uint32 initFlags) {
-	IMuseInternal *i = new IMuseInternal(vm, sndType, initFlags);
+IMuseInternal *IMuseInternal::create(ScummEngine *vm, MidiDriver *nativeMidiDriver, MidiDriver *adlibMidiDriver, MidiDriverFlags sndType, bool nativeMT32) {
+	IMuseInternal *i = new IMuseInternal(vm, sndType, nativeMT32);
 	i->initialize(vm->_system, nativeMidiDriver, adlibMidiDriver);
 	return i;
 }
@@ -1423,6 +1523,9 @@ int IMuseInternal::initialize(OSystem *syst, MidiDriver *native_midi, MidiDriver
 	if (!_tempoFactor)
 		_tempoFactor = 100;
 	_master_volume = 255;
+
+	if (_lowLevelVolumeControl)
+		_music_volume = _music_volume_eff = 255;
 
 	for (i = 0; i != 8; i++)
 		_channel_volume[i] = _channel_volume_eff[i] = _volchan_table[i] = 127;
@@ -1526,11 +1629,74 @@ void IMuseInternal::midiTimerCallback(void *data) {
 	info->imuse->on_timer(info->driver);
 }
 
+MidiChannel *IMuseInternal::allocateChannel(MidiDriver *midi, byte prio) {
+	MidiChannel *mc = midi->allocateChannel();
+	if (mc)
+		return mc;
+
+	Part *best = nullptr;
+	for (Part *part = _parts; part < &_parts[ARRAYSIZE(_parts)]; ++part) {
+		if (!part->_percussion && part->_mc && part->_mc->device() == midi && part->_pri_eff <= prio) {
+			prio = part->_pri_eff;
+			best = part;
+		}
+	}
+
+	if (best) {
+		best->off();
+		suspendPart(best);
+		mc = midi->allocateChannel();
+	}
+
+	return mc;
+}
+
+bool IMuseInternal::reassignChannelAndResumePart(MidiChannel *mc) {
+	while (!_waitingPartsQueue.empty()) {
+		Part *part = _waitingPartsQueue.remove_at(0);
+		if (part->_player) {
+			part->_mc = mc;
+			part->sendAll();
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void IMuseInternal::suspendPart(Part *part) {
+	if (_waitingPartsQueue.empty()) {
+		_waitingPartsQueue.push_back(part);
+		return;
+	}
+
+	for (Common::Array<Part*>::iterator it = _waitingPartsQueue.begin(); it != _waitingPartsQueue.end(); ++it) {
+		if ((*it)->_pri_eff > part->_pri_eff)
+			continue;
+		_waitingPartsQueue.insert(it, part);
+		return;
+	}
+
+	_waitingPartsQueue.push_back(part);
+}
+
+void IMuseInternal::removeSuspendedPart(Part *part) {
+	for (Common::Array<Part*>::iterator it = _waitingPartsQueue.begin(); it != _waitingPartsQueue.end(); ++it) {
+		if (*it != part)
+			continue;
+		_waitingPartsQueue.erase(it);
+		return;
+	}
+}
+
 void IMuseInternal::reallocateMidiChannels(MidiDriver *midi) {
 	Part *part, *hipart;
 	int i;
 	byte hipri, lopri;
 	Part *lopart;
+
+	if (!_dynamicChanAllocation)
+		return;
 
 	while (true) {
 		hipri = 0;
@@ -1610,8 +1776,8 @@ void IMuseInternal::copyGlobalInstrument(byte slot, Instrument *dest) {
  * of the implementation to be changed and updated
  * without requiring a recompile of the client code.
  */
-IMuse *IMuse::create(ScummEngine *vm, MidiDriver *nativeMidiDriver, MidiDriver *adlibMidiDriver, MidiDriverFlags sndType, uint32 flags) {
-	IMuseInternal *engine = IMuseInternal::create(vm, nativeMidiDriver, adlibMidiDriver, sndType, flags);
+IMuse *IMuse::create(ScummEngine *vm, MidiDriver *nativeMidiDriver, MidiDriver *adlibMidiDriver, MidiDriverFlags sndType, bool nativeMT32) {
+	IMuseInternal *engine = IMuseInternal::create(vm, nativeMidiDriver, adlibMidiDriver, sndType, nativeMT32);
 	return engine;
 }
 

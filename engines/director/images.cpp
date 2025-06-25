@@ -21,6 +21,7 @@
 
 #include "common/substream.h"
 #include "graphics/macgui/macwindowmanager.h"
+#include "graphics/pixelformat.h"
 #include "image/codecs/bmp_raw.h"
 
 #include "director/director.h"
@@ -28,10 +29,9 @@
 
 namespace Director {
 
-DIBDecoder::DIBDecoder() {
+DIBDecoder::DIBDecoder() : _palette(0) {
 	_surface = nullptr;
-	_palette = nullptr;
-	_paletteColorCount = 0;
+	_bitsPerPixel = 0;
 	_codec = nullptr;
 }
 
@@ -42,9 +42,7 @@ DIBDecoder::~DIBDecoder() {
 void DIBDecoder::destroy() {
 	_surface = nullptr;	// It is deleted by BitmapRawDecoder
 
-	delete[] _palette;
-	_palette = nullptr;
-	_paletteColorCount = 0;
+	_palette.clear();
 
 	delete _codec;
 	_codec = nullptr;
@@ -52,24 +50,23 @@ void DIBDecoder::destroy() {
 
 void DIBDecoder::loadPalette(Common::SeekableReadStream &stream) {
 	uint16 steps = stream.size() / 6;
-	uint16 index = 0;
-	_paletteColorCount = steps;
-	_palette = new byte[steps * 3];
+	_palette.resize(steps, false);
 
 	for (uint8 i = 0; i < steps; i++) {
-		_palette[index] = stream.readByte();
+		byte r = stream.readByte();
 		stream.readByte();
 
-		_palette[index + 1] = stream.readByte();
+		byte g = stream.readByte();
 		stream.readByte();
 
-		_palette[index + 2] = stream.readByte();
+		byte b = stream.readByte();
 		stream.readByte();
-		index += 3;
+		_palette.set(i, r, g, b);
 	}
 }
 
 bool DIBDecoder::loadStream(Common::SeekableReadStream &stream) {
+	//stream.hexdump(stream.size());
 	uint32 headerSize = stream.readUint32LE();
 	if (headerSize != 40)
 		return false;
@@ -80,27 +77,38 @@ bool DIBDecoder::loadStream(Common::SeekableReadStream &stream) {
 		warning("BUILDBOT: height < 0 for DIB");
 	}
 	stream.readUint16LE(); // planes
-	uint16 bitsPerPixel = stream.readUint16LE();
+	_bitsPerPixel = stream.readUint16LE();
 	uint32 compression = stream.readUint32BE();
 	/* uint32 imageSize = */ stream.readUint32LE();
 	/* int32 pixelsPerMeterX = */ stream.readSint32LE();
 	/* int32 pixelsPerMeterY = */ stream.readSint32LE();
-	_paletteColorCount = stream.readUint32LE();
+	uint32 paletteColorCount = stream.readUint32LE();
 	/* uint32 colorsImportant = */ stream.readUint32LE();
 
-	_paletteColorCount = (_paletteColorCount == 0) ? 255: _paletteColorCount;
+	paletteColorCount = (paletteColorCount == 0) ? 255: paletteColorCount;
+	_palette.resize(paletteColorCount, false);
 
 	Common::SeekableSubReadStream subStream(&stream, 40, stream.size());
 
-	_codec = Image::createBitmapCodec(compression, 0, width, height, bitsPerPixel);
+	_codec = Image::createBitmapCodec(compression, 0, width, height, _bitsPerPixel);
 
 	if (!_codec)
 		return false;
 
 	_surface = _codec->decodeFrame(subStream);
 
-	// For some reason, DIB cast members have the palette indexes reversed
-	if (bitsPerPixel == 8) {
+	// The DIB decoder converts 1bpp images to the 16-color equivalent; we need them to be the palette extrema
+	// in order to work.
+	if (_bitsPerPixel == 1) {
+		for (int y = 0; y < _surface->h; y++) {
+			for (int x = 0; x < _surface->w; x++) {
+				*const_cast<byte *>((const byte *)_surface->getBasePtr(x, y)) = *(const byte *)_surface->getBasePtr(x, y) == 0xf ? 0x00 : 0xff;
+			}
+		}
+	}
+
+	// For some reason, DIB cast members have the palette indices reversed
+	if (_bitsPerPixel == 8) {
 		for (int y = 0; y < _surface->h; y++) {
 			for (int x = 0; x < _surface->w; x++) {
 				// We're not su[pposed to modify the image that is coming from the decoder
@@ -117,7 +125,7 @@ bool DIBDecoder::loadStream(Common::SeekableReadStream &stream) {
 * BITD
 ****************************/
 
-BITDDecoder::BITDDecoder(int w, int h, uint16 bitsPerPixel, uint16 pitch, const byte *palette, uint16 version) {
+BITDDecoder::BITDDecoder(int w, int h, uint16 bitsPerPixel, uint16 pitch, const byte *palette, uint16 version) : _palette(0) {
 	_surface = new Graphics::Surface();
 	_pitch = pitch;
 	_version = version;
@@ -128,13 +136,32 @@ BITDDecoder::BITDDecoder(int w, int h, uint16 bitsPerPixel, uint16 pitch, const 
 
 		_pitch = minPitch;
 	}
+	byte Bpp = bitsPerPixel >> 3;
+	Graphics::PixelFormat format;
+	switch (Bpp) {
+	case 0:
+	case 1:
+		// 8-bit palette
+		format = Graphics::PixelFormat::createFormatCLUT8();
+		break;
+	case 2:
+		// RGB555
+		format = Graphics::PixelFormat(2, 5, 5, 5, 0, 10, 5, 0, 0);
+		break;
+	case 4:
+		// RGB888
+		format = Graphics::PixelFormat(4, 8, 8, 8, 0, 16, 8, 0, 0);
+		break;
+	default:
+		warning("BITDDecoder::BITDDecoder(): unsupported bpp %d", bitsPerPixel);
+		break;
+	}
 
-	_surface->create(w, h, g_director->_pixelformat);
-
-	_palette = palette;
+	_surface->create(w, h, format);
 
 	// TODO: Bring this in from the main surface?
-	_paletteColorCount = 255;
+	_palette.resize(255, false);
+	_palette.set(palette, 0, 255);
 
 	_bitsPerPixel = bitsPerPixel;
 }
@@ -147,28 +174,10 @@ void BITDDecoder::destroy() {
 	_surface->free();
 	delete _surface;
 	_surface = nullptr;
-
-	_paletteColorCount = 0;
 }
 
 void BITDDecoder::loadPalette(Common::SeekableReadStream &stream) {
 	// no op
-}
-
-void BITDDecoder::convertPixelIntoSurface(void* surfacePointer, uint fromBpp, uint toBpp, int red, int green, int blue) {
-	switch (toBpp) {
-	case 1:
-		*((byte*)surfacePointer) = g_director->_wm->findBestColor(red, green, blue);
-		break;
-
-	case 4:
-		*((uint32 *)surfacePointer) = g_director->_wm->findBestColor(red, green, blue);
-		break;
-
-	default:
-		warning("BITDDecoder::convertPixelIntoSurface(): conversion from %d to %d not implemented", fromBpp, toBpp);
-		break;
-	}
 }
 
 bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
@@ -247,7 +256,6 @@ bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
 		offset = _surface->w % 2;
 
 	uint32 color;
-	bool paletted = (g_director->_pixelformat.bytesPerPixel == 1);
 
 	if (pixels.size() > 0) {
 		for (y = 0; y < _surface->h; y++) {
@@ -256,62 +264,35 @@ bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
 				case 1:
 					for (int c = 0; c < 8 && x < _surface->w; c++, x++) {
 						color = (pixels[(y * _pitch) + (x >> 3)] & (1 << (7 - c))) ? 0xff : 0x00;
-						if (paletted) {
-							*((byte *)_surface->getBasePtr(x, y)) = color;
-						} else {
-							*((uint32 *)_surface->getBasePtr(x, y)) = color ? g_director->_wm->_colorWhite : g_director->_wm->_colorBlack;
-						}
+						*((byte *)_surface->getBasePtr(x, y)) = color;
 					}
 					break;
 				case 2:
 					for (int c = 0; c < 4 && x < _surface->w; c++, x++) {
 						color = (pixels[(y * _pitch) + (x >> 2)] & (0x3 << (2 * (3 - c)))) >> (2 * (3 - c));
-						if (paletted) {
-							*((byte *)_surface->getBasePtr(x, y)) = color;
-						} else {
-							*((uint32 *)_surface->getBasePtr(x, y)) = g_director->transformColor(color);
-						}
+						*((byte *)_surface->getBasePtr(x, y)) = color;
 					}
 					break;
 				case 4:
 					for (int c = 0; c < 2 && x < _surface->w; c++, x++) {
 						color = (pixels[(y * _pitch) + (x >> 1)] & (0xf << (4 * (1 - c)))) >> (4 * (1 - c));
-						if (paletted) {
-							*((byte *)_surface->getBasePtr(x, y)) = color;
-						} else {
-							*((uint32 *)_surface->getBasePtr(x, y)) = g_director->transformColor(color);
-						}
+						*((byte *)_surface->getBasePtr(x, y)) = color;
 					}
 					break;
 				case 8:
-					// this calculation is wrong.. need a demo with colours.
-					if (paletted) {
-						*((byte *)_surface->getBasePtr(x, y)) = pixels[(y * _surface->w) + x + (y * offset)];
-					} else {
-						// FIXME: this won't work if the palette for the image is not the current screen one
-						*((uint32 *)_surface->getBasePtr(x, y)) = g_director->transformColor(pixels[(y * _surface->w) + x + (y * offset)]);
-					}
+					*((byte *)_surface->getBasePtr(x, y)) = pixels[(y * _surface->w) + x + (y * offset)];
 					x++;
 					break;
 
 				case 16:
 					if (_version < kFileVer400) {
-						convertPixelIntoSurface(_surface->getBasePtr(x, y),
-							(_bitsPerPixel / 8),
-							_surface->format.bytesPerPixel,
-							(pixels[((y * _surface->w) * 2) + x * 2] & 0x7c) << 1,
-							(pixels[((y * _surface->w) * 2) + x * 2] & 0x03) << 6 |
-							(pixels[((y * _surface->w) * 2) + x * 2 + 1] & 0xe0) >> 2,
-							(pixels[((y * _surface->w) * 2) + x * 2 + 1] & 0x1f) << 3);
+						color = (pixels[((y * _surface->w) * 2) + x * 2]) << 8 |
+							(pixels[((y * _surface->w) * 2) + x * 2 + 1]);
 					} else {
-						convertPixelIntoSurface(_surface->getBasePtr(x, y),
-							(_bitsPerPixel / 8),
-							_surface->format.bytesPerPixel,
-							(pixels[((y * _surface->w) * 2) + x] & 0x7c) << 1,
-							(pixels[((y * _surface->w) * 2) + x] & 0x03) << 6 |
-							(pixels[((y * _surface->w) * 2) + (_surface->w) + x] & 0xe0) >> 2,
-							(pixels[((y * _surface->w) * 2) + (_surface->w) + x] & 0x1f) << 3);
+						color =	(pixels[((y * _surface->w) * 2) + x]) << 8 |
+							(pixels[((y * _surface->w) * 2) + (_surface->w) + x]);
 					}
+					*((uint16 *)_surface->getBasePtr(x, y)) = color;
 					x++;
 					break;
 
@@ -319,20 +300,15 @@ bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
 					// if we have the issue in D3 32bpp images, then the way to fix it should be the same as 16bpp images.
 					// check the code above, there is different behaviour between in D4 and D3. Currently we are only using D4.
 					if (_version < kFileVer400) {
-						convertPixelIntoSurface(_surface->getBasePtr(x, y),
-							(_bitsPerPixel / 8),
-							_surface->format.bytesPerPixel,
-							pixels[(((y * _surface->w * 4)) + (x * 4 + 1))],
-							pixels[(((y * _surface->w * 4)) + (x * 4 + 2))],
-							pixels[(((y * _surface->w * 4)) + (x * 4 + 3))]);
+						color = pixels[(((y * _surface->w * 4)) + (x * 4 + 1))] << 16 |
+							pixels[(((y * _surface->w * 4)) + (x * 4 + 2))] << 8 |
+							pixels[(((y * _surface->w * 4)) + (x * 4 + 3))];
 					} else {
-						convertPixelIntoSurface(_surface->getBasePtr(x, y),
-							(_bitsPerPixel / 8),
-							_surface->format.bytesPerPixel,
-							pixels[(((y * _surface->w * 4)) + (x + _surface->w))],
-							pixels[(((y * _surface->w * 4)) + (x + 2 * _surface->w))],
-							pixels[(((y * _surface->w * 4)) + (x + 3 * _surface->w))]);
+						color = pixels[(((y * _surface->w * 4)) + (x + _surface->w))] << 16 |
+							pixels[(((y * _surface->w * 4)) + (x + 2 * _surface->w))] << 8 |
+							pixels[(((y * _surface->w * 4)) + (x + 3 * _surface->w))];
 					}
+					*((uint32 *)_surface->getBasePtr(x, y)) = color;
 					x++;
 					break;
 
@@ -346,5 +322,35 @@ bool BITDDecoder::loadStream(Common::SeekableReadStream &stream) {
 
 	return true;
 }
+
+void copyStretchImg(const Graphics::Surface *srcSurface, Graphics::Surface *targetSurface, const Common::Rect &srcRect, const Common::Rect &targetRect, const byte *pal) {
+	if (!(srcSurface) || !(targetSurface))
+		return;
+	if ((srcSurface->h <= 0) || (srcSurface->w <= 0)) {
+		// Source area is nonexistant
+		return;
+	}
+
+	Graphics::Surface *temp1 = nullptr;
+	Graphics::Surface *temp2 = nullptr;
+	// Convert source surface to target colourspace (if required)
+	if (srcSurface->format.bytesPerPixel != g_director->_wm->_pixelformat.bytesPerPixel) {
+		temp1 = srcSurface->convertTo(g_director->_wm->_pixelformat, g_director->_wm->getPalette(), g_director->_wm->getPaletteSize(), g_director->_wm->getPalette(), g_director->_wm->getPaletteSize());
+	}
+	// Nearest-neighbour scale source surface to target dimensions (if required)
+	if (targetRect.width() != srcRect.width() || targetRect.height() != srcRect.height()) {
+		temp2 = (temp1 ? temp1 : srcSurface)->scale(targetRect.width(), targetRect.height(), false);
+	}
+	targetSurface->copyFrom(*(temp2 ? temp2 : (temp1 ? temp1 : srcSurface)));
+	if (temp1) {
+		temp1->free();
+		delete temp1;
+	}
+	if (temp2) {
+		temp2->free();
+		delete temp2;
+	}
+}
+
 
 } // End of namespace Director

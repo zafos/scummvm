@@ -62,7 +62,7 @@ struct ObjectLoader {
 };
 
 ObjectManager::ObjectManager() {
-	debugN(MM_INFO, "Creating ObjectManager...\n");
+	debug(1, "Creating ObjectManager...");
 
 	_objectManager = this;
 
@@ -77,7 +77,7 @@ ObjectManager::ObjectManager() {
 
 ObjectManager::~ObjectManager() {
 	reset();
-	debugN(MM_INFO, "Destroying ObjectManager...\n");
+	debug(1, "Destroying ObjectManager...");
 
 	_objectManager = nullptr;
 
@@ -86,7 +86,7 @@ ObjectManager::~ObjectManager() {
 }
 
 void ObjectManager::reset() {
-	debugN(MM_INFO, "Resetting ObjectManager...\n");
+	debug(1, "Resetting ObjectManager...");
 
 	unsigned int i;
 
@@ -110,7 +110,7 @@ void ObjectManager::reset() {
 	_objects.clear();
 	_objects.resize(65536);
 	_objIDs->clearAll(32766);
-	_objIDs->reserveID(666);     // 666 is reserved for the Guardian Bark hack
+	_objIDs->reserveID(kGuardianId);     // Reserved for the Guardian Bark hack
 	_actorIDs->clearAll();
 }
 
@@ -141,9 +141,8 @@ void ObjectManager::objectTypes() {
 		objecttypes[o->GetClassType()._className]++;
 	}
 
-	Common::HashMap<Common::String, unsigned int>::const_iterator iter;
-	for (iter = objecttypes.begin(); iter != objecttypes.end(); ++iter) {
-		g_debugger->debugPrintf("%s: %u\n", (*iter)._key.c_str(), (*iter)._value);
+	for (const auto &i : objecttypes) {
+		g_debugger->debugPrintf("%s: %u\n", i._key.c_str(), i._value);
 	}
 }
 
@@ -261,7 +260,7 @@ bool ObjectManager::load(Common::ReadStream *rs, uint32 version) {
 	// _objIDs (up to 511 is reserved by U8Game, 666 is reserved for Guardian
 	// barks).
 	// FIXME: Properly fix this objID leak and increment the savegame number.
-	//        This check can then be turned into an savegame corruption check
+	//        This check can then be turned into a savegame corruption check
 	//        for saves with the new savegame version.
 	// We also fail loading when we're out of _objIDs since this could
 	// have caused serious issues when critical _objects haven't been created.
@@ -276,7 +275,7 @@ bool ObjectManager::load(Common::ReadStream *rs, uint32 version) {
 			count++;
 		}
 	}
-	debug(MM_INFO, "Reclaimed %u _objIDs on load.", count);
+	debug(1, "Reclaimed %u _objIDs on load.", count);
 
 	// Integrity check items - their ids should match, and if they have
 	// parents, those should be valid.

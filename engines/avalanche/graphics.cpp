@@ -27,10 +27,10 @@
 #include "avalanche/avalanche.h"
 #include "avalanche/graphics.h"
 
-#include "common/math.h"
 #include "common/system.h"
 #include "engines/util.h"
-#include "graphics/palette.h"
+#include "graphics/paletteman.h"
+#include "math/utils.h"
 
 namespace Avalanche {
 
@@ -163,15 +163,15 @@ void GraphicManager::loadMouse(byte which) {
 	mask.free();
 	f.close();
 
-	CursorMan.replaceCursor(cursor.getPixels(), 16, 32, kMouseHotSpots[which]._horizontal, kMouseHotSpots[which]._vertical * 2, 255, false);
+	CursorMan.replaceCursor(cursor, kMouseHotSpots[which]._horizontal, kMouseHotSpots[which]._vertical * 2, 255, false);
 	cursor.free();
 }
 
-void GraphicManager::drawThinkPic(Common::String filename, int id) {
+void GraphicManager::drawThinkPic(const Common::Path &filename, int id) {
 	static const int16 picSize = 966;
 	Common::File file;
 	if (!file.open(filename))
-		error("drawThinkPic(): File not found: %s", filename.c_str());
+		error("drawThinkPic(): File not found: %s", filename.toString(Common::Path::kNativeSeparator).c_str());
 
 	file.seek(id * picSize + 65);
 	Graphics::Surface picture = loadPictureGraphic(file);
@@ -208,7 +208,7 @@ Common::Point GraphicManager::drawArc(Graphics::Surface &surface, int16 x, int16
 	if (yRadius == 0)
 		yRadius++;
 
-	// Check for an ellipse with negligable x and y radius.
+	// Check for an ellipse with negligible x and y radius.
 	if ((xRadius <= 1) && (yRadius <= 1)) {
 		*(byte *)_scrolls.getBasePtr(x, y) = color;
 		endPoint.x = x;
@@ -242,7 +242,7 @@ Common::Point GraphicManager::drawArc(Graphics::Surface &surface, int16 x, int16
 	uint16 deltaEnd = 91;
 
 	// Set the end point.
-	float tempTerm = Common::deg2rad<float>(endAngle);
+	float tempTerm = Math::deg2rad<float>(endAngle);
 	endPoint.x = (int16)floor(xRadius * cos(tempTerm) + 0.5) + x;
 	endPoint.y = (int16)floor(yRadius * sin(tempTerm + M_PI) + 0.5) + y;
 
@@ -253,7 +253,7 @@ Common::Point GraphicManager::drawArc(Graphics::Surface &surface, int16 x, int16
 		int16 xTemp = xNext;
 		int16 yTemp = yNext;
 		// This is used by both sin and cos.
-		tempTerm = Common::deg2rad<float>(j + delta);
+		tempTerm = Math::deg2rad<float>(j + delta);
 
 		xNext = (int16)floor(xRadius * cos(tempTerm) + 0.5);
 		yNext = (int16)floor(yRadius * sin(tempTerm + M_PI) + 0.5);
@@ -335,7 +335,7 @@ void GraphicManager::drawTriangle(Common::Point *p, Color color) {
 	_scrolls.drawLine(p[2].x, p[2].y, p[0].x, p[0].y, color);
 }
 
-void GraphicManager::drawText(Graphics::Surface &surface, const Common::String text, FontType font, byte fontHeight, int16 x, int16 y, Color color) {
+void GraphicManager::drawText(Graphics::Surface &surface, const Common::String &text, FontType font, byte fontHeight, int16 x, int16 y, Color color) {
 	for (uint i = 0; i < text.size(); i++) {
 		for (int j = 0; j < fontHeight; j++) {
 			byte pixel = font[(byte)text[i]][j];
@@ -348,14 +348,14 @@ void GraphicManager::drawText(Graphics::Surface &surface, const Common::String t
 	}
 }
 
-void GraphicManager::drawNormalText(const Common::String text, FontType font, byte fontHeight, int16 x, int16 y, Color color) {
+void GraphicManager::drawNormalText(const Common::String &text, FontType font, byte fontHeight, int16 x, int16 y, Color color) {
 	drawText(_surface, text, font, fontHeight, x, y, color);
 }
 
 /**
  * Draws text double the size of the normal.
  */
-void GraphicManager::drawBigText(Graphics::Surface &surface, const Common::String text, FontType font, byte fontHeight, int16 x, int16 y, Color color) {
+void GraphicManager::drawBigText(Graphics::Surface &surface, const Common::String &text, FontType font, byte fontHeight, int16 x, int16 y, Color color) {
 	for (uint i = 0; i < text.size(); i++) {
 		for (int j = 0; j < fontHeight; j++) {
 			byte pixel = font[(byte)text[i]][j];
@@ -371,7 +371,7 @@ void GraphicManager::drawBigText(Graphics::Surface &surface, const Common::Strin
 	}
 }
 
-void GraphicManager::drawScrollText(const Common::String text, FontType font, byte fontHeight, int16 x, int16 y, Color color) {
+void GraphicManager::drawScrollText(const Common::String &text, FontType font, byte fontHeight, int16 x, int16 y, Color color) {
 	drawText(_scrolls, text, font, fontHeight, x, y, color);
 }
 
@@ -492,10 +492,10 @@ void GraphicManager::blackOutScreen() {
 
 void GraphicManager::nimLoad() {
 	Common::File file;
-	Common::String filename = "nim.avd";
+	Common::Path filename("nim.avd");
 
 	if (!file.open(filename))
-		error("AVALANCHE: Scrolls: File not found: %s", filename.c_str());
+		error("AVALANCHE: Scrolls: File not found: %s", filename.toString(Common::Path::kNativeSeparator).c_str());
 
 	file.seek(41);
 
@@ -621,11 +621,11 @@ void GraphicManager::ghostDrawBackgroundItems(Common::File &file) {
 		int height = cb._height + 1;
 
 		Graphics::Surface picture;
-		picture.create(width, height, Graphics::PixelFormat::createFormatCLUT8());
 
 		// Load the picture according to it's type.
 		switch (cb._flavour) {
 		case kFlavourOne: // There is only one plane.
+			picture.create(width, height, Graphics::PixelFormat::createFormatCLUT8());
 			for (uint16 y = 0; y < height; y++) {
 				for (uint16 x = 0; x < width; x += 8) {
 					byte pixel = file.readByte();
@@ -640,6 +640,7 @@ void GraphicManager::ghostDrawBackgroundItems(Common::File &file) {
 			picture = loadPictureRaw(file, width, height);
 			break;
 		default:
+			picture.create(width, height, Graphics::PixelFormat::createFormatCLUT8());
 			break;
 		}
 
@@ -695,7 +696,7 @@ void GraphicManager::helpDrawHighlight(byte which, Color color) {
 	drawRectangle(Common::Rect(466, 38 + which * 27, 556, 63 + which * 27), color);
 }
 
-void GraphicManager::helpDrawBigText(const Common::String text, int16 x, int16 y, Color color) {
+void GraphicManager::helpDrawBigText(const Common::String &text, int16 x, int16 y, Color color) {
 	drawBigText(_surface, text, _vm->_font, 8, x, y, color);
 }
 
@@ -1034,7 +1035,7 @@ void GraphicManager::drawSprite(AnimationType *sprite, byte picnum, int16 x, int
 	for (int j = 0; j < sprite->_yLength; j++) {
 		for (int i = 0; i < sprite->_xLength; i++) {
 			if ((x + i < _surface.w) && (y + j < _surface.h)) {
-				if (((*sprite->_sil[picnum])[j][i / 8] >> ((7 - i % 8)) & 1) == 0)
+				if (((*sprite->_sil[picnum])[j][i / 8] >> (7 - (i % 8)) & 1) == 0)
 					*(byte *)_surface.getBasePtr(x + i, y + j) = 0;
 			}
 		}
@@ -1058,7 +1059,7 @@ void GraphicManager::drawSprite(AnimationType *sprite, byte picnum, int16 x, int
 	}
 }
 
-void GraphicManager::drawPicture(Graphics::Surface &target, const Graphics::Surface picture, uint16 destX, uint16 destY) {
+void GraphicManager::drawPicture(Graphics::Surface &target, const Graphics::Surface &picture, uint16 destX, uint16 destY) {
 	// Copy the picture to the given place on the screen.
 	uint16 maxX = picture.w;
 	uint16 maxY = picture.h;
@@ -1111,10 +1112,10 @@ void GraphicManager::drawErrorLight(bool state) {
  */
 void GraphicManager::drawSign(Common::String fn, int16 xl, int16 yl, int16 y) {
 	Common::File file;
-	Common::String filename = Common::String::format("%s.avd", fn.c_str());
+	Common::Path filename(Common::String::format("%s.avd", fn.c_str()));
 
 	if (!file.open(filename))
-		error("AVALANCHE: Scrolls: File not found: %s", filename.c_str());
+		error("AVALANCHE: Scrolls: File not found: %s", filename.toString(Common::Path::kNativeSeparator).c_str());
 
 	Graphics::Surface sign; // We make a Surface object for the picture itself.
 	sign = loadPictureSign(file, xl, yl);

@@ -1,14 +1,19 @@
 MODULE := graphics
 
 MODULE_OBJS := \
-	blit.o \
-	blit-scale.o \
+	big5.o \
+	blit/blit.o \
+	blit/blit-alpha.o \
+	blit/blit-generic.o \
+	blit/blit-scale.o \
+	color_quantizer.o \
 	cursorman.o \
 	font.o \
 	fontman.o \
 	fonts/amigafont.o \
 	fonts/bdf.o \
 	fonts/consolefont.o \
+	fonts/dosfont.o \
 	fonts/freetype.o \
 	fonts/macfont.o \
 	fonts/newfont_big.o \
@@ -16,6 +21,7 @@ MODULE_OBJS := \
 	fonts/ttf.o \
 	fonts/winfont.o \
 	framelimiter.o \
+	image-archive.o \
 	korfont.o \
 	larryScale.o \
 	maccursor.o \
@@ -24,7 +30,10 @@ MODULE_OBJS := \
 	macgui/macdialog.o \
 	macgui/macfontmanager.o \
 	macgui/macmenu.o \
+	macgui/macpopupmenu.o \
 	macgui/mactext.o \
+	macgui/mactext-canvas.o \
+	macgui/mactext-md.o \
 	macgui/mactextwindow.o \
 	macgui/macwidget.o \
 	macgui/macwindow.o \
@@ -35,12 +44,14 @@ MODULE_OBJS := \
 	opengl/context.o \
 	opengl/debug.o \
 	opengl/shader.o \
+	opengl/texture.o \
 	palette.o \
 	pixelformat.o \
 	pm5544.o \
 	primitives.o \
 	renderer.o \
 	scalerplugin.o \
+	scaler/downscaler.o \
 	scaler/thumbnail_intern.o \
 	screen.o \
 	scaler/normal.o \
@@ -49,12 +60,16 @@ MODULE_OBJS := \
 	svg.o \
 	transform_struct.o \
 	transform_tools.o \
-	transparent_surface.o \
 	thumbnail.o \
 	VectorRenderer.o \
 	VectorRendererSpec.o \
 	wincursor.o \
 	yuv_to_rgb.o
+
+ifdef USE_ARM_SCALER_ASM
+MODULE_OBJS += \
+	scaler/downscalerARM.o
+endif
 
 ifdef USE_TINYGL
 MODULE_OBJS += \
@@ -94,7 +109,6 @@ MODULE_OBJS += \
 	scaler/dotmatrix.o \
 	scaler/sai.o \
 	scaler/pm.o \
-	scaler/downscaler.o \
 	scaler/scale2x.o \
 	scaler/scale3x.o \
 	scaler/scalebit.o \
@@ -102,7 +116,6 @@ MODULE_OBJS += \
 
 ifdef USE_ARM_SCALER_ASM
 MODULE_OBJS += \
-	scaler/downscalerARM.o \
 	scaler/scale2xARM.o \
 	scaler/Normal2xARM.o
 endif
@@ -124,6 +137,24 @@ MODULE_OBJS += \
 	scaler/edge.o
 endif
 
+endif
+
+ifdef ATARI
+MODULE_OBJS += \
+	blit/blit-atari.o
+endif
+
+ifdef SCUMMVM_NEON
+MODULE_OBJS += \
+	blit/blit-neon.o
+endif
+ifdef SCUMMVM_SSE2
+MODULE_OBJS += \
+	blit/blit-sse2.o
+endif
+ifdef SCUMMVM_AVX2
+MODULE_OBJS += \
+	blit/blit-avx2.o
 endif
 
 # Include common rules

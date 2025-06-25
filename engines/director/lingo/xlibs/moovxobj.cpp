@@ -27,41 +27,43 @@
  *************************************/
 
 /*
-  moovXobj: Creative Multimedia, 1993 <<gzr>>
-  --moovXobj 10.22.93 <<gzr>>
-  moovXobj
-  I       mNew                            --Creates a new instance of the XObject.
-  X       mDispose                        --Disposes of XObject instance.
-  S       mName                           --Returns the XObject name (moovobj).
-  I       mMovieInit                      --Initialize QTW.
-  I       mMovieKill                      --Dispose of QTW.
-  I       mFondler                        --Movie idle task.
-  ISII    mPlayMovie name,left,top        --Play movie at designated location.
-  I       mPauseMovie                     --Pause active movie.
-  II      mSoundMovie                     --Turn movie sound on or off.
-  I       mStopMovie                      --Stops active movie.
-  I       mMovieDone                      --Returns true if movie done.
-
-  ScummVM Note: mMovieDone returns true when the movie is _not_ done.
+ * moovXobj: Creative Multimedia, 1993 <<gzr>>
+ * --moovXobj 10.22.93 <<gzr>>
+ * moovXobj
+ * I       mNew                            --Creates a new instance of the XObject.
+ * X       mDispose                        --Disposes of XObject instance.
+ * S       mName                           --Returns the XObject name (moovobj).
+ * I       mMovieInit                      --Initialize QTW.
+ * I       mMovieKill                      --Dispose of QTW.
+ * I       mFondler                        --Movie idle task.
+ * ISII    mPlayMovie name,left,top        --Play movie at designated location.
+ * I       mPauseMovie                     --Pause active movie.
+ * II      mSoundMovie                     --Turn movie sound on or off.
+ * I       mStopMovie                      --Stops active movie.
+ * I       mMovieDone                      --Returns true if movie done.
+ *
+ * ScummVM Note: mMovieDone returns true when the movie is _not_ done.
  */
 
+#include "graphics/paletteman.h"
 #include "video/qt_decoder.h"
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/moovxobj.h"
 
 
 namespace Director {
 
-const char *MoovXObj::xlibName = "moovxobj";
-const char *MoovXObj::fileNames[] = {
-	"moovxobj",
-	nullptr
+const char *const MoovXObj::xlibName = "moovxobj";
+const XlibFileDesc MoovXObj::fileNames[] = {
+	{ "moovxobj",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",					MoovXObj::m_new,			    0,	0,	300 },	// D3
 	{ "Dispose",				MoovXObj::m_dispose,		    0,	0,	300 },	// D3
 	{ "Name",				    MoovXObj::m_name,		        0,	0,	300 },	// D4
@@ -76,7 +78,7 @@ static MethodProto xlibMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void MoovXObj::open(int type) {
+void MoovXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		MoovXObject::initMethods(xlibMethods);
 		MoovXObject *xobj = new MoovXObject(kXObj);
@@ -84,7 +86,7 @@ void MoovXObj::open(int type) {
 	}
 }
 
-void MoovXObj::close(int type) {
+void MoovXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		MoovXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -118,15 +120,10 @@ void MoovXObj::m_dispose(int nargs) {
 	}
 }
 
-void MoovXObj::m_name(int nargs) {
-	// unused in C.H.A.O.S.
-	g_lingo->printSTUBWithArglist("MoovXObj::m_name", nargs);
-}
-
-void MoovXObj::m_movieInit(int nargs) {
-	// called in C.H.A.O.S. ScummVMs setup happens in playMovie
-	g_lingo->printSTUBWithArglist("MoovXObj::m_movieInit", nargs);
-}
+// unused in C.H.A.O.S.
+XOBJSTUB(MoovXObj::m_name, "MoovXObj")
+// called in C.H.A.O.S. ScummVMs setup happens in playMovie
+XOBJSTUB(MoovXObj::m_movieInit, 0)
 
 void MoovXObj::m_movieKill(int nargs) {
 	debug(5, "MoovXObj::m_movieKill");
@@ -165,28 +162,17 @@ void MoovXObj::m_playMovie(int nargs) {
 	if (result && g_director->_pixelformat.bytesPerPixel == 1) {
 		// Director supports playing back RGB and paletted video in 256 colour mode.
 		// In both cases they are dithered to match the Director palette.
-		byte palette[256 * 3];
-		g_system->getPaletteManager()->grabPalette(palette, 0, 256);
-		me->_video->setDitheringPalette(palette);
+		me->_video->setDitheringPalette(g_director->getPalette());
 	}
 	me->_video->start();
 }
 
-void MoovXObj::m_pauseMovie(int nargs) {
-	// unused in C.H.A.O.S.
-	g_lingo->printSTUBWithArglist("MoovXObj::m_pauseMovie", nargs);
-}
-
-void MoovXObj::m_soundMovie(int nargs) {
-	// unused in C.H.A.O.S.
-	g_lingo->printSTUBWithArglist("MoovXObj::m_soundMovie", nargs);
-	g_lingo->dropStack(nargs);
-}
-
-void MoovXObj::m_stopMovie(int nargs) {
-	// unused in C.H.A.O.S.
-	g_lingo->printSTUBWithArglist("MoovXObj::m_stopMovie", nargs);
-}
+// unused in C.H.A.O.S.
+XOBJSTUB(MoovXObj::m_pauseMovie, 0)
+// unused in C.H.A.O.S.
+XOBJSTUB(MoovXObj::m_soundMovie, 0)
+// unused in C.H.A.O.S.
+XOBJSTUB(MoovXObj::m_stopMovie, 0)
 
 void MoovXObj::m_movieDone(int nargs) {
 	MoovXObject *me = static_cast<MoovXObject *>(g_lingo->_state->me.u.obj);

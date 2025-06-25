@@ -62,16 +62,22 @@ public:
 	/** @name Graphics */
 	//@{
 
-	GraphicsManager *getGraphicsManager();
+	GraphicsManager *getGraphicsManager() { return _graphicsManager; }
 	const GraphicsMode *getSupportedGraphicsModes() const override;
 	int getDefaultGraphicsMode() const override;
 	bool setGraphicsMode(int mode, uint flags = kGfxModeNoFlags) override;
 	int getGraphicsMode() const override;
-	bool setShader(const Common::String &name) override final;
+#if defined(USE_IMGUI)
+	void setImGuiCallbacks(const ImGuiCallbacks &callbacks) override final;
+	void *getImGuiTexture(const Graphics::Surface &image, const byte *palette, int palCount) override final;
+	void freeImGuiTexture(void *texture) override final;
+#endif
+	bool setShader(const Common::Path &name) override final;
 	const GraphicsMode *getSupportedStretchModes() const override final;
 	int getDefaultStretchMode() const override final;
 	bool setStretchMode(int mode) override final;
 	int getStretchMode() const override final;
+	bool setRotationMode(Common::RotationMode rotation) override final;
 	uint getDefaultScaler() const override final;
 	uint getDefaultScaleFactor() const override final;
 	using BaseBackend::setScaler;
@@ -96,7 +102,9 @@ public:
 	Graphics::Surface *lockScreen() override final;
 	void unlockScreen() override final;
 	void fillScreen(uint32 col) override final;
+	void fillScreen(const Common::Rect &r, uint32 col) override final;
 	void updateScreen() override final;
+	void presentBuffer() override final;
 	void setShakePos(int shakeXOffset, int shakeYOffset) override final;
 	void setFocusRectangle(const Common::Rect& rect) override final;
 	void clearFocusRectangle() override final;

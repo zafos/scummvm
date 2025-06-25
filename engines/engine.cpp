@@ -56,6 +56,7 @@
 
 #include "graphics/cursorman.h"
 #include "graphics/fontman.h"
+#include "graphics/paletteman.h"
 #include "graphics/pixelformat.h"
 #include "image/bmp.h"
 
@@ -63,6 +64,7 @@
 
 // FIXME: HACK for error()
 Engine *g_engine = 0;
+bool Engine::_quitRequested;
 
 // Output formatter for debug() and error() which invokes
 // the errorString method of the active engine, if any.
@@ -112,7 +114,7 @@ void ChainedGamesManager::clear() {
 	_chainedGames.clear();
 }
 
-void ChainedGamesManager::push(const Common::String target, const int slot) {
+void ChainedGamesManager::push(const Common::String &target, const int slot) {
 	Game game;
 	game.target = target;
 	game.slot = slot;
@@ -143,6 +145,7 @@ Engine::Engine(OSystem *syst)
 		_metaEngine(nullptr),
 		_pauseLevel(0),
 		_pauseStartTime(0),
+		_pauseScreenChangeID(-1),
 		_saveSlotToLoad(-1),
 		_autoSaving(false),
 		_engineStartTime(_system->getMillis()),
@@ -152,6 +155,7 @@ Engine::Engine(OSystem *syst)
 		_lastAutosaveTime(_system->getMillis()) {
 
 	g_engine = this;
+	_quitRequested = false;
 	Common::setErrorOutputFormatter(defaultOutputFormatter);
 	Common::setErrorHandler(defaultErrorHandler);
 
@@ -178,10 +182,38 @@ Engine::Engine(OSystem *syst)
 	// Note: Using this dummy palette will actually disable cursor
 	// palettes till the user enables it again.
 	CursorMan.pushCursorPalette(NULL, 0, 0);
+
+	// If we go from engine A to engine B via launcher, the palette
+	// is not touched during this process, since our GUI is 16-bit
+	// or 32-bit.
+	//
+	// This may lead to residual palette entries held in the backend
+	// from a previous engine. Here we make sure we reset the palette.
+	byte dummyPalette[768];
+	memset(dummyPalette, 0, 768);
+	g_system->getPaletteManager()->setPalette(dummyPalette, 0, 256);
+
+	defaultSyncSoundSettings();
+
+	// Register original bug fixes as defaults...
+	ConfMan.registerDefault("enhancements", kEnhGameBreakingBugFixes | kEnhGrp1);
+	if (!ConfMan.hasKey("enhancements", _targetName)) {
+		if (ConfMan.hasKey("enable_enhancements", _targetName) && ConfMan.getBool("enable_enhancements", _targetName)) {
+			// Was the "enable_enhancements" key previously set to true?
+			// Convert it to a full activation of the enhancement flags then!
+			ConfMan.setInt("enhancements", kEnhGameBreakingBugFixes | kEnhGrp1 | kEnhGrp2 | kEnhGrp3 | kEnhGrp4);
+		}
+	}
+
+	_activeEnhancements = (int32)ConfMan.getInt("enhancements");
 }
 
 Engine::~Engine() {
 	_mixer->stopAll();
+
+	// Flush any pending remaining events
+	Common::Event evt;
+	while (g_system->getEventManager()->pollEvent(evt)) {}
 
 	delete _debugger;
 	delete _mainMenuDialog;
@@ -193,37 +225,58 @@ Engine::~Engine() {
 }
 
 void Engine::initializePath(const Common::FSNode &gamePath) {
-	SearchMan.addDirectory(gamePath.getPath(), gamePath, 0, 4);
+	SearchMan.addDirectory(gamePath, 0, 4);
 }
 
-void initCommonGFX() {
+bool Engine::enhancementEnabled(int32 cls) {
+	return _activeEnhancements & cls;
+}
+
+void initCommonGFX(bool is3D) {
 	const Common::ConfigManager::Domain *gameDomain = ConfMan.getActiveDomain();
 
 	// Any global or command line settings already have been applied at the time
 	// we get here, so we only do something if the game domain overrides those
 	// values
-	if (gameDomain) {
-		if (gameDomain->contains("aspect_ratio"))
-			g_system->setFeatureState(OSystem::kFeatureAspectRatioCorrection, ConfMan.getBool("aspect_ratio"));
+	if (!gameDomain)
+		return;
 
-		if (gameDomain->contains("fullscreen"))
-			g_system->setFeatureState(OSystem::kFeatureFullscreenMode, ConfMan.getBool("fullscreen"));
+	if (gameDomain->contains("aspect_ratio"))
+		g_system->setFeatureState(OSystem::kFeatureAspectRatioCorrection, ConfMan.getBool("aspect_ratio"));
 
-		if (gameDomain->contains("filtering"))
-			g_system->setFeatureState(OSystem::kFeatureFilteringMode, ConfMan.getBool("filtering"));
+	if (gameDomain->contains("fullscreen"))
+		g_system->setFeatureState(OSystem::kFeatureFullscreenMode, ConfMan.getBool("fullscreen"));
 
-		if (gameDomain->contains("vsync"))
-			g_system->setFeatureState(OSystem::kFeatureVSync, ConfMan.getBool("vsync"));
+	if (gameDomain->contains("vsync"))
+		g_system->setFeatureState(OSystem::kFeatureVSync, ConfMan.getBool("vsync"));
 
-		if (gameDomain->contains("stretch_mode"))
-			g_system->setStretchMode(ConfMan.get("stretch_mode").c_str());
+	if (gameDomain->contains("stretch_mode"))
+		g_system->setStretchMode(ConfMan.get("stretch_mode").c_str());
 
-		if (gameDomain->contains("scaler") || gameDomain->contains("scale_factor"))
-			g_system->setScaler(ConfMan.get("scaler").c_str(), ConfMan.getInt("scale_factor"));
+	if (gameDomain->contains("rotation_mode"))
+		g_system->setRotationMode(ConfMan.getInt("rotation_mode"));
 
-		if (gameDomain->contains("shader"))
-			g_system->setShader(ConfMan.get("shader"));
-	}
+	if (gameDomain->contains("shader"))
+		g_system->setShader(ConfMan.getPath("shader"));
+
+	// Stop here for hardware-accelerated 3D games
+	if (is3D)
+		return;
+
+	// Set up filtering, scaling for 2D games
+	if (gameDomain->contains("filtering"))
+		g_system->setFeatureState(OSystem::kFeatureFilteringMode, ConfMan.getBool("filtering"));
+
+	if (gameDomain->contains("scaler") || gameDomain->contains("scale_factor"))
+		g_system->setScaler(ConfMan.get("scaler").c_str(), ConfMan.getInt("scale_factor"));
+
+	// TODO: switching between OpenGL and SurfaceSDL is quite fragile
+	// and the SDL backend doesn't really need this so leave it out
+	// for now to avoid regressions
+#ifndef SDL_BACKEND
+	if (gameDomain->contains("gfx_mode"))
+		g_system->setGraphicsMode(ConfMan.get("gfx_mode").c_str());
+#endif
 }
 
 // Please leave the splash screen in working order for your releases, even if they're commercial.
@@ -272,7 +325,7 @@ void splashScreen() {
 	screen.free();
 
 	// Draw logo
-	Graphics::Surface *logo = bitmap.getSurface()->convertTo(g_system->getOverlayFormat(), bitmap.getPalette());
+	Graphics::Surface *logo = bitmap.getSurface()->convertTo(g_system->getOverlayFormat(), bitmap.getPalette().data(), bitmap.getPalette().size());
 	if (scaleFactor != 1.0f) {
 		Graphics::Surface *tmp = logo->scale(int16(logo->w * scaleFactor), int16(logo->h * scaleFactor), true);
 		logo->free();
@@ -310,30 +363,7 @@ void initGraphicsModes(const Graphics::ModeList &modes) {
 	g_system->initSizeHint(modes);
 }
 
-void initGraphics(int width, int height, const Graphics::PixelFormat *format) {
-
-	g_system->beginGFXTransaction();
-
-		initCommonGFX();
-#ifdef USE_RGB_COLOR
-		if (format)
-			g_system->initSize(width, height, format);
-		else {
-			Graphics::PixelFormat bestFormat = g_system->getSupportedFormats().front();
-			g_system->initSize(width, height, &bestFormat);
-		}
-#else
-		g_system->initSize(width, height);
-#endif
-
-	OSystem::TransactionError gfxError = g_system->endGFXTransaction();
-
-	if (!splash && !GUI::GuiManager::instance()._launched)
-		splashScreen();
-
-	if (gfxError == OSystem::kTransactionSuccess)
-		return;
-
+static void warnTransactionFailures(OSystem::TransactionError gfxError, int width, int height) {
 	// Error out on size switch failure
 	if (gfxError & OSystem::kTransactionSizeChangeFailed) {
 		Common::U32String message;
@@ -383,6 +413,62 @@ void initGraphics(int width, int height, const Graphics::PixelFormat *format) {
 		GUI::MessageDialog dialog(_("Could not apply filtering setting."));
 		dialog.runModal();
 	}
+
+	if (gfxError & OSystem::kTransactionShaderChangeFailed) {
+		GUI::MessageDialog dialog(_("Could not apply shader setting."));
+		dialog.runModal();
+	}
+}
+
+/**
+ * Inits any of the modes in "modes". "modes" is in the order of preference.
+ * Return value is index in modes of resulting mode.
+ */
+int initGraphicsAny(const Graphics::ModeWithFormatList &modes, int start) {
+	int candidate = -1;
+	OSystem::TransactionError gfxError = OSystem::kTransactionSizeChangeFailed;
+	int last_width = 0, last_height = 0;
+
+	for (candidate = start; candidate < (int)modes.size(); candidate++) {
+		g_system->beginGFXTransaction();
+		initCommonGFX(false);
+#ifdef USE_RGB_COLOR
+		if (modes[candidate].hasFormat)
+			g_system->initSize(modes[candidate].width, modes[candidate].height, &modes[candidate].format);
+		else {
+			Graphics::PixelFormat bestFormat = g_system->getSupportedFormats().front();
+			g_system->initSize(modes[candidate].width, modes[candidate].height, &bestFormat);
+		}
+#else
+		g_system->initSize(modes[candidate].width, modes[candidate].height);
+#endif
+		last_width = modes[candidate].width;
+		last_height = modes[candidate].height;
+
+		gfxError = g_system->endGFXTransaction();
+
+		if (!splash && !GUI::GuiManager::instance()._launched)
+			splashScreen();
+
+		if (gfxError == OSystem::kTransactionSuccess)
+			return candidate;
+
+		// If error is related to resolution, continue
+		if (gfxError & (OSystem::kTransactionSizeChangeFailed | OSystem::kTransactionFormatNotSupported))
+			continue;
+
+		break;
+	}
+
+	warnTransactionFailures(gfxError, last_width, last_height);
+
+	return candidate;
+}
+
+void initGraphics(int width, int height, const Graphics::PixelFormat *format) {
+	Graphics::ModeWithFormatList modes;
+	modes.push_back(Graphics::ModeWithFormat(width, height, format));
+	initGraphicsAny(modes);
 }
 
 /**
@@ -395,10 +481,10 @@ void initGraphics(int width, int height, const Graphics::PixelFormat *format) {
  */
 inline Graphics::PixelFormat findCompatibleFormat(const Common::List<Graphics::PixelFormat> &backend, const Common::List<Graphics::PixelFormat> &frontend) {
 #ifdef USE_RGB_COLOR
-	for (Common::List<Graphics::PixelFormat>::const_iterator i = backend.begin(); i != backend.end(); ++i) {
-		for (Common::List<Graphics::PixelFormat>::const_iterator j = frontend.begin(); j != frontend.end(); ++j) {
-			if (*i == *j)
-				return *i;
+	for (const auto &back : backend) {
+		for (auto &front : frontend) {
+			if (back == front)
+				return back;
 		}
 	}
 #endif
@@ -419,12 +505,17 @@ void initGraphics(int width, int height) {
 void initGraphics3d(int width, int height) {
 	g_system->beginGFXTransaction();
 		g_system->setGraphicsMode(0, OSystem::kGfxModeRender3d);
+		initCommonGFX(true);
 		g_system->initSize(width, height);
-		g_system->setFeatureState(OSystem::kFeatureFullscreenMode, ConfMan.getBool("fullscreen")); // TODO: Replace this with initCommonGFX()
-		g_system->setFeatureState(OSystem::kFeatureAspectRatioCorrection, ConfMan.getBool("aspect_ratio")); // TODO: Replace this with initCommonGFX()
-		g_system->setFeatureState(OSystem::kFeatureVSync, ConfMan.getBool("vsync")); // TODO: Replace this with initCommonGFX()
-		g_system->setStretchMode(ConfMan.get("stretch_mode").c_str()); // TODO: Replace this with initCommonGFX()
-	g_system->endGFXTransaction();
+	OSystem::TransactionError gfxError = g_system->endGFXTransaction();
+
+	if (!splash && !GUI::GuiManager::instance()._launched) {
+		Common::Event event;
+		(void)g_system->getEventManager()->pollEvent(event);
+		splashScreen();
+	}
+
+	warnTransactionFailures(gfxError, width, height);
 }
 
 void GUIErrorMessageWithURL(const Common::U32String &msg, const char *url) {
@@ -442,7 +533,7 @@ void GUIErrorMessage(const Common::String &msg, const char *url) {
 void GUIErrorMessage(const Common::U32String &msg, const char *url) {
 	g_system->setWindowCaption(_("Error"));
 	g_system->beginGFXTransaction();
-		initCommonGFX();
+		initCommonGFX(false);
 		g_system->initSize(320, 200);
 	if (g_system->endGFXTransaction() == OSystem::kTransactionSuccess) {
 		if (url) {
@@ -469,7 +560,7 @@ void GUIErrorMessageFormat(const char *fmt, ...) {
 }
 
 void GUIErrorMessageFormatU32StringPtr(const Common::U32String *fmt, ...) {
-	Common::U32String msg("");
+	Common::U32String msg;
 
 	va_list va;
 	va_start(va, fmt);
@@ -553,26 +644,29 @@ bool Engine::warnBeforeOverwritingAutosave() {
 	if (!desc.isValid() || desc.isAutosave())
 		return true;
 	Common::U32StringArray altButtons;
-	altButtons.push_back(_("Overwrite"));
-	altButtons.push_back(_("Cancel autosave"));
+	altButtons.push_back(_("Delete"));
+	altButtons.push_back(_("Skip autosave"));
 	const Common::U32String message = Common::U32String::format(
-				_("WARNING: The autosave slot has a saved game named %S. "
-				  "You can either move the existing save to a new slot, "
-				  "Overwrite the existing save, "
-				  "or cancel autosave (will not prompt again until restart)"), desc.getDescription().c_str());
+				_("WARNING: The autosave slot contains a saved game named %S, and an autosave is pending.\n"
+				  "Please move this saved game to a new slot, or delete it if it's no longer needed.\n"
+				  "Alternatively, you can skip the autosave (will prompt again in 5 minutes)."), desc.getDescription().c_str());
 	GUI::MessageDialog warn(message, _("Move"), altButtons);
 	switch (runDialog(warn)) {
 	case GUI::kMessageOK:
-		if (!getMetaEngine()->copySaveFileToFreeSlot(_targetName.c_str(), getAutosaveSlot())) {
-			GUI::MessageDialog error(_("ERROR: Could not copy the savegame to a new slot"));
-			error.runModal();
-			return false;
+		if (getMetaEngine()->copySaveFileToFreeSlot(_targetName.c_str(), getAutosaveSlot())) {
+				g_system->getSavefileManager()->removeSavefile(
+							getMetaEngine()->getSavegameFile(getAutosaveSlot(), _targetName.c_str()));
+		} else {
+				GUI::MessageDialog error(_("ERROR: Could not copy the savegame to a new slot"));
+				error.runModal();
+				return false;
 		}
 		return true;
-	case GUI::kMessageAlt: // Overwrite
+	case GUI::kMessageAlt: // Delete
+		g_system->getSavefileManager()->removeSavefile(
+					getMetaEngine()->getSavegameFile(getAutosaveSlot(), _targetName.c_str()));
 		return true;
-	case GUI::kMessageAlt + 1: // Cancel autosave
-		_autosaveInterval = 0;
+	case GUI::kMessageAlt + 1: // Skip autosave
 		return false;
 	default: // Hitting Escape returns -1. On this case, don't save but do prompt again later.
 		return false;
@@ -602,9 +696,9 @@ void Engine::saveAutosaveIfEnabled() {
 		saveFlag = false;
 	}
 
-	if (saveFlag) {
-		_lastAutosaveTime = _system->getMillis();
-	} else {
+	_lastAutosaveTime = _system->getMillis();
+
+	if (!saveFlag) {
 		// Set the next autosave interval to be in 5 minutes, rather than whatever
 		// full autosave interval the user has selected
 		_lastAutosaveTime += ((5 * 60 - _autosaveInterval) * 1000);
@@ -623,6 +717,7 @@ PauseToken Engine::pauseEngine() {
 
 	if (_pauseLevel == 1) {
 		_pauseStartTime = _system->getMillis();
+		_pauseScreenChangeID = g_system->getScreenChangeID();
 		pauseEngineIntern(true);
 	}
 
@@ -635,6 +730,13 @@ void Engine::resumeEngine() {
 	_pauseLevel--;
 
 	if (_pauseLevel == 0) {
+		if (_pauseScreenChangeID != g_system->getScreenChangeID()) {
+			// Inject a screen change event in the event loop for the engine
+			Common::Event ev;
+			ev.type = Common::EVENT_SCREEN_CHANGED;
+			g_system->getEventManager()->pushEvent(ev);
+		}
+		_pauseScreenChangeID = -1;
 		pauseEngineIntern(false);
 		_engineStartTime += _system->getMillis() - _pauseStartTime;
 		_pauseStartTime = 0;
@@ -758,6 +860,10 @@ void Engine::setGameToLoadSlot(int slot) {
 }
 
 void Engine::syncSoundSettings() {
+	defaultSyncSoundSettings();
+}
+
+void Engine::defaultSyncSoundSettings() {
 	// Sync the engine with the config manager
 	int soundVolumeMusic = ConfMan.getInt("music_volume");
 	int soundVolumeSFX = ConfMan.getInt("sfx_volume");
@@ -827,7 +933,7 @@ Common::Error Engine::loadGameStream(Common::SeekableReadStream *stream) {
 	return Common::kReadingFailed;
 }
 
-bool Engine::canLoadGameStateCurrently() {
+bool Engine::canLoadGameStateCurrently(Common::U32String *msg) {
 	// Do not allow loading by default
 	return false;
 }
@@ -840,7 +946,7 @@ Common::Error Engine::saveGameState(int slot, const Common::String &desc, bool i
 
 	Common::Error result = saveGameStream(saveFile, isAutosave);
 	if (result.getCode() == Common::kNoError) {
-		getMetaEngine()->appendExtendedSave(saveFile, getTotalPlayTime() / 1000, desc, isAutosave);
+		getMetaEngine()->appendExtendedSave(saveFile, getTotalPlayTime(), desc, isAutosave);
 
 		saveFile->finalize();
 	}
@@ -854,7 +960,7 @@ Common::Error Engine::saveGameStream(Common::WriteStream *stream, bool isAutosav
 	return Common::kWritingFailed;
 }
 
-bool Engine::canSaveGameStateCurrently() {
+bool Engine::canSaveGameStateCurrently(Common::U32String *msg) {
 	// Do not allow saving by default
 	return false;
 }
@@ -925,11 +1031,13 @@ void Engine::quitGame() {
 
 	event.type = Common::EVENT_QUIT;
 	g_system->getEventManager()->pushEvent(event);
+	_quitRequested = true;
 }
 
 bool Engine::shouldQuit() {
 	Common::EventManager *eventMan = g_system->getEventManager();
-	return (eventMan->shouldQuit() || eventMan->shouldReturnToLauncher());
+	return eventMan->shouldQuit() || eventMan->shouldReturnToLauncher()
+		|| _quitRequested;
 }
 
 GUI::Debugger *Engine::getOrCreateDebugger() {
@@ -940,23 +1048,6 @@ GUI::Debugger *Engine::getOrCreateDebugger() {
 
 	return _debugger;
 }
-
-/*
-EnginePlugin *Engine::getMetaEnginePlugin() const {
-	return EngineMan.findPlugin(ConfMan.get("engineid"));
-}
-
-*/
-
-MetaEngineDetection &Engine::getMetaEngineDetection() {
-	const Plugin *plugin = EngineMan.findPlugin(ConfMan.get("engineid"));
-	assert(plugin);
-	return plugin->get<MetaEngineDetection>();
-}
-
-PauseToken::PauseToken() : _engine(nullptr) {}
-
-PauseToken::PauseToken(Engine *engine) : _engine(engine) {}
 
 void PauseToken::operator=(const PauseToken &t2) {
 	if (_engine) {

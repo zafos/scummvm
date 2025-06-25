@@ -124,6 +124,8 @@ AGS
      -
    * - Thierry Crozat
      -
+   * - Walter Agazzi
+     - Maintenance, Game archival
    * - Chris Jones
      - Creator
    * - Alan Van Drake
@@ -233,6 +235,32 @@ Avalanche
    * - Arnaud Boutonné
      -
 
+awe
+^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Gregory Montoir
+     -
+   * - Paul Gilbert
+     -
+
+Bagel
+^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Arnaud Boutonné
+     -
+   * - Daniel Albano
+     -
+   * - Eugene Sandulenko
+     -
+   * - Paul Gilbert
+     -
+
 BBVS
 ^^^^
 
@@ -290,6 +318,17 @@ CGE2
    * - Paul Gilbert
      -
 
+Chamber
+^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Retro-Junk;
+     -
+   * - Eugene Sandulenko
+     -
+
 Chewy
 ^^^^^
 
@@ -331,6 +370,15 @@ Composer
    * - Alyssa Milburn
      -
 
+CRAB
+^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Kartik Agarwala
+     -
+
 CruisE
 ^^^^^^
 
@@ -364,6 +412,28 @@ Cryomni3D
    :widths: 35 65
 
    * - Philippe Valembois
+     -
+
+Darkseed
+^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Eric Fry
+     -
+
+DGDS
+^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Matthew Duggan
+     -
+   * - Filippos Karapetis
+     -
+   * - Vasco Alexandre da Silva Costa
      -
 
 Director
@@ -458,6 +528,15 @@ DreamWeb
    * - Willem Jan Palenstijn
      -
 
+Efh
+^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Arnaud Boutonné
+     -
+
 Freescape
 ^^^^^^^^^
 
@@ -516,6 +595,19 @@ Gob
    * - Sven Hesse
      -
    * - Eugene Sandulenko
+     -
+
+Got
+^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Paul Gilbert
+     -
+   * - Arnaud Boutonné
+     -
+   * - Coen Rampen
      -
 
 Griffon
@@ -653,6 +745,15 @@ Illusions
    * - Eric Fry
      -
 
+Immortal
+^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Michael Hayman
+     -
+
 Kingdom
 ^^^^^^^
 
@@ -704,6 +805,8 @@ Lastexpress
 .. list-table::
    :widths: 35 65
 
+   * - Andrea Boscarino
+     - Engine rewrite
    * - Matthew Hoops
      - (retired)
    * - Jordi Vilalta Prat
@@ -727,6 +830,17 @@ Lure
    :widths: 35 65
 
    * - Paul Gilbert
+     -
+
+M4
+^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Paul Gilbert
+     -
+   * - Arnaud Boutonné
      -
 
 MacVenture
@@ -762,6 +876,15 @@ MADS
    * - Filippos Karapetis
      -
 
+Media Station
+^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Nathanael Gentry
+     -
+
 MM (Xeen)
 ^^^^^^^^^
 
@@ -772,6 +895,8 @@ MM (Xeen)
      -
    * - Benoit Pierre
      -
+   * - TheDrakeRaider
+     - (M&M1 Gfx Mod)
    * - David Goldsmith
      - (Xeen analysis)
    * - Matt Taylor
@@ -940,6 +1065,17 @@ Private
    * - Gustavo Grieco
      -
 
+QDEngine
+^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Eugene Sandulenko
+     -
+   * - Kunal Tiwari
+     -
+
 Queen
 ^^^^^
 
@@ -1045,6 +1181,8 @@ SCUMM HE
 .. list-table::
    :widths: 35 65
 
+   * - Andrea Boscarino
+     - Digital audio, WIZ graphics system
    * - Jonathan Gray
      - (retired)
    * - Travis Howell
@@ -1136,6 +1274,8 @@ Sword1
 
    * - Fabio Battaglia
      - PSX version support
+   * - Andrea Boscarino
+     - Palette fading, menus, audio
    * - Thierry Crozat
      - Mac version support
    * - Robert Göffringmann
@@ -1329,6 +1469,15 @@ TwinE
    * - Martin Gerhardy
      -
 
+Thimbleweed Park
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Valéry Sablonnière
+     -
+
 Ultima
 ^^^^^^
 
@@ -1378,6 +1527,15 @@ Ultima
    * - Willem Jan Palenstijn
      - (Pentagram)
 
+V-Cruise
+^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Eric Lasota
+     -
+
 Voyeur
 ^^^^^^
 
@@ -1398,6 +1556,15 @@ WAGE
    * - Eugene Sandulenko
      -
 
+Watchmaker
+^^^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Einar Johan Troan Somaen;
+     -
+
 Wintermute
 ^^^^^^^^^^
 
@@ -1406,9 +1573,13 @@ Wintermute
 
    * - Gunnar Birke
      - Wintermute 3D
+   * - Paweł Kołodziejski
+     - Wintermute 3D
    * - Einar Johan T. Sømåen
      -
    * - Tobia Tesan
+     -
+   * - lolbot-iichan
      -
 
 Z-Vision
@@ -1426,6 +1597,15 @@ Z-Vision
 
 Backend Teams
 *************
+
+Atari
+^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Miro Kropáček
+     -
 
 Android
 ^^^^^^^
@@ -1474,10 +1654,12 @@ iPhone / iPad
    :widths: 35 65
 
    * - Oystein Eftevaag
-     -
+     - (retired)
    * - Vincent Bénony
      -
    * - Thierry Crozat
+     -
+   * - Lars Sundström
      -
 
 LinuxMoto
@@ -1666,6 +1848,15 @@ Raspberry Pi
    :widths: 35 65
 
    * - Manuel Alfayate
+     -
+
+Libretro
+^^^^^^^^
+
+.. list-table::
+   :widths: 35 65
+
+   * - Giovanni Cascione
      -
 
 Other subsystems
@@ -1880,9 +2071,11 @@ macOS
    * - Max Horn
      - (retired)
    * - Oystein Eftevaag
-     -
+     - (retired)
    * - Thierry Crozat
      -
+   * - dwa
+     - Tiger/Leopard PPC
 
 Mandriva
 ^^^^^^^^
@@ -2046,6 +2239,8 @@ Finnish
 .. list-table::
    :widths: 35 65
 
+   * - Linus Virtanen
+     -
    * - Toni Saarela
      -
    * - Timo Mikkolainen
@@ -2217,6 +2412,8 @@ CGE
 .. list-table::
    :widths: 35 65
 
+   * - Arnaud Boutonné
+     - Soltys English translation
    * - Dan Serban
      - Soltys English translation
    * - Víctor González
@@ -2254,6 +2451,8 @@ Mortevielle
 .. list-table::
    :widths: 35 65
 
+   * - Arnaud Boutonné
+     - First English translation, improve German translation
    * - Hugo Labrande
      - Improve English translation
    * - Thierry Crozat
@@ -2310,6 +2509,12 @@ Icons pack
 .. list-table::
    :widths: 35 65
 
+   * - Stefan Philippsen
+     - Primary contributor and coordination
+   * - Benjamin Funke
+     -
+   * - Daniel Albano
+     -
    * - David Calvert
      -
    * - Eugene Sandulenko
@@ -2324,11 +2529,11 @@ Icons pack
      -
    * - Olly Dean
      -
-   * - Stefan Philippsen
+   * - Walter Agazzi
+     -
+   * - beresk137
      -
    * - Canuma
-     -
-   * - SupSuper
      -
    * - Thunderforge
      -
@@ -2477,7 +2682,7 @@ FreeSCI Contributors
    * - Jordi Vilalta
      - Numerous code and website clean-up patches
    * - Petr Vyhnak
-     - The DCL-INFLATE algorithm, many Win32 improvements
+     - The DCL-IMPLODE algorithm, many Win32 improvements
    * - Bas Zoetekouw
      - Man pages, debian package management, CVS maintenance
 
@@ -2707,4 +2912,6 @@ Bret Mogilefsky, for managing to create a SPUTM-style 3D LUA engine, and avoidin
 Benjamin Haisch, for emimeshviewer, which our EMI code borrows heavily from.
 
 Fabrizio Lagorio from Trecision S.p.A., for finding and providing the source code of many of their games.
+
+Ron Davis for releasing the sources and generously giving away the three chapters of God of Thunder.
 

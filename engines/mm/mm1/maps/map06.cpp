@@ -93,7 +93,7 @@ void Map06::special() {
 void Map06::special00() {
 	visitedExit();
 	send(SoundMessage(
-		STRING["maps.map06.passage_outside"],
+		STRING["maps.passage_outside2"],
 		[]() {
 			g_maps->_mapPos = Common::Point(15, 11);
 			g_maps->changeMap(0xa11, 2);
@@ -159,10 +159,10 @@ void Map06::special06() {
 }
 
 void Map06::special07() {
-	send(SoundMessage(17, 1, STRING["maps.poof"]));
 	g_maps->_mapPos.x = 10;
 	g_maps->_mapPos.y = 11;
 	updateGame();
+	send(SoundMessage(17, 1, STRING["maps.poof"]));
 }
 
 void Map06::special09() {
@@ -208,7 +208,7 @@ void Map06::slide() {
 
 	SoundMessage msg(16, 1, STRING["maps.map06.slide"]);
 	msg._delaySeconds = 2;
-	msg._timeoutCallback = []() {
+	msg._callback = []() {
 		g_maps->_currentMap->updateGame();
 	};
 

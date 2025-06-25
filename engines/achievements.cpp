@@ -20,6 +20,7 @@
  */
 
 
+#include "common/config-manager.h"
 #include "common/debug.h"
 #include "common/stream.h"
 #include "common/system.h"
@@ -97,7 +98,17 @@ String AchievementsManager::getCurrentLang() const {
 
 
 bool AchievementsManager::loadAchievementsData(const char *platform, const char *appId) {
-	Archive *cfgZip = Common::makeZipArchive("achievements.dat");
+	Archive *cfgZip = nullptr;
+
+	if (!cfgZip && ConfMan.hasKey("extrapath")) {
+		Common::FSDirectory extrapath(ConfMan.getPath("extrapath"));
+		cfgZip = Common::makeZipArchive(extrapath.createReadStreamForMember("achievements.dat"));
+	}
+
+	if (!cfgZip) {
+		cfgZip = Common::makeZipArchive("achievements.dat");
+	}
+
 	if (!cfgZip) {
 		warning("achievements.dat is not found. Achievements messages are unavailable");
 		return false;
@@ -120,7 +131,7 @@ bool AchievementsManager::loadAchievementsData(const char *platform, const char 
 	}
 
 	String cfgFileName = String::format("%s-%s.ini", platform, appId);
-	SeekableReadStream *stream = cfgZip->createReadStreamForMember(cfgFileName);
+	SeekableReadStream *stream = cfgZip->createReadStreamForMember(Common::Path(cfgFileName));
 	if (!stream) {
 		delete cfgZip;
 		warning("%s is not found in achievements.dat. Achievements messages are unavailable", cfgFileName.c_str());
@@ -137,20 +148,20 @@ bool AchievementsManager::loadAchievementsData(const char *platform, const char 
 
 	_achievements.clear();
 	INIFile::SectionList sections = cfgFile.getSections();
-	for (Common::INIFile::SectionList::const_iterator section = sections.begin(); section != sections.end(); ++section) {
-		if (!(section->name.hasPrefix("achievements:"))) {
+	for (const auto &section : sections) {
+		if (!(section.name.hasPrefix("achievements:"))) {
 			continue;
 		}
 
-		String lang = section->name.substr(13); //strlen("achievements:")
+		String lang = section.name.substr(13); //strlen("achievements:")
 
 		for (int i = 0; i < 256; i++) {
 			String prefix = String::format("item_%d", i);
 
-			String id      = section->getKey(prefix + "_id")      ? section->getKey(prefix + "_id")->value      : "";
-			String title   = section->getKey(prefix + "_title")   ? section->getKey(prefix + "_title")->value   : "";
-			String comment = section->getKey(prefix + "_comment") ? section->getKey(prefix + "_comment")->value : "";
-			String hidden  = section->getKey(prefix + "_hidden")  ? section->getKey(prefix + "_hidden")->value  : "";
+			String id      = section.getKey(prefix + "_id")      ? section.getKey(prefix + "_id")->value      : "";
+			String title   = section.getKey(prefix + "_title")   ? section.getKey(prefix + "_title")->value   : "";
+			String comment = section.getKey(prefix + "_comment") ? section.getKey(prefix + "_comment")->value : "";
+			String hidden  = section.getKey(prefix + "_hidden")  ? section.getKey(prefix + "_hidden")->value  : "";
 
 			if (id.empty()) {
 				break;
@@ -225,7 +236,7 @@ bool AchievementsManager::setAchievement(const String &id) {
 	_iniFile->setKey(id, "achievements", "true");
 	_iniFile->saveToSaveFile(_iniFileName);
 
-	if (!displayedMessage.empty() && g_system) {
+	if (!ConfMan.getBool("disable_achievement_unlocked_osd") && !displayedMessage.empty() && g_system) {
 		U32String msg;
 		msg = Common::U32String::format("%S\n%S",
 			_("Achievement unlocked!").c_str(),

@@ -125,6 +125,17 @@ static const ADGameDescription gameDescriptions[] = {
 		GUIO1(GUIO_NOMIDI)
 	},
 
+	// Norwegian
+	{
+		"peril",
+		0,
+		AD_ENTRY1s("PPTP.ORB", "5f4db7a9c8dab9c871f571c75120de72", 612644330),
+		Common::NB_NOR,
+		Common::kPlatformWindows,
+		ADGF_DROPPLATFORM,
+		GUIO1(GUIO_NOMIDI)
+	},
+
 	// Polish
 	{
 		"peril",
@@ -170,6 +181,17 @@ static const ADGameDescription gameDescriptions[] = {
 		GUIO1(GUIO_NOMIDI)
 	},
 
+	// Spanish (older) - reported in TRAC #14490
+	{
+		"peril",
+		0,
+		AD_ENTRY1s("PPTP.ORB", "e9bc2eca6526c1b2f0047dc3f1c815d2", 634841166),
+		Common::ES_ESP,
+		Common::kPlatformWindows,
+		ADGF_DROPPLATFORM,
+		GUIO1(GUIO_NOMIDI)
+	},
+
 	// Spanish
 	{
 		"peril",
@@ -186,11 +208,23 @@ static const ADGameDescription gameDescriptions[] = {
 		"peril",
 		0,
 		AD_ENTRY1s("PPTP.ORB", "eadbc52f4c43b85edb7cc493b4149ba0", 633843917),
-		Common::SE_SWE,
+		Common::SV_SWE,
 		Common::kPlatformWindows,
 		ADGF_DROPPLATFORM,
 		GUIO1(GUIO_NOMIDI)
 	},
+
+	// German demo
+	{
+		"peril",
+		"Demo",
+		AD_ENTRY1s("PPTP.ORB", "6ab19c3fba0fd3894758236831001456", 89851874),
+		Common::DE_DEU,
+		Common::kPlatformWindows,
+		ADGF_DROPPLATFORM | ADGF_DEMO,
+		GUIO1(GUIO_NOMIDI)
+	},
+
 
 	// Dutch, Version 1.0
 	{
@@ -318,7 +352,7 @@ static const ADGameDescription gameDescriptions[] = {
 		"pokus",
 		0,
 		AD_ENTRY1s("HPP.orb", "7b7909414d93f847ff0c023a06ae1f7e", 500103742),
-		Common::SE_SWE,
+		Common::SV_SWE,
 		Common::kPlatformWindows,
 		ADGF_DROPPLATFORM,
 		GUIO1(GUIO_NOMIDI)

@@ -105,7 +105,7 @@ void dgBody::SetMassMatrix(dgFloat32 mass, dgFloat32 Ix, dgFloat32 Iy,
 		masterList.RotateToEnd(m_masterNode);
 	}
 
-#ifdef _DEBUG
+#if 0 && defined(_DEBUG) // NEWTON_ASSERT is disabled so this whole calculation is useless
 	dgBodyMasterList &me = *m_world;
 	dgBodyMasterList::dgListNode *refNode;
 	for (refNode = me.GetFirst(); refNode; refNode = refNode->GetNext()) {
@@ -340,8 +340,8 @@ dgFloat32 dgBody::RayCast(const dgLineBox &line, OnRayCastAction filter,
 
 				contactOut.m_normal = m_collisionWorldMatrix.RotateVectorSimd(
 				                          contactOut.m_normal);
-				minT = filter(this, contactOut.m_normal, dgInt32(contactOut.m_userId),
-				              userData, t);
+				minT = filter(reinterpret_cast<const NewtonBody *>(this), &contactOut.m_normal.m_x, dgInt32(contactOut.m_userId),
+							  userData, t);
 			}
 		}
 	} else {
@@ -355,8 +355,8 @@ dgFloat32 dgBody::RayCast(const dgLineBox &line, OnRayCastAction filter,
 				NEWTON_ASSERT(t <= 1.0f);
 				contactOut.m_normal = m_collisionWorldMatrix.RotateVector(
 				                          contactOut.m_normal);
-				minT = filter(this, contactOut.m_normal, dgInt32(contactOut.m_userId),
-				              userData, t);
+				minT = filter(reinterpret_cast<const NewtonBody *>(this), &contactOut.m_normal.m_x, dgInt32(contactOut.m_userId),
+							  userData, t);
 			}
 		}
 	}
@@ -538,7 +538,7 @@ void dgBody::CalcInvInertiaMatrixSimd() {
 void dgBody::UpdateMatrix(dgFloat32 timestep, dgInt32 threadIndex) {
 	if (m_matrixUpdate) {
 		//      m_world->dgGetUserLock_();
-		m_matrixUpdate(*this, m_matrix, threadIndex);
+		m_matrixUpdate(reinterpret_cast<const NewtonBody *>(this), &m_matrix.m_front.m_x, threadIndex);
 		//      m_world->dgReleasedUserLock_();
 	}
 	//  UpdateCollisionMatrix (timestep, threadIndex);
@@ -572,7 +572,7 @@ void dgBody::IntegrateVelocity(dgFloat32 timestep) {
 
 	m_matrix.m_posit = m_globalCentreOfMass - m_matrix.RotateVector(m_localCentreOfMass);
 
-#ifdef _DEBUG
+#if 0 && defined(_DEBUG) // NEWTON_ASSERT is disabled so this whole calculation is useless
 	for (int i = 0; i < 4; i++) {
 		for (int j = 0; j < 4; j++) {
 			NEWTON_ASSERT(dgCheckFloat(m_matrix[i][j]));

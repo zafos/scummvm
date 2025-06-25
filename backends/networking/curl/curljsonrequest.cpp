@@ -30,34 +30,13 @@
 
 namespace Networking {
 
-CurlJsonRequest::CurlJsonRequest(JsonCallback cb, ErrorCallback ecb, Common::String url) :
+CurlJsonRequest::CurlJsonRequest(JsonCallback cb, ErrorCallback ecb, const Common::String &url) :
 	CurlRequest(nullptr, ecb, url), _jsonCallback(cb), _contentsStream(DisposeAfterUse::YES),
 	_buffer(new byte[CURL_JSON_REQUEST_BUFFER_SIZE]) {}
 
 CurlJsonRequest::~CurlJsonRequest() {
 	delete _jsonCallback;
 	delete[] _buffer;
-}
-
-char *CurlJsonRequest::getPreparedContents() {
-	//write one more byte in the end
-	byte zero[1] = {0};
-	_contentsStream.write(zero, 1);
-
-	//replace all "bad" bytes with '.' character
-	byte *result = _contentsStream.getData();
-	uint32 size = _contentsStream.size();
-	for (uint32 i = 0; i < size; ++i) {
-		if (result[i] == '\n')
-				result[i] = ' '; //yeah, kinda stupid
-		else if (result[i] < 0x20 || result[i] > 0x7f)
-			result[i] = '.';
-	}
-
-	//make it zero-terminated string
-	result[size - 1] = '\0';
-
-	return (char *)result;
 }
 
 void CurlJsonRequest::handle() {
@@ -70,7 +49,7 @@ void CurlJsonRequest::handle() {
 				warning("CurlJsonRequest: unable to write all the bytes into MemoryWriteStreamDynamic");
 
 		if (_stream->eos()) {
-			char *contents = getPreparedContents();
+			char *contents = Common::JSON::zeroTerminateContents(_contentsStream);
 			Common::JSONValue *json = Common::JSON::parse(contents);
 			if (json) {
 				finishJson(json); //it's JSON even if's not 200 OK? That's fine!..
@@ -92,7 +71,7 @@ void CurlJsonRequest::restart() {
 	//with no stream available next handle() will create another one
 }
 
-void CurlJsonRequest::finishJson(Common::JSONValue *json) {
+void CurlJsonRequest::finishJson(const Common::JSONValue *json) {
 	Request::finishSuccess();
 	if (_jsonCallback)
 		(*_jsonCallback)(JsonResponse(this, json)); //potential memory leak, free it in your callbacks!
@@ -100,7 +79,7 @@ void CurlJsonRequest::finishJson(Common::JSONValue *json) {
 		delete json;
 }
 
-bool CurlJsonRequest::jsonIsObject(Common::JSONValue *item, const char *warningPrefix) {
+bool CurlJsonRequest::jsonIsObject(const Common::JSONValue *item, const char *warningPrefix) {
 	if (item == nullptr) {
 		warning("%s: passed item is NULL", warningPrefix);
 		return false;
@@ -113,7 +92,7 @@ bool CurlJsonRequest::jsonIsObject(Common::JSONValue *item, const char *warningP
 	return false;
 }
 
-bool CurlJsonRequest::jsonContainsObject(Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
+bool CurlJsonRequest::jsonContainsObject(const Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
 	if (!item.contains(key)) {
 		if (isOptional) {
 			return true;
@@ -130,7 +109,7 @@ bool CurlJsonRequest::jsonContainsObject(Common::JSONObject &item, const char *k
 	return false;
 }
 
-bool CurlJsonRequest::jsonContainsString(Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
+bool CurlJsonRequest::jsonContainsString(const Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
 	if (!item.contains(key)) {
 		if (isOptional) {
 			return true;
@@ -147,7 +126,7 @@ bool CurlJsonRequest::jsonContainsString(Common::JSONObject &item, const char *k
 	return false;
 }
 
-bool CurlJsonRequest::jsonContainsIntegerNumber(Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
+bool CurlJsonRequest::jsonContainsIntegerNumber(const Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
 	if (!item.contains(key)) {
 		if (isOptional) {
 			return true;
@@ -164,7 +143,7 @@ bool CurlJsonRequest::jsonContainsIntegerNumber(Common::JSONObject &item, const 
 	return false;
 }
 
-bool CurlJsonRequest::jsonContainsArray(Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
+bool CurlJsonRequest::jsonContainsArray(const Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
 	if (!item.contains(key)) {
 		if (isOptional) {
 			return true;
@@ -181,7 +160,7 @@ bool CurlJsonRequest::jsonContainsArray(Common::JSONObject &item, const char *ke
 	return false;
 }
 
-bool CurlJsonRequest::jsonContainsStringOrIntegerNumber(Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
+bool CurlJsonRequest::jsonContainsStringOrIntegerNumber(const Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
 	if (!item.contains(key)) {
 		if (isOptional) {
 			return true;
@@ -198,7 +177,7 @@ bool CurlJsonRequest::jsonContainsStringOrIntegerNumber(Common::JSONObject &item
 	return false;
 }
 
-bool CurlJsonRequest::jsonContainsAttribute(Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
+bool CurlJsonRequest::jsonContainsAttribute(const Common::JSONObject &item, const char *key, const char *warningPrefix, bool isOptional) {
 	if (!item.contains(key)) {
 		if (isOptional) {
 			return true;

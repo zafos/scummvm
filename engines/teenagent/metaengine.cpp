@@ -22,19 +22,41 @@
 #include "common/system.h"
 #include "common/savefile.h"
 #include "common/algorithm.h"
+#include "common/translation.h"
 
 #include "base/plugins.h"
 
 #include "engines/advancedDetector.h"
 #include "teenagent/resources.h"
 #include "teenagent/teenagent.h"
+#include "teenagent/detection.h"
 #include "graphics/thumbnail.h"
 
 enum {
 	MAX_SAVES = 20
 };
 
-class TeenAgentMetaEngine : public AdvancedMetaEngine {
+#ifdef USE_TTS
+
+static const ADExtraGuiOptionsMap optionsList[] = {
+	{
+		GAMEOPTION_TTS,
+		{
+			_s("Enable Text to Speech"),
+			_s("Use TTS to read text in the game (if TTS is available)"),
+			"tts_enabled",
+			false,
+			0,
+			0
+		}
+	},
+
+	AD_EXTRA_GUI_OPTIONS_TERMINATOR
+};
+
+#endif
+
+class TeenAgentMetaEngine : public AdvancedMetaEngine<ADGameDescription> {
 public:
 	const char *getName() const override {
 		return "teenagent";
@@ -52,6 +74,12 @@ public:
 			return false;
 		}
 	}
+
+#ifdef USE_TTS
+	const ADExtraGuiOptionsMap *getAdvancedExtraGuiOptions() const override {
+		return optionsList;
+	}
+#endif
 
 	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override {
 		*engine = new TeenAgent::TeenAgentEngine(syst, desc);
@@ -97,8 +125,8 @@ public:
 		return MAX_SAVES - 1;
 	}
 
-	void removeSaveState(const char *target, int slot) const override {
-		g_system->getSavefileManager()->removeSavefile(getSavegameFile(slot, target));
+	bool removeSaveState(const char *target, int slot) const override {
+		return g_system->getSavefileManager()->removeSavefile(getSavegameFile(slot, target));
 	}
 
 	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override {

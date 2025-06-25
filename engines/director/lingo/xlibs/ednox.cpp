@@ -28,47 +28,49 @@
  * Return to Jurassic (Win)
  *
  *************************************/
+
 /*
--- Ednox External Factory. 22Nov93 PTM
-ednox
-I      mNew                --Creates a new instance of the XObject
-X      mDispose            --Disposes of XObject instance
-S      mName               --Returns the XObject name (Widget)
-I      mStatus             --Returns an integer status code
-SI     mError, code        --Returns an error string
-S      mLastError          --Returns last error string
-SSI    playSoundX       --Play an external sound, return status string
-S      clearSoundX      --Stop an external sound, return status string
-S      checkSoundX      --check an external sound,see if it is still playing
-SS      drawBkgndX,hBkgnd   --draw background image, from resource bitmap
-SS     SaveX, hStrIn    --Save string into a file(file name will be prompted
-SSSI    GetPathX,hSection,hStrIn,mMacMode, Retrieve the installed path name from the win.ini and return
-S      RestoreX     --Restore string from a file(file name will be prompted
-SS      SetDriveX,hStrIn    --Set the current path name
-SSS    IsCDX,hDrive,hStrIn --Check for the correct CD
-S      EnableTaskSwitch    --enable task switch
-S      DisableTaskSwitch   --Disable task switch
-SSS    getDocumentName,hdir,hext --Get strings of file in specific directory
-SSS    getDocumentFile,hDir,hFile --Get string from a file
-SSSS   saveDocumentFile,hDir,hFile,hStrIn --save string into a file
-SSS    deleteDocumentFile,hDir,hFile  -- delete a file from the directory
+ * -- Ednox External Factory. 22Nov93 PTM
+ * ednox
+ * I      mNew                --Creates a new instance of the XObject
+ * X      mDispose            --Disposes of XObject instance
+ * S      mName               --Returns the XObject name (Widget)
+ * I      mStatus             --Returns an integer status code
+ * SI     mError, code        --Returns an error string
+ * S      mLastError          --Returns last error string
+ * SSI    playSoundX       --Play an external sound, return status string
+ * S      clearSoundX      --Stop an external sound, return status string
+ * S      checkSoundX      --check an external sound,see if it is still playing
+ * SS      drawBkgndX,hBkgnd   --draw background image, from resource bitmap
+ * SS     SaveX, hStrIn    --Save string into a file(file name will be prompted
+ * SSSI    GetPathX,hSection,hStrIn,mMacMode, Retrieve the installed path name from the win.ini and return
+ * S      RestoreX     --Restore string from a file(file name will be prompted
+ * SS      SetDriveX,hStrIn    --Set the current path name
+ * SSS    IsCDX,hDrive,hStrIn --Check for the correct CD
+ * S      EnableTaskSwitch    --enable task switch
+ * S      DisableTaskSwitch   --Disable task switch
+ * SSS    getDocumentName,hdir,hext --Get strings of file in specific directory
+ * SSS    getDocumentFile,hDir,hFile --Get string from a file
+ * SSSS   saveDocumentFile,hDir,hFile,hStrIn --save string into a file
+ * SSS    deleteDocumentFile,hDir,hFile  -- delete a file from the directory
 */
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/ednox.h"
 
 
 namespace Director {
 
-const char *Ednox::xlibName = "Ednox";
-const char *Ednox::fileNames[] = {
-	"Ednox",
-	0
+const char *const Ednox::xlibName = "Ednox";
+const XlibFileDesc Ednox::fileNames[] = {
+	{ "Ednox",	nullptr },
+	{ nullptr,	nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "mNew",				Ednox::m_new,					0,	0,	300 },	// d3
 	{ "mDispose",			Ednox::m_dispose,				0,	0,	300 },	// d3
 	{ "mName",				Ednox::m_name,					0,	0,	300 },	// d3
@@ -93,7 +95,7 @@ static MethodProto xlibMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void Ednox::open(int type) {
+void Ednox::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		EdnoxObject::initMethods(xlibMethods);
 		EdnoxObject *xobj = new EdnoxObject(kXObj);
@@ -101,7 +103,7 @@ void Ednox::open(int type) {
 	}
 }
 
-void Ednox::close(int type) {
+void Ednox::close(ObjectType type) {
 	if (type == kXObj) {
 		EdnoxObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -117,9 +119,7 @@ void Ednox::m_new(int nargs) {
 	g_lingo->push(g_lingo->_state->me);
 }
 
-void Ednox::m_dispose(int nargs) {
-	g_lingo->printSTUBWithArglist("Ednox::m_dispose", nargs);
-}
+XOBJSTUBNR(Ednox::m_dispose)
 
 void Ednox::m_getdocumentfile(int nargs) {
 	// Common::U32String hFile = g_lingo->pop().asString();
@@ -166,13 +166,8 @@ void Ednox::m_setdrivex(int nargs) {
 	g_lingo->push(Datum(0));
 }
 
-void Ednox::m_checksoundx(int nargs) {
-	g_lingo->printSTUBWithArglist("Ednox::m_checksoundx", nargs);
-}
-
-void Ednox::m_clearsoundx(int nargs) {
-	g_lingo->printSTUBWithArglist("Ednox::m_clearsoundx", nargs);
-}
+XOBJSTUB(Ednox::m_checksoundx, "")
+XOBJSTUB(Ednox::m_clearsoundx, "")
 
 void Ednox::m_deletedocumentfile(int nargs) {
 	// Common::U32String hFile = g_lingo->pop().asString();
@@ -181,17 +176,12 @@ void Ednox::m_deletedocumentfile(int nargs) {
 	g_lingo->dropStack(nargs);
 }
 
-void Ednox::m_disabletaskswitch(int nargs) {
-	g_lingo->printSTUBWithArglist("Ednox::m_disabletaskswitch", nargs);
-}
+XOBJSTUB(Ednox::m_enabletaskswitch, "")
+XOBJSTUB(Ednox::m_disabletaskswitch, "")
 
 void Ednox::m_drawbkgndx(int nargs) {
 	// Common::U32String hBkgnd = g_lingo->pop().asString();
 	g_lingo->printSTUBWithArglist("Ednox::m_drawbkgndx", nargs);
-}
-
-void Ednox::m_enabletaskswitch(int nargs) {
-	g_lingo->printSTUBWithArglist("Ednox::m_enabletaskswitch", nargs);
 }
 
 void Ednox::m_getdocumentname(int nargs) {
@@ -207,25 +197,15 @@ void Ednox::m_error(int nargs) {
 	g_lingo->dropStack(nargs);
 }
 
-void Ednox::m_lasterror(int nargs) {
-	g_lingo->printSTUBWithArglist("Ednox::m_lasterror", nargs);
-}
+XOBJSTUB(Ednox::m_lasterror, "")
 
 void Ednox::m_name(int nargs) {
 	g_lingo->push(Datum("ednox"));
 }
 
-void Ednox::m_status(int nargs) {
-	g_lingo->printSTUBWithArglist("Ednox::m_status", nargs);
-}
-
-void Ednox::m_playsoundx(int nargs) {
-	g_lingo->printSTUBWithArglist("Ednox::m_playsoundx", nargs);
-}
-
-void Ednox::m_restorex(int nargs) {
-	g_lingo->printSTUBWithArglist("Ednox::m_restorex", nargs);
-}
+XOBJSTUB(Ednox::m_status, 0)
+XOBJSTUB(Ednox::m_playsoundx, "")
+XOBJSTUB(Ednox::m_restorex, "")
 
 void Ednox::m_savex(int nargs) {
 	// Common::U32String hStrIn = g_lingo->pop().asString();

@@ -23,7 +23,7 @@
 #include "ultima/ultima8/gumps/book_gump.h"
 #include "ultima/ultima8/gumps/widgets/text_widget.h"
 #include "ultima/ultima8/games/game_data.h"
-#include "ultima/ultima8/graphics/gump_shape_archive.h"
+#include "ultima/ultima8/gfx/gump_shape_archive.h"
 #include "ultima/ultima8/usecode/uc_machine.h"
 #include "ultima/ultima8/gumps/gump_notify_process.h"
 #include "ultima/ultima8/world/item.h"
@@ -66,11 +66,11 @@ void BookGump::InitGump(Gump *newparent, bool take_focus) {
 	}
 
 	// Create the TextWidgets (NOTE: they _must_ have exactly the same _dims)
-	TextWidget *widget = new TextWidget(9, 5, _text, true, 9, 123, 129); //!! constants
+	TextWidget *widget = new TextWidget(9, 5, _text, true, 9, 123, 129, Font::TEXT_LEFT, true); //!! constants
 	widget->InitGump(this);
 	_textWidgetL = widget->getObjId();
 
-	widget = new TextWidget(150, 5, _text, true, 9, 123, 129); //!! constants
+	widget = new TextWidget(150, 5, _text, true, 9, 123, 129, Font::TEXT_LEFT, true); //!! constants
 	widget->InitGump(this);
 	_textWidgetR = widget->getObjId();
 	widget->setupNextText();

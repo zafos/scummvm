@@ -55,19 +55,19 @@
 
 namespace Director {
 
-const char *AiffXObj::xlibName = "aiff";
-const char *AiffXObj::fileNames[] = {
-	"AIFF",
-	nullptr
+const char *const AiffXObj::xlibName = "aiff";
+const XlibFileDesc AiffXObj::fileNames[] = {
+	{ "AIFF",	nullptr },
+	{ nullptr,	nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",   		AiffXObj::m_new,					0,	0,	400 },	// D4
 	{ "Duration",   AiffXObj::m_duration,				1,	1,	400 },	// D4
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void AiffXObj::open(int type) {
+void AiffXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		AiffXObject::initMethods(xlibMethods);
 		AiffXObject *xobj = new AiffXObject(kXObj);
@@ -75,7 +75,7 @@ void AiffXObj::open(int type) {
 	}
 }
 
-void AiffXObj::close(int type) {
+void AiffXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		AiffXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -83,7 +83,7 @@ void AiffXObj::close(int type) {
 }
 
 
-AiffXObject::AiffXObject(ObjectType ObjectType) :Object<AiffXObject>("AiffXObj") {
+AiffXObject::AiffXObject(ObjectType ObjectType) :Object<AiffXObject>("Aiff") {
 	_objType = ObjectType;
 }
 
@@ -93,22 +93,27 @@ void AiffXObj::m_new(int nargs) {
 }
 
 void AiffXObj::m_duration(int nargs) {
-	g_lingo->printSTUBWithArglist("AiffXObj::m_duration", nargs);
-	auto filePath = g_lingo->pop().asString();
+	Common::String filePath = g_lingo->pop().asString();
 
-	// Mac-ify any mac-paths to make them at least consistent:
-	Common::replace(filePath, "\\", ":");
-
-	auto aiffStream = Common::MacResManager::openFileOrDataFork(Common::Path(pathMakeRelative(filePath), g_director->_dirSeparator));
+	Common::SeekableReadStream *aiffStream = Common::MacResManager::openFileOrDataFork(findPath(filePath));
 	if (!aiffStream) {
-		error("Failed to open %s", filePath.c_str());
+		warning("AiffXObj::m_duration: Failed to open %s", filePath.c_str());
+		g_lingo->push(0);
+		return;
 	}
 
-	auto aiffHeader = Audio::AIFFHeader::readAIFFHeader(aiffStream, DisposeAfterUse::YES);
+	Audio::AIFFHeader *aiffHeader = Audio::AIFFHeader::readAIFFHeader(aiffStream, DisposeAfterUse::NO);
+	if (!aiffHeader) {
+		warning("AiffXObj::m_duration: No AIFF header found for %s", filePath.c_str());
+		g_lingo->push(0);
+		delete aiffStream;
+		return;
+	}
 
 	int duration = (aiffHeader->getFrameCount() / (float)aiffHeader->getFrameRate()) * 60;
 
 	delete aiffHeader;
+	delete aiffStream;
 	g_lingo->push(Datum(duration));
 }
 

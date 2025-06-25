@@ -148,6 +148,32 @@ bool GraphicEngine::endFrame() {
 
 	g_system->updateScreen();
 
+	// Debug-Lines zeichnen
+	if (!_debugLines.empty()) {
+#if 0
+		glEnable(GL_LINE_SMOOTH);
+		glBegin(GL_LINES);
+
+		Common::Array<DebugLine>::const_iterator iter = m_DebugLines.begin();
+		for (; iter != m_DebugLines.end(); ++iter) {
+			const uint &Color = (*iter).Color;
+			const BS_Vertex &Start = (*iter).Start;
+			const BS_Vertex &End = (*iter).End;
+
+			glColor4ub((Color >> 16) & 0xff, (Color >> 8) & 0xff, Color & 0xff, Color >> 24);
+			glVertex2d(Start.X, Start.Y);
+			glVertex2d(End.X, End.Y);
+		}
+
+		glEnd();
+		glDisable(GL_LINE_SMOOTH);
+#endif
+
+		warning("STUB: Drawing debug lines");
+
+		_debugLines.clear();
+	}
+
 	return true;
 }
 
@@ -341,6 +367,15 @@ bool GraphicEngine::canLoadResource(const Common::String &filename) {
 		filename.hasPrefix("/saves");
 }
 
+
+// -----------------------------------------------------------------------------
+// DEBUGGING
+// -----------------------------------------------------------------------------
+
+void GraphicEngine::drawDebugLine(const Vertex &start, const Vertex &end, uint color) {
+	_debugLines.push_back(DebugLine(start, end, color));
+}
+
 void  GraphicEngine::updateLastFrameDuration() {
 	// Record current time
 	const uint currentTime = Kernel::getInstance()->getMilliTicks();
@@ -368,7 +403,7 @@ bool GraphicEngine::saveThumbnailScreenshot(const Common::String &filename) {
 	// until needed when creating savegame files
 	delete _thumbnail;
 
-	_thumbnail = Screenshot::createThumbnail(&_backSurface);
+	_thumbnail = Screenshot::createThumbnail(_backSurface.surfacePtr());
 
 	return true;
 }

@@ -25,10 +25,10 @@
  * This file is part of HPL1 Engine.
  */
 
-#include "hpl1/engine/libraries/angelscript/add-ons/scripthelper.h"
 #include "hpl1/engine/impl/SqScript.h"
 #include "common/file.h"
 #include "hpl1/debug.h"
+#include "hpl1/engine/libraries/angelscript/add-ons/scripthelper.h"
 #include "hpl1/engine/libraries/angelscript/angelscript.h"
 #include "hpl1/engine/math/Math.h"
 #include "hpl1/engine/system/String.h"
@@ -126,7 +126,7 @@ bool cSqScript::Run(int alHandle) {
 
 char *cSqScript::LoadCharBuffer(const tString &asFileName, int &alLength) {
 	Common::File file;
-	file.open(asFileName);
+	file.open(Common::Path(asFileName));
 	if (!file.isOpen()) {
 		debugCN(Hpl1::kDebugLevelError, Hpl1::kDebugFilePath,
 				"script file at %s could not be opened", asFileName.c_str());

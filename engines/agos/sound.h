@@ -59,7 +59,7 @@ private:
 	bool _hasVoiceFile;
 	uint16 _ambientPlaying;
 
-	// Personal Nightmare specfic
+	// Personal Nightmare specific
 	byte *_soundQueuePtr;
 	uint16 _soundQueueNum;
 	uint32 _soundQueueSize;
@@ -79,15 +79,15 @@ protected:
 	void loadSfxFile(const GameSpecificSettings *gss);
 
 public:
-	void readSfxFile(const Common::String &filename);
+	void readSfxFile(const Common::Path &filename);
 	void loadSfxTable(const char *gameFilename, uint32 base);
-	void readVoiceFile(const Common::String &filename);
+	void readVoiceFile(const Common::Path &filename);
 
 	void playVoice(uint sound);
 	void playEffects(uint sound);
 	void playAmbient(uint sound);
 
-	// Personal Nightmare specfic
+	// Personal Nightmare specific
 	void handleSoundQueue();
 	void queueSound(byte *ptr, uint16 sound, uint32 size, uint16 freq);
 

@@ -6,6 +6,7 @@ MODULE_OBJS := \
 	events.o \
 	fs.o \
 	graphics.o \
+	image.o \
 	metaengine.o \
 	midi.o \
 	misc.o \
@@ -31,6 +32,11 @@ endif
 ifdef USE_TTS
 MODULE_OBJS += \
 	speech.o
+endif
+
+ifdef USE_IMGUI
+MODULE_OBJS += \
+	imgui.o
 endif
 
 MODULE_DIRS += \

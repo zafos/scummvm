@@ -42,55 +42,56 @@ MSVCProvider::MSVCProvider(StringList &global_warnings, std::map<std::string, St
 	amd64_disabled_features.push_back("nasm");
 	_arch_disabled_features[ARCH_AMD64] = amd64_disabled_features;
 	// NASM not supported for WoA target
-	// No OpenGL on Windows on ARM
-	// https://github.com/microsoft/vcpkg/issues/11248 [fribidi] Fribidi doesn't cross-compile on x86-64 to target arm/arm64
 	StringList arm64_disabled_features;
 	arm64_disabled_features.push_back("nasm");
-	arm64_disabled_features.push_back("opengl");
-	arm64_disabled_features.push_back("fribidi");
 	_arch_disabled_features[ARCH_ARM64] = arm64_disabled_features;
 }
 
 std::string MSVCProvider::getLibraryFromFeature(const char *feature, const BuildSetup &setup, bool isRelease) const {
 	static const MSVCLibrary s_libraries[] = {
 		// Libraries
-		{       "sdl", "SDL.lib",                   "SDLd.lib",      "winmm.lib imm32.lib version.lib setupapi.lib",    nullptr },
-		{      "sdl2", "SDL2.lib",                  "SDL2d.lib",     "winmm.lib imm32.lib version.lib setupapi.lib",    nullptr },
-		{      "zlib", "zlib.lib",                  "zlibd.lib",     nullptr,                                           nullptr },
-		{       "mad", "mad.lib",                   nullptr,         nullptr,                                           "libmad.lib" },
-		{   "fribidi", "fribidi.lib",               nullptr,         nullptr,                                           nullptr },
-		{       "ogg", "ogg.lib",                   nullptr,         nullptr,                                           "libogg_static.lib" },
-		{    "vorbis", "vorbis.lib vorbisfile.lib", nullptr,         nullptr,                                           "libvorbisfile_static.lib libvorbis_static.lib" },
-		{      "flac", "FLAC.lib",                  nullptr,         nullptr,                                           "libFLAC_static.lib win_utf8_io_static.lib" },
-		{       "png", "libpng16.lib",              "libpng16d.lib", nullptr,                                           nullptr },
-		{       "gif", "gif.lib",                   nullptr,         nullptr,                                           nullptr },
-		{      "faad", "faad.lib",                  nullptr,         nullptr,                                           "libfaad.lib" },
-		{     "mpeg2", "mpeg2.lib",                 nullptr,         nullptr,                                           "libmpeg2.lib" },
-		{ "theoradec", "theora.lib",                nullptr,         nullptr,                                           "libtheora_static.lib" },
-		{ "freetype2", "freetype.lib",              "freetyped.lib", nullptr,                                           nullptr },
-		{      "jpeg", "jpeg.lib",                  nullptr,         nullptr,                                           "jpeg-static.lib" },
-		{"fluidsynth", "fluidsynth.lib",            nullptr,         nullptr,                                           "libfluidsynth.lib" },
-		{ "fluidlite", "fluidlite.lib",             nullptr,         nullptr,                                           nullptr },
-		{   "libcurl", "libcurl.lib",               "libcurl-d.lib", "ws2_32.lib wldap32.lib crypt32.lib normaliz.lib", nullptr },
-		{    "sdlnet", "SDL_net.lib",               nullptr,         "iphlpapi.lib",                                    nullptr },
-		{   "sdl2net", "SDL2_net.lib",              nullptr,         "iphlpapi.lib",                                    "SDL_net.lib" },
-		{   "discord", "discord-rpc.lib",           nullptr,         nullptr,                                           nullptr },
-		{ "retrowave", "retrowave.lib",             nullptr,         nullptr,                                           nullptr },
+		{       "sdl", "SDL.lib",                   "SDLd.lib",        kSDLVersion1,   "winmm.lib imm32.lib version.lib setupapi.lib"    },
+		{       "sdl", "SDL2.lib",                  "SDL2d.lib",       kSDLVersion2,   "winmm.lib imm32.lib version.lib setupapi.lib"    },
+		{       "sdl", "SDL3.lib",                  "SDL3d.lib",       kSDLVersion3,   "winmm.lib imm32.lib version.lib setupapi.lib"    },
+		{      "zlib", "zlib.lib",                  "zlibd.lib",       kSDLVersionAny, nullptr                                           },
+		{       "mad", "mad.lib",                   nullptr,           kSDLVersionAny, nullptr                                           },
+		{   "fribidi", "fribidi.lib",               nullptr,           kSDLVersionAny, nullptr                                           },
+		{       "ogg", "ogg.lib",                   nullptr,           kSDLVersionAny, nullptr                                           },
+		{    "vorbis", "vorbis.lib vorbisfile.lib", nullptr,           kSDLVersionAny, nullptr                                           },
+		{    "tremor", "vorbisidec.lib",            nullptr,           kSDLVersionAny, nullptr                                           },
+		{      "flac", "FLAC.lib",                  nullptr,           kSDLVersionAny, nullptr                                           },
+		{       "png", "libpng16.lib",              "libpng16d.lib",   kSDLVersionAny, nullptr                                           },
+		{       "gif", "gif.lib",                   nullptr,           kSDLVersionAny, nullptr                                           },
+		{      "faad", "faad.lib",                  nullptr,           kSDLVersionAny, nullptr                                           },
+		{    "mikmod", "mikmod.lib",                nullptr,           kSDLVersionAny, nullptr                                           },
+		{   "openmpt", "openmpt.lib",               nullptr,           kSDLVersionAny, nullptr                                           },
+		{     "mpeg2", "mpeg2.lib",                 nullptr,           kSDLVersionAny, nullptr                                           },
+		{ "theoradec", "theora.lib",                nullptr,           kSDLVersionAny, nullptr                                           },
+		{       "vpx", "vpx.lib",                   nullptr,           kSDLVersionAny, nullptr                                           },
+		{ "freetype2", "freetype.lib",              "freetyped.lib",   kSDLVersionAny, nullptr                                           },
+		{      "jpeg", "jpeg.lib",                  nullptr,           kSDLVersionAny, nullptr                                           },
+		{"fluidsynth", "fluidsynth.lib",            nullptr,           kSDLVersionAny, nullptr                                           },
+		{ "fluidlite", "fluidlite.lib",             nullptr,           kSDLVersionAny, nullptr                                           },
+		{   "libcurl", "libcurl.lib",               "libcurl-d.lib",   kSDLVersionAny, "ws2_32.lib wldap32.lib crypt32.lib normaliz.lib" },
+		{    "sdlnet", "SDL_net.lib",               nullptr,           kSDLVersion1,   "iphlpapi.lib"                                    },
+		{    "sdlnet", "SDL2_net.lib",              "SDL2_netd.lib",   kSDLVersion2,   "iphlpapi.lib"                                    },
+		{    "sdlnet", "SDL3_net.lib",              "SDL3_netd.lib",   kSDLVersion3,   "iphlpapi.lib"                                    },
+		{   "discord", "discord-rpc.lib",           nullptr,           kSDLVersionAny, nullptr                                           },
+		{ "retrowave", "RetroWave.lib",             nullptr,           kSDLVersionAny, nullptr                                           },
+		{       "a52", "a52.lib",                   nullptr,           kSDLVersionAny, nullptr                                           },
+		{       "mpc", "libmpcdec.lib",             "libmpcdec_d.lib", kSDLVersionAny, nullptr                                           },
 		// Feature flags with library dependencies
-		{   "updates", "winsparkle.lib",            nullptr,         nullptr,                                           nullptr },
-		{       "tts", nullptr,                     nullptr,         "sapi.lib",                                        nullptr },
-		{    "opengl", nullptr,                     nullptr,         "opengl32.lib",                                    nullptr }
+		{   "updates", "WinSparkle.lib",            nullptr,           kSDLVersionAny, nullptr                                           },
+		{       "tts", nullptr,                     nullptr,           kSDLVersionAny, "sapi.lib"                                        },
+		{    "opengl", nullptr,                     nullptr,           kSDLVersionAny, nullptr                                           },
+		{      "enet", nullptr,                     nullptr,           kSDLVersionAny, "winmm.lib ws2_32.lib"                            }
 	};
-
-	// HACK for switching SDL_net to SDL2_net
-	const char *sdl2net = "sdl2net";
-	if (std::strcmp(feature, "sdlnet") == 0 && setup.useSDL2) {
-		feature = sdl2net;
-	}
 
 	const MSVCLibrary *library = nullptr;
 	for (unsigned int i = 0; i < sizeof(s_libraries) / sizeof(s_libraries[0]); i++) {
-		if (std::strcmp(feature, s_libraries[i].feature) == 0) {
+		if (std::strcmp(feature, s_libraries[i].feature) == 0 &&
+			((s_libraries[i].sdl == kSDLVersionAny) ||
+			(s_libraries[i].sdl == setup.useSDL))) {
 			library = &s_libraries[i];
 			break;
 		}
@@ -104,20 +105,16 @@ std::string MSVCProvider::getLibraryFromFeature(const char *feature, const Build
 			libs += " ";
 		}
 
-		const char *basename = library->release;
-		if (setup.useCanonicalLibNames) {
+		// Vcpkg already adds the libs
+		if (!setup.useVcpkg) {
+			const char *basename = library->release;
 			// Debug name takes priority
 			if (!isRelease && library->debug) {
 				basename = library->debug;
 			}
-		} else {
-			// Legacy name ignores configuration
-			if (library->legacy) {
-				basename = library->legacy;
+			if (basename) {
+				libs += basename;
 			}
-		}
-		if (basename) {
-			libs += basename;
 		}
 	}
 
@@ -127,11 +124,8 @@ std::string MSVCProvider::getLibraryFromFeature(const char *feature, const Build
 std::string MSVCProvider::outputLibraryDependencies(const BuildSetup &setup, bool isRelease) const {
 	std::string libs;
 
-	if (setup.useSDL2) {
-		libs += getLibraryFromFeature("sdl2", setup, isRelease);
-	} else {
-		libs += getLibraryFromFeature("sdl", setup, isRelease);
-	}
+	// SDL is always enabled
+	libs += getLibraryFromFeature("sdl", setup, isRelease);
 	libs += " ";
 	for (FeatureList::const_iterator i = setup.features.begin(); i != setup.features.end(); ++i) {
 		if (i->enable) {
@@ -189,7 +183,7 @@ void MSVCProvider::createWorkspace(const BuildSetup &setup) {
 
 	for (std::list<MSVC_Architecture>::const_iterator arch = _archs.begin(); arch != _archs.end(); ++arch) {
 		solution << "\t\tDebug|" << getMSVCConfigName(*arch) << " = Debug|" << getMSVCConfigName(*arch) << "\n"
-		         << "\t\tAnalysis|" << getMSVCConfigName(*arch) << " = Analysis|" << getMSVCConfigName(*arch) << "\n"
+		         << "\t\tASan|" << getMSVCConfigName(*arch) << " = ASan|" << getMSVCConfigName(*arch) << "\n"
 		         << "\t\tLLVM|" << getMSVCConfigName(*arch) << " = LLVM|" << getMSVCConfigName(*arch) << "\n"
 		         << "\t\tRelease|" << getMSVCConfigName(*arch) << " = Release|" << getMSVCConfigName(*arch) << "\n";
 	}
@@ -201,8 +195,8 @@ void MSVCProvider::createWorkspace(const BuildSetup &setup) {
 		for (std::list<MSVC_Architecture>::const_iterator arch = _archs.begin(); arch != _archs.end(); ++arch) {
 			solution << "\t\t{" << i->second << "}.Debug|" << getMSVCConfigName(*arch) << ".ActiveCfg = Debug|" << getMSVCConfigName(*arch) << "\n"
 			         << "\t\t{" << i->second << "}.Debug|" << getMSVCConfigName(*arch) << ".Build.0 = Debug|" << getMSVCConfigName(*arch) << "\n"
-			         << "\t\t{" << i->second << "}.Analysis|" << getMSVCConfigName(*arch) << ".ActiveCfg = Analysis|" << getMSVCConfigName(*arch) << "\n"
-			         << "\t\t{" << i->second << "}.Analysis|" << getMSVCConfigName(*arch) << ".Build.0 = Analysis|" << getMSVCConfigName(*arch) << "\n"
+			         << "\t\t{" << i->second << "}.ASan|" << getMSVCConfigName(*arch) << ".ActiveCfg = ASan|" << getMSVCConfigName(*arch) << "\n"
+			         << "\t\t{" << i->second << "}.ASan|" << getMSVCConfigName(*arch) << ".Build.0 = ASan|" << getMSVCConfigName(*arch) << "\n"
 			         << "\t\t{" << i->second << "}.LLVM|" << getMSVCConfigName(*arch) << ".ActiveCfg = LLVM|" << getMSVCConfigName(*arch) << "\n"
 			         << "\t\t{" << i->second << "}.LLVM|" << getMSVCConfigName(*arch) << ".Build.0 = LLVM|" << getMSVCConfigName(*arch) << "\n"
 			         << "\t\t{" << i->second << "}.Release|" << getMSVCConfigName(*arch) << ".ActiveCfg = Release|" << getMSVCConfigName(*arch) << "\n"
@@ -222,11 +216,11 @@ void MSVCProvider::createOtherBuildFiles(const BuildSetup &setup) {
 	createGlobalProp(setup);
 
 	// Create the configuration property files (for Debug and Release with 32 and 64bits versions)
-	// Note: we use the debug properties for the analysis configuration
+	// Note: we use the debug properties for the asan configuration
 	for (std::list<MSVC_Architecture>::const_iterator arch = _archs.begin(); arch != _archs.end(); ++arch) {
 		createBuildProp(setup, true, *arch, "Release");
 		createBuildProp(setup, false, *arch, "Debug");
-		createBuildProp(setup, false, *arch, "Analysis");
+		createBuildProp(setup, false, *arch, "ASan");
 		createBuildProp(setup, false, *arch, "LLVM");
 	}
 }
@@ -250,7 +244,7 @@ void MSVCProvider::createGlobalProp(const BuildSetup &setup) {
 			}
 		}
 
-		outputGlobalPropFile(archSetup, properties, *arch, archSetup.defines, convertPathToWin(archSetup.filePrefix), archSetup.runBuildEvents);
+		outputGlobalPropFile(archSetup, properties, *arch, archSetup.defines, convertPathToWin(archSetup.filePrefix));
 		properties.close();
 	}
 }
@@ -277,7 +271,7 @@ std::string MSVCProvider::getTestPreBuildEvent(const BuildSetup &setup) const {
 	return "&quot;$(SolutionDir)../../test/cxxtest/cxxtestgen.py&quot; --runner=ParenPrinter --no-std --no-eh -o &quot;$(SolutionDir)test_runner.cpp&quot;" + target;
 }
 
-std::string MSVCProvider::getPostBuildEvent(MSVC_Architecture arch, const BuildSetup &setup) const {
+std::string MSVCProvider::getPostBuildEvent(MSVC_Architecture arch, const BuildSetup &setup, bool isRelease) const {
 	std::string cmdLine = "";
 
 	cmdLine = "@echo off\n"
@@ -285,11 +279,27 @@ std::string MSVCProvider::getPostBuildEvent(MSVC_Architecture arch, const BuildS
 	          "echo.\n"
 	          "@call &quot;$(SolutionDir)../../devtools/create_project/scripts/postbuild.cmd&quot; &quot;$(SolutionDir)/../..&quot; &quot;$(OutDir)&quot; ";
 
-	cmdLine += (setup.useSDL2) ? "SDL2" : "SDL";
+	cmdLine += setup.getSDLName();
 
-	cmdLine += " &quot;%" LIBS_DEFINE "%/lib/";
-	cmdLine += getMSVCArchName(arch);
-	cmdLine += "/$(Configuration)&quot; ";
+	if (setup.useVcpkg) {
+		cmdLine += " &quot;$(_ZVcpkgCurrentInstalledDir)";
+		if (!isRelease) {
+			cmdLine += "debug/";
+		}
+		cmdLine += "bin/&quot; ";
+	} else {
+		std::string libsPath;
+		if (setup.libsDir.empty())
+			libsPath = "%" LIBS_DEFINE "%";
+		else
+			libsPath = convertPathToWin(setup.libsDir);
+
+		cmdLine += " &quot;";
+		cmdLine += libsPath;
+		cmdLine += "/lib/";
+		cmdLine += getMSVCArchName(arch);
+		cmdLine += "/$(Configuration)&quot; ";
+	}
 
 	// Specify if installer needs to be built or not
 	cmdLine += (setup.createInstaller ? "1" : "0");

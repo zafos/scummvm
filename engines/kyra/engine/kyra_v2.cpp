@@ -77,9 +77,10 @@ KyraEngine_v2::KyraEngine_v2(OSystem *system, const GameFlags &flags, const Engi
 	_smoothingPath = false;
 
 	_lang = 0;
+	_scriptLang = 0;
 	Common::Language lang = Common::parseLanguage(ConfMan.get("language"));
 	if (lang == _flags.fanLang && _flags.replacedLang != Common::UNK_LANG)
-		lang = _flags.replacedLang;
+			lang = _flags.replacedLang;
 
 	if (_flags.extraLang == Common::ZH_TWN)
 		_langIntern = 1;
@@ -110,10 +111,17 @@ KyraEngine_v2::KyraEngine_v2(OSystem *system, const GameFlags &flags, const Engi
 		_lang = 3;
 		break;
 
+	case Common::PL_POL:
+		_lang = 4;
+		break;
+
 	default:
 		warning("unsupported language, switching back to English");
 		_lang = 0;
 	}
+
+	// This fan MR translation use Chinese style script file extensions...
+	_scriptLang = (_flags.fanLang == Common::CS_CZE && _lang == 1) ? 3 : _lang;
 
 	_animResetFrame = _animShapeWidth =	_animShapeHeight = _animShapeXAdd = _animShapeYAdd = _itemInHand = _savedMouseState = _mainCharX = _mainCharY = _charScale = _unk4 = _unk5 = 0;
 	_unkSceneScreenFlag1 = _unkHandleSceneChangeFlag = false;

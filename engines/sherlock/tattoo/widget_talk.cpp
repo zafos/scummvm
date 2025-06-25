@@ -43,15 +43,17 @@ WidgetTalk::WidgetTalk(SherlockEngine *vm) : WidgetBase(vm) {
 }
 
 void WidgetTalk::getTalkWindowSize() {
-	TattooTalk &talk = *(TattooTalk *)_vm->_talk;
+	//TattooTalk &talk = *(TattooTalk *)_vm->_talk;
 	int width, height;
 
 	// See how many statements are going to be available
+#if 0
 	int numStatements = 0;
 	for (uint idx = 0; idx < talk._statements.size(); ++idx) {
 		if (talk._statements[idx]._talkMap != -1)
 			++numStatements;
 	}
+#endif
 
 	width = SHERLOCK_SCREEN_WIDTH * 2 / 3;
 
@@ -440,7 +442,7 @@ void WidgetTalk::setStatementLines() {
 	_statementLines.clear();
 
 	for (uint statementNum = 0; statementNum < talk._statements.size(); ++statementNum) {
-		// See if this statment meets all of its flag requirements
+		// See if this statement meets all of its flag requirements
 		if (talk._statements[statementNum]._talkMap != -1) {
 			// Get the next statement text to process
 			Common::String str = talk._statements[statementNum]._statement;

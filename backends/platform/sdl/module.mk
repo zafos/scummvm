@@ -7,8 +7,7 @@ MODULE_OBJS := \
 ifdef KOLIBRIOS
 MODULE_OBJS += \
 	kolibrios/kolibrios-main.o \
-	kolibrios/kolibrios.o \
-	kolibrios/sdl-stubs.o
+	kolibrios/kolibrios.o
 endif
 
 ifdef POSIX
@@ -24,6 +23,7 @@ MODULE_OBJS += \
 	macosx/macosx-touchbar.o \
 	macosx/macosx-window.o \
 	macosx/macosx_wrapper.o \
+	macosx/macosx_osys_misc.o \
 	macosx/appmenu_osx.o
 endif
 
@@ -77,6 +77,13 @@ CC=arm-vita-eabi-gcc
 MODULE_OBJS += \
 	psp2/psp2-main.o \
 	psp2/psp2.o
+endif
+
+ifdef SAILFISH
+MODULE_OBJS += \
+	sailfish/sailfish-main.o \
+	sailfish/sailfish-window.o \
+	sailfish/sailfish.o
 endif
 
 ifdef SWITCH

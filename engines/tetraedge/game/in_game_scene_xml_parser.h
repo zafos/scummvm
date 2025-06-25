@@ -33,6 +33,9 @@ namespace Tetraedge {
  */
 class InGameSceneXmlParser : public TeXmlParser {
 public:
+	InGameSceneXmlParser(InGameScene *scene)
+		: _scene(scene), _textNodeType(TextNodeNone) {}
+
 	// NOTE: This doesn't handle snowCustom tag which was
 	// added in original but commented out in every place.
 	CUSTOM_XML_PARSER(InGameSceneXmlParser) {
@@ -114,6 +117,8 @@ public:
 			KEY_END()
 			XML_KEY(collisionSlide)
 			KEY_END()
+			XML_KEY(coliisionSlide)
+			KEY_END()
 			XML_KEY(noCollisionSlide)
 			KEY_END()
 		KEY_END()
@@ -137,6 +142,7 @@ public:
 	bool parserCallback_rBB(ParserNode *node);
 	bool parserCallback_light(ParserNode *node);
 	bool parserCallback_collisionSlide(ParserNode *node);
+	bool parserCallback_coliisionSlide(ParserNode *node);
 	bool parserCallback_noCollisionSlide(ParserNode *node);
 
 	// Flamme and its children.

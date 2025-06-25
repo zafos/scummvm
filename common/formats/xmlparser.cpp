@@ -34,14 +34,13 @@ XMLParser::~XMLParser() {
 	delete _XMLkeys;
 	delete _stream;
 
-	for (List<XMLKeyLayout *>::iterator i = _layoutList.begin();
-		i != _layoutList.end(); ++i)
-		delete *i;
+	for (auto *layout : _layoutList)
+		delete layout;
 
 	_layoutList.clear();
 }
 
-bool XMLParser::loadFile(const String &filename) {
+bool XMLParser::loadFile(const Path &filename) {
 	_stream = SearchMan.createReadStreamForMember(filename);
 	if (!_stream)
 		return false;
@@ -65,9 +64,9 @@ bool XMLParser::loadBuffer(const byte *buffer, uint32 size, DisposeAfterUse::Fla
 	return true;
 }
 
-bool XMLParser::loadStream(SeekableReadStream *stream) {
+bool XMLParser::loadStream(SeekableReadStream *stream, const String &name) {
 	_stream = stream;
-	_fileName = "File Stream";
+	_fileName = name;
 	return _stream != nullptr;
 }
 
@@ -96,7 +95,7 @@ bool XMLParser::parserError(const String &errStr) {
 	assert(_stream->pos() == startPosition);
 	currentPosition = startPosition;
 
-	Common::String errorMessage = Common::String::format("\n  File <%s>, line %d:\n", _fileName.c_str(), lineCount);
+	Common::String errorMessage = Common::String::format("\n  File <%s>, line %d:\n", _fileName.toString().c_str(), lineCount);
 
 	if (startPosition > 1) {
 		int keyOpening = 0;
@@ -171,12 +170,12 @@ bool XMLParser::parseActiveKey(bool closed) {
 		StringMap localMap = key->values;
 		int keyCount = localMap.size();
 
-		for (List<XMLKeyLayout::XMLKeyProperty>::const_iterator i = key->layout->properties.begin(); i != key->layout->properties.end(); ++i) {
-			if (i->required && !localMap.contains(i->name))
-				return parserError("Missing required property '" + i->name + "' inside key '" + key->name + "'");
-			else if (localMap.contains(i->name)) {
+		for (const auto &prop : key->layout->properties) {
+			if (prop.required && !localMap.contains(prop.name))
+				return parserError("Missing required property '" + prop.name + "' inside key '" + key->name + "'");
+			else if (localMap.contains(prop.name)) {
 				keyCount--;
-				localMap.erase(i->name);
+				localMap.erase(prop.name);
 			}
 		}
 

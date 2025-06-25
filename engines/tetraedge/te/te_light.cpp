@@ -19,7 +19,6 @@
  *
  */
 
-#include "common/math.h"
 #include "graphics/renderer.h"
 
 #include "tetraedge/tetraedge.h"
@@ -87,6 +86,11 @@ Common::String TeLight::dump() const {
 		_colSpecular.dump().c_str(), _position3d.dump().c_str(),
 		_positionRadial.dump().c_str(), _constAtten, _linearAtten,
 		_quadraticAtten, _cutoff, _exponent, _displaySize);
+}
+
+void TeLight::correctAttenuation() {
+	if (!_constAtten && !_linearAtten && !_quadraticAtten)
+		_constAtten = 1.0;
 }
 
 /*static*/

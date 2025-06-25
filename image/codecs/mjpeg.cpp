@@ -40,7 +40,13 @@ namespace Image {
 
 MJPEGDecoder::MJPEGDecoder() : Codec() {
 	_pixelFormat = g_system->getScreenFormat();
+
+	// Default to a 32bpp format, if in 8bpp mode
+	if (_pixelFormat.bytesPerPixel == 1)
+		_pixelFormat = Graphics::PixelFormat(4, 8, 8, 8, 8, 8, 16, 24, 0);
+
 	_surface = 0;
+	_accuracy = CodecAccuracy::Default;
 }
 
 MJPEGDecoder::~MJPEGDecoder() {
@@ -199,6 +205,7 @@ const Graphics::Surface *MJPEGDecoder::decodeFrame(Common::SeekableReadStream &s
 
 	Common::MemoryReadStream convertedStream(data, outputSize, DisposeAfterUse::YES);
 	JPEGDecoder jpeg;
+	jpeg.setCodecAccuracy(_accuracy);
 	jpeg.setOutputPixelFormat(_pixelFormat);
 
 	if (!jpeg.loadStream(convertedStream)) {
@@ -217,6 +224,10 @@ const Graphics::Surface *MJPEGDecoder::decodeFrame(Common::SeekableReadStream &s
 	assert(_surface->format == _pixelFormat);
 
 	return _surface;
+}
+
+void MJPEGDecoder::setCodecAccuracy(CodecAccuracy accuracy) {
+	_accuracy = accuracy;
 }
 
 } // End of namespace Image

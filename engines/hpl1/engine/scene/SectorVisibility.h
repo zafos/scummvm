@@ -117,7 +117,7 @@ private:
 	cSectorVisibilityContainer *mpContainer;
 };
 
-typedef Hpl1::Std::map<cSector *, cSectorVisibility *> tSectorVisibilityMap;
+typedef Common::StableMap<cSector *, cSectorVisibility *> tSectorVisibilityMap;
 typedef tSectorVisibilityMap::iterator tSectorVisibilityMapIt;
 
 //----------------------------------------------------
@@ -160,7 +160,7 @@ private:
 
 	tString GetTabs();
 
-	//cPortalContainer *mpContainer;
+	// cPortalContainer *mpContainer;
 
 	tSectorSet m_setStartSectors;
 
@@ -178,6 +178,6 @@ private:
 
 //----------------------------------------------------
 
-}     // namespace hpl
+} // namespace hpl
 
 #endif // HPL_SECTOR_VISIBILTY_H

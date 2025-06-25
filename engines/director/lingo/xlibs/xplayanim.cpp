@@ -19,6 +19,13 @@
  *
  */
 
+/*************************************
+ *
+ * USED IN:
+ * Iron Helix
+ *
+ *************************************/
+
 #include "video/paco_decoder.h"
 
 #include "director/director.h"
@@ -29,22 +36,22 @@
 
 namespace Director {
 
-const char *XPlayAnim::xlibName = "XPlayAnim";
-const char *XPlayAnim::fileNames[] = {
-	"XPlayAnim",
-	nullptr
+const char *const XPlayAnim::xlibName = "XPlayAnim";
+const XlibFileDesc XPlayAnim::fileNames[] = {
+	{ "XPlayAnim",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static BuiltinProto builtins[] = {
+static const BuiltinProto builtins[] = {
 	{ "XPlayAnim",	XPlayAnim::b_xplayanim, 3, 3, 300, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
-void XPlayAnim::open(int type) {
+void XPlayAnim::open(ObjectType type, const Common::Path &path) {
 	g_lingo->initBuiltIns(builtins);
 }
 
-void XPlayAnim::close(int type) {
+void XPlayAnim::close(ObjectType type) {
 	g_lingo->cleanupBuiltIns(builtins);
 }
 
@@ -77,7 +84,7 @@ void XPlayAnim::b_xplayanim(int nargs) {
 	bool keepPlaying = true;
 	video->start();
 	while (!video->endOfVideo()) {
-		if (g_system->getEventManager()->pollEvent(event)) {
+		if (g_director->pollEvent(event)) {
 			switch(event.type) {
 				case Common::EVENT_QUIT:
 					g_director->processEventQUIT();

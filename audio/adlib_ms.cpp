@@ -23,12 +23,12 @@
 
 #include "common/debug.h"
 
-bool OplInstrumentOperatorDefinition::isEmpty() {
+bool OplInstrumentOperatorDefinition::isEmpty() const {
 	return freqMultMisc == 0 && level == 0 && decayAttack == 0 &&
 		   releaseSustain == 0 && waveformSelect == 0;
 }
 
-bool OplInstrumentDefinition::isEmpty() {
+bool OplInstrumentDefinition::isEmpty() const {
 	if (rhythmType != RHYTHM_TYPE_UNDEFINED) {
 		return operator0.isEmpty() &&
 			(rhythmType != RHYTHM_TYPE_BASS_DRUM || operator1.isEmpty());
@@ -40,7 +40,7 @@ bool OplInstrumentDefinition::isEmpty() {
 	}
 }
 
-uint8 OplInstrumentDefinition::getNumberOfOperators() {
+uint8 OplInstrumentDefinition::getNumberOfOperators() const {
 	if (rhythmType == RHYTHM_TYPE_UNDEFINED) {
 		return fourOperator ? 4 : 2;
 	} else {
@@ -50,7 +50,7 @@ uint8 OplInstrumentDefinition::getNumberOfOperators() {
 	}
 }
 
-OplInstrumentOperatorDefinition &OplInstrumentDefinition::getOperatorDefinition(uint8 operatorNum) {
+const OplInstrumentOperatorDefinition &OplInstrumentDefinition::getOperatorDefinition(uint8 operatorNum) const {
 	assert((!fourOperator && operatorNum < 2) || operatorNum < 4);
 
 	switch (operatorNum) {
@@ -68,7 +68,7 @@ OplInstrumentOperatorDefinition &OplInstrumentDefinition::getOperatorDefinition(
 	}
 }
 
-void AdLibBnkInstrumentOperatorDefinition::toOplInstrumentOperatorDefinition(OplInstrumentOperatorDefinition &operatorDef, uint8 waveformSelect) {
+void AdLibBnkInstrumentOperatorDefinition::toOplInstrumentOperatorDefinition(OplInstrumentOperatorDefinition &operatorDef, uint8 waveformSelect) const {
 	// Combine the separate fields of the BNK format into complete register values.
 	operatorDef.freqMultMisc = frequencyMultiplier | (keyScalingRate == 0 ? 0 : 0x10) |
 		(envelopeGainType == 0 ? 0 : 0x20) | (vibrato == 0 ? 0 : 0x40) | (amplitudeModulation == 0 ? 0 : 0x80);
@@ -78,7 +78,7 @@ void AdLibBnkInstrumentOperatorDefinition::toOplInstrumentOperatorDefinition(Opl
 	operatorDef.waveformSelect = waveformSelect;
 }
 
-void AdLibBnkInstrumentDefinition::toOplInstrumentDefinition(OplInstrumentDefinition &instrumentDef) {
+void AdLibBnkInstrumentDefinition::toOplInstrumentDefinition(OplInstrumentDefinition &instrumentDef) const {
 	instrumentDef.fourOperator = false;
 
 	operator0.toOplInstrumentOperatorDefinition(instrumentDef.operator0, waveformSelect0);
@@ -93,8 +93,52 @@ void AdLibBnkInstrumentDefinition::toOplInstrumentDefinition(OplInstrumentDefini
 	instrumentDef.rhythmType = RHYTHM_TYPE_UNDEFINED;
 }
 
+void AdLibIbkInstrumentDefinition::toOplInstrumentDefinition(OplInstrumentDefinition &instrumentDef) const {
+	instrumentDef.fourOperator = false;
+
+	instrumentDef.operator0.freqMultMisc = o0FreqMultMisc;
+	instrumentDef.operator0.level = o0Level;
+	instrumentDef.operator0.decayAttack = o0DecayAttack;
+	instrumentDef.operator0.releaseSustain = o0ReleaseSustain;
+	instrumentDef.operator0.waveformSelect = o0WaveformSelect;
+
+	instrumentDef.operator1.freqMultMisc = o1FreqMultMisc;
+	instrumentDef.operator1.level = o1Level;
+	instrumentDef.operator1.decayAttack = o1DecayAttack;
+	instrumentDef.operator1.releaseSustain = o1ReleaseSustain;
+	instrumentDef.operator1.waveformSelect = o1WaveformSelect;
+
+	instrumentDef.connectionFeedback0 = connectionFeedback;
+
+	instrumentDef.rhythmNote = rhythmNote;
+	OplInstrumentRhythmType convRhythmType;
+	switch (rhythmType) {
+		case 6:
+			convRhythmType = RHYTHM_TYPE_BASS_DRUM;
+			break;
+		case 7:
+			convRhythmType = RHYTHM_TYPE_SNARE_DRUM;
+			break;
+		case 8:
+			convRhythmType = RHYTHM_TYPE_TOM_TOM;
+			break;
+		case 9:
+			convRhythmType = RHYTHM_TYPE_CYMBAL;
+			break;
+		case 10:
+			convRhythmType = RHYTHM_TYPE_HI_HAT;
+			break;
+		case 0:
+		default:
+			convRhythmType = RHYTHM_TYPE_UNDEFINED;
+			break;
+	}
+	instrumentDef.rhythmType = convRhythmType;
+	// TODO Add support for transpose
+}
+
 // These are the melodic instrument definitions used by the Win95 SB16 driver.
-OplInstrumentDefinition MidiDriver_ADLIB_Multisource::OPL_INSTRUMENT_BANK[128] = {
+const OplInstrumentDefinition MidiDriver_ADLIB_Multisource::OPL_INSTRUMENT_BANK[128] = {
 	// 0x00
 	{ false, { 0x01, 0x8F, 0xF2, 0xF4, 0x00 }, { 0x01, 0x06, 0xF2, 0xF7, 0x00 }, { 0x00, 0x00, 0x00, 0x00, 0x00 }, { 0x00, 0x00, 0x00, 0x00, 0x00 }, 0x38, 0x00, 0x00, RHYTHM_TYPE_UNDEFINED },
 	{ false, { 0x01, 0x4B, 0xF2, 0xF4, 0x00 }, { 0x01, 0x00, 0xF2, 0xF7, 0x00 }, { 0x00, 0x00, 0x00, 0x00, 0x00 }, { 0x00, 0x00, 0x00, 0x00, 0x00 }, 0x38, 0x00, 0x00, RHYTHM_TYPE_UNDEFINED },
@@ -242,7 +286,7 @@ OplInstrumentDefinition MidiDriver_ADLIB_Multisource::OPL_INSTRUMENT_BANK[128] =
 };
 
 // These are the rhythm instrument definitions used by the Win95 SB16 driver.
-OplInstrumentDefinition MidiDriver_ADLIB_Multisource::OPL_RHYTHM_BANK[62] = {
+const OplInstrumentDefinition MidiDriver_ADLIB_Multisource::OPL_RHYTHM_BANK[62] = {
 	// GS percussion start
 	// 0x1B
 	{ false, { 0x00, 0x00, 0x00, 0x00, 0x00 }, { 0x00, 0x00, 0x00, 0x00, 0x00 }, { 0x00, 0x00, 0x00, 0x00, 0x00 }, { 0x00, 0x00, 0x00, 0x00, 0x00 }, 0x00, 0x00, 0x00, RHYTHM_TYPE_UNDEFINED },
@@ -325,10 +369,10 @@ OplInstrumentDefinition MidiDriver_ADLIB_Multisource::OPL_RHYTHM_BANK[62] = {
 
 // Rhythm mode uses OPL channels 6, 7 and 8. The remaining channels are
 // available for melodic instruments.
-uint8 MidiDriver_ADLIB_Multisource::MELODIC_CHANNELS_OPL2[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
-uint8 MidiDriver_ADLIB_Multisource::MELODIC_CHANNELS_OPL2_RHYTHM[] = { 0, 1, 2, 3, 4, 5 };
-uint8 MidiDriver_ADLIB_Multisource::MELODIC_CHANNELS_OPL3[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 };
-uint8 MidiDriver_ADLIB_Multisource::MELODIC_CHANNELS_OPL3_RHYTHM[] = { 0, 1, 2, 3, 4, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17 };
+const uint8 MidiDriver_ADLIB_Multisource::MELODIC_CHANNELS_OPL2[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
+const uint8 MidiDriver_ADLIB_Multisource::MELODIC_CHANNELS_OPL2_RHYTHM[] = { 0, 1, 2, 3, 4, 5 };
+const uint8 MidiDriver_ADLIB_Multisource::MELODIC_CHANNELS_OPL3[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 };
+const uint8 MidiDriver_ADLIB_Multisource::MELODIC_CHANNELS_OPL3_RHYTHM[] = { 0, 1, 2, 3, 4, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17 };
 
 const uint8 MidiDriver_ADLIB_Multisource::OPL_REGISTER_RHYTHM_OFFSETS[OPL_NUM_RHYTHM_INSTRUMENTS] = { 0x11, 0x15, 0x12, 0x14, 0x10 };
 
@@ -385,6 +429,7 @@ void MidiDriver_ADLIB_Multisource::ActiveNote::init() {
 	noteCounterValue = 0;
 
 	instrumentId = 0;
+	lastWrittenInstrumentId = -1;
 	instrumentDef = nullptr;
 
 	channelAllocated = false;
@@ -400,12 +445,15 @@ MidiDriver_ADLIB_Multisource::MidiDriver_ADLIB_Multisource(OPL::Config::OplType 
 		_isOpen(false),
 		_accuracyMode(ACCURACY_MODE_SB16_WIN95),
 		_allocationMode(ALLOCATION_MODE_DYNAMIC),
+		_instrumentWriteMode(INSTRUMENT_WRITE_MODE_NOTE_ON),
 		_rhythmModeIgnoreNoteOffs(false),
+		_rhythmInstrumentMode(RHYTHM_INSTRUMENT_MODE_CHANNEL_10),
 		_defaultChannelVolume(0),
 		_noteSelect(NOTE_SELECT_MODE_0),
 		_modulationDepth(MODULATION_DEPTH_HIGH),
 		_vibratoDepth(VIBRATO_DEPTH_HIGH),
 		_rhythmMode(false),
+		_rhythmModeRewriteSharedRegister(false),
 		_instrumentBank(OPL_INSTRUMENT_BANK),
 		_rhythmBank(OPL_RHYTHM_BANK),
 		_rhythmBankFirstNote(GS_RHYTHM_FIRST_NOTE),
@@ -606,13 +654,21 @@ void MidiDriver_ADLIB_Multisource::send(int8 source, uint32 b) {
 void MidiDriver_ADLIB_Multisource::noteOff(uint8 channel, uint8 note, uint8 velocity, uint8 source) {
 	_activeNotesMutex.lock();
 
-	if (_rhythmMode && channel == MIDI_RHYTHM_CHANNEL) {
+	InstrumentInfo instrument = determineInstrument(channel, source, note);
+	// If rhythm mode is on and the note is on the rhythm channel or the 
+	// instrument is a rhythm instrument, this note was played using the OPL
+	// rhythm register.
+	bool rhythmNote = _rhythmMode && ((_rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_CHANNEL_10 && channel == MIDI_RHYTHM_CHANNEL) ||
+									  (_rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_RHYTHM_TYPE &&
+									   instrument.instrumentDef != nullptr && instrument.instrumentDef->rhythmType != RHYTHM_TYPE_UNDEFINED));
+
+	if (rhythmNote) {
 		if (!_rhythmModeIgnoreNoteOffs) {
 			// Find the OPL rhythm instrument playing this note.
 			for (int i = 0; i < OPL_NUM_RHYTHM_INSTRUMENTS; i++) {
 				if (_activeRhythmNotes[i].noteActive && _activeRhythmNotes[i].source == source &&
-						_activeRhythmNotes[i].note == note) {
-					writeKeyOff(0, static_cast<OplInstrumentRhythmType>(i + 1));
+						_activeRhythmNotes[i].channel == channel && _activeRhythmNotes[i].note == note) {
+					writeKeyOff(OPL_RHYTHM_INSTRUMENT_CHANNELS[i], static_cast<OplInstrumentRhythmType>(i + 1));
 					break;
 				}
 			}
@@ -645,14 +701,17 @@ void MidiDriver_ADLIB_Multisource::noteOn(uint8 channel, uint8 note, uint8 veloc
 	}
 
 	InstrumentInfo instrument = determineInstrument(channel, source, note);
-	// If rhythm mode is on and the note is on the rhythm channel, this note
-	// will be played using the OPL rhythm register.
-	bool rhythmNote = _rhythmMode && channel == MIDI_RHYTHM_CHANNEL;
+	// If rhythm mode is on and the note is on the rhythm channel or the
+	// instrument is a rhythm instrument, this note will be played using the
+	// OPL rhythm register.
+	bool rhythmNote = _rhythmMode && ((_rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_CHANNEL_10 && channel == MIDI_RHYTHM_CHANNEL) ||
+									  (_rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_RHYTHM_TYPE &&
+									   instrument.instrumentDef != nullptr && instrument.instrumentDef->rhythmType != RHYTHM_TYPE_UNDEFINED));
 
-	if (!instrument.instrumentDef || instrument.instrumentDef->isEmpty() ||
-			(rhythmNote && instrument.instrumentDef->rhythmType == RHYTHM_TYPE_UNDEFINED)) {
+	if (instrument.instrumentDef == nullptr || instrument.instrumentDef->isEmpty() ||
+		(rhythmNote && instrument.instrumentDef->rhythmType == RHYTHM_TYPE_UNDEFINED)) {
 		// Instrument definition contains no data or it is not suitable for
-		// rhythm mode, so the note cannot be played.
+		// a rhythm note, so the note cannot be played.
 		return;
 	}
 
@@ -661,13 +720,14 @@ void MidiDriver_ADLIB_Multisource::noteOn(uint8 channel, uint8 note, uint8 veloc
 	// Determine the OPL channel to use and the active note data to update.
 	uint8 oplChannel = 0xFF;
 	ActiveNote *activeNote = nullptr;
-	if (rhythmNote) {
-		activeNote = &_activeRhythmNotes[instrument.instrumentDef->rhythmType - 1];
-	} else {
-		// Allocate a melodic OPL channel.
-		oplChannel = allocateOplChannel(channel, source, instrument.instrumentId);
-		if (oplChannel != 0xFF)
+	oplChannel = allocateOplChannel(channel, source, instrument);
+	if (oplChannel != 0xFF) {
+		if (rhythmNote) {
+			activeNote = &_activeRhythmNotes[instrument.instrumentDef->rhythmType - 1];
+		}
+		else {
 			activeNote = &_activeNotes[oplChannel];
+		}
 	}
 	if (activeNote != nullptr) {
 		if (activeNote->noteActive) {
@@ -690,8 +750,24 @@ void MidiDriver_ADLIB_Multisource::noteOn(uint8 channel, uint8 note, uint8 veloc
 		activeNote->instrumentId = instrument.instrumentId;
 		activeNote->instrumentDef = instrument.instrumentDef;
 
-		// Write out the instrument definition, volume and panning.
-		writeInstrument(oplChannel, instrument);
+		if (_instrumentWriteMode == INSTRUMENT_WRITE_MODE_NOTE_ON ||
+				(_instrumentWriteMode == INSTRUMENT_WRITE_MODE_FIRST_NOTE_ON &&
+					activeNote->lastWrittenInstrumentId != activeNote->instrumentId)) {
+			// Write out the instrument definition, volume and panning.
+			writeInstrument(oplChannel, instrument);
+		}
+		else {
+			if (_rhythmModeRewriteSharedRegister && rhythmNote && instrument.instrumentDef->rhythmType != RHYTHM_TYPE_BASS_DRUM) {
+				// Rewrite the shared panning / feedback / connection register.
+				writePanning(oplChannel, instrument.instrumentDef->rhythmType);
+			}
+
+			// Write out volume, if applicable.
+			for (int i = 0; i < activeNote->instrumentDef->getNumberOfOperators(); i++) {
+				if (isVolumeApplicableToOperator(*activeNote->instrumentDef, i))
+					writeVolume(oplChannel, i, instrument.instrumentDef->rhythmType);
+			}
+		}
 
 		// Calculate and write frequency and block and write key on bit.
 		writeFrequency(oplChannel, instrument.instrumentDef->rhythmType);
@@ -760,8 +836,57 @@ void MidiDriver_ADLIB_Multisource::controlChange(uint8 channel, uint8 controller
 }
 
 void MidiDriver_ADLIB_Multisource::programChange(uint8 channel, uint8 program, uint8 source) {
-	// Just set the MIDI program value; this event does not affect active notes.
+	// Set the MIDI program value. This event does not affect active notes...
 	_controlData[source][channel].program = program;
+
+	// ...unless instrument write mode on program change is set.
+	if (_instrumentWriteMode == INSTRUMENT_WRITE_MODE_PROGRAM_CHANGE &&
+			!(_rhythmMode && _rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_CHANNEL_10 && channel == MIDI_RHYTHM_CHANNEL)) {
+		InstrumentInfo instrument = determineInstrument(channel, source, 0);
+		if (instrument.instrumentDef == nullptr || instrument.instrumentDef->isEmpty()) {
+			// Instrument definition contains no data.
+			return;
+		}
+
+
+		// If rhythm mode is on and the instrument is a rhythm instrument,
+		// notes on this channel will be played using the OPL rhythm register.
+		bool rhythmNote = _rhythmMode && _rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_RHYTHM_TYPE &&
+				instrument.instrumentDef->rhythmType != RHYTHM_TYPE_UNDEFINED;
+
+		_activeNotesMutex.lock();
+
+		// Determine the OPL channel to use and the active note data to update.
+		uint8 oplChannel = 0xFF;
+		ActiveNote *activeNote = nullptr;
+		oplChannel = allocateOplChannel(channel, source, instrument);
+		if (oplChannel != 0xFF) {
+			if (rhythmNote) {
+				activeNote = &_activeRhythmNotes[instrument.instrumentDef->rhythmType - 1];
+			}
+			else {
+				activeNote = &_activeNotes[oplChannel];
+			}
+		}
+
+		if (activeNote != nullptr) {
+			if (activeNote->noteActive) {
+				// Turn off the note currently playing on this OPL channel or
+				// rhythm instrument.
+				writeKeyOff(oplChannel, instrument.instrumentDef->rhythmType);
+			}
+
+			// Update the active note data.
+			activeNote->channel = channel;
+			activeNote->source = source;
+			activeNote->instrumentId = instrument.instrumentId;
+			activeNote->instrumentDef = instrument.instrumentDef;
+
+			writeInstrument(oplChannel, instrument);
+		}
+
+		_activeNotesMutex.unlock();
+	}
 }
 
 void MidiDriver_ADLIB_Multisource::channelAftertouch(uint8 channel, uint8 pressure, uint8 source) {
@@ -833,6 +958,13 @@ void MidiDriver_ADLIB_Multisource::deinitSource(uint8 source) {
 		uint8 oplChannel = _melodicChannels[i];
 		if (_activeNotes[oplChannel].channelAllocated && _activeNotes[oplChannel].source == source) {
 			_activeNotes[oplChannel].channelAllocated = false;
+			_activeNotes[oplChannel].lastWrittenInstrumentId = -1;
+		}
+	}
+	for (int i = 0; i < 5; i++) {
+		if (_activeRhythmNotes[i].channelAllocated && _activeRhythmNotes[i].source == source) {
+			_activeRhythmNotes[i].channelAllocated = false;
+			_activeRhythmNotes[i].lastWrittenInstrumentId = -1;
 		}
 	}
 
@@ -948,20 +1080,23 @@ void MidiDriver_ADLIB_Multisource::panning(uint8 channel, uint8 panning, uint8 s
 
 	_activeNotesMutex.lock();
 
+	bool rhythmChannel = (_rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_CHANNEL_10 && channel == MIDI_RHYTHM_CHANNEL);
+
 	// Apply the new channel panning to any active notes.
-	if (_rhythmMode && channel == MIDI_RHYTHM_CHANNEL) {
+	if (_rhythmMode) {
 		for (int i = 0; i < OPL_NUM_RHYTHM_INSTRUMENTS; i++) {
-			if (_activeRhythmNotes[i].noteActive && _activeRhythmNotes[i].source == source) {
+			if (_activeRhythmNotes[i].noteActive && (rhythmChannel || _activeRhythmNotes[i].channel == channel) &&
+					_activeRhythmNotes[i].source == source) {
 				writePanning(0xFF, static_cast<OplInstrumentRhythmType>(i + 1));
 			}
 		}
-	} else {
-		for (int i = 0; i < _numMelodicChannels; i++) {
-			uint8 oplChannel = _melodicChannels[i];
-			if (_activeNotes[oplChannel].noteActive && _activeNotes[oplChannel].channel == channel &&
-					_activeNotes[oplChannel].source == source) {
-				writePanning(oplChannel);
-			}
+	}
+
+	for (int i = 0; i < _numMelodicChannels; i++) {
+		uint8 oplChannel = _melodicChannels[i];
+		if (_activeNotes[oplChannel].noteActive && _activeNotes[oplChannel].channel == channel &&
+				_activeNotes[oplChannel].source == source) {
+			writePanning(oplChannel);
 		}
 	}
 
@@ -1032,21 +1167,24 @@ void MidiDriver_ADLIB_Multisource::resetAllControllers(uint8 channel, uint8 sour
 void MidiDriver_ADLIB_Multisource::allNotesOff(uint8 channel, uint8 source) {
 	_activeNotesMutex.lock();
 
+	bool rhythmChannel = (_rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_CHANNEL_10 && channel == MIDI_RHYTHM_CHANNEL);
+
 	// Execute a note off for all active notes on this MIDI channel. This will
 	// turn the notes off if sustain is off and sustain the notes if it is on.
-	if (_rhythmMode && channel == MIDI_RHYTHM_CHANNEL) {
+	if (_rhythmMode) {
 		for (int i = 0; i < OPL_NUM_RHYTHM_INSTRUMENTS; i++) {
-			if (_activeRhythmNotes[i].noteActive && _activeRhythmNotes[i].source == source) {
+			if (_activeRhythmNotes[i].noteActive && (rhythmChannel || _activeRhythmNotes[i].channel == channel) && 
+					_activeRhythmNotes[i].source == source) {
 				noteOff(channel, _activeRhythmNotes[i].note, 0, source);
 			}
 		}
-	} else {
-		for (int i = 0; i < _numMelodicChannels; i++) {
-			uint8 oplChannel = _melodicChannels[i];
-			if (_activeNotes[oplChannel].noteActive && !_activeNotes[oplChannel].noteSustained && 
-					_activeNotes[oplChannel].source == source && _activeNotes[oplChannel].channel == channel) {
-				noteOff(channel, _activeNotes[oplChannel].note, 0, source);
-			}
+	}
+
+	for (int i = 0; i < _numMelodicChannels; i++) {
+		uint8 oplChannel = _melodicChannels[i];
+		if (_activeNotes[oplChannel].noteActive && !_activeNotes[oplChannel].noteSustained && 
+				_activeNotes[oplChannel].source == source && _activeNotes[oplChannel].channel == channel) {
+			noteOff(channel, _activeNotes[oplChannel].note, 0, source);
 		}
 	}
 
@@ -1071,6 +1209,8 @@ void MidiDriver_ADLIB_Multisource::stopAllNotes(bool stopSustainedNotes) {
 void MidiDriver_ADLIB_Multisource::stopAllNotes(uint8 source, uint8 channel) {
 	_activeNotesMutex.lock();
 
+	bool rhythmChannel = (_rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_CHANNEL_10 && channel == MIDI_RHYTHM_CHANNEL);
+
 	// Write the key off bit for all active notes on this MIDI channel and
 	// source.
 	for (int i = 0; i < _numMelodicChannels; i++) {
@@ -1080,10 +1220,11 @@ void MidiDriver_ADLIB_Multisource::stopAllNotes(uint8 source, uint8 channel) {
 			writeKeyOff(oplChannel);
 		}
 	}
-	if (_rhythmMode && !_rhythmModeIgnoreNoteOffs && (channel == 0xFF || channel == MIDI_RHYTHM_CHANNEL)) {
+	if (_rhythmMode && !_rhythmModeIgnoreNoteOffs) {
 		bool rhythmChanged = false;
 		for (int i = 0; i < 5; i++) {
-			if (_activeRhythmNotes[i].noteActive && (source == 0xFF || _activeRhythmNotes[i].source == source)) {
+			if (_activeRhythmNotes[i].noteActive && (channel == 0xFF || rhythmChannel || _activeRhythmNotes[i].channel == channel) && 
+					(source == 0xFF || _activeRhythmNotes[i].source == source)) {
 				_activeRhythmNotes[i].noteActive = false;
 				rhythmChanged = true;
 			}
@@ -1196,19 +1337,27 @@ void MidiDriver_ADLIB_Multisource::initOpl() {
 void MidiDriver_ADLIB_Multisource::recalculateFrequencies(uint8 channel, uint8 source) {
 	_activeNotesMutex.lock();
 
+	bool rhythmChannel = (_rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_CHANNEL_10 && channel == MIDI_RHYTHM_CHANNEL);
+
 	// Calculate and write the frequency of all active notes on this MIDI
 	// channel and source.
-	if (_rhythmMode && channel == MIDI_RHYTHM_CHANNEL) {
+	if (_rhythmMode) {
 		// Always rewrite bass drum frequency if it is active.
-		if (_activeRhythmNotes[RHYTHM_TYPE_BASS_DRUM - 1].noteActive && _activeRhythmNotes[RHYTHM_TYPE_BASS_DRUM - 1].source == source) {
+		if (_activeRhythmNotes[RHYTHM_TYPE_BASS_DRUM - 1].noteActive &&
+				(rhythmChannel || _activeRhythmNotes[RHYTHM_TYPE_BASS_DRUM - 1].channel == channel) && 
+				_activeRhythmNotes[RHYTHM_TYPE_BASS_DRUM - 1].source == source) {
 			writeFrequency(0xFF, RHYTHM_TYPE_BASS_DRUM);
 		}
 
 		// Snare drum and hi-hat share the same frequency setting. If both are
 		// active, use the most recently played instrument.
 		OplInstrumentRhythmType rhythmType = RHYTHM_TYPE_UNDEFINED;
-		bool snareActive = _activeRhythmNotes[RHYTHM_TYPE_SNARE_DRUM - 1].noteActive && _activeRhythmNotes[RHYTHM_TYPE_SNARE_DRUM - 1].source == source;
-		bool hiHatActive = _activeRhythmNotes[RHYTHM_TYPE_HI_HAT - 1].noteActive && _activeRhythmNotes[RHYTHM_TYPE_HI_HAT - 1].source == source;
+		bool snareActive = _activeRhythmNotes[RHYTHM_TYPE_SNARE_DRUM - 1].noteActive &&
+			(rhythmChannel || _activeRhythmNotes[RHYTHM_TYPE_SNARE_DRUM - 1].channel == channel) &&
+			_activeRhythmNotes[RHYTHM_TYPE_SNARE_DRUM - 1].source == source;
+		bool hiHatActive = _activeRhythmNotes[RHYTHM_TYPE_HI_HAT - 1].noteActive &&
+			(rhythmChannel || _activeRhythmNotes[RHYTHM_TYPE_HI_HAT - 1].channel == channel) &&
+			_activeRhythmNotes[RHYTHM_TYPE_HI_HAT - 1].source == source;
 		if (snareActive && hiHatActive) {
 			rhythmType = (_activeRhythmNotes[RHYTHM_TYPE_SNARE_DRUM - 1].noteCounterValue >=
 				_activeRhythmNotes[RHYTHM_TYPE_HI_HAT - 1].noteCounterValue ? RHYTHM_TYPE_SNARE_DRUM : RHYTHM_TYPE_HI_HAT);
@@ -1223,8 +1372,12 @@ void MidiDriver_ADLIB_Multisource::recalculateFrequencies(uint8 channel, uint8 s
 		// Tom tom and cymbal share the same frequency setting. If both are 
 		// active, use the most recently played instrument.
 		rhythmType = RHYTHM_TYPE_UNDEFINED;
-		bool tomTomActive = _activeRhythmNotes[RHYTHM_TYPE_TOM_TOM - 1].noteActive && _activeRhythmNotes[RHYTHM_TYPE_TOM_TOM - 1].source == source;
-		bool cymbalActive = _activeRhythmNotes[RHYTHM_TYPE_CYMBAL - 1].noteActive && _activeRhythmNotes[RHYTHM_TYPE_CYMBAL - 1].source == source;
+		bool tomTomActive = _activeRhythmNotes[RHYTHM_TYPE_TOM_TOM - 1].noteActive &&
+			(rhythmChannel || _activeRhythmNotes[RHYTHM_TYPE_TOM_TOM - 1].channel == channel) &&
+			_activeRhythmNotes[RHYTHM_TYPE_TOM_TOM - 1].source == source;
+		bool cymbalActive = _activeRhythmNotes[RHYTHM_TYPE_CYMBAL - 1].noteActive &&
+			(rhythmChannel || _activeRhythmNotes[RHYTHM_TYPE_CYMBAL - 1].channel == channel) &&
+			_activeRhythmNotes[RHYTHM_TYPE_CYMBAL - 1].source == source;
 		if (tomTomActive && cymbalActive) {
 			rhythmType = (_activeRhythmNotes[RHYTHM_TYPE_TOM_TOM - 1].noteCounterValue >=
 				_activeRhythmNotes[RHYTHM_TYPE_CYMBAL - 1].noteCounterValue ? RHYTHM_TYPE_TOM_TOM : RHYTHM_TYPE_CYMBAL);
@@ -1235,13 +1388,13 @@ void MidiDriver_ADLIB_Multisource::recalculateFrequencies(uint8 channel, uint8 s
 		}
 		if (rhythmType != RHYTHM_TYPE_UNDEFINED)
 			writeFrequency(0xFF, rhythmType);
-	} else {
-		for (int i = 0; i < _numMelodicChannels; i++) {
-			uint8 oplChannel = _melodicChannels[i];
-			if (_activeNotes[oplChannel].noteActive && _activeNotes[oplChannel].channel == channel &&
-					_activeNotes[oplChannel].source == source) {
-				writeFrequency(oplChannel);
-			}
+	}
+
+	for (int i = 0; i < _numMelodicChannels; i++) {
+		uint8 oplChannel = _melodicChannels[i];
+		if (_activeNotes[oplChannel].noteActive && _activeNotes[oplChannel].channel == channel &&
+				_activeNotes[oplChannel].source == source) {
+			writeFrequency(oplChannel);
 		}
 	}
 
@@ -1250,6 +1403,8 @@ void MidiDriver_ADLIB_Multisource::recalculateFrequencies(uint8 channel, uint8 s
 
 void MidiDriver_ADLIB_Multisource::recalculateVolumes(uint8 channel, uint8 source) {
 	_activeNotesMutex.lock();
+
+	bool rhythmChannel = (_rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_CHANNEL_10 && channel == MIDI_RHYTHM_CHANNEL);
 
 	// Calculate and write the volume of all operators of all active notes on
 	// this MIDI channel and source. 
@@ -1263,9 +1418,11 @@ void MidiDriver_ADLIB_Multisource::recalculateVolumes(uint8 channel, uint8 sourc
 			}
 		}
 	}
-	if (_rhythmMode && (channel == 0xFF || channel == MIDI_RHYTHM_CHANNEL)) {
+	if (_rhythmMode) {
 		for (int i = 0; i < OPL_NUM_RHYTHM_INSTRUMENTS; i++) {
-			if (_activeRhythmNotes[i].noteActive && (source == 0xFF || _activeRhythmNotes[i].source == source)) {
+			if (_activeRhythmNotes[i].noteActive && 
+					(channel == 0xFF || rhythmChannel || _activeRhythmNotes[i].channel == channel) && 
+					(source == 0xFF || _activeRhythmNotes[i].source == source)) {
 				for (int j = 0; j < _activeRhythmNotes[i].instrumentDef->getNumberOfOperators(); j++) {
 					writeVolume(0xFF, j, static_cast<OplInstrumentRhythmType>(i + 1));
 				}
@@ -1279,7 +1436,7 @@ void MidiDriver_ADLIB_Multisource::recalculateVolumes(uint8 channel, uint8 sourc
 MidiDriver_ADLIB_Multisource::InstrumentInfo MidiDriver_ADLIB_Multisource::determineInstrument(uint8 channel, uint8 source, uint8 note) {
 	InstrumentInfo instrument = { 0, nullptr, 0 };
 
-	if (channel == MIDI_RHYTHM_CHANNEL) {
+	if (_rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_CHANNEL_10 && channel == MIDI_RHYTHM_CHANNEL) {
 		// On the rhythm channel, the note played indicates which instrument
 		// should be used.
 		if (note < _rhythmBankFirstNote || note > _rhythmBankLastNote)
@@ -1306,7 +1463,28 @@ MidiDriver_ADLIB_Multisource::InstrumentInfo MidiDriver_ADLIB_Multisource::deter
 	return instrument;
 }
 
-uint8 MidiDriver_ADLIB_Multisource::allocateOplChannel(uint8 channel, uint8 source, uint8 instrumentId) {
+uint8 MidiDriver_ADLIB_Multisource::allocateOplChannel(uint8 channel, uint8 source, InstrumentInfo &instrumentInfo) {
+
+	// Allocate channel for OPL rhythm mode notes. These are just mapped to the
+	// OPL channel used to play the OPL rhythm mode instrument.
+	if (_rhythmMode) {
+		if (_rhythmInstrumentMode == RHYTHM_INSTRUMENT_MODE_CHANNEL_10 && channel == MIDI_RHYTHM_CHANNEL) {
+			// OPL rhythm notes are played using the MIDI rhythm channel,
+			// and this channel is being used to play a note.
+			// If the instrument is an OPL rhythm instrument, return the
+			// corresponding OPL channel. Otherwise the note should not be
+			// played, so do not return a channel.
+			return instrumentInfo.instrumentDef->rhythmType != RHYTHM_TYPE_UNDEFINED ?
+				OPL_RHYTHM_INSTRUMENT_CHANNELS[instrumentInfo.instrumentDef->rhythmType - 1] :
+				0xFF;
+		}
+		else if (instrumentInfo.instrumentDef->rhythmType != RHYTHM_TYPE_UNDEFINED) {
+			// OPL rhythm notes are played based on the instrument rhythm type.
+			// If it is a rhythm instrument, return the corresponding OPL
+			// channel. Otherwise, allocate a melodic channel.
+			return OPL_RHYTHM_INSTRUMENT_CHANNELS[instrumentInfo.instrumentDef->rhythmType - 1];
+		}
+	}
 
 	uint8 allocatedChannel = 0xFF;
 	if (_allocationMode == ALLOCATION_MODE_DYNAMIC) {
@@ -1343,7 +1521,7 @@ uint8 MidiDriver_ADLIB_Multisource::allocateOplChannel(uint8 channel, uint8 sour
 				inactiveChannel = oplChannel;
 				continue;
 			}
-			if (_activeNotes[oplChannel].noteActive && _activeNotes[oplChannel].instrumentId == instrumentId &&
+			if (_activeNotes[oplChannel].noteActive && _activeNotes[oplChannel].instrumentId == instrumentInfo.instrumentId &&
 					_activeNotes[oplChannel].noteCounterValue < instrumentNoteCounter) {
 				// A channel playing a note using the same instrument with a
 				// lower note counter value has been found.
@@ -1537,10 +1715,77 @@ int32 MidiDriver_ADLIB_Multisource::calculatePitchBend(uint8 channel, uint8 sour
 	return pitchBend;
 }
 
-uint8 MidiDriver_ADLIB_Multisource::calculateVolume(uint8 channel, uint8 source, uint8 velocity, OplInstrumentDefinition &instrumentDef, uint8 operatorNum) {
+uint8 MidiDriver_ADLIB_Multisource::calculateVolume(uint8 channel, uint8 source, uint8 velocity, const OplInstrumentDefinition &instrumentDef, uint8 operatorNum) {
 	// Get the volume (level) for this operator from the instrument definition.
 	uint8 operatorDefVolume = instrumentDef.getOperatorDefinition(operatorNum).level & 0x3F;
 
+	// Determine if volume settings should be applied to this operator.
+	if (!isVolumeApplicableToOperator(instrumentDef, operatorNum))
+		// No need to apply volume settings; just use the instrument definition
+		// operator volume.
+		return operatorDefVolume;
+
+	// Calculate the volume based on note velocity, channel volume and
+	// expression.
+	uint8 unscaledVolume = calculateUnscaledVolume(channel, source, velocity, instrumentDef, operatorNum);
+
+	uint8 invertedVolume = 0x3F - unscaledVolume;
+	// Scale by source volume.
+	invertedVolume = (invertedVolume * _sources[source].volume) / _sources[source].neutralVolume;
+	if (_userVolumeScaling) {
+		if (_userMute) {
+			invertedVolume = 0;
+		} else {
+			// Scale by user volume.
+			uint16 userVolume = (_sources[source].type == SOURCE_TYPE_SFX ? _userSfxVolume : _userMusicVolume); // Treat SOURCE_TYPE_UNDEFINED as music
+			invertedVolume = (invertedVolume * userVolume) >> 8;
+		}
+	}
+	// Source volume scaling might clip volume, so reduce to maximum.
+	invertedVolume = MIN((uint8)0x3F, invertedVolume);
+	uint8 scaledVolume = 0x3F - invertedVolume;
+
+	return scaledVolume;
+}
+
+uint8 MidiDriver_ADLIB_Multisource::calculateUnscaledVolume(uint8 channel, uint8 source, uint8 velocity, const OplInstrumentDefinition &instrumentDef, uint8 operatorNum) {
+	uint8 unscaledVolume;
+	// Get the volume (level) for this operator from the instrument definition.
+	uint8 operatorVolume = instrumentDef.getOperatorDefinition(operatorNum).level & 0x3F;
+
+	if (_accuracyMode == ACCURACY_MODE_SB16_WIN95) {
+		// Volume calculation using the algorithm of the Win95 SB16 driver.
+
+		// Shift velocity and channel volume to a 5 bit value and look up the OPL
+		// volume value.
+		uint8 velocityVolume = OPL_VOLUME_LOOKUP[velocity >> 2];
+		uint8 channelVolume = OPL_VOLUME_LOOKUP[_controlData[source][channel].volume >> 2];
+		// Add velocity and channel OPL volume to get the unscaled volume. The
+		// operator volume is an additional (negative) volume adjustment to balance
+		// the instruments.
+		// Note that large OPL volume values can exceed the 0x3F limit; this is
+		// handled below. (0x3F means maximum attenuation - no sound.)
+		unscaledVolume = velocityVolume + channelVolume + operatorVolume;
+	} else {
+		// Volume calculation using an algorithm more accurate to the General MIDI
+		// standard.
+
+		// Calculate the volume in dB according to the GM formula:
+		// 40 log(velocity * volume * expression / 127 ^ 3)
+		// Note that velocity is not specified in detail in the MIDI standards;
+		// we use the same volume curve as channel volume and expression.
+		float volumeDb = 40 * log10((velocity * _controlData[source][channel].volume * _controlData[source][channel].expression) / 2048383.0f);
+		// Convert to OPL volume (every unit is 0.75 dB attenuation). The
+		// operator volume is an additional (negative) volume adjustment to balance
+		// the instruments.
+		unscaledVolume = volumeDb / -0.75f + operatorVolume;
+	}
+
+	// Clip the volume to the maximum value.
+	return MIN((uint8)0x3F, unscaledVolume);
+}
+
+bool MidiDriver_ADLIB_Multisource::isVolumeApplicableToOperator(const OplInstrumentDefinition &instrumentDef, uint8 operatorNum) {
 	// Determine if volume settings should be applied to this operator. Carrier
 	// operators in FM synthesis and all operators in additive synthesis need
 	// to have volume settings applied; modulator operators just use the
@@ -1585,69 +1830,7 @@ uint8 MidiDriver_ADLIB_Multisource::calculateVolume(uint8 channel, uint8 source,
 		// carrier.
 		applyVolume = (instrumentDef.connectionFeedback0 & 0x01) == 0x01 || operatorNum == 1;
 	}
-	if (!applyVolume)
-		// No need to apply volume settings; just use the instrument definition
-		// operator volume.
-		return operatorDefVolume;
-
-	// Calculate the volume based on note velocity, channel volume and
-	// expression.
-	uint8 unscaledVolume = calculateUnscaledVolume(channel, source, velocity, instrumentDef, operatorNum);
-
-	uint8 invertedVolume = 0x3F - unscaledVolume;
-	// Scale by source volume.
-	invertedVolume = (invertedVolume * _sources[source].volume) / _sources[source].neutralVolume;
-	if (_userVolumeScaling) {
-		if (_userMute) {
-			invertedVolume = 0;
-		} else {
-			// Scale by user volume.
-			uint16 userVolume = (_sources[source].type == SOURCE_TYPE_SFX ? _userSfxVolume : _userMusicVolume); // Treat SOURCE_TYPE_UNDEFINED as music
-			invertedVolume = (invertedVolume * userVolume) >> 8;
-		}
-	}
-	// Source volume scaling might clip volume, so reduce to maximum.
-	invertedVolume = MIN((uint8)0x3F, invertedVolume);
-	uint8 scaledVolume = 0x3F - invertedVolume;
-
-	return scaledVolume;
-}
-
-uint8 MidiDriver_ADLIB_Multisource::calculateUnscaledVolume(uint8 channel, uint8 source, uint8 velocity, OplInstrumentDefinition &instrumentDef, uint8 operatorNum) {
-	uint8 unscaledVolume;
-	// Get the volume (level) for this operator from the instrument definition.
-	uint8 operatorVolume = instrumentDef.getOperatorDefinition(operatorNum).level & 0x3F;
-
-	if (_accuracyMode == ACCURACY_MODE_SB16_WIN95) {
-		// Volume calculation using the algorithm of the Win95 SB16 driver.
-
-		// Shift velocity and channel volume to a 5 bit value and look up the OPL
-		// volume value.
-		uint8 velocityVolume = OPL_VOLUME_LOOKUP[velocity >> 2];
-		uint8 channelVolume = OPL_VOLUME_LOOKUP[_controlData[source][channel].volume >> 2];
-		// Add velocity and channel OPL volume to get the unscaled volume. The
-		// operator volume is an additional (negative) volume adjustment to balance
-		// the instruments.
-		// Note that large OPL volume values can exceed the 0x3F limit; this is
-		// handled below. (0x3F means maximum attenuation - no sound.)
-		unscaledVolume = velocityVolume + channelVolume + operatorVolume;
-	} else {
-		// Volume calculation using an algorithm more accurate to the General MIDI
-		// standard.
-
-		// Calculate the volume in dB according to the GM formula:
-		// 40 log(velocity * volume * expression / 127 ^ 3)
-		// Note that velocity is not specified in detail in the MIDI standards;
-		// we use the same volume curve as channel volume and expression.
-		float volumeDb = 40 * log10((velocity * _controlData[source][channel].volume * _controlData[source][channel].expression) / 2048383.0f);
-		// Convert to OPL volume (every unit is 0.75 dB attenuation). The
-		// operator volume is an additional (negative) volume adjustment to balance
-		// the instruments.
-		unscaledVolume = volumeDb / -0.75f + operatorVolume;
-	}
-
-	// Clip the volume to the maximum value.
-	return MIN((uint8)0x3F, unscaledVolume);
+	return applyVolume;
 }
 
 uint8 MidiDriver_ADLIB_Multisource::calculatePanning(uint8 channel, uint8 source) {
@@ -1756,6 +1939,7 @@ uint16 MidiDriver_ADLIB_Multisource::determineChannelRegisterOffset(uint8 oplCha
 void MidiDriver_ADLIB_Multisource::writeInstrument(uint8 oplChannel, InstrumentInfo instrument) {
 	ActiveNote *activeNote = (instrument.instrumentDef->rhythmType == RHYTHM_TYPE_UNDEFINED ? &_activeNotes[oplChannel] : &_activeRhythmNotes[instrument.instrumentDef->rhythmType - 1]);
 	activeNote->instrumentDef = instrument.instrumentDef;
+	activeNote->lastWrittenInstrumentId = instrument.instrumentId;
 
 	// Calculate operator volumes and write operator definitions to
 	// the OPL registers.

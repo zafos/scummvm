@@ -27,21 +27,21 @@
  *************************************/
 
 /*
-	-- SoundJam Copyright © Canter Technology 1995
-	SoundJam
-	II   mNew, numberOfChannels
-	ISI  mDefineFileSound, fullPathName, numberOfBeats
-	III  mDefineCastSound, castMemberNumber, numberOfBeats
-	II   mUndefineSound, soundID
-	III  mReadSome, soundID, byteCount
-	II   mStartSound, soundID
-	II   mSwitchNew, soundID
-	II   mSwitchParallel, soundID
-	I    mHasSwitchHappened
-	X    mToggleMute
-	X    mStop
-	X    mDispose
-*/
+ * -- SoundJam Copyright © Canter Technology 1995
+ * SoundJam
+ * II   mNew, numberOfChannels
+ * ISI  mDefineFileSound, fullPathName, numberOfBeats
+ * III  mDefineCastSound, castMemberNumber, numberOfBeats
+ * II   mUndefineSound, soundID
+ * III  mReadSome, soundID, byteCount
+ * II   mStartSound, soundID
+ * II   mSwitchNew, soundID
+ * II   mSwitchParallel, soundID
+ * I    mHasSwitchHappened
+ * X    mToggleMute
+ * X    mStop
+ * X    mDispose
+ */
 
 #include "director/director.h"
 #include "director/window.h"
@@ -53,15 +53,15 @@
 
 namespace Director {
 
-const char *SoundJam::xlibName = "SoundJam";
-const char *SoundJam::fileNames[] = {
-	"SoundJam",
-	nullptr
+const char *const SoundJam::xlibName = "SoundJam";
+const XlibFileDesc SoundJam::fileNames[] = {
+	{ "SoundJam",	nullptr },
+	{ nullptr,		nullptr },
 };
 
 const int kJamChannel = 3;
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",				SoundJam::m_new,			 1, 1,	400 },
 	{ "defineFileSound",	SoundJam::m_defineFileSound, 2, 2,	400 },
 	{ "defineCastSound",	SoundJam::m_defineCastSound, 2, 2,	400 },
@@ -76,7 +76,7 @@ static MethodProto xlibMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void SoundJam::open(int type) {
+void SoundJam::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		SoundJamObject::initMethods(xlibMethods);
 		SoundJamObject *xobj = new SoundJamObject(kXObj);
@@ -84,7 +84,7 @@ void SoundJam::open(int type) {
 	}
 }
 
-void SoundJam::close(int type) {
+void SoundJam::close(ObjectType type) {
 	if (type == kXObj) {
 		SoundJamObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -107,11 +107,7 @@ void SoundJam::m_new(int nargs) {
 	g_lingo->push(g_lingo->_state->me);
 }
 
-void SoundJam::m_defineFileSound(int nargs) {
-	g_lingo->printSTUBWithArglist("SoundJam::m_defineFileSound", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
+XOBJSTUB(SoundJam::m_defineFileSound, 0)
 
 void SoundJam::m_defineCastSound(int nargs) {
 	SoundJamObject *me = static_cast<SoundJamObject *>(g_lingo->_state->me.u.obj);
@@ -147,17 +143,8 @@ void SoundJam::m_undefineSound(int nargs) {
 	g_lingo->push(0); // success
 }
 
-void SoundJam::m_readSome(int nargs) {
-	g_lingo->printSTUBWithArglist("SoundJam::m_readSome", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SoundJam::m_startSound(int nargs) {
-	g_lingo->printSTUBWithArglist("SoundJam::m_startSound", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
+XOBJSTUB(SoundJam::m_readSome, 0)
+XOBJSTUB(SoundJam::m_startSound, 0)
 
 void SoundJam::m_switchNew(int nargs) {
 	SoundJamObject *me = static_cast<SoundJamObject *>(g_lingo->_state->me.u.obj);
@@ -175,22 +162,9 @@ void SoundJam::m_switchNew(int nargs) {
 	g_lingo->push(0); // success
 }
 
-void SoundJam::m_switchParallel(int nargs) {
-	g_lingo->printSTUBWithArglist("SoundJam::m_switchParallel", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SoundJam::m_hasSwitchHappened(int nargs) {
-	g_lingo->printSTUBWithArglist("SoundJam::m_hasSwitchHappened", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SoundJam::m_toggleMute(int nargs) {
-	g_lingo->printSTUBWithArglist("SoundJam::m_toggleMute", nargs);
-	g_lingo->dropStack(nargs);
-}
+XOBJSTUB(SoundJam::m_switchParallel, 0)
+XOBJSTUB(SoundJam::m_hasSwitchHappened, 0)
+XOBJSTUBNR(SoundJam::m_toggleMute)
 
 void SoundJam::m_stop(int nargs) {
 	DirectorSound *sound = g_director->getCurrentWindow()->getSoundManager();
@@ -199,4 +173,3 @@ void SoundJam::m_stop(int nargs) {
 }
 
 } // End of namespace Director
-

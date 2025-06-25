@@ -22,7 +22,7 @@
 #include "common/file.h"
 #include "common/util.h"
 #include "common/substream.h"
-#include "common/compression/zlib.h"
+#include "common/compression/deflate.h"
 
 #include "tetraedge/tetraedge.h"
 #include "tetraedge/te/te_light.h"
@@ -138,12 +138,13 @@ TeTRS TeModel::getBone(TeIntrusivePtr<TeModelAnimation> anim, uint num) {
 }
 
 void TeModel::invertNormals() {
-	for (auto mesh : meshes()) {
-		for (uint i = 0; i < mesh->numIndexes() / 3; i++) {
-			uint idx0 = mesh->index(i);
-			uint idx2 = mesh->index(i + 2);
-			mesh->setIndex(i, idx2);
-			mesh->setIndex(i, idx0);
+	for (auto &mesh : _meshes) {
+		for (uint i = 0; i < mesh->numIndexes() / 3; i += 3) {
+			// Swap order of verticies in each triangle.
+			uint idx0 = mesh->index(i * 3);
+			uint idx2 = mesh->index(i * 3 + 2);
+			mesh->setIndex(i * 3, idx2);
+			mesh->setIndex(i * 3 + 2, idx0);
 		}
 		for (uint i = 0; i < mesh->numVerticies(); i++) {
 			mesh->setNormal(i, -mesh->normal(i));
@@ -185,8 +186,7 @@ void TeModel::update() {
 	//if (name().contains("Kate"))
 	//	debug("TeModel::update model %s", name().c_str());
 	if (_bones.size()) {
-		Common::Array<TeMatrix4x4> matricies;
-		matricies.resize(_bones.size());
+		Common::Array<TeMatrix4x4> matricies(_bones.size());
 		for (uint i = 0; i < _bones.size(); i++) {
 			const Bone &b = _bones[i];
 			const TeMatrix4x4 matrix = TeMatrix4x4::fromTRS(b._trs);
@@ -284,7 +284,7 @@ void TeModel::update() {
 						updatedvertex = vertex;
 						if (verticies.empty())
 							updatedvertex = _boneMatricies[idx] * updatedvertex;
-						updatednormal = _boneMatricies[idx] * normal;
+						updatednormal = _boneMatricies[idx].mult3x3(normal);
 					} else {
 						idx -= _bones.size();
 						for (uint w = 0; w < _weightElements[idx].size(); w++) {
@@ -396,7 +396,7 @@ bool TeModel::load(Common::SeekableReadStream &stream) {
 		loadAlign(stream);
 		_bones[i]._parentBone = stream.readUint32LE();
 		TeTRS::deserialize(stream, _bones[i]._trs);
-		if (!_skipSkinOffsets) {
+		if (!_skipSkinOffsets || g_engine->gameType() == TetraedgeEngine::kSyberia2) {
 			_skinOffsets[i].deserialize(stream);
 		}
 	}
@@ -422,7 +422,7 @@ bool TeModel::load(Common::SeekableReadStream &stream) {
 bool TeModel::load(const Common::Path &path) {
 	Common::File modelFile;
 	if (!modelFile.open(path)) {
-		warning("[TeModel::load] Can't open file : %s.", path.toString().c_str());
+		warning("[TeModel::load] Can't open file : %s.", path.toString(Common::Path::kNativeSeparator).c_str());
 		return false;
 	}
 
@@ -453,7 +453,7 @@ Common::SeekableReadStream *TeModel::tryLoadZlibStream(Common::SeekableReadStrea
 	}
 	uint32 uncompressedSize = stream.readUint32LE();
 	Common::SeekableSubReadStream *substream = new Common::SeekableSubReadStream(&stream, stream.pos(), stream.size());
-	return Common::wrapCompressedReadStream(substream, uncompressedSize);
+	return Common::wrapCompressedReadStream(substream, DisposeAfterUse::YES, uncompressedSize);
 }
 
 bool TeModel::loadWeights(Common::ReadStream &stream, Common::Array<weightElement> &weights) {
@@ -569,6 +569,7 @@ bool TeModel::loadMesh(Common::SeekableReadStream &stream, TeMesh &mesh) {
 }
 
 void TeModel::setQuad(const TeIntrusivePtr<Te3DTexture> &tex, const Common::Array<TeVector3f32> &verts, const TeColor &col) {
+	_meshes.clear();
 	Common::SharedPtr<TeMesh> mesh(TeMesh::makeInstance());
 	mesh->setConf(4, 4, TeMesh::MeshMode_TriangleStrip, 0, 0);
 	mesh->defaultMaterial(tex);

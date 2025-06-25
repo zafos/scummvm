@@ -44,19 +44,21 @@ public:
 
 
 protected:
-	int _smushFrameRate;
+	int _smushFrameRate = 0;
 
 	/**
 	 * Flag which signals that the SMUSH video playback should end now
 	 * (e.g. because it was aborted by the user or it's simply finished).
 	 */
-	bool _smushVideoShouldFinish;
+	bool _smushVideoShouldFinish = false;
 
-	bool _smushActive;
+	bool _smushActive = false;
 
-	Insane *_insane;
+	Insane *_insane = nullptr;
 
 public:
+	void syncSoundSettings() override;
+
 	SmushMixer *_smixer;
 	SmushPlayer *_splayer;
 
@@ -70,15 +72,15 @@ protected:
 	TextRenderer_v7 *_textV7;
 	Common::Rect _defaultTextClipRect;
 	Common::Rect _wrappedTextClipRect;
-	bool _newTextRenderStyle;
+	bool _newTextRenderStyle = false;
 	int _blastTextRectsQueue = 0;
 
-	int _verbLineSpacing;
-	bool _existLanguageFile;
-	char *_languageBuffer;
+	int _verbLineSpacing = 0;
+	bool _existLanguageFile = false;
+	char *_languageBuffer = nullptr;
 	LangIndexNode *_languageIndex;
-	int _languageIndexSize;
-	char _lastStringTag[12+1];
+	int _languageIndexSize = 0;
+	char _lastStringTag[12+1] = {};
 
 	struct SubtitleText : TextObject {
 		void clear() {
@@ -99,7 +101,7 @@ public:
 	void processSubtitleQueue();
 	void addSubtitleToQueue(const byte *text, const Common::Point &pos, byte color, byte charset, bool center, bool wrap);
 	void clearSubtitleQueue();
-	void CHARSET_1() override;
+	void displayDialog() override;
 	bool isSmushActive() override { return _smushActive; }
 	bool isInsaneActive() override { return _insane ? _insane->isInsaneActive() : false; }
 	void removeBlastTexts() override;
@@ -112,7 +114,7 @@ protected:
 	void processInput() override;
 	void processKeyboard(Common::KeyState lastKeyHit) override;
 
-	void setupScumm(const Common::String &macResourceFile) override;
+	void setupScumm(const Common::Path &macResourceFile) override;
 	void resetScumm() override;
 
 	void setupScummVars() override;

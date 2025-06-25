@@ -21,11 +21,12 @@
 #include "common/array.h"
 #include "common/list.h"
 #include "common/system.h"
-#include "common/timer.h"
+#include "common/text-to-speech.h"
 
 #include "graphics/cursorman.h"
 #include "graphics/managed_surface.h"
 #include "graphics/palette.h"
+#include "graphics/paletteman.h"
 #include "graphics/primitives.h"
 #include "graphics/macgui/macwindowmanager.h"
 #include "graphics/macgui/macfontmanager.h"
@@ -152,7 +153,17 @@ static const byte macCursorCrossBar[] = {
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 };
 
-static void menuTimerHandler(void *refCon);
+template<typename T>
+class MacDrawPrimitives : public Primitives {
+public:
+	void drawPoint(int x, int y, uint32 color, void *data) override;
+};
+
+template<typename T>
+class MacDrawInvertPrimitives : public MacDrawPrimitives<T> {
+public:
+	void drawPoint(int x, int y, uint32 color, void *data) override;
+};
 
 MacWindowManager::MacWindowManager(uint32 mode, MacPatterns *patterns, Common::Language language) {
 	_screen = nullptr;
@@ -164,6 +175,9 @@ MacWindowManager::MacWindowManager(uint32 mode, MacPatterns *patterns, Common::L
 	_needsRemoval = false;
 
 	_activeWidget = nullptr;
+	_lockedWidget = nullptr;
+	_backgroundWindow = nullptr;
+
 	_mouseDown = false;
 	_hoveredWidget = nullptr;
 
@@ -172,12 +186,13 @@ MacWindowManager::MacWindowManager(uint32 mode, MacPatterns *patterns, Common::L
 
 	_menu = 0;
 	_menuDelay = 0;
-	_menuTimerActive = false;
+	_menuTimer = 0;
 
 	_engineP = nullptr;
 	_engineR = nullptr;
 	_redrawEngineCallback = nullptr;
 	_screenCopyPauseToken = nullptr;
+	_activateMenuCallback = nullptr;
 
 	_colorBlack = kColorBlack;
 	_colorGray80 = kColorGray80;
@@ -192,10 +207,16 @@ MacWindowManager::MacWindowManager(uint32 mode, MacPatterns *patterns, Common::L
 
 	_hilitingWidget = false;
 
-	if (mode & kWMMode32bpp)
+	if (mode & kWMMode32bpp) {
 		_pixelformat = Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0);
-	else
+		_macDrawPrimitives = new MacDrawPrimitives<uint32>();
+		// No implementation yet
+		_macDrawInvertPrimitives = nullptr;
+	} else {
 		_pixelformat = PixelFormat::createFormatCLUT8();
+		_macDrawPrimitives = new MacDrawPrimitives<byte>();
+		_macDrawInvertPrimitives = new MacDrawInvertPrimitives<byte>();
+	}
 
 	if (patterns) {
 		_patterns = *patterns;
@@ -208,7 +229,8 @@ MacWindowManager::MacWindowManager(uint32 mode, MacPatterns *patterns, Common::L
 	for (int i = 0; i < ARRAYSIZE(fillPatterns); i++)
 		_builtinPatterns.push_back(fillPatterns[i]);
 
-	g_system->getPaletteManager()->setPalette(palette, 0, ARRAYSIZE(palette) / 3);
+	if (g_system->getScreenFormat().isCLUT8())
+		g_system->getPaletteManager()->setPalette(palette, 0, ARRAYSIZE(palette) / 3);
 
 	_paletteSize = ARRAYSIZE(palette) / 3;
 	if (_paletteSize) {
@@ -219,10 +241,14 @@ MacWindowManager::MacWindowManager(uint32 mode, MacPatterns *patterns, Common::L
 
 	_fontMan = new MacFontManager(mode, language);
 
-	_cursor = nullptr;
-	_tempType = kMacCursorArrow;
-	replaceCursor(kMacCursorArrow);
-	CursorMan.showMouse(true);
+	if (!(mode & kWMModeNoCursorOverride)) {
+		_cursor = nullptr;
+		_tempType = kMacCursorArrow;
+		replaceCursor(kMacCursorArrow);
+		CursorMan.showMouse(true);
+	}
+
+	_ttsEnabled = false;
 
 	loadDataBundle();
 	setDesktopMode(mode);
@@ -237,6 +263,8 @@ void MacWindowManager::cleanupDesktopBmp() {
 }
 
 MacWindowManager::~MacWindowManager() {
+	Common::StackLock lock(_mutex);
+
 	for (Common::HashMap<uint, BaseMacWindow *>::iterator it = _windows.begin(); it != _windows.end(); it++)
 		delete it->_value;
 
@@ -248,10 +276,11 @@ MacWindowManager::~MacWindowManager() {
 
 	delete _desktop;
 
+	delete _macDrawPrimitives;
+	delete _macDrawInvertPrimitives;
+
 	cleanupDesktopBmp();
 	cleanupDataBundle();
-
-	g_system->getTimerManager()->removeTimerProc(&menuTimerHandler);
 }
 
 void MacWindowManager::setDesktopMode(uint32 mode) {
@@ -266,6 +295,8 @@ void MacWindowManager::setDesktopMode(uint32 mode) {
 }
 
 void MacWindowManager::setScreen(ManagedSurface *screen) {
+	Common::StackLock lock(_mutex);
+
 	_screen = screen;
 	delete _screenCopy;
 	_screenCopy = nullptr;
@@ -299,6 +330,8 @@ int MacWindowManager::getHeight() {
 }
 
 void MacWindowManager::resizeScreen(int w, int h) {
+	Common::StackLock lock(_mutex);
+
 	if (!_screen)
 		error("MacWindowManager::resizeScreen(): Trying to creating surface on non-existing screen");
 	_screenDims = Common::Rect(w, h);
@@ -335,6 +368,17 @@ void MacWindowManager::setActiveWidget(MacWidget *widget) {
 
 	if (_activeWidget)
 		_activeWidget->setActive(true);
+}
+
+void MacWindowManager::setLockedWidget(MacWidget *widget) {
+	if (_lockedWidget == widget)
+		return;
+
+	_lockedWidget = widget;
+}
+
+void MacWindowManager::setBackgroundWindow(MacWindow *window) {
+	_backgroundWindow = window;
 }
 
 void MacWindowManager::clearWidgetRefs(MacWidget *widget) {
@@ -394,10 +438,20 @@ MacMenu *MacWindowManager::addMenu() {
 	return _menu;
 }
 
+void MacWindowManager::addMenu(int id, MacMenu *menu) {
+	_windows[id] = menu;
+}
+
 MacMenu *MacWindowManager::getMenu() {
 	if (_menu) {
 		return _menu;
 	}
+	return nullptr;
+}
+
+MacMenu *MacWindowManager::getMenu(int id) {
+	if (_windows.contains(id))
+		return (MacMenu *)_windows[id];
 	return nullptr;
 }
 
@@ -417,15 +471,19 @@ void MacWindowManager::activateMenu() {
 		activateScreenCopy();
 	}
 
+	if (_activateMenuCallback != nullptr)
+		_activateMenuCallback(_engineAM);
+
 	_menu->setVisible(true);
 }
 
 void MacWindowManager::activateScreenCopy() {
+	Common::StackLock lock(_mutex);
+
 	if (_screen) {
 		if (!_screenCopy)
-			_screenCopy = new ManagedSurface(*_screen);	// Create a copy
-		else
-			*_screenCopy = *_screen;
+			_screenCopy = new ManagedSurface();
+		_screenCopy->copyFrom(*_screen); // Create a copy
 	} else {
 		Surface *surface = g_system->lockScreen();
 
@@ -441,6 +499,8 @@ void MacWindowManager::activateScreenCopy() {
 }
 
 void MacWindowManager::disableScreenCopy() {
+	Common::StackLock lock(_mutex);
+
 	if (_screenCopyPauseToken) {
 		_screenCopyPauseToken->clear();
 		delete _screenCopyPauseToken;
@@ -452,7 +512,7 @@ void MacWindowManager::disableScreenCopy() {
 		return;
 
 	if (_screen)
-		*_screen = *_screenCopy; // restore screen
+		_screen->copyFrom(*_screenCopy); // restore screen
 
 	g_system->copyRectToScreen(_screenCopy->getBasePtr(0, 0), _screenCopy->pitch, 0, 0, _screenCopy->w, _screenCopy->h);
 }
@@ -556,12 +616,53 @@ Common::U32String stripFormat(const Common::U32String &str) {
 				if (*s == '\001') {
 					tmp += *s++;
 				}
-			} else if (*s == '\015') {	// binary format
-				// we are skipping the formatting stuffs
-				// this number 12, and the number 23, is the size of our format
-				s += 12;
 			} else if (*s == '\016') {	// human-readable format
-				s += 23;
+				s++;
+				if (*s == '+' || *s == '-') // style + header size
+					s += 5;
+				else if (*s == '[') // color information
+					s += 13;
+				else if (*s == ']') // default color
+					s += 1;
+				else if (*s == '*') { // bullet
+					s++;
+					uint16 len;
+					s = readHex(&len, s, 2);
+					s += len;
+				} else if (*s == 'i') { // image
+					s += 3; // skip percent
+					uint16 len;
+					s = readHex(&len, s, 2); // fname
+					s += len;
+
+					s = readHex(&len, s, 2);
+					Common::String alt = Common::U32String(s, len);
+					s += len;
+
+					res += '[';
+					res += alt;
+					res += ']';
+
+					s = readHex(&len, s, 2); // title
+					s = readHex(&len, s, 2); // ext
+					s += len;
+				} else if (*s == 't') { // font
+					s += 5;
+				} else if (*s == 'l') { // link
+					s++;
+					uint16 len;
+					s = readHex(&len, s, 2);
+					s += len;
+				} else if (*s == 'T') { // table
+					s++;
+					char cmd = *s;
+
+					if (cmd == 'h' || cmd == 'b' || cmd == 'B' || cmd == 'r' || cmd == 'C')
+						s++;
+					else if (cmd == 'c') // cell
+						s += 3;
+				} else
+					s += 22;
 			} else {
 				tmp += *s++;
 			}
@@ -688,24 +789,24 @@ void MacWindowManager::removeWindow(MacWindow *target) {
 }
 
 template<typename T>
-void macDrawPixel(int x, int y, int color, void *data) {
+void MacDrawPrimitives<T>::drawPoint(int x, int y, uint32 color, void *data) {
 	MacPlotData *p = (MacPlotData *)data;
 
 	if (p->fillType > p->patterns->size() || !p->fillType)
 		return;
 
-	byte *pat = p->patterns->operator[](p->fillType - 1);
+	const byte *pat = p->patterns->operator[](p->fillType - 1);
 
 	if (p->thickness == 1) {
 		if (x >= 0 && x < p->surface->w && y >= 0 && y < p->surface->h) {
 			uint xu = (uint)x; // for letting compiler optimize it
 			uint yu = (uint)y;
 
-			*((T)p->surface->getBasePtr(xu, yu)) = p->invert ? ~(*((T)p->surface->getBasePtr(xu, yu))) :
+			*((T *)p->surface->getBasePtr(xu, yu)) = p->invert ? ~(*((T *)p->surface->getBasePtr(xu, yu))) :
 				(pat[(yu + p->fillOriginY) % 8] & (1 << (7 - (xu + p->fillOriginX) % 8))) ? color : p->bgColor;
 
 			if (p->mask)
-				*((T)p->mask->getBasePtr(xu, yu)) = 0xff;
+				*((T *)p->mask->getBasePtr(xu, yu)) = 0xff;
 		}
 	} else {
 		int x1 = x;
@@ -718,16 +819,19 @@ void macDrawPixel(int x, int y, int color, void *data) {
 				if (x >= 0 && x < p->surface->w && y >= 0 && y < p->surface->h) {
 					uint xu = (uint)x; // for letting compiler optimize it
 					uint yu = (uint)y;
-					*((T)p->surface->getBasePtr(xu, yu)) = p->invert ? ~(*((T)p->surface->getBasePtr(xu, yu))) :
+					*((T *)p->surface->getBasePtr(xu, yu)) = p->invert ? ~(*((T *)p->surface->getBasePtr(xu, yu))) :
 						(pat[(yu + p->fillOriginY) % 8] & (1 << (7 + (xu - p->fillOriginX) % 8))) ? color : p->bgColor;
 
 					if (p->mask)
-						*((T)p->mask->getBasePtr(xu, yu)) = 0xff;
+						*((T *)p->mask->getBasePtr(xu, yu)) = 0xff;
 				}
 	}
 }
 
-void macDrawInvertPixel(int x, int y, int color, void *data) {
+// TODO: implement for other bpp
+
+template<>
+void MacDrawInvertPrimitives<byte>::drawPoint(int x, int y, uint32 color, void *data) {
 	MacPlotData *p = (MacPlotData *)data;
 
 	if (p->fillType > p->patterns->size() || !p->fillType)
@@ -751,19 +855,11 @@ void macDrawInvertPixel(int x, int y, int color, void *data) {
 	}
 }
 
-MacDrawPixPtr MacWindowManager::getDrawPixel() {
-	if (_pixelformat.bytesPerPixel == 1)
-		return &macDrawPixel<byte *>;
-	else
-		return &macDrawPixel<uint32 *>;
-}
-
 // get the function of drawing invert pixel for default palette
-MacDrawPixPtr MacWindowManager::getDrawInvertPixel() {
-	if (_pixelformat.bytesPerPixel == 1)
-		return &macDrawInvertPixel;
-	warning("function of drawing invert pixel for default palette has not implemented yet");
-	return nullptr;
+Primitives &MacWindowManager::getDrawInvertPrimitives() const {
+	if (!_macDrawInvertPrimitives)
+		warning("function of drawing invert pixel for default palette has not implemented yet");
+	return *_macDrawInvertPrimitives;
 }
 
 void MacWindowManager::loadDesktop() {
@@ -772,33 +868,23 @@ void MacWindowManager::loadDesktop() {
 		return;
 
 	Image::BitmapDecoder bmpDecoder;
-	Graphics::Surface *source;
-	_desktopBmp = new Graphics::TransparentSurface();
-
 	bmpDecoder.loadStream(*file);
-	source = bmpDecoder.getSurface()->convertTo(_desktopBmp->getSupportedPixelFormat(), bmpDecoder.getPalette());
 
-	_desktopBmp->copyFrom(*source);
+	const Graphics::PixelFormat requiredFormat_4byte(4, 8, 8, 8, 8, 24, 16, 8, 0);
+	_desktopBmp = bmpDecoder.getSurface()->convertTo(requiredFormat_4byte, bmpDecoder.getPalette().data(), bmpDecoder.getPalette().size());
 
 	delete file;
-	source->free();
-	delete source;
 }
 
 void MacWindowManager::setDesktopColor(byte r, byte g, byte b) {
 	cleanupDesktopBmp();
-	_desktopBmp = new Graphics::TransparentSurface();
-	uint32 color = TS_RGB(r, g, b);
 
-	const Graphics::PixelFormat requiredFormat_4byte(4, 8, 8, 8, 8, 0, 8, 16, 24);
-	Graphics::ManagedSurface *source = new Graphics::ManagedSurface();
-	source->create(10, 10, requiredFormat_4byte);
-	Common::Rect area = source->getBounds();
-	source->fillRect(area, color);
+	const Graphics::PixelFormat requiredFormat_4byte(4, 8, 8, 8, 8, 24, 16, 8, 0);
+	uint32 color = requiredFormat_4byte.RGBToColor(r, g, b);
 
-	_desktopBmp->copyFrom(*source);
-	source->free();
-	delete source;
+	_desktopBmp = new Graphics::Surface();
+	_desktopBmp->create(10, 10, requiredFormat_4byte);
+	_desktopBmp->fillRect(Common::Rect(10, 10), color);
 }
 
 void MacWindowManager::drawDesktop() {
@@ -822,11 +908,13 @@ void MacWindowManager::drawDesktop() {
 
 		MacPlotData pd(_desktop, nullptr, &_patterns, kPatternCheckers, 0, 0, 1, _colorWhite);
 
-		Graphics::drawRoundRect(r, kDesktopArc, _colorBlack, true, getDrawPixel(), &pd);
+		getDrawPrimitives().drawRoundRect(r, kDesktopArc, _colorBlack, true, &pd);
 	}
 }
 
 void MacWindowManager::draw() {
+	Common::StackLock lock(_mutex);
+
 	removeMarked();
 
 	Common::Rect bounds = getScreenBounds();
@@ -872,8 +960,8 @@ void MacWindowManager::draw() {
 
 		bool forceRedraw = _fullRefresh;
 		if (!forceRedraw && dirtyRects.size()) {
-			for (Common::Array<Common::Rect>::iterator dirty = dirtyRects.begin(); dirty != dirtyRects.end(); dirty++) {
-				if (clip.intersects(*dirty)) {
+			for (auto &dirty : dirtyRects) {
+				if (clip.intersects(dirty)) {
 					forceRedraw = true;
 					break;
 				}
@@ -936,8 +1024,8 @@ void MacWindowManager::draw() {
 		else {
 			// add intersection check with menu
 			bool menuRedraw = false;
-			for (Common::Array<Common::Rect>::iterator dirty = dirtyRects.begin(); dirty != dirtyRects.end(); dirty++) {
-				if (_menu->checkIntersects(*dirty)) {
+			for (auto &dirty : dirtyRects) {
+				if (_menu->checkIntersects(dirty)) {
 					menuRedraw = true;
 					break;
 				}
@@ -947,18 +1035,6 @@ void MacWindowManager::draw() {
 	}
 
 	_fullRefresh = false;
-}
-
-static void menuTimerHandler(void *refCon) {
-	MacWindowManager *wm = (MacWindowManager *)refCon;
-
-	if (wm->_menuHotzone.contains(wm->_lastMousePos)) {
-		wm->activateMenu();
-	}
-
-	wm->_menuTimerActive = false;
-
-	g_system->getTimerManager()->removeTimerProc(&menuTimerHandler);
 }
 
 bool MacWindowManager::processEvent(Common::Event &event) {
@@ -979,17 +1055,33 @@ bool MacWindowManager::processEvent(Common::Event &event) {
 
 	if (_menu && !_menu->isVisible()) {
 		if ((_mode & kWMModeAutohideMenu) && event.type == Common::EVENT_MOUSEMOVE) {
-			if (!_menuTimerActive && _menuHotzone.contains(event.mouse)) {
-				_menuTimerActive = true;
-
-				g_system->getTimerManager()->installTimerProc(&menuTimerHandler, _menuDelay, this, "menuWindowCursor");
+			if (!_menuTimer && _menuHotzone.contains(event.mouse)) {
+				_menuTimer = g_system->getMillis() + _menuDelay;
 			}
+		}
+
+		if (_menuTimer && g_system->getMillis() >= _menuTimer) {
+			if (_menuHotzone.contains(_lastMousePos)) {
+				activateMenu();
+			}
+
+			_menuTimer = 0;
 		}
 	}
 
 	// Menu gets events first for shortcuts and menu bar
-	if (_menu && _menu->processEvent(event))
+	if (_menu && _menu->processEvent(event)) {
+		if (_mode & kWMModalMenuMode) {
+			_menu->draw(_screen);
+			_menu->eventLoop();
+
+			// Do not do full refresh as we took care of restoring
+			// the screen. WM is not even aware we were drawing.
+			setFullRefresh(false);
+		}
+
 		return true;
+	}
 
 	if (_activeWindow != -1) {
 		if ((_windows[_activeWindow]->isEditable() && _windows[_activeWindow]->getType() == kWindowWindow &&
@@ -1014,10 +1106,11 @@ bool MacWindowManager::processEvent(Common::Event &event) {
 	for (Common::List<BaseMacWindow *>::const_iterator it = _windowStack.end(); it != _windowStack.begin();) {
 		it--;
 		BaseMacWindow *w = *it;
-
-		if (w->hasAllFocus() || (w->isEditable() && event.type == Common::EVENT_KEYDOWN) ||
+		if (_lockedWidget != nullptr && w != _lockedWidget)
+			continue;
+		if (w->hasAllFocus() || (event.type == Common::EVENT_KEYDOWN) ||
 				w->getDimensions().contains(event.mouse.x, event.mouse.y)) {
-			if (event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP)
+			if ((event.type == Common::EVENT_LBUTTONDOWN || event.type == Common::EVENT_LBUTTONUP) && (!_backgroundWindow || w != _backgroundWindow))
 				setActiveWindow(w->getId());
 
 			return w->processEvent(event);
@@ -1054,6 +1147,8 @@ void MacWindowManager::removeMarked() {
 	for (it = _windowsToRemove.begin(); it != _windowsToRemove.end(); it++) {
 		removeFromStack(*it);
 		removeFromWindowList(*it);
+		if (_lockedWidget == *it)
+			_lockedWidget = nullptr;
 		delete *it;
 		_activeWindow = -1;
 		_fullRefresh = true;
@@ -1095,6 +1190,8 @@ void MacWindowManager::addZoomBox(ZoomBox *box) {
 }
 
 void MacWindowManager::renderZoomBox(bool redraw) {
+	Common::StackLock lock(_mutex);
+
 	if (!_zoomBoxes.size())
 		return;
 
@@ -1152,10 +1249,11 @@ void MacWindowManager::renderZoomBox(bool redraw) {
 }
 
 void MacWindowManager::zoomBoxInner(Common::Rect &r, Graphics::MacPlotData &pd) {
-	Graphics::drawLine(r.left,  r.top,    r.right, r.top,    0xff, getDrawPixel(), &pd);
-	Graphics::drawLine(r.right, r.top,    r.right, r.bottom, 0xff, getDrawPixel(), &pd);
-	Graphics::drawLine(r.left,  r.bottom, r.right, r.bottom, 0xff, getDrawPixel(), &pd);
-	Graphics::drawLine(r.left,  r.top,    r.left,  r.bottom, 0xff, getDrawPixel(), &pd);
+	Primitives &primitives = getDrawPrimitives();
+	primitives.drawHLine(r.left, r.right, r.top, 0xff, &pd);
+	primitives.drawVLine(r.right, r.top, r.bottom, 0xff, &pd);
+	primitives.drawHLine(r.left, r.right, r.bottom, 0xff, &pd);
+	primitives.drawVLine(r.left, r.top, r.bottom, 0xff, &pd);
 }
 
 /////////////////
@@ -1370,6 +1468,11 @@ void MacWindowManager::setEngineRedrawCallback(void *engine, void (*redrawCallba
 	_redrawEngineCallback = redrawCallback;
 }
 
+void MacWindowManager::setEngineActivateMenuCallback(void *engine, void (*activateMenuCallback)(void *)) {
+	_engineAM = engine;
+	_activateMenuCallback = activateMenuCallback;
+}
+
 void MacWindowManager::printWMMode(int debuglevel) {
 	Common::String out;
 
@@ -1414,5 +1517,33 @@ void MacWindowManager::printWMMode(int debuglevel) {
 
 	debug(debuglevel, "WM mode: %s", out.c_str());
 }
+
+const Common::U32String::value_type *readHex(uint16 *res, const Common::U32String::value_type *s, int len) {
+	*res = 0;
+
+	for (int i = 0; i < len; i++) {
+		char b = tolower((char)*s++);
+
+		*res <<= 4;
+		if (b >= 'a' && b <= 'f')
+			*res |= b - 'a' + 10;
+		else if (b >= '0' && b <= '9')
+			*res |= b - '0';
+	}
+
+	return s;
+}
+
+void MacWindowManager::sayText(const Common::U32String &text) const {
+	Common::TextToSpeechManager *ttsMan = g_system->getTextToSpeechManager();
+	if (ttsMan && _ttsEnabled) {
+		ttsMan->say(text, Common::TextToSpeechManager::INTERRUPT);
+	}
+}
+
+void MacWindowManager::setTTSEnabled(bool enabled) {
+	_ttsEnabled = enabled;
+}
+
 
 } // End of namespace Graphics

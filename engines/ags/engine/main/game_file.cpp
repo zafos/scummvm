@@ -30,7 +30,6 @@
 #include "ags/engine/ac/game.h"
 #include "ags/engine/ac/game_setup.h"
 #include "ags/shared/ac/game_setup_struct.h"
-#include "ags/engine/ac/game_state.h"
 #include "ags/shared/ac/game_struct_defines.h"
 #include "ags/engine/ac/gui.h"
 #include "ags/engine/ac/view_frame.h"
@@ -46,7 +45,6 @@
 #include "ags/engine/platform/base/ags_platform_driver.h"
 #include "ags/shared/script/cc_common.h"
 #include "ags/engine/script/script.h"
-#include "ags/shared/util/aligned_stream.h"
 #include "ags/shared/util/stream.h"
 #include "ags/shared/util/text_stream_reader.h"
 #include "ags/globals.h"
@@ -126,7 +124,7 @@ static inline HError MakeScriptLoadError(const char *name) {
 // For those that do exist, reads them and replaces any scripts of same kind
 // in the already loaded game data.
 HError LoadGameScripts(LoadedGameEntities &ents) {
-	// Global script 
+	// Global script
 	std::unique_ptr<Stream> in(_GP(AssetMgr)->OpenAsset("GlobalScript.o"));
 	if (in) {
 		PScript script(ccScript::CreateFromStream(in.get()));
@@ -175,6 +173,8 @@ HError load_game_file() {
 		return err;
 
 	err = (HError)ReadGameData(ents, src.InputStream.get(), src.DataVersion);
+	if (!err)
+		return err;
 	src.InputStream.reset();
 
 	//-------------------------------------------------------------------------
@@ -190,7 +190,7 @@ HError load_game_file() {
 	}
 	// Upscale mode -- for old games that supported it.
 	if ((_G(loaded_game_file_version) < kGameVersion_310) && _GP(usetup).override_upscale) {
-		if (_GP(game).GetResolutionType() == kGameResolution_320x200)
+		if (_GP(game).GetResolutionType() == kGameResolution_320x200 || _GP(game).GetResolutionType() == kGameResolution_Default)
 			_GP(game).SetGameResolution(kGameResolution_640x400);
 		else if (_GP(game).GetResolutionType() == kGameResolution_320x240)
 			_GP(game).SetGameResolution(kGameResolution_640x480);

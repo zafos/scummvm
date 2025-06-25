@@ -29,6 +29,8 @@
 #include "common/hashmap.h"
 #include "common/events.h"
 
+#include "graphics/renderer.h"
+
 #include "engines/grim/textobject.h"
 #include "engines/grim/iris.h"
 #include "engines/grim/detection.h"
@@ -83,7 +85,7 @@ public:
 	Common::Language getGameLanguage() { return _gameLanguage; }
 	Common::Platform getGamePlatform() { return _gamePlatform; }
 	virtual const char *getUpdateFilename();
-	bool canLoadGameStateCurrently() override { return true; }
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override { return true; }
 	Common::Error loadGameState(int slot) override;
 	bool isRemastered() const { return !!(_gameFlags & ADGF_REMASTERED); }
 
@@ -172,6 +174,8 @@ public:
 	void enableCutscene(uint32 number);
 
 	Commentary *getCommentary() { return _commentary; }
+
+	Graphics::RendererType getRendererType();
 
 	// TODO: Refactor.
 	void setSaveMetaData(const char*, int, const char*);
@@ -288,6 +292,9 @@ protected:
 public:
 	int _cursorX = 0;
 	int _cursorY = 0;
+	bool _isUtf8 = false;
+	bool _transcodeChineseToSimplified = false;
+	Font *_overrideFont = nullptr;
 };
 
 extern GrimEngine *g_grim;

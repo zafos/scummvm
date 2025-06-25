@@ -24,7 +24,10 @@
 #include "ultima/ultima8/world/current_map.h"
 #include "ultima/ultima8/world/world.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
-#include "ultima/ultima8/graphics/render_surface.h"
+#include "ultima/ultima8/gfx/palette.h"
+#include "ultima/ultima8/gfx/palette_manager.h"
+#include "ultima/ultima8/gfx/render_surface.h"
+#include "ultima/ultima8/gfx/texture.h"
 #include "ultima/ultima8/world/get_object.h"
 #include "ultima/ultima8/kernel/mouse.h"
 
@@ -33,8 +36,10 @@ namespace Ultima8 {
 
 DEFINE_RUNTIME_CLASSTYPE_CODE(MiniMapGump)
 
-static const uint32 NORMAL_COLOR = 0xFFFFAF00;
-static const uint32 HIGHLIGHT_COLOR = 0xFFFFCF00;
+static const uint BACKGROUND_COLOR = 0;
+static const uint NORMAL_COLOR = 53;
+static const uint HIGHLIGHT_COLOR = 52;
+static const uint KEY_COLOR = 255;
 
 MiniMapGump::MiniMapGump(int x, int y) : ResizableGump(x, y, 120, 120), _minimaps(), _ax(0), _ay(0) {
 	setMinSize(60, 60);
@@ -45,9 +50,8 @@ MiniMapGump::MiniMapGump() : ResizableGump(), _minimaps(), _ax(0), _ay(0) {
 }
 
 MiniMapGump::~MiniMapGump(void) {
-	Common::HashMap<uint32, MiniMap *>::iterator iter;
-	for (iter = _minimaps.begin(); iter != _minimaps.end(); ++iter) {
-		delete iter->_value;
+	for (auto &i : _minimaps) {
+		delete i._value;
 	}
 }
 
@@ -97,30 +101,39 @@ void MiniMapGump::generate() {
 }
 
 void MiniMapGump::clear() {
-	Common::HashMap<uint32, MiniMap *>::iterator iter;
-	for (iter = _minimaps.begin(); iter != _minimaps.end(); ++iter) {
-		delete iter->_value;
+	for (auto &i : _minimaps) {
+		delete i._value;
 	}
 	_minimaps.clear();
 }
 
+bool MiniMapGump::dump(const Common::Path &filename) const {
+	World *world = World::get_instance();
+	CurrentMap *currentmap = world->getCurrentMap();
+
+	uint32 mapNum = currentmap->getNum();
+
+	MiniMap *minimap = _minimaps[mapNum];
+	return minimap ? minimap->dump(filename) : false;	
+}
+
 void MiniMapGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool scaled) {
-	uint32 color = NORMAL_COLOR;
+	Palette *pal = PaletteManager::get_instance()->getPalette(PaletteManager::Pal_Game);
+	uint32 *map = pal->_native;
+
+	uint32 color = map[NORMAL_COLOR];
 	if (_dragPosition != Gump::CENTER || _mousePosition != Gump::CENTER)
-		color = HIGHLIGHT_COLOR;
+		color = map[HIGHLIGHT_COLOR];
 
 	// Draw the border
-	surf->DrawLine32(color, _dims.left, _dims.top, _dims.right - 1, _dims.top);
-	surf->DrawLine32(color, _dims.left, _dims.top, _dims.left, _dims.bottom - 1);
-	surf->DrawLine32(color, _dims.left, _dims.bottom - 1, _dims.right - 1, _dims.bottom - 1);
-	surf->DrawLine32(color, _dims.right -1, _dims.top, _dims.right - 1, _dims.bottom - 1);
+	surf->frameRect(_dims, color);
 
 	// Dimensions minus border
 	Rect dims = _dims;
 	dims.grow(-1);
 
 	// Fill the background
-	surf->Fill32(0xFF000000, dims);
+	surf->fillRect(dims, map[BACKGROUND_COLOR]);
 
 	// Center on avatar
 	int sx = _ax - dims.width() / 2;
@@ -138,37 +151,37 @@ void MiniMapGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool scaled)
 		_minimaps[mapNum] = minimap;
 	}
 
-	Graphics::ManagedSurface ms(minimap->getSurface(), DisposeAfterUse::NO);
+	const Graphics::Surface *ms = minimap->getSurface();
 	Common::Rect r(sx, sy, sx + dims.width(), sy + dims.height());
 
 	if (r.left < 0) {
 		dx -= r.left;
 		r.left = 0;
 	}
-	if (r.right > ms.w) {
-		r.right = ms.w;
+	if (r.right > ms->w) {
+		r.right = ms->w;
 	}
 
 	if (r.top < 0) {
 		dy -= r.top;
 		r.top = 0;
 	}
-	if (r.bottom > ms.h) {
-		r.bottom = ms.h;
+	if (r.bottom > ms->h) {
+		r.bottom = ms->h;
 	}
 
 	if (!r.isEmpty()) {
-		surf->Blit(ms, r, dx, dy);
+		surf->CrossKeyBlitMap(*ms, r, dx, dy, map, KEY_COLOR);
 	}
 
 	int32 ax = _ax - sx;
 	int32 ay = _ay - sy;
 
 	// Paint the avatar position marker
-	surf->DrawLine32(color, ax - 1, ay + 1, ax, ay + 1);
-	surf->DrawLine32(color, ax + 1, ay - 1, ax + 1, ay);
-	surf->DrawLine32(color, ax + 2, ay + 1, ax + 3, ay + 1);
-	surf->DrawLine32(color, ax + 1, ay + 2, ax + 1, ay + 3);
+	surf->drawLine(ax - 1, ay + 1, ax, ay + 1, color);
+	surf->drawLine(ax + 1, ay - 1, ax + 1, ay, color);
+	surf->drawLine(ax + 2, ay + 1, ax + 3, ay + 1, color);
+	surf->drawLine(ax + 1, ay + 2, ax + 1, ay + 3, color);
 }
 
 Gump *MiniMapGump::onMouseDown(int button, int32 mx, int32 my) {
@@ -193,10 +206,9 @@ void MiniMapGump::saveData(Common::WriteStream *ws) {
 	Gump::saveData(ws);
 
 	ws->writeUint32LE(static_cast<uint32>(_minimaps.size()));
-	Common::HashMap<uint32, MiniMap *>::const_iterator iter;
-	for (iter = _minimaps.begin(); iter != _minimaps.end(); ++iter) {
-		const MiniMap *minimap = iter->_value;
-		ws->writeUint32LE(iter->_key);
+	for (const auto &i : _minimaps) {
+		const MiniMap *minimap = i._value;
+		ws->writeUint32LE(i._key);
 		minimap->save(ws);
 	}
 }

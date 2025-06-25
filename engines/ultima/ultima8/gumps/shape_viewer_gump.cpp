@@ -19,28 +19,31 @@
  *
  */
 
+#include "common/file.h"
+
 #include "ultima/ultima8/gumps/shape_viewer_gump.h"
 
-#include "ultima/ultima8/graphics/render_surface.h"
+#include "ultima/ultima8/gfx/render_surface.h"
 #include "ultima/ultima8/ultima8.h"
 #include "ultima/ultima8/kernel/mouse.h"
-#include "ultima/ultima8/graphics/shape.h"
-#include "ultima/ultima8/graphics/shape_frame.h"
-#include "ultima/ultima8/graphics/shape_info.h"
+#include "ultima/ultima8/gfx/shape.h"
+#include "ultima/ultima8/gfx/shape_frame.h"
+#include "ultima/ultima8/gfx/shape_info.h"
 
-#include "ultima/ultima8/graphics/fonts/rendered_text.h"
-#include "ultima/ultima8/graphics/fonts/font.h"
-#include "ultima/ultima8/graphics/fonts/font_manager.h"
+#include "ultima/ultima8/gfx/fonts/rendered_text.h"
+#include "ultima/ultima8/gfx/fonts/font.h"
+#include "ultima/ultima8/gfx/fonts/font_manager.h"
 
 #include "ultima/ultima8/games/game_data.h"
-#include "ultima/ultima8/graphics/fonts/font_shape_archive.h"
-#include "ultima/ultima8/graphics/main_shape_archive.h"
-#include "ultima/ultima8/graphics/gump_shape_archive.h"
-#include "ultima/ultima8/graphics/mouse_shape_archive.h"
+#include "ultima/ultima8/gfx/fonts/font_shape_archive.h"
+#include "ultima/ultima8/gfx/main_shape_archive.h"
+#include "ultima/ultima8/gfx/gump_shape_archive.h"
+#include "ultima/ultima8/gfx/mouse_shape_archive.h"
+#include "ultima/ultima8/gfx/texture.h"
 
-#include "ultima/ultima8/filesys/file_system.h"
 #include "ultima/ultima8/convert/u8/convert_shape_u8.h"
-#include "ultima/ultima8/graphics/palette_manager.h"
+#include "ultima/ultima8/gfx/palette.h"
+#include "ultima/ultima8/gfx/palette_manager.h"
 #include "ultima/ultima8/usecode/usecode.h"
 
 #include "ultima/ultima8/metaengine.h"
@@ -50,9 +53,25 @@ namespace Ultima8 {
 
 DEFINE_RUNTIME_CLASSTYPE_CODE(ShapeViewerGump)
 
+static const uint32 background_colors[] = {
+	TEX32_PACK_RGB(0x10, 0x10, 0x10),
+	TEX32_PACK_RGB(0x90, 0x90, 0x90)
+};
+
+static const uint32 grid_colors[] = {
+	TEX32_PACK_RGB(0x20, 0x20, 0x20),
+	TEX32_PACK_RGB(0xA0, 0xA0, 0xA0)
+};
+
+static const uint32 axis_colors[] = {
+	TEX32_PACK_RGB(0x10, 0x30, 0x10),
+	TEX32_PACK_RGB(0x90, 0xB0, 0x90)
+};
+
 ShapeViewerGump::ShapeViewerGump()
 	: ModalGump(), _curArchive(0), _curShape(0), _curFrame(0),
-	  _background(0x101010), _fontNo(0), _shapeW(0), _shapeH(0), _shapeX(0), _shapeY(0) {
+	  _background(0), _fontNo(0), _showGrid(false), _mirrored(false),
+	  _shapeW(0), _shapeH(0), _shapeX(0), _shapeY(0) {
 
 }
 
@@ -60,8 +79,9 @@ ShapeViewerGump::ShapeViewerGump(int x, int y, int width, int height,
 								 Common::Array<ShapeArchiveEntry> &archives,
 								 uint32 flags, int32 layer)
 		: ModalGump(x, y, width, height, 0, flags, layer), _archives(archives),
-		_curArchive(0), _curShape(0), _curFrame(0), _background(0x101010), _fontNo(0),
-		_shapeW(0), _shapeH(0), _shapeX(0), _shapeY(0) {
+		  _curArchive(0), _curShape(0), _curFrame(0),
+		  _background(0), _fontNo(0), _showGrid(false), _mirrored(false),
+		  _shapeW(0), _shapeH(0), _shapeX(0), _shapeY(0) {
 
 	if (GAME_IS_CRUSADER) {
 		// Default to a decent font on Crusader
@@ -70,9 +90,9 @@ ShapeViewerGump::ShapeViewerGump(int x, int y, int width, int height,
 }
 
 ShapeViewerGump::~ShapeViewerGump() {
-	for (Common::Array<ShapeArchiveEntry>::iterator it = _archives.begin(); it != _archives.end(); it++) {
-		if (it->_disposeAfterUse == DisposeAfterUse::YES) {
-			delete it->_archive;
+	for (auto &entry : _archives) {
+		if (entry._disposeAfterUse == DisposeAfterUse::YES) {
+			delete entry._archive;
 		}
 	}
 }
@@ -87,15 +107,46 @@ void ShapeViewerGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool /*s
 		return;
 	}
 
-	surf->Fill32(_background, _dims);
+	uint32 color = background_colors[_background];
+	surf->fill32(color, _dims);
 
 	int32 posx = (_dims.width() - _shapeW) / 2 + _shapeX;
 	int32 posy = (_dims.height() - _shapeH) / 2 + _shapeY - 25;
 
+	if (_showGrid) {
+		const int step = 16;
+
+		color = grid_colors[_background];
+		for (int i = step; i < _dims.width(); i += step) {
+			int32 x = posx + i;
+			if (x < _dims.right)
+				surf->drawLine32(color, x, _dims.top, x, _dims.bottom - 1);
+
+			x = posx - i;
+			if (x > _dims.left)
+				surf->drawLine32(color, x, _dims.top, x, _dims.bottom - 1);
+		}
+
+		for (int i = step; i < _dims.height(); i += step) {
+			int32 y = posy + i;
+			if (y < _dims.bottom)
+				surf->drawLine32(color, _dims.left, y, _dims.right - 1, y);
+
+			y = posy - i;
+			if (y > _dims.top)
+				surf->drawLine32(color, _dims.left, y, _dims.right - 1, y);
+		}
+
+		color = axis_colors[_background];
+		surf->drawLine32(color, posx, _dims.top, posx, _dims.bottom - 1);
+		surf->drawLine32(color, _dims.left, posy, _dims.right - 1, posy);
+	}
+
 	ShapeArchive *archive = _archives[_curArchive]._archive;
 	const Shape *shape = archive->getShape(_curShape);
-	if (shape && _curFrame < shape->frameCount())
-		surf->Paint(shape, _curFrame, posx, posy);
+	if (shape && _curFrame < shape->frameCount()) {
+		surf->Paint(shape, _curFrame, posx, posy, _mirrored);
+	}
 
 	RenderedText *rendtext;
 	Font *font = FontManager::get_instance()->getGameFont(_fontNo, true);
@@ -113,14 +164,14 @@ void ShapeViewerGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool /*s
 		} else {
 			Common::sprintf_s(buf1, "Frame %d of %d", _curFrame+1, shape->frameCount());
 		}
-		Common::sprintf_s(buf2, "%s:  Shape %d, %s", _archives[_curArchive]._name.c_str(),
-				_curShape, buf1);
+		Common::sprintf_s(buf2, "%s:  Shape %d, %s %s", _archives[_curArchive]._name.c_str(),
+						  _curShape, buf1, _mirrored ? "(Mirrored)" : "");
 		rendtext = font->renderText(buf2, remaining);
 		rendtext->draw(surf, 8, 10);
 		delete rendtext;
 	}
 
-	{
+	if (!_mirrored) {
 		// Dump the pixel val under the mouse cursor:
 		int32 mx = 0;
 		int32 my = 0;
@@ -137,10 +188,9 @@ void ShapeViewerGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool /*s
 			rely -= _shapeY;
 			const ShapeFrame *frame = shape->getFrame(_curFrame);
 			if (frame && frame->hasPoint(relx, rely)) {
-				uint8 rawpx = frame->getPixelAtPoint(relx, rely);
-				uint8 px_r = shape->getPalette()->_palette[rawpx * 3];
-				uint8 px_g = shape->getPalette()->_palette[rawpx * 3 + 1];
-				uint8 px_b = shape->getPalette()->_palette[rawpx * 3 + 2];
+				uint8 rawpx = frame->getPixel(relx, rely);
+				uint8 px_r, px_g, px_b;
+				shape->getPalette()->get(rawpx, px_r, px_g, px_b);
 
 				Common::sprintf_s(buf2, "px: (%d, %d)(%d, %d): %d (%d, %d, %d)", relx, rely, frame->_xoff, frame->_yoff, rawpx, px_r, px_g, px_b);
 				rendtext = font->renderText(buf2, remaining);
@@ -267,9 +317,16 @@ bool ShapeViewerGump::OnKeyDown(int key, int mod) {
 		}
 	}
 	break;
+	case Common::KEYCODE_m: {
+		_mirrored = !_mirrored;
+	}
+	break;
+	case Common::KEYCODE_g: {
+		_showGrid = !_showGrid;
+	}
+	break;
 	case Common::KEYCODE_b: {
-		_background += 0x808080;
-		_background &= 0xF0F0F0;
+		_background = _background ? 0 : 1;
 	} break;
 	case Common::KEYCODE_ESCAPE: {
 		Close();
@@ -300,21 +357,24 @@ void ShapeViewerGump::U8ShapeViewer() {
 	ShapeArchive *mouseShapes = new MouseShapeArchive(gamedata->getMouse(), GameData::OTHER);
 	archives.push_back(ShapeArchiveEntry("mouse", mouseShapes, DisposeAfterUse::YES));
 
-	FileSystem *filesys = FileSystem::get_instance();
-	Common::SeekableReadStream *eintro = filesys->ReadFile("static/eintro.skf");
-	if (eintro) {
+	auto *eintro = new Common::File();
+	if (eintro->open("static/eintro.skf")) {
 		ShapeArchive *eintroshapes = new ShapeArchive(eintro, GameData::OTHER,
 		        PaletteManager::get_instance()->getPalette(PaletteManager::Pal_Game),
 		        &U8SKFShapeFormat);
 		archives.push_back(ShapeArchiveEntry("eintro", eintroshapes, DisposeAfterUse::YES));
+	} else {
+		delete eintro;
 	}
 
-	Common::SeekableReadStream *endgame = filesys->ReadFile("static/endgame.skf");
-	if (endgame) {
+	auto *endgame = new Common::File();
+	if (endgame->open("static/endgame.skf")) {
 		ShapeArchive *endgameshapes = new ShapeArchive(endgame, GameData::OTHER,
 		        PaletteManager::get_instance()->getPalette(PaletteManager::Pal_Game),
 		        &U8SKFShapeFormat);
 		archives.push_back(ShapeArchiveEntry("endgame", endgameshapes, DisposeAfterUse::YES));
+	} else {
+		delete endgame;
 	}
 
 	Gump *desktopGump = Ultima8Engine::get_instance()->getDesktopGump();

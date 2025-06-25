@@ -24,17 +24,94 @@
 
 #include <jni.h>
 
-#include "common/translation.h"
 #include "backends/fs/abstract-fs.h"
+#include "common/ptr.h"
+
+#include "backends/fs/android/android-fs.h"
 
 /**
  * Implementation of the ScummVM file system API.
  *
  * Parts of this class are documented in the base interface class, AbstractFSNode.
  */
-class AndroidSAFFilesystemNode final : public AbstractFSNode {
+class AndroidSAFFilesystemNode final : public AbstractFSNode, public AndroidFSNode {
 protected:
+	/**
+	 * A class managing a global reference.
+	 *
+	 * This handles the reference management and avoids duplicating them in JNI.
+	 */
+	class GlobalRef final : public Common::SharedPtr<_jobject> {
+		struct Deleter {
+			void operator()(_jobject *obj);
+		};
+	public:
+		GlobalRef() : Common::SharedPtr<_jobject>() {}
+		GlobalRef(const GlobalRef &ref) : Common::SharedPtr<_jobject>(ref) {}
+		GlobalRef(JNIEnv *env, jobject jobj) : Common::SharedPtr<_jobject>(jobj ? env->NewGlobalRef(jobj) : nullptr, Deleter()) {
+			// Make sure NewGlobalRef succeeded
+			assert((jobj == nullptr) == (get() == nullptr));
+		}
+		GlobalRef &operator=(const GlobalRef &r) {
+			Common::SharedPtr<_jobject>::reset(r);
+			return *this;
+		}
+
+		operator jobject() {
+			return Common::SharedPtr<_jobject>::get();
+		}
+		operator jobject() const {
+			return Common::SharedPtr<_jobject>::get();
+		}
+	};
+
+	/**
+	 * A class managing our SAFFSNode references.
+	 *
+	 * Reference counting is managed by SAFFSNode in Java and this class uses
+	 * RAII to call the reference counting methods at the appropriate time.
+	 */
+	class NodeRef final {
+	private:
+		jlong _ref;
+
+	public:
+		NodeRef() : _ref(0) {}
+		~NodeRef() { reset(); }
+		NodeRef(const NodeRef &r) { reset(r); }
+		NodeRef(JNIEnv *env, jobject node) { reset(env, node); }
+
+		void reset();
+		void reset(const NodeRef &r);
+		void reset(JNIEnv *env, jobject node);
+
+		NodeRef &operator=(const NodeRef &r) {
+			reset(r);
+			return *this;
+		}
+
+		bool operator==(const NodeRef &r) const {
+			return _ref == r._ref;
+		}
+
+		bool operator!=(const NodeRef &r) const {
+			return _ref != r._ref;
+		}
+
+		explicit operator bool() const {
+			return _ref != 0;
+		}
+
+		jlong get() const { return _ref; }
+		jobject localRef(JNIEnv *env) const;
+	};
+
 	// SAFFSTree
+	static jclass    _CLS_SAFFSTree;
+
+	static jmethodID _MID_addNodeRef;
+	static jmethodID _MID_decNodeRef;
+	static jmethodID _MID_refToNode;
 	static jmethodID _MID_getTreeId;
 	static jmethodID _MID_pathToNode;
 	static jmethodID _MID_getChildren;
@@ -43,12 +120,15 @@ protected:
 	static jmethodID _MID_createFile;
 	static jmethodID _MID_createReadStream;
 	static jmethodID _MID_createWriteStream;
+	static jmethodID _MID_removeNode;
 	static jmethodID _MID_removeTree;
 
 	static jfieldID _FID__treeName;
 	static jfieldID _FID__root;
 
 	// SAFFSNode
+	static jmethodID _MID_addRef;
+
 	static jfieldID _FID__parent;
 	static jfieldID _FID__path;
 	static jfieldID _FID__documentId;
@@ -61,27 +141,18 @@ protected:
 	static const int WRITABLE  = 2;
 	static const int READABLE  = 4;
 
-	jobject _safTree;
-	// When null, node doesn't exist yet
+	GlobalRef _safTree;
+	// When 0, node doesn't exist yet
 	// In this case _path is the parent path, _newName the node name and _safParent the parent SAF object
-	jobject _safNode;
+	NodeRef _safNode;
 
-	bool _cached;
 	Common::String _path;
 	int _flags;
-	jobject _safParent;
+	NodeRef _safParent;
 
 	// Used when creating a new node
 	// Also used for root node to store its pretty name
 	Common::String _newName;
-
-	/**
-	 * Creates an AndroidSAFFilesystemNode given its tree and its node
-	 *
-	 * @param safTree SAF root in Java side
-	 * @param safNode SAF node in Java side
-	 */
-	AndroidSAFFilesystemNode(jobject safTree, jobject safNode);
 
 public:
 	static const char SAF_MOUNT_POINT[];
@@ -106,19 +177,7 @@ public:
 	 */
 	static AndroidSAFFilesystemNode *makeFromTree(jobject safTree);
 
-	/**
-	 * Copy constructor.
-	 *
-	 * @note Needed because we keep references
-	 */
-	AndroidSAFFilesystemNode(const AndroidSAFFilesystemNode &node);
-
-	/**
-	 * Destructor.
-	 */
-	~AndroidSAFFilesystemNode() override;
-
-	bool exists() const override { return _safNode != nullptr; }
+	bool exists() const override { return (bool)_safNode; }
 	Common::U32String getDisplayName() const override { return Common::U32String(getName()); }
 	Common::String getName() const override;
 	Common::String getPath() const override;
@@ -131,8 +190,10 @@ public:
 	AbstractFSNode *getParent() const override;
 
 	Common::SeekableReadStream *createReadStream() override;
-	Common::SeekableWriteStream *createWriteStream() override;
+	Common::SeekableWriteStream *createWriteStream(bool atomic) override;
 	bool createDirectory() override;
+
+	bool remove() override;
 
 	/**
 	 * Removes the SAF tree.
@@ -141,6 +202,14 @@ public:
 	void removeTree();
 protected:
 	/**
+	 * Creates an AndroidSAFFilesystemNode given its tree and its node
+	 *
+	 * @param safTree SAF root in Java side
+	 * @param safNode SAF node in Java side
+	 */
+	AndroidSAFFilesystemNode(const GlobalRef &safTree, jobject safNode);
+
+	/**
 	 * Creates an non-existent AndroidSAFFilesystemNode given its tree, parent node and name
 	 *
 	 * @param safTree SAF root in Java side
@@ -148,13 +217,24 @@ protected:
 	 * @param path Parent path
 	 * @param name Item name
 	 */
-	AndroidSAFFilesystemNode(jobject safTree, jobject safParent,
+	AndroidSAFFilesystemNode(const GlobalRef &safTree, jobject safParent,
 	                         const Common::String &path, const Common::String &name);
 
-	void cacheData(bool force = false);
+	/**
+	 * Creates an non-existent AndroidSAFFilesystemNode given its tree, parent node and name
+	 *
+	 * @param safTree SAF root in Java side
+	 * @param safParent SAF parent node reference in Java side
+	 * @param path Parent path
+	 * @param name Item name
+	 */
+	AndroidSAFFilesystemNode(const GlobalRef &safTree, const NodeRef &safParent,
+	                         const Common::String &path, const Common::String &name);
+
+	void cacheData(JNIEnv *env, jobject node);
 };
 
-class AddSAFFakeNode final : public AbstractFSNode {
+class AddSAFFakeNode final : public AbstractFSNode, public AndroidFSNode {
 protected:
 	AbstractFSNode *getChild(const Common::String &name) const override;
 	AbstractFSNode *getParent() const override;
@@ -162,7 +242,7 @@ protected:
 public:
 	static const char SAF_ADD_FAKE_PATH[];
 
-	AddSAFFakeNode() : _proxied(nullptr) { }
+	AddSAFFakeNode(bool fromPath) : _proxied(nullptr), _fromPath(fromPath) { }
 	~AddSAFFakeNode() override;
 
 	bool exists() const override;
@@ -170,23 +250,24 @@ public:
 	bool getChildren(AbstractFSList &list, ListMode mode, bool hidden) const override;
 
 	// I18N: This is displayed in the file browser to let the user choose a new folder for Android Storage Attached Framework
-	Common::U32String getDisplayName() const override { return Common::U32String::format("\x01<%s>", _("Add a new folder").c_str()); };
-	Common::String getName() const override { return Common::String::format("\x01<%s>", _("Add a new folder").encode().c_str()); };
+	Common::U32String getDisplayName() const override;
+	Common::String getName() const override;
 	Common::String getPath() const override;
 
 	bool isDirectory() const override { return true; }
 	bool isReadable() const override;
 	bool isWritable() const override;
 
-
 	Common::SeekableReadStream *createReadStream() override { return nullptr; }
-	virtual Common::SeekableWriteStream *createWriteStream() override { return nullptr; }
+	Common::SeekableWriteStream *createWriteStream(bool atomic) override { return nullptr; }
 
-	virtual bool createDirectory() { return false; }
+	bool createDirectory() override { return false; }
+	bool remove() override { return false; }
 
 private:
 	void makeProxySAF() const;
 
+	bool _fromPath;
 	mutable AbstractFSNode *_proxied;
 };
 #endif

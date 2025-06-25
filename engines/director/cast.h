@@ -30,6 +30,11 @@ namespace Common {
 	class SeekableReadStreamEndian;
 }
 
+namespace LingoDec {
+	class ChunkResolver;
+	struct ScriptContext;
+}
+
 namespace Director {
 
 class Archive;
@@ -40,6 +45,9 @@ class Lingo;
 struct LingoArchive;
 struct Resource;
 class Stxt;
+class RTE0;
+class RTE1;
+class RTE2;
 class BitmapCastMember;
 class FilmLoopCastMember;
 class ScriptCastMember;
@@ -76,53 +84,55 @@ struct TilePatternEntry {
 
 class Cast {
 public:
-	Cast(Movie *movie, uint16 castLibID, bool shared = false);
+	Cast(Movie *movie, uint16 castLibID, bool isShared = false, bool isExternal = false, uint16 libResourceId = 1024);
 	~Cast();
 
 	void loadArchive();
 	void setArchive(Archive *archive);
 	Archive *getArchive() const { return _castArchive; };
 	Common::String getMacName() const { return _macName; }
+	Common::String getCastName() const { return _castName; }
+	void setCastName(const Common::String &name) { _castName = name; }
 
 	bool loadConfig();
 	void loadCast();
 	void loadCastDataVWCR(Common::SeekableReadStreamEndian &stream);
 	void loadCastData(Common::SeekableReadStreamEndian &stream, uint16 id, Resource *res);
 	void loadCastInfo(Common::SeekableReadStreamEndian &stream, uint16 id);
+	void loadCastLibInfo(Common::SeekableReadStreamEndian &stream, uint16 id);
 	void loadLingoContext(Common::SeekableReadStreamEndian &stream);
 	void loadExternalSound(Common::SeekableReadStreamEndian &stream);
 	void loadSord(Common::SeekableReadStreamEndian &stream);
 
-	void loadCastMemberData();
-	void loadStxtData(int key, TextCastMember *member);
-	void loadPaletteData(PaletteCastMember *member, Common::HashMap<int, PaletteV4>::iterator &p);
-	void loadFilmLoopData(FilmLoopCastMember *member);
-	void loadBitmapData(int key, BitmapCastMember *bitmapCast);
-	void loadSoundData(int key, SoundCastMember *soundCast);
-
 	int getCastSize();
+	int getCastMaxID();
+	int getNextUnusedID();
 	Common::Rect getCastMemberInitialRect(int castId);
 	void setCastMemberModified(int castId);
-	CastMember *setCastMember(CastMemberID castId, CastMember *cast);
-	bool eraseCastMember(CastMemberID castId);
-	CastMember *getCastMember(int castId);
+	CastMember *setCastMember(int castId, CastMember *cast);
+	bool duplicateCastMember(CastMember *source, CastMemberInfo *info, int targetId);
+	bool eraseCastMember(int castId);
+	CastMember *getCastMember(int castId, bool load = true);
 	CastMember *getCastMemberByNameAndType(const Common::String &name, CastType type);
 	CastMember *getCastMemberByScriptId(int scriptId);
 	CastMemberInfo *getCastMemberInfo(int castId);
 	const Stxt *getStxt(int castId);
+	Common::String getLinkedPath(int castId);
 	Common::String getVideoPath(int castId);
+	Common::SeekableReadStreamEndian *getResource(uint32 tag, uint16 id);
+	void rebuildCastNameCache();
 
 	// release all castmember's widget, should be called when we are changing movie.
 	// because widget is handled by channel, thus we should clear all of those run-time info when we are switching the movie. (because we will create new widgets for cast)
 	void releaseCastMemberWidget();
 
 	void dumpScript(const char *script, ScriptType type, uint16 id);
-	PaletteV4 loadPalette(Common::SeekableReadStreamEndian &stream);
 
 	Common::CodePage getFileEncoding();
 	Common::U32String decodeString(const Common::String &str);
 
 	Common::String formatCastSummary(int castId);
+	PaletteV4 loadPalette(Common::SeekableReadStreamEndian &stream, int id);
 
 private:
 	void loadScriptV2(Common::SeekableReadStreamEndian &stream, uint16 id);
@@ -137,24 +147,35 @@ public:
 	uint16 _version;
 	Common::Platform _platform;
 	uint16 _castLibID;
+	uint16 _libResourceId;
+	bool _isExternal;
 
 	CharMap _macCharsToWin;
 	CharMap _winCharsToMac;
 	FontXPlatformMap _fontXPlatformMap;
 	FontMap _fontMap;
 
+	bool _isProtected;
+
 	Common::HashMap<int, CastMember *> *_loadedCast;
-	Common::HashMap<int, const Stxt *> *_loadedStxts;
+	Common::HashMap<int, const Stxt *> _loadedStxts;
+	Common::HashMap<uint, const RTE0 *> _loadedRTE0s;
+	Common::HashMap<uint, const RTE1 *> _loadedRTE1s;
+	Common::HashMap<uint, const RTE2 *> _loadedRTE2s;
 	uint16 _castIDoffset;
 	uint16 _castArrayStart;
 	uint16 _castArrayEnd;
 
 	Common::Rect _movieRect;
 	uint16 _stageColor;
-	int _defaultPalette;
+	CastMemberID _defaultPalette;
+	int16 _frameRate;
 	TilePatternEntry _tiles[kNumBuiltinTiles];
 
 	LingoArchive *_lingoArchive;
+
+	LingoDec::ScriptContext *_lingodec = nullptr;
+	LingoDec::ChunkResolver *_chunkResolver = nullptr;
 
 private:
 	DirectorEngine *_vm;
@@ -162,8 +183,11 @@ private:
 	Movie *_movie;
 
 	bool _isShared;
+	bool _loadMutex;
+	Common::Array<CastMember *> _loadQueue;
 
 	Common::String _macName;
+	Common::String _castName;
 
 	Common::HashMap<uint16, CastMemberInfo *> _castsInfo;
 	Common::HashMap<Common::String, int, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> _castsNames;

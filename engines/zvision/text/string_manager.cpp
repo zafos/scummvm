@@ -19,12 +19,11 @@
  *
  */
 
-#include "common/scummsys.h"
-#include "common/file.h"
-#include "common/tokenizer.h"
 #include "common/debug.h"
+#include "common/file.h"
+#include "common/scummsys.h"
+#include "common/tokenizer.h"
 #include "graphics/fontman.h"
-
 #include "zvision/zvision.h"
 #include "zvision/file/search_manager.h"
 #include "zvision/text/string_manager.h"
@@ -47,14 +46,14 @@ void StringManager::initialize(ZVisionGameId gameId) {
 		loadStrFile("inquis.str");
 }
 
-void StringManager::loadStrFile(const Common::String &fileName) {
+void StringManager::loadStrFile(const Common::Path &fileName) {
 	Common::File file;
 	if (!_engine->getSearchManager()->openFile(file, fileName))
-		error("%s does not exist. String parsing failed", fileName.c_str());
+		error("%s does not exist. String parsing failed", fileName.toString().c_str());
 
 	uint lineNumber = 0;
 	while (!file.eos()) {
-		_lines[lineNumber] = readWideLine(file);
+		_lines[lineNumber] = readWideLine(file).encode();
 
 		lineNumber++;
 		assert(lineNumber <= NUM_TEXT_LINES);

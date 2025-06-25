@@ -23,18 +23,23 @@
 #include "common/fs.h"
 #include "common/debug.h"
 #include "common/config-manager.h"
+#include "common/language.h"
+#include "common/tokenizer.h"
 
 #include "tetraedge/te/te_core.h"
+
+#include "tetraedge/tetraedge.h"
 
 #include "tetraedge/te/te_png.h"
 #include "tetraedge/te/te_images_sequence.h"
 #include "tetraedge/te/te_jpeg.h"
+#include "tetraedge/te/te_zlib_jpeg.h"
 #include "tetraedge/te/te_theora.h"
 #include "tetraedge/te/te_tga.h"
 
 namespace Tetraedge {
 
-TeCore::TeCore() : _loc(nullptr), _coreNotReady(true) {
+TeCore::TeCore() : _loc(nullptr), _coreNotReady(true), _resourcesRoot("") {
 	create();
 }
 
@@ -46,25 +51,40 @@ void TeCore::addLoc(TeILoc *loc) {
 }
 
 void TeCore::create() {
-	// TODO: Get language from the game definition.  For now just default to en.
-	language("en");
+	const char *langCode = getLanguageCode(g_engine->getGameLanguage());
+	const Common::String confLang = ConfMan.get("language");
+	Common::String useLang = "en";
+	if (langCode)
+		useLang = langCode;
+	if (!confLang.empty())
+		useLang = confLang;
+	language(useLang);
 	_coreNotReady = false;
 	_activityTrackingTimer.alarmSignal().add(this, &TeCore::onActivityTrackingAlarm);
 	warning("TODO: TeCore::create: Finish implementing me.");
+
+	const Common::FSNode gameRoot(ConfMan.getPath("path"));
+	if (!gameRoot.isDirectory())
+		error("Game directory should be a directory");
+	const Common::FSNode resNode = (g_engine->getGamePlatform() == Common::kPlatformMacintosh
+										? gameRoot.getChild("Resources")
+										: gameRoot);
+	if (!resNode.isDirectory())
+		error("Resources directory should exist in game");
+
+	_resourcesRoot = Common::FSDirectory(resNode, 5, false, false, true);
 }
 
-TeICodec *TeCore::createVideoCodec(const Common::FSNode &node) {
-	const Common::String filename = node.getName();
-	if (!filename.contains('.'))
-		return nullptr;
-	Common::String extn = filename.substr(filename.findFirstOf('.') + 1);
-	extn.toLowercase();
+TeICodec *TeCore::createVideoCodec(const Common::String &extn) {
 	// The original engine has more formats and even checks for alpha maps,
 	// but it never uses them.
 	if (TePng::matchExtension(extn)) {
-		return new TePng();
+		// png codec needs to know extension
+		return new TePng(extn);
 	} else if (TeJpeg::matchExtension(extn)) {
 		return new TeJpeg();
+	} else if (TeZlibJpeg::matchExtension(extn)) {
+		return new TeZlibJpeg();
 	} else if (TeTheora::matchExtension(extn)) {
 		return new TeTheora();
 	} else if (TeTga::matchExtension(extn)) {
@@ -72,7 +92,23 @@ TeICodec *TeCore::createVideoCodec(const Common::FSNode &node) {
 	} else if (TeImagesSequence::matchExtension(extn)) {
 		return new TeImagesSequence();
 	}
-	error("TTeCore::createVideoCodec: Unrecognised format %s", node.getName().c_str());
+	return nullptr;
+}
+
+TeICodec *TeCore::createVideoCodec(const TetraedgeFSNode &node, const Common::Path &origPath) {
+	//
+	// Need to use the original requested path (not the node path) as
+	// it might include the #anim directive for animated pngs.
+	//
+	const Common::String filename = origPath.baseName();
+	if (!filename.contains('.'))
+		return nullptr;
+	Common::String extn = filename.substr(filename.findLastOf('.') + 1);
+	extn.toLowercase();
+	TeICodec *codec = createVideoCodec(extn);
+	if (!codec)
+		error("TTeCore::createVideoCodec: Unrecognised format %s", filename.c_str());
+	return codec;
 }
 
 const Common::String &TeCore::fileFlagSystemFlag(const Common::String &name) const {
@@ -111,99 +147,99 @@ bool TeCore::onActivityTrackingAlarm() {
 	error("TODO: Implement TeCore::onActivityTrackingAlarm");
 }
 
-static Common::FSNode _findSubPath(const Common::FSNode &parent, const Common::Path &childPath) {
-	if (childPath.empty())
-		return parent;
-	Common::FSNode childNode = parent;
-	const Common::StringArray comps = childPath.splitComponents();
-	unsigned int i;
-	for (i = 0; i < comps.size(); i++) {
-		childNode = childNode.getChild(comps[i]);
-		if (!childNode.exists())
-			break;
-	}
-	if (i == comps.size())
-		return childNode;
-	return Common::FSNode();
+static bool _checkFileFlag(const Common::String &fname, const Common::HashMap<Common::String, bool, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> &activeTags) {
+	Common::StringTokenizer tokenizer(fname, "-");
+	while(!tokenizer.empty())
+		if (activeTags.getValOrDefault(tokenizer.nextToken(), false))
+			return true;
+	return false;
 }
 
+static void _findFileRecursively(const TetraedgeFSNode &parent,
+				 const Common::HashMap<Common::String, bool, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> &activeTags,
+				 const Common::String &fname,
+				 Common::Array<TetraedgeFSNode> &foundFiles,
+				 int maxDepth) {
+	if (parent.getChild(Common::Path(fname, '/')).exists()) {
+		foundFiles.push_back(parent.getChild(Common::Path(fname, '/')));
+	}
 
-Common::FSNode TeCore::findFile(const Common::Path &path) const {
-	Common::FSNode node(path);
-	if (node.exists())
-		return node;
+	if (maxDepth <= 0)
+		return;
 
-	const Common::FSNode gameRoot(ConfMan.get("path"));
-	if (!gameRoot.isDirectory())
-		error("Game directory should be a directory");
-	const Common::FSNode resNode = gameRoot.getChild("Resources");
-	if (!resNode.isDirectory())
-		error("Resources directory should exist in game");
+	TetraedgeFSList list;
+	if (!parent.getChildren(list))
+		return;
 
-	const Common::Path fname = path.getLastComponent();
+	for (TetraedgeFSList::const_iterator it = list.begin(); it != list.end(); it++)
+		if (_checkFileFlag(it->getName(), activeTags))
+			_findFileRecursively(*it, activeTags, fname, foundFiles, maxDepth - 1);
+}
+
+TetraedgeFSNode TeCore::findFile(const Common::Path &path, bool quiet) const {
+	Common::Array<TetraedgeFSNode> dirNodes;
 	const Common::Path dir = path.getParent();
 
-	static const char *pathSuffixes[] = {
-		nullptr, // no suffix
-		"PC-MacOSX",
-		"PC-PS3-Android-MacOSX",
-		"PC-MacOSX-Android-iPhone-iPad",
-		"PC-Android-MacOSX-iPhone-iPad",
-		"PC-MacOSX-Xbox360-PS3",
-		"PC-MacOSX-PS3-Xbox360",
-		"PC-MacOSX-Xbox360-PS3/PC-MacOSX",
-		"PC-MacOSX-MacOSXAppStore-Android-iPhone-iPad",
-		"PC-MacOSX-MacOSXAppStore-Xbox360-Android-iPad-iPhone",
-		"Android-iPhone-iPad-PC-MacOSX",
-		"Full",
-		"Part1-Full",
-		"Part2-Full-Part1",
-		"Part3-Full-Part1",
-		"HD",
-		"HD/PC-MacOSX-Xbox360-PS3"
-	};
+	TetraedgeFSNode node;
 
-	const Common::Path langs[] = {
-		"",
-		language(),
-		"en",
-		"de-es-fr-it-en"
-	};
+	const Common::Array<Common::Archive *> &roots = g_engine->getRootArchives();
+	for (Common::Archive *const archive : roots) {
+		TetraedgeFSNode archiveNode(archive);
+		node = archiveNode.getChild(path);
+		if (node.exists())
+			return node;
+		dirNodes.push_back(archiveNode.getChild(dir));
+	}
 
-	// Note: the audio files for a few videos have a weird path
-	// structure where the language is first, followed by some other
-	// part names, followed by the file.
-	// Dialogs have part stuff followed by lang, so we have to try
-	// adding language before *and* after the suffix.
+	Common::String fname = path.getLastComponent().toString();
 
-	for (int langtype = 0; langtype < ARRAYSIZE(langs); langtype++) {
-		const Common::Path &lang = langs[langtype];
-		for (int i = 0; i < ARRAYSIZE(pathSuffixes); i++) {
-			const char *suffix = pathSuffixes[i];
+	// Slight HACK: Remove 'comments' used to specify animated pngs
+	if (fname.contains('#'))
+		fname = fname.substr(0, fname.find('#'));
 
-			Common::Path testPath = dir;
-			if (suffix)
-				testPath.joinInPlace(suffix);
-			if (!lang.empty())
-				testPath.joinInPlace(lang);
-			testPath.joinInPlace(fname);
-			node = _findSubPath(resNode, testPath);
-			if (node.exists())
-				return node;
+	Common::HashMap<Common::String, bool, Common::IgnoreCase_Hash, Common::IgnoreCase_EqualTo> activeFlags;
 
-			// also try the other way around
-			if (!lang.empty() && suffix) {
-				testPath = dir.join(lang).joinInPlace(suffix).join(fname);
-				node = _findSubPath(resNode, testPath);
-				if (node.exists())
-					return node;
+	for (Common::HashMap<Common::String, Common::String, Common::CaseSensitiveString_Hash, Common::CaseSensitiveString_EqualTo>::const_iterator it = _fileSystemFlags.begin();
+	     it != _fileSystemFlags.end(); it++)
+		activeFlags[it->_value] = true;
+
+	// This is to keep behivour changes small when we migrated from old system.
+	// I'm not sure if it's needed
+	// TODO: Figure out what to do with this. Right now we set flag
+	// to "SD" but use assets from "HD". This seems to give the best
+	// results but is fundamentally wrong.
+	activeFlags.erase("SD");
+	activeFlags["HD"] = true;
+
+	for (int attempt = 0; attempt < 2; attempt++) {
+		if (attempt == 1)
+			activeFlags["en"] = true;
+		for (uint dirNode = 0; dirNode < dirNodes.size(); dirNode++) {
+			Common::Array<TetraedgeFSNode> foundFiles;
+			_findFileRecursively(dirNodes[dirNode], activeFlags, fname, foundFiles, 5);
+			if (foundFiles.empty())
+				continue;
+			TetraedgeFSNode best = foundFiles[0];
+			int bestDepth = best.getDepth();
+			for (uint i = 1; i < foundFiles.size(); i++) {
+				int depth = foundFiles[i].getDepth();
+				if (depth > bestDepth) {
+					bestDepth = depth;
+					best = foundFiles[i];
+				}
 			}
+
+			if (attempt == 1 && !quiet)
+				debug("TeCore::findFile Falled back to English for %s", path.toString().c_str());
+
+			return best;
 		}
 	}
 
 	// Didn't find it at all..
-	debug("TeCore::findFile Searched but didn't find %s", path.toString().c_str());
-	return Common::FSNode(path);
+	if (!quiet)
+		debug("TeCore::findFile Searched but didn't find %s", path.toString().c_str());
+	return TetraedgeFSNode(nullptr, path);
 }
 
 } // end namespace Tetraedge

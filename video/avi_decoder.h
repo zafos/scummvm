@@ -26,6 +26,7 @@
 #include "common/rational.h"
 #include "common/rect.h"
 #include "common/str.h"
+#include "graphics/palette.h"
 
 #include "video/video_decoder.h"
 #include "audio/mixer.h"
@@ -202,7 +203,7 @@ protected:
 
 	class AVIVideoTrack : public FixedRateVideoTrack {
 	public:
-		AVIVideoTrack(int frameCount, const AVIStreamHeader &streamHeader, const BitmapInfoHeader &bitmapInfoHeader, byte *initialPalette = 0);
+		AVIVideoTrack(int frameCount, const AVIStreamHeader &streamHeader, const BitmapInfoHeader &bitmapInfoHeader, byte *initialPalette, Image::CodecAccuracy accuracy);
 		~AVIVideoTrack();
 
 		void decodeFrame(Common::SeekableReadStream *stream);
@@ -212,6 +213,8 @@ protected:
 		uint16 getHeight() const { return _bmInfo.height; }
 		uint16 getBitCount() const { return _bmInfo.bitCount; }
 		Graphics::PixelFormat getPixelFormat() const;
+		bool setOutputPixelFormat(const Graphics::PixelFormat &format);
+		void setCodecAccuracy(Image::CodecAccuracy accuracy);
 		int getCurFrame() const { return _curFrame; }
 		int getFrameCount() const { return _frameCount; }
 		Common::String &getName() { return _vidsHeader.name; }
@@ -268,7 +271,7 @@ protected:
 	private:
 		AVIStreamHeader _vidsHeader;
 		BitmapInfoHeader _bmInfo;
-		byte _palette[3 * 256];
+		Graphics::Palette _palette;
 		byte *_initialPalette;
 		mutable bool _dirtyPalette;
 		int _frameCount, _curFrame;
@@ -276,6 +279,8 @@ protected:
 
 		Image::Codec *_videoCodec;
 		const Graphics::Surface *_lastFrame;
+		Image::CodecAccuracy _accuracy;
+
 		Image::Codec *createCodec();
 	};
 
@@ -352,6 +357,7 @@ protected:
 
 	Common::Array<TrackStatus> _videoTracks, _audioTracks;
 	TrackStatus _transparencyTrack;
+
 public:
 	virtual AVIAudioTrack *createAudioTrack(AVIStreamHeader sHeader, PCMWaveFormat wvInfo);
 

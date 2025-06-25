@@ -20,26 +20,26 @@
  */
 
 #include "common/file.h"
-#include "common/fs.h"
 #include "common/keyboard.h"
 #include "common/macresman.h"
 #include "common/memstream.h"
 #include "common/punycode.h"
+#include "common/str-array.h"
 #include "common/tokenizer.h"
-#include "common/compression/zlib.h"
+#include "common/xpfloat.h"
+#include "common/compression/deflate.h"
 
 #include "director/types.h"
 #include "graphics/macgui/macwindowmanager.h"
-#include "graphics/macgui/macfontmanager.h"
+#include "gui/filebrowser-dialog.h"
 
 #include "director/director.h"
 #include "director/movie.h"
 #include "director/lingo/lingo.h"
-#include "director/util.h"
 
 namespace Director {
 
-static struct MacKeyCodeMapping {
+static const struct MacKeyCodeMapping {
 	Common::KeyCode scummvm;
 	int mac;
 } MackeyCodeMappings[] = {
@@ -167,7 +167,7 @@ static struct MacKeyCodeMapping {
 	{ Common::KEYCODE_INVALID,		0 }
 };
 
-static struct WinKeyCodeMapping {
+static const struct WinKeyCodeMapping {
 	Common::KeyCode scummvm;
 	int win;
 } WinkeyCodeMappings[] = {
@@ -279,13 +279,99 @@ static struct WinKeyCodeMapping {
 };
 
 void DirectorEngine::loadKeyCodes() {
-	if (g_director->getPlatform() == Common::kPlatformWindows) {
-		for (WinKeyCodeMapping *k = WinkeyCodeMappings; k->scummvm != Common::KEYCODE_INVALID; k++)
+	if ((g_director->getPlatform() == Common::kPlatformWindows) && (g_director->getVersion() < 400)) {
+		// Allegedly this keykode list applies for the Windows version of D3.
+		// D4 and D5 for Windows are both confirmed to use the Mac keycode table.
+		for (const WinKeyCodeMapping *k = WinkeyCodeMappings; k->scummvm != Common::KEYCODE_INVALID; k++)
 			_KeyCodes[k->scummvm] = k->win;
 	} else {
-		for (MacKeyCodeMapping *k = MackeyCodeMappings; k->scummvm != Common::KEYCODE_INVALID; k++)
+		for (const MacKeyCodeMapping *k = MackeyCodeMappings; k->scummvm != Common::KEYCODE_INVALID; k++)
 			_KeyCodes[k->scummvm] = k->mac;
 	}
+}
+
+void DirectorEngine::setMachineType(int machineType) {
+    _machineType = machineType;
+
+    switch (machineType) {
+    case 1: // Macintosh 512Ke
+    case 2: // Macintosh Plus
+    case 3: // Macintosh SE
+    case 4: // Macintosh II
+    case 5: // Macintosh IIx
+    case 6: // Macintosh IIcx
+    case 7: // Macintosh SE/30
+    case 8: // Macintosh Portable
+    case 9: // Macintosh IIci
+        _wmWidth = 512;
+        _wmHeight = 384;
+        _colorDepth = 8;
+        break;
+    case 11: // Macintosh IIfx
+        _wmWidth = 1152;
+        _wmHeight = 870;
+        _colorDepth = 1;
+        break;
+    case 15: // Macintosh Classic
+    case 16: // Macintosh IIsi
+    case 17: // Macintosh LC
+    case 20: // Macintosh Quadra 700
+    case 21: // Classic II
+    case 22: // PowerBook 100
+    case 23: // PowerBook 140
+    case 27: // Macintosh LCIII
+    case 28: // Macintosh Centris 650
+    case 30: // PowerBook Duo 230
+    case 31: // PowerBook 180
+    case 32: // PowerBook 160
+    case 33: // Macintosh Quadra 800
+    case 35: // Macintosh LC II
+    case 42: // Macintosh IIvi
+    case 46: // Macintosh IIvx
+    case 47: // Macintosh Color Classic
+    case 48: // PowerBook 165c
+    case 50: // Macintosh Centris 610
+    case 52: // PowerBook 145
+        _wmWidth = 640;
+        _wmHeight = 480;
+        _colorDepth = 8;
+        break;
+    case 45: // Power Macintosh 7100/70
+    case 53: // PowerComputing 8100/100
+        _wmWidth = 832;
+        _wmHeight = 624;
+        _colorDepth = 8;
+        break;
+    case 70: // PowerBook 540C
+        _wmWidth = 640;
+        _wmHeight = 480;
+        _colorDepth = 16;
+        break;
+    case 73: // Power Macintosh 6100/60
+        _wmWidth = 832;
+        _wmHeight = 624;
+        _colorDepth = 16;
+        break;
+    case 18: // Macintosh Quadra 900
+    case 24: // Macintosh Quadra 950
+    case 76: // Macintosh Quadra 840av
+        _wmWidth = 832;
+        _wmHeight = 624;
+        _colorDepth = 32;
+        break;
+    case 19: // PowerBook 170
+    case 25: // PowerBook Duo 210
+        _wmWidth = 640;
+        _wmHeight = 400;
+        _colorDepth = 4;
+        break;
+    case 256: // IBM PC-type machine
+    default:
+        _wmWidth = 640;
+        _wmHeight = 480;
+        _colorDepth = 8;
+        break;
+    }
 }
 
 int castNumToNum(const char *str) {
@@ -335,8 +421,8 @@ Common::String CastMemberID::asString() const {
 	return res;
 }
 
-int recLevel = 0;
-const char *tabs[] = {	"",
+const int recLevel = 0;
+const char *const tabs[] = {	"",
 						"  ",
 						"    ",
 						"      ",
@@ -358,12 +444,91 @@ const char *recIndent() {
 	return tabs[recLevel];
 }
 
-Common::String convertPath(Common::String &path) {
+bool isAbsolutePath(const Common::String &path) {
+	// Starts with Mac directory notation for the game root
+	if (path.hasPrefix(Common::String("@") + g_director->_dirSeparator))
+		return true;
+	// Starts with a Windows drive letter
+	if (path.size() >= 3
+			&& Common::isAlpha(path[0])
+			&& path[1] == ':'
+			&& path[2] == '\\')
+		return true;
+	return false;
+}
+
+bool isPathWithRelativeMarkers(const Common::String &path) {
+	if (path.contains("::"))
+		return true;
+	if (path.hasPrefix(".\\") || path.hasSuffix("\\.") || path.contains("\\.\\"))
+		return true;
+	if (path.hasPrefix("..\\") || path.hasSuffix("\\..") || path.contains("\\..\\"))
+		return true;
+	return false;
+}
+
+
+Common::String rectifyRelativePath(const Common::String &path, const Common::Path &base) {
+	Common::StringArray components = base.splitComponents();
+	uint32 idx = 0;
+
+	while (idx < path.size()) {
+		uint32 start = idx;
+		while (idx < path.size() && path[idx] != ':' && path[idx] != '\\')
+			idx++;
+		Common::String comp = path.substr(start, idx - start);
+		if (comp.equals("..") && !components.empty()) {
+			components.pop_back();
+		} else if (!comp.empty() && !comp.equals(".")) {
+			components.push_back(comp);
+		}
+		if (idx >= path.size())
+			break;
+
+		if (path[idx] == ':') {
+			idx += 1;
+			while (idx < path.size() && path[idx] == ':') {
+				if (!components.empty())
+					components.pop_back();
+				idx += 1;
+			}
+			continue;
+		}
+
+		if (path[idx] == '\\') {
+			idx += 1;
+			continue;
+		}
+	}
+	Common::String result = "@:" + Common::Path::joinComponents(components).toString(g_director->_dirSeparator);
+	debug(9, "rectifyRelativePath(): '%s' + '%s' => '%s'", base.toString(g_director->_dirSeparator).c_str(), path.c_str(), result.c_str());
+	warning("rectifyRelativePath(): '%s' + '%s' => '%s'", base.toString(g_director->_dirSeparator).c_str(), path.c_str(), result.c_str());
+	return result;
+}
+
+
+Common::Path toSafePath(const Common::String &path) {
+	// Encode a Director raw path as a platform-independent path.
+	// This needs special care, as Mac filenames allow using '/' in them!
+	// - Scrub the pathname to be relative with the correct dir separator
+	// - Split it into tokens
+	// - Encode each token with punycode_encodefilename
+	// - Join the tokens back together with the default dir separator
+	Common::StringTokenizer pathList(convertPath(path), Common::String(g_director->_dirSeparator));
+	Common::Path result;
+	while (!pathList.empty()) {
+		Common::String token = pathList.nextToken();
+		token = Common::punycode_encodefilename(token);
+		if (!result.empty())
+			result.appendInPlace(Common::String(g_director->_dirSeparator), g_director->_dirSeparator);
+		result.appendInPlace(token);
+	}
+	return result;
+}
+
+Common::String convertPath(const Common::String &path) {
 	if (path.empty())
 		return path;
-
-	debugN(9, "%s", recIndent());
-	debug(9, "convertPath(%s)", path.c_str());
 
 	if (!path.contains(':') && !path.contains('\\') && !path.contains('@')) {
 		return path;
@@ -374,7 +539,7 @@ Common::String convertPath(Common::String &path) {
 
 	if (path.hasPrefix("::")) { // Parent directory
 		idx = 2;
-	} else if (path.hasPrefix("@:")) { // Root of the game
+	} else if (path.hasPrefix(Common::String("@") + g_director->_dirSeparator)) { // Root of the game
 		idx = 2;
 	} else if (path.size() >= 3
 					&& Common::isAlpha(path[0])
@@ -410,7 +575,7 @@ Common::String unixToMacPath(const Common::String &path) {
 	return res;
 }
 
-Common::String getPath(Common::String path, Common::String cwd) {
+Common::String getPath(const Common::String &path, const Common::String &cwd) {
 	const char *s;
 	if ((s = strrchr(path.c_str(), g_director->_dirSeparator))) {
 		return Common::String(path.c_str(), s + 1);
@@ -419,286 +584,423 @@ Common::String getPath(Common::String path, Common::String cwd) {
 	return cwd; // The path is not altered
 }
 
-bool testPath(Common::String &path, bool directory) {
-	Common::FSNode d = Common::FSNode(*g_director->getGameDataDir());
-	Common::FSNode node;
+Common::String convert83Path(const Common::String &path) {
+	Common::String addedexts;
+	Common::String convPath;
 
-	// Test if we have it right in the SearchMan. Also accept MacBinary
-	// for Mac and Pippin
-	if (SearchMan.hasFile(Common::Path(path, g_director->_dirSeparator)) ||
-	    ((g_director->getPlatform() == Common::kPlatformMacintoshII
-	      || g_director->getPlatform() == Common::kPlatformMacintosh
-	      || g_director->getPlatform() == Common::kPlatformPippin) &&
-	     Common::MacResManager::exists(Common::Path(path, g_director->_dirSeparator))))
-		return true;
+	const char *ptr = path.c_str();
+	Common::String component;
 
-	debugN(9, "%s", recIndent());
-	debug(9, "testPath: %s  dir: %d", path.c_str(), directory);
+	while (*ptr) {
+		if (*ptr == g_director->_dirSeparator) {
+			if (component.equals(".")) {
+				convPath += component;
+			} else {
+				convPath += convertMacFilename(component.c_str());
+			}
 
-	// check for the game data dir
-	if (!path.contains(g_director->_dirSeparator) && path.equalsIgnoreCase(d.getName())) {
-		if (!directory)
-			return false;
-		path = "";
-		return true;
+			component.clear();
+			convPath += g_director->_dirSeparator;
+		} else {
+			component += *ptr;
+		}
+
+		ptr++;
 	}
 
-	Common::StringTokenizer directory_list(path, Common::String(g_director->_dirSeparator));
-	Common::String newPath;
+	if (hasExtension(component)) {
+		Common::String nameWithoutExt = component.substr(0, component.size() - 4);
+		Common::String ext = component.substr(component.size() - 4);
+		convPath += convertMacFilename(nameWithoutExt.c_str()) + ext;
+	} else {
+		convPath += convertMacFilename(component.c_str());
+	}
+
+	return convPath;
+}
+
+Common::Path resolveFSPath(const Common::String &path, const Common::Path &base, bool directory) {
+	// Path is the raw input from Director. Scrub it to be a clean relative path.
+	Common::String converted = convertPath(path);
+
+	// Absolute path to the game directory
+	Common::Path gamePath = Common::Path(g_director->getGameDataDir()->getPath());
+	// Absolute path to the game directory + the base search path
+	Common::Path testPath = gamePath;
+	if (!base.empty()) {
+		testPath.appendInPlace(Common::String(g_director->_dirSeparator), g_director->_dirSeparator);
+		testPath.appendInPlace(base);
+	}
+	// FSNode for the current walk location in the filesystem
+	Common::FSNode filesystem(testPath);
+
+	// Split this into a component list for iteration.
+	Common::StringTokenizer directory_list(converted, Common::String(g_director->_dirSeparator));
+	// newPath is our final result; construct this based on successful filesystem tests
+	Common::Path newPath = Common::Path(base);
+	if (!base.empty())
+		newPath.appendInPlace(Common::String(g_director->_dirSeparator), g_director->_dirSeparator);
 
 	Common::FSList fslist;
+	bool exists = false;
 	while (!directory_list.empty()) {
-		Common::String token = directory_list.nextToken();
+		Common::String token = punycode_decodefilename(directory_list.nextToken());
 		fslist.clear();
 		Common::FSNode::ListMode mode = Common::FSNode::kListDirectoriesOnly;
 		if (directory_list.empty() && !directory) {
 			mode = Common::FSNode::kListAll;
 		}
-		bool hasChildren = d.getChildren(fslist, mode);
+		bool hasChildren = filesystem.getChildren(fslist, mode);
 		if (!hasChildren)
 			continue;
 
-		bool exists = false;
-		for (Common::FSList::iterator i = fslist.begin(); i != fslist.end(); ++i) {
+		exists = false;
+		for (auto &i : fslist) {
 			// for each element in the path, choose the first FSNode
 			// with a case-insensitive matching name
-			if (i->getName().equalsIgnoreCase(token)) {
+			Common::String decodedName = i.getName();
+			if (decodedName.equalsIgnoreCase(token)) {
 				// If this the final path component, check if we're allowed to match with a directory
-				node = Common::FSNode(*i);
-				if (directory_list.empty() && !directory && node.isDirectory()) {
+				if (directory_list.empty() && (directory != i.isDirectory())) {
 					continue;
 				}
 
 				exists = true;
-				newPath += i->getName();
-				if (!directory_list.empty())
-					newPath += (g_director->_dirSeparator);
+				newPath.appendInPlace(i.getRealName());
+				if (!directory_list.empty() && !newPath.empty())
+					newPath.appendInPlace(Common::String(g_director->_dirSeparator), g_director->_dirSeparator);
 
-				d = node;
+				filesystem = i;
 				break;
 			}
 		}
 		if (!exists) {
-			debugN(9, "%s", recIndent());
-			debug(9, "testPath: Not exists");
-			return false;
-		}
-	}
-	debugN(9, "%s", recIndent());
-	debug(9, "testPath: ***** HAVE MATCH");
-	// write back path with correct case
-	path = newPath;
-	return true;
-}
-
-
-Common::String pathMakeRelative(Common::String path, bool recursive, bool addexts, bool directory) {
-	//Wrap pathMakeRelative to search in extra paths defined by the game
-	Common::String foundPath;
-
-	recLevel = 0;
-
-	debugN(8, "%s", recIndent());
-	debug(8, "pathMakeRelative(\"%s\", recursive: %d, addexts: %d, directory: %d):", path.c_str(), recursive, addexts, directory);
-	path = convertPath(path);
-	debugN(9, "%s", recIndent());
-	debug(9, "pathMakeRelative(): converted -> %s", path.c_str());
-
-	Datum searchPath = g_director->getLingo()->_searchPath;
-	if (searchPath.type == ARRAY && searchPath.u.farr->arr.size() > 0) {
-		for (uint i = 0; i < searchPath.u.farr->arr.size(); i++) {
-			Common::String searchIn = searchPath.u.farr->arr[i].asString();
-			debugN(9, "%s", recIndent());
-			debug(9, "pathMakeRelative(): searchPath: %s", searchIn.c_str());
-
-			recLevel++;
-			foundPath = wrappedPathMakeRelative(searchIn + path, recursive, addexts, directory);
-			recLevel--;
-
-			if (testPath(foundPath, directory))
-				return foundPath;
-
-			debugN(9, "%s", recIndent());
-			debug(9, "pathMakeRelative(): -- searchPath not found: %s", foundPath.c_str());
-		}
-	}
-
-	for (auto i = g_director->_extraSearchPath.begin(); i != g_director->_extraSearchPath.end(); ++i) {
-		debugN(9, "%s", recIndent());
-		debug(9, "pathMakeRelative(): extraSearchPath: %s", i->c_str());
-
-		recLevel++;
-		foundPath = wrappedPathMakeRelative(*i + path, recursive, addexts, directory);
-		recLevel--;
-
-		if (testPath(foundPath, directory))
-			return foundPath;
-
-		debugN(9, "%s", recIndent());
-		debug(9, "pathMakeRelative(): -- extraSearchPath not found: %s", foundPath.c_str());
-	}
-
-	return wrappedPathMakeRelative(path, recursive, addexts, directory);
-}
-
-
-// if we are finding the file path, then this func will return exactly the executable file path
-// if we are finding the directory path, then we will get the path relative to the game data dir.
-// e.g. if we have game data dir as SSwarlock, then "A:SSwarlock" -> "", "A:SSwarlock:Nav" -> "Nav"
-Common::String wrappedPathMakeRelative(Common::String path, bool recursive, bool addexts, bool directory) {
-
-	Common::String initialPath(path);
-
-	debugN(9, "%s", recIndent());
-	debug(9, "wrappedPathMakeRelative(): s0 %s -> %s", path.c_str(), initialPath.c_str());
-
-	if (recursive) // first level
-		initialPath = convertPath(initialPath);
-
-	debugN(9, "%s", recIndent());
-	debug(9, "wrappedPathMakeRelative(): s1 %s -> %s", path.c_str(), initialPath.c_str());
-
-	initialPath = Common::normalizePath(g_director->getCurrentPath() + initialPath, g_director->_dirSeparator);
-	Common::String convPath = initialPath;
-
-	debugN(9, "%s", recIndent());
-	debug(9, "wrappedPathMakeRelative(): s2 %s", convPath.c_str());
-
-	if (testPath(initialPath, directory))
-		return initialPath;
-
-	debugN(9, "%s", recIndent());
-	debug(9, "wrappedPathMakeRelative(): s2.1 -- not found %s", initialPath.c_str());
-
-	// Now try to search the file
-	bool opened = false;
-
-	while (convPath.contains(g_director->_dirSeparator)) {
-		int pos = convPath.find(g_director->_dirSeparator);
-		convPath = Common::String(&convPath.c_str()[pos + 1]);
-
-		debugN(9, "%s", recIndent());
-		debug(9, "wrappedPathMakeRelative(): s3 try %s", convPath.c_str());
-
-		if (!testPath(convPath, directory)) {
-			// If we were supplied a path with subdirectories,
-			// attempt to combine it with the current movie path at every iteration
-			Common::String locPath = Common::normalizePath(g_director->getCurrentPath() + convPath, g_director->_dirSeparator);
-			debugN(9, "%s", recIndent());
-			debug(9, "wrappedPathMakeRelative(): s3.1 try %s", locPath.c_str());
-
-			if (!testPath(locPath, directory)) {
-				debugN(9, "%s", recIndent());
-				debug(9, "wrappedPathMakeRelative(): s3.1 -- not found %s", locPath.c_str());
-				continue;
-			}
-		}
-
-		debug(9, "wrappedPathMakeRelative(): s3 converted %s -> %s", path.c_str(), convPath.c_str());
-
-		opened = true;
-
-		break;
-	}
-
-	if (!opened) {
-		// Try stripping all of the characters not allowed in FAT
-		convPath = stripMacPath(initialPath.c_str());
-
-		debugN(9, "%s", recIndent());
-		debug(9, "wrappedPathMakeRelative(): s4 %s", convPath.c_str());
-
-		if (testPath(initialPath, directory))
-			return initialPath;
-
-		debugN(9, "%s", recIndent());
-		debug(9, "wrappedPathMakeRelative(): s4.1 -- not found %s", initialPath.c_str());
-
-		// Now try to search the file
-		while (convPath.contains(g_director->_dirSeparator)) {
-			int pos = convPath.find(g_director->_dirSeparator);
-			convPath = Common::String(&convPath.c_str()[pos + 1]);
-
-			debugN(9, "%s", recIndent());
-			debug(9, "wrappedPathMakeRelative(): s5 try %s", convPath.c_str());
-
-			if (!testPath(convPath, directory)) {
-				debugN(9, "%s", recIndent());
-				debug(9, "wrappedPathMakeRelative(): s5 -- not found %s", convPath.c_str());
-				continue;
-			}
-
-			debugN(9, "%s", recIndent());
-			debug(9, "wrappedPathMakeRelative(): s5 converted %s -> %s", path.c_str(), convPath.c_str());
-
-			opened = true;
-
 			break;
 		}
 	}
 
-	if (!opened && recursive && !directory) {
-		// Hmmm. We couldn't find the path as is.
-		// Let's try to translate file path into 8.3 format
-		Common::String addedexts;
-
-		convPath.clear();
-		const char *ptr = initialPath.c_str();
-		Common::String component;
-
-		while (*ptr) {
-			if (*ptr == g_director->_dirSeparator) {
-				if (component.equals(".")) {
-					convPath += component;
-				} else {
-					convPath += convertMacFilename(component.c_str());
-				}
-
-				component.clear();
-				convPath += g_director->_dirSeparator;
-			} else {
-				component += *ptr;
-			}
-
-			ptr++;
-		}
-
-		if (g_director->getPlatform() == Common::kPlatformWindows) {
-			if (hasExtension(component)) {
-				Common::String nameWithoutExt = component.substr(0, component.size() - 4);
-				Common::String ext = component.substr(component.size() - 4);
-				Common::String newpath = convPath + convertMacFilename(nameWithoutExt.c_str()) + ext;
-
-				debugN(9, "%s", recIndent());
-				debug(9, "wrappedPathMakeRelative(): s6 %s -> try %s", initialPath.c_str(), newpath.c_str());
-
-				recLevel++;
-				Common::String res = wrappedPathMakeRelative(newpath, false, false);
-				recLevel--;
-
-				if (testPath(res))
-					return res;
-
-				debugN(9, "%s", recIndent());
-				debug(9, "wrappedPathMakeRelative(): s6 -- not found %s", res.c_str());
-			}
-		}
-
-		if (addexts)
-			addedexts = testExtensions(component, initialPath, convPath);
-
-		if (!addedexts.empty()) {
-			return addedexts;
-		}
-
-		return initialPath;	// Anyway nothing good is happening
+	if (exists) {
+		debugN(9, "%s", recIndent());
+		debug(9, "resolveFSPath(): Found filesystem match for %s -> %s", path.c_str(), newPath.toString().c_str());
+		return newPath;
 	}
 
-	if (opened)
-		return convPath;
-	else
-		return initialPath;
+	return Common::Path();
 }
+
+Common::Path resolvePathInner(const Common::String &path, const Common::Path &base, bool directory) {
+	Common::Path result = resolveFSPath(path, base, directory);
+	if (!result.empty()) {
+		return result;
+	}
+
+	// No filesystem match, check caches
+	Common::Path newPath = base;
+	if (!newPath.empty())
+		newPath.appendInPlace(Common::String(g_director->_dirSeparator), g_director->_dirSeparator);
+	newPath.appendInPlace(toSafePath(path));
+	if (!directory) {
+		// Check SearchMan
+		if (SearchMan.hasFile(newPath)) {
+			debugN(9, "%s", recIndent());
+			debug(9, "resolvePath(): Found SearchMan match for %s -> %s", path.c_str(), newPath.toString().c_str());
+			return newPath;
+		}
+		// Check MacResArchive
+		if (Common::MacResManager::exists(newPath)) {
+			debugN(9, "%s", recIndent());
+			debug(9, "resolvePath(): Found MacResManager match for %s -> %s", path.c_str(), newPath.toString().c_str());
+			return newPath;
+		}
+	} else {
+		// Iterate through every SearchMan file to check for directory matches
+		Common::StringArray srcComponents = newPath.splitComponents();
+		Common::ArchiveMemberList list;
+		SearchMan.listMembers(list);
+		for (auto &it : list) {
+			Common::Path test(it->getName());
+			Common::Path testParent = test.getParent();
+			Common::StringArray destComponents = testParent.splitComponents();
+			if (destComponents[destComponents.size() - 1].empty()) {
+				destComponents.pop_back();
+				testParent = Common::Path::joinComponents(destComponents);
+			}
+			if (srcComponents.size() != destComponents.size()) {
+				continue;
+			}
+			bool match = true;
+			for (size_t i = 0; i < srcComponents.size(); i++) {
+				Common::String component = Common::punycode_decodefilename(destComponents[i]);
+				if (!component.equalsIgnoreCase(srcComponents[i])) {
+					match = false;
+					break;
+				}
+			}
+			if (match) {
+				debugN(9, "%s", recIndent());
+				debug(9, "resolvePath(): Found SearchMan match for %s -> %s", path.c_str(), testParent.toString().c_str());
+				return testParent;
+			}
+
+		}
+	}
+
+	debugN(9, "%s", recIndent());
+	debug(9, "resolvePath(): No match found for %s", path.c_str());
+	return Common::Path();
+}
+
+Common::Path resolvePath(const Common::String &path, const Common::Path &base, bool directory, const char **exts) {
+	Common::Path result = resolvePathInner(path, base, directory);
+	if (result.empty() && !directory && exts) {
+		Common::String fileBase = path;
+		if (hasExtension(fileBase))
+			fileBase = fileBase.substr(0, fileBase.size() - 4);
+		for (int i = 0; exts[i]; i++) {
+			Common::String fileExt = fileBase + exts[i];
+			result = resolvePathInner(fileExt, base, directory);
+			if (!result.empty())
+				break;
+		}
+	}
+	return result;
+}
+
+Common::Path resolvePartialPath(const Common::String &path, const Common::Path &base, bool directory, const char **exts) {
+	Common::String converted = convertPath(path);
+	Common::Path result;
+
+	Common::StringArray baseTokens = base.splitComponents();
+	bool basesLeft = true;
+	while (basesLeft) {
+		Common::Path testBase = Common::Path::joinComponents(baseTokens);
+
+		// Try removing leading components of the target path
+		Common::StringArray tokens = Common::StringTokenizer(converted, Common::String(g_director->_dirSeparator)).split();
+
+		while (tokens.size()) {
+			Common::String subpath;
+			for (uint i = 0; i < tokens.size(); i++) {
+				subpath += tokens[i];
+				if (i < tokens.size() - 1) {
+					subpath += g_director->_dirSeparator;
+				}
+			}
+			result = resolvePath(subpath, testBase, directory, exts);
+			if (!result.empty()) {
+				break;
+			}
+			tokens.remove_at(0);
+		}
+		if (!result.empty())
+			break;
+		if (!baseTokens.size()) {
+			basesLeft = false;
+		} else {
+			baseTokens.pop_back();
+		}
+	}
+	return result;
+}
+
+Common::Path resolvePathWithFuzz(const Common::String &path, const Common::Path &base, bool directory, const char **exts) {
+	Common::Path result = resolvePath(path, base, directory, exts);
+	if (result.empty()) {
+		// Try again with all non-FAT compatible characters stripped
+		Common::String newPath = stripMacPath(path.c_str());
+		if (newPath != path)
+			result = resolvePath(newPath, base, directory, exts);
+	}
+	if (result.empty()) {
+		// Try again with the path horribly disfigured to fit into 8.3 DOS filenames
+		Common::String newPath = convert83Path(path);
+		if (newPath != path)
+			result = resolvePath(newPath, base, directory, exts);
+	}
+	return result;
+}
+
+Common::Path resolvePartialPathWithFuzz(const Common::String &path, const Common::Path &base, bool directory, const char **exts) {
+	Common::Path result = resolvePartialPath(path, base, directory, exts);
+	if (result.empty()) {
+		// Try again with all non-FAT compatible characters stripped
+		Common::String newPath = stripMacPath(path.c_str());
+		if (newPath != path)
+			result = resolvePartialPath(newPath, base, directory, exts);
+	}
+	if (result.empty()) {
+		// Try again with the path horribly disfigured to fit into 8.3 DOS filenames
+		Common::String newPath = convert83Path(path);
+		if (newPath != path)
+			result = resolvePartialPath(newPath, base, directory, exts);
+	}
+	return result;
+}
+
+Common::Path findAbsolutePath(const Common::String &path, bool directory, const char **exts) {
+	Common::Path result, base;
+	if (isAbsolutePath(path)) {
+		debugN(9, "%s", recIndent());
+		debug(9, "findAbsolutePath(): searching absolute path");
+		result = resolvePathWithFuzz(path, base, directory, exts);
+		if (!result.empty()) {
+			debugN(9, "%s", recIndent());
+			debug(9, "findAbsolutePath(): resolved \"%s\" -> \"%s\"", path.c_str(), result.toString().c_str());
+		}
+	}
+	return result;
+}
+
+Common::Path findPath(const Common::Path &path, bool currentFolder, bool searchPaths, bool directory, const char **exts) {
+	return findPath(path.toString(g_director->_dirSeparator), currentFolder, searchPaths, directory, exts);
+}
+
+Common::Path findPath(const Common::String &path, bool currentFolder, bool searchPaths, bool directory, const char **exts) {
+	Common::Path result, base;
+	debugN(9, "%s", recIndent());
+	debug(9, "findPath(): beginning search for \"%s\"", path.c_str());
+
+	Common::String currentPath = g_director->getCurrentPath();
+	Common::Path current = resolvePath(currentPath, base, true, exts);
+
+	Common::String testPath = path;
+	// If the path contains relative elements, rectify it with respect to the current folder
+	if (isPathWithRelativeMarkers(testPath)) {
+		testPath = rectifyRelativePath(testPath, current);
+	}
+
+	// For an absolute path, first check it relative to the filesystem
+	result = findAbsolutePath(testPath, directory, exts);
+	if (!result.empty()) {
+		return result;
+	}
+
+	if (currentFolder) {
+		debugN(9, "%s", recIndent());
+		debug(9, "findPath(): searching current folder %s", current.toString().c_str());
+		base = current;
+		result = resolvePartialPathWithFuzz(testPath, base, directory, exts);
+		if (!result.empty()) {
+			debugN(9, "%s", recIndent());
+			debug(9, "findPath(): resolved \"%s\" -> \"%s\"", testPath.c_str(), result.toString().c_str());
+			return result;
+		}
+	}
+
+	// Fall back to checking the game root path
+	debugN(9, "%s", recIndent());
+	debug(9, "findPath(): searching game root path");
+	base = Common::Path();
+	result = resolvePartialPathWithFuzz(testPath, base, directory, exts);
+	if (!result.empty()) {
+		debugN(9, "%s", recIndent());
+		debug(9, "findPath(): resolved \"%s\" -> \"%s\"", testPath.c_str(), result.toString().c_str());
+		return result;
+	}
+
+	// Check each of the search paths in sequence
+	if (searchPaths) {
+		Common::Array<Common::String> searchPathList;
+		Datum searchPath = g_director->getLingo()->_searchPath;
+		if (searchPath.type == ARRAY) {
+			for (auto &it : searchPath.u.farr->arr) {
+				searchPathList.push_back(it.asString());
+			}
+		}
+		for (auto &it : g_director->_extraSearchPath) {
+			searchPathList.push_back(it);
+		}
+		for (auto &searchIn : searchPathList) {
+			base = Common::Path();
+			base = resolvePathWithFuzz(searchIn, base, true, exts);
+			if (base.empty()) {
+				debugN(9, "%s", recIndent());
+				debug(9, "findPath(): couldn't resolve search path folder %s, skipping", searchIn.c_str());
+				continue;
+			}
+			debugN(9, "%s", recIndent());
+			debug(9, "findPath(): searching search path folder %s", searchIn.c_str());
+			result = resolvePartialPathWithFuzz(testPath, base, directory, exts);
+			if (!result.empty()) {
+				debugN(9, "%s", recIndent());
+				debug(9, "findPath(): resolved \"%s\" -> \"%s\"", testPath.c_str(), result.toString().c_str());
+				return result;
+			}
+		}
+	}
+
+	// Return empty path
+	debug(9, "findPath(): failed to resolve \"%s\"", path.c_str());
+	return Common::Path();
+}
+
+Common::Path findMoviePath(const Common::String &path, bool currentFolder, bool searchPaths) {
+	const char *extsD3[] = { ".MMM", nullptr };
+	const char *extsD4[] = { ".DIR", ".DXR", ".EXE", nullptr };
+	const char *extsD5[] = { ".DIR", ".DXR", ".CST", ".CXT", ".EXE", nullptr };
+
+	const char **exts = nullptr;
+	if (g_director->getVersion() < 400) {
+		exts = extsD3;
+	} else if (g_director->getVersion() >= 400 && g_director->getVersion() < 500) {
+		exts = extsD4;
+	} else if (g_director->getVersion() >= 500 && g_director->getVersion() < 600) {
+		exts = extsD5;
+	} else {
+		warning("findMoviePath(): file extensions not yet supported for version %d, falling back to D5", g_director->getVersion());
+		exts = extsD5;
+	}
+
+	Common::Path result = findPath(path, currentFolder, searchPaths, false, exts);
+	return result;
+}
+
+Common::Path findXLibPath(const Common::String &path, bool currentFolder, bool searchPaths) {
+	const char *extsD3[] = { ".DLL", nullptr };
+	const char *extsD5[] = { ".DLL", ".X16", ".X32", nullptr };
+
+	const char **exts = nullptr;
+	if (g_director->getVersion() < 500) {
+		exts = extsD3;
+	} else if (g_director->getVersion() < 600) {
+		exts = extsD5;
+	} else {
+		warning("findXLibPath(): file extensions not yet supported for version %d, falling back to D5", g_director->getVersion());
+		exts = extsD5;
+	}
+
+	Common::Path result = findPath(path, currentFolder, searchPaths, false, exts);
+	return result;
+}
+
+Common::Path findAudioPath(const Common::String &path, bool currentFolder, bool searchPaths) {
+	const char *exts[] = { ".AIF", ".WAV", nullptr };
+
+	Common::Path result = findPath(path, currentFolder, searchPaths, false, exts);
+	return result;
+}
+
+Common::String getFileNameFromModal(bool save, const Common::String &suggested, const Common::String &title, const char *ext) {
+	Common::String prefix = savePrefix();
+	Common::String mask = prefix + "*";
+	if (ext) {
+		mask += ".";
+		mask += ext;
+	}
+	GUI::FileBrowserDialog browser(title.c_str(), "txt", save ? GUI::kFBModeSave : GUI::kFBModeLoad, mask.c_str(), suggested.c_str());
+	if (browser.runModal() <= 0) {
+		return Common::String();
+	}
+	Common::String result = browser.getResult();
+	if (!result.empty() && !result.hasPrefixIgnoreCase(prefix))
+		result = prefix + result;
+	return result;
+}
+
+Common::String savePrefix() {
+	return g_director->getTargetName() + '-';
+}
+
 
 bool hasExtension(Common::String filename) {
 	uint len = filename.size();
@@ -706,35 +1008,6 @@ bool hasExtension(Common::String filename) {
 					&& Common::isAlpha(filename[len - 3])
 					&& Common::isAlpha(filename[len - 2])
 					&& Common::isAlpha(filename[len - 1]);
-}
-
-Common::String testExtensions(Common::String component, Common::String initialPath, Common::String convPath) {
-	const char *extsD3[] = { ".MMM", nullptr };
-	const char *extsD4[] = { ".DIR", ".DXR", nullptr };
-
-	const char **exts = (g_director->getVersion() >= 400) ? extsD4 : extsD3;
-	for (int i = 0; exts[i]; ++i) {
-		Common::String newpath = convPath + component.c_str() + exts[i];
-
-		debugN(9, "%s", recIndent());
-		debug(9, "testExtensions(): sT %s -> try %s, comp: %s", initialPath.c_str(), newpath.c_str(), component.c_str());
-		Common::String res = wrappedPathMakeRelative(newpath, false, false);
-
-		if (testPath(res))
-			return res;
-	}
-	for (int i = 0; exts[i]; ++i) {
-		Common::String newpath = convPath + convertMacFilename(component.c_str()) + exts[i];
-
-		debugN(9, "%s", recIndent());
-		debug(9, "testExtensions(): sT %s -> try %s, comp: %s", initialPath.c_str(), newpath.c_str(), component.c_str());
-		Common::String res = wrappedPathMakeRelative(newpath, false, false);
-
-		if (testPath(res))
-			return res;
-	}
-
-	return Common::String();
 }
 
 Common::String getFileName(Common::String path) {
@@ -874,7 +1147,7 @@ Common::String convertMacFilename(const char *name) {
 	return res;
 }
 
-Common::String dumpScriptName(const char *prefix, int type, int id, const char *ext) {
+Common::Path dumpScriptName(const char *prefix, int type, int id, const char *ext) {
 	Common::String typeName;
 
 	switch (type) {
@@ -893,16 +1166,19 @@ Common::String dumpScriptName(const char *prefix, int type, int id, const char *
 	case kScoreScript:
 		typeName = "score";
 		break;
+	case kParentScript:
+		typeName = "parent";
+		break;
 	default:
 		error("dumpScriptName(): Incorrect call (type %d)", type);
 		break;
 	}
 
-	return Common::String::format("./dumps/%s-%s-%d.%s", prefix, typeName.c_str(), id, ext);
+	return Common::Path(Common::String::format("./dumps/%s-%s-%d.%s", prefix, typeName.c_str(), id, ext), '/');
 }
 
-Common::String dumpFactoryName(const char *prefix, const char *name, const char *ext) {
-	return Common::String::format("./dumps/%s-factory-%s.%s", prefix, name, ext);
+Common::Path dumpFactoryName(const char *prefix, const char *name, const char *ext) {
+	return Common::Path(Common::String::format("./dumps/%s-factory-%s.%s", prefix, name, ext), '/');
 }
 
 void RandomState::setSeed(int seed) {
@@ -977,12 +1253,11 @@ uint32 readVarInt(Common::SeekableReadStream &stream) {
 }
 
 Common::SeekableReadStreamEndian *readZlibData(Common::SeekableReadStream &stream, unsigned long len, unsigned long *outLen, bool bigEndian) {
-#ifdef USE_ZLIB
 	byte *in = (byte *)malloc(len);
 	byte *out = (byte *)malloc(*outLen);
 	stream.read(in, len);
 
-	if (!Common::uncompress(out, outLen, in, len)) {
+	if (!Common::inflateZlib(out, outLen, in, len)) {
 		free(in);
 		free(out);
 		return nullptr;
@@ -990,9 +1265,6 @@ Common::SeekableReadStreamEndian *readZlibData(Common::SeekableReadStream &strea
 
 	free(in);
 	return new Common::MemoryReadStreamEndian(out, *outLen, bigEndian, DisposeAfterUse::YES);
-# else
-	return nullptr;
-# endif
 }
 
 uint16 humanVersion(uint16 ver) {
@@ -1049,6 +1321,12 @@ Common::CodePage getEncoding(Common::Platform platform, Common::Language languag
 	default:
 		break;
 	}
+	// If there's no language override, but there is a Lingo
+	// request for a double-byte interpreter, assume this means
+	// the text cast members contain Shift-JIS.
+	if (!g_lingo->_romanLingo)
+		return Common::kWindows932; // Shift JIS
+
 	return (platform == Common::kPlatformWindows)
 				? Common::kWindows1252
 				: Common::kMacRoman;
@@ -1088,6 +1366,15 @@ Common::String utf8ToPrintable(const Common::String &str) {
 
 Common::String decodePlatformEncoding(Common::String input) {
 	return input.decode(g_director->getPlatformEncoding());
+}
+
+Common::String formatStringForDump(const Common::String &str) {
+	Common::String format = str;
+	for (int i = 0; i < (int)format.size(); i++) {
+		if (format[i] == '\r')
+			format.replace(i, 1, "\n");
+	}
+	return format;
 }
 
 /////////////////////////////////////////////////////////////
@@ -1164,16 +1451,16 @@ const byte orderTableD4Jmac[256] = {
 };
 
 //
-// Director 4.0-5.0 Win, cp1250 encoding
+// Director 4.0-5.0 Win, cp1252 encoding
 //
 // ................................
 //   !"«»#$%&'‘’()*+,-./0123456789:
-// ;<=>?@AÁŔÂÄĂĹĆaáŕâäăĺćBbCÇcçDĐdđ
-// EÉČĘËeéčęëFfGgHhIÍĚÎĎiíěîďJjKkLl
-// MmNŃnńOÓŇÔÖŐŘŚoóňôöőřśPpQqRrSŠsš
-// ßTtUÚŮŰÜuúůűüVvWwXxYÝźyý.Zz[\]^_
-// `{|}~.€�‚�„…†‡�‰‹ŤŽŹ�“”•–—�™›ťžˇ
-// ˘Ł¤Ą¦§¨©Ş¬®Ż°±˛ł´µ¶·¸ąşĽ˝ľż×Ţţ÷
+// ;<=>?@AÁÀÂÄÃÅÆaáàâäãåæBbCÇcçDÐdð
+// EÉÈÊËeéèêëFfGgHhIÍÌÎÏiíìîïJjKkLl
+// MmNÑnñOÓÒÔÖÕØŒoóòôöõøœPpQqRrSŠsš
+// ßTtUÚÙÛÜuúùûüVvWwXxYÝŸyý.Zz[\]^_
+// `{|}~.€�‚ƒ„…†‡ˆ‰‹�Ž��“”•–—˜™›�ž¡
+// ¢£¤¥¦§¨©ª¬­®¯°±²³´µ¶·¸¹º¼½¾¿×Þþ÷
 
 const byte orderTableD4win[256] = {
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
@@ -1196,16 +1483,16 @@ const byte orderTableD4win[256] = {
 
 
 //
-// Director 6.0 Win, cp1250 encoding
+// Director 6.0 Win, cp1252 encoding
 //
-// ............................�ŤŹ�
-// ť'-–—  .....!"#$%&()*,./:;?@[\]
-// ^�_`{|}~ˇ¦¨Ż´¸ż�‘’‚“”„‹›+<=>±«»×
-// ÷˘Ł¤Ą§©¬®°µ¶·†‡•…‰€0Ľ˝ľ1ą2˛3ł456
-// 789aAŞáÁŕŔâÂäÄăĂĺĹćĆbBcCçÇdDđĐeE
-// éÉčČęĘëËfF�gGhHiIíÍěĚîÎďĎjJkKlLm
-// MnNńŃoOşóÓňŇôÔöÖőŐřŘśŚpPqQrRsSšŠ
-// ßtTţŢ™uUúÚůŮűŰüÜvVwWxXyYýÝ.źzZžŽ
+// ............................����
+// �'-­–—  .....!"#$%&()*,./:;?@[\]
+// ^ˆ_`{|}~¡¦¨¯´¸¿˜‘’‚“”„‹›+<=>±«»×
+// ÷¢£¤¥§©¬®°µ¶·†‡•…‰€0¼½¾1¹2²3³456
+// 789aAªáÁàÀâÂäÄãÃåÅæÆbBcCçÇdDðÐeE
+// éÉèÈêÊëËfFƒgGhHiIíÍìÌîÎïÏjJkKlLm
+// MnNñÑoOºóÓòÒôÔöÖõÕøØœŒpPqQrRsSšŠ
+// ßtTþÞ™uUúÚùÙûÛüÜvVwWxXyYýÝ.ŸzZžŽ
 
 const byte orderTableD6win[256] = {
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x09, 0x0a,
@@ -1225,6 +1512,156 @@ const byte orderTableD6win[256] = {
 	0x88, 0x86, 0x8a, 0x8e, 0x8c, 0x90, 0x92, 0x98, 0xa2, 0xa0, 0xa4, 0xa6, 0xb3, 0xb1, 0xb5, 0xb7,
 	0x9c, 0xc3, 0xca, 0xc8, 0xcc, 0xd0, 0xce, 0x60, 0xd2, 0xea, 0xe8, 0xec, 0xee, 0xf8, 0xe3, 0xfa,
 };
+
+
+//
+// Director 8.5 Mac, MacRoman encoding
+//
+// ................................
+//   !"«»“”#$%&'‘’()*+,-./012345678
+// 9:;<=>?@AÁÀÂÄÃÅaáàâäãåÆæBbCÇcçDd
+// EÉÈÊËeéèêëFfﬁﬂGgHhIÍÌÎÏı.íìîïJjK
+// kLlMmNÑnñOÓÒÔÖΩØoóòôöõøŒœPpQqRrS
+// sßTtUÚÙÛÜuúùûüVvWwXxYyÿŸZz[\]^_`
+// {|}~.†°¢£§•¶®©™´¨≠∞±≤≥¥µ∂∑∏π∫ªºΩ
+// ¿¡¬√ƒ≈Δ…–—÷◊⁄¤‹›‡·‚„‰��¯˘˙˚¸˝˛.
+
+const byte orderTableD8mac[256] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+	0x20, 0x22, 0x23, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36,
+	0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46,
+	0x47, 0x48, 0x58, 0x5a, 0x5e, 0x60, 0x6a, 0x6e, 0x70, 0x72, 0x7d, 0x7f, 0x81, 0x83, 0x85, 0x89,
+	0x99, 0x9b, 0x9d, 0x9f, 0xa2, 0xa4, 0xae, 0xb0, 0xb2, 0xb4, 0xb8, 0xba, 0xbb, 0xbc, 0xbd, 0xbe,
+	0xbf, 0x4f, 0x59, 0x5c, 0x5f, 0x65, 0x6b, 0x6f, 0x71, 0x77, 0x7e, 0x80, 0x82, 0x84, 0x87, 0x90,
+	0x9a, 0x9c, 0x9e, 0xa0, 0xa3, 0xa9, 0xaf, 0xb1, 0xb3, 0xb5, 0xb9, 0xc0, 0xc1, 0xc2, 0xc3, 0xc4,
+	0x4c, 0x4e, 0x5b, 0x61, 0x86, 0x8d, 0xa8, 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x5d, 0x66, 0x67,
+	0x68, 0x69, 0x79, 0x7a, 0x7b, 0x7c, 0x88, 0x91, 0x92, 0x93, 0x94, 0x95, 0xaa, 0xab, 0xac, 0xad,
+	0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xcb, 0xa1, 0xcc, 0xcd, 0xce, 0xcf, 0xd0, 0xd1, 0x56, 0x8f,
+	0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0xdf, 0x57, 0x96,
+	0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0x24, 0x25, 0xe7, 0x21, 0x4a, 0x4d, 0x8e, 0x97, 0x98,
+	0xe8, 0xe9, 0x26, 0x27, 0x2d, 0x2e, 0xea, 0xeb, 0xb6, 0xb7, 0xec, 0xed, 0xee, 0xef, 0x6c, 0x6d,
+	0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0x4b, 0x63, 0x49, 0x64, 0x62, 0x73, 0x75, 0x76, 0x74, 0x8a, 0x8c,
+	0xf5, 0x8b, 0xa5, 0xa7, 0xa6, 0x77, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
+};
+
+
+//
+// Director 8.5-10 Win, cp1252 encoding
+//
+// ­............................'-–
+// —  .....!"#$%&()*,./:;?@[\]ˆ._`{
+// |}~¡¦¨¯´¸¿˜‘’‚“”„‹›¢£¤¥€+<=>±«»×
+// ÷§©¬®°µ¶·…†‡•‰�����0¼½¾1¹2²3³456
+// 789aAªáÁàÀâÂäÄãÃåÅæÆbBcCçÇdDðÐeE
+// éÉèÈêÊëËfFƒgGhHiIíÍìÌîÎïÏjJkKlLm
+// MnNñÑoOºóÓòÒôÔöÖõÕøØœŒpPqQrRsSšŠ
+// ßtTþÞ™uUúÚùÙûÛüÜvVwWxXyYýÝ.ŸzZžŽ
+
+const byte orderTableD8win[256] = {
+	0x00, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x23, 0x24, 0x25, 0x26, 0x27, 0x0a, 0x0b,
+	0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b,
+	0x21, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x1d, 0x2e, 0x2f, 0x30, 0x58, 0x31, 0x1e, 0x32, 0x33,
+	0x73, 0x77, 0x79, 0x7b, 0x7d, 0x7e, 0x7f, 0x80, 0x81, 0x82, 0x34, 0x35, 0x59, 0x5a, 0x5b, 0x36,
+	0x37, 0x84, 0x95, 0x97, 0x9b, 0x9f, 0xa9, 0xac, 0xae, 0xb0, 0xba, 0xbc, 0xbe, 0xc0, 0xc2, 0xc6,
+	0xd7, 0xd9, 0xdb, 0xdd, 0xe2, 0xe7, 0xf1, 0xf3, 0xf5, 0xf7, 0xfd, 0x38, 0x39, 0x3a, 0x3b, 0x3d,
+	0x3e, 0x83, 0x94, 0x96, 0x9a, 0x9e, 0xa8, 0xab, 0xad, 0xaf, 0xb9, 0xbb, 0xbd, 0xbf, 0xc1, 0xc5,
+	0xd6, 0xd8, 0xda, 0xdc, 0xe1, 0xe6, 0xf0, 0xf2, 0xf4, 0xf6, 0xfc, 0x3f, 0x40, 0x41, 0x42, 0x1c,
+	0x57, 0x6e, 0x4d, 0xaa, 0x50, 0x69, 0x6a, 0x6b, 0x3b, 0x6d, 0xdf, 0x51, 0xd5, 0x6f, 0xff, 0x70,
+	0x71, 0x4b, 0x4c, 0x4e, 0x4f, 0x6c, 0x1f, 0x20, 0x4a, 0xe5, 0xde, 0x52, 0xd4, 0x72, 0xfe, 0xfb,
+	0x22, 0x43, 0x53, 0x54, 0x55, 0x56, 0x44, 0x61, 0x45, 0x62, 0x85, 0x5d, 0x63, 0x00, 0x64, 0x46,
+	0x65, 0x5c, 0x7a, 0x7c, 0x47, 0x66, 0x67, 0x68, 0x48, 0x78, 0xc7, 0x5e, 0x74, 0x75, 0x76, 0x49,
+	0x89, 0x87, 0x8b, 0x8f, 0x8d, 0x91, 0x93, 0x99, 0xa3, 0xa1, 0xa5, 0xa7, 0xb4, 0xb2, 0xb6, 0xb8,
+	0x9d, 0xc4, 0xcb, 0xc9, 0xcd, 0xd1, 0xcf, 0x5f, 0xd3, 0xeb, 0xe9, 0xed, 0xef, 0xf9, 0xe4, 0xe0,
+	0x88, 0x86, 0x8a, 0x8e, 0x8c, 0x90, 0x92, 0x98, 0xa2, 0xa0, 0xa4, 0xa6, 0xb3, 0xb1, 0xb5, 0xb7,
+	0x9c, 0xc3, 0xca, 0xc8, 0xcc, 0xd0, 0xce, 0x60, 0xd2, 0xea, 0xe8, 0xec, 0xee, 0xf8, 0xe3, 0xfa,
+};
+
+/////////////////////////////////////////////////////////////
+// String comparison equality tables
+//
+// Director is using its way to compare if two characters are equal
+// It is declared as case-insensitive but the reality is more complex.
+//
+// The tables below contain the first instance of the letter that is
+// comparable in the given position.
+//
+// e.g. for D5 win character 159 and 255 are equal. Item 159 is equal to 159 and item
+// 255 is equal to 159 as well.
+//
+// The tools to recreate these tables is available in the director tests repository
+//	https://github.com/scummvm/director-tests/tree/master/stringequality
+
+//
+// Director 4 Win, cp1252 encoding
+// D4 win: does lowercase comparison and discards diacritics.
+//
+
+const byte equalityTableD4win[256] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+	0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
+	0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
+	0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+	0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
+	0x60, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+	0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f,
+	0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x53, 0x8b, 0x4f, 0x8d, 0x8e, 0x8f,
+	0x90, 0x27, 0x27, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x53, 0x9b, 0x4f, 0x9d, 0x9e, 0x59,
+	0x20, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0x22, 0xac, 0xad, 0xae, 0xaf,
+	0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xb9, 0xba, 0x22, 0xbc, 0xbd, 0xbe, 0xbf,
+	0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x43, 0x45, 0x45, 0x45, 0x45, 0x49, 0x49, 0x49, 0x49,
+	0x44, 0x4e, 0x4f, 0x4f, 0x4f, 0x4f, 0x4f, 0xd7, 0x4f, 0x55, 0x55, 0x55, 0x55, 0x59, 0xde, 0x53,
+	0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x43, 0x45, 0x45, 0x45, 0x45, 0x49, 0x49, 0x49, 0x49,
+	0x44, 0x4e, 0x4f, 0x4f, 0x4f, 0x4f, 0x4f, 0xf7, 0x4f, 0x55, 0x55, 0x55, 0x55, 0x59, 0xde, 0x59
+};
+
+//
+// Director 5 Win, cp1252 encoding
+//
+
+const byte equalityTableD5win[256] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+	0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
+	0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
+	0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+	0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
+	0x60, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+	0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f,
+	0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+	0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x8a, 0x9b, 0x8c, 0x9d, 0x9e, 0x9f,
+	0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf,
+	0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf,
+	0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf,
+	0xd0, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0xdf,
+	0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf,
+	0xd0, 0x98, 0x9c, 0x9e, 0x9d, 0xd5, 0xd6, 0xf7, 0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0x9f
+};
+
+//
+// Director 3, 4, 5 Mac MacRoman
+//
+
+const byte equalityTableD3mac[256] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+	0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
+	0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
+	0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+	0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
+	0x60, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+	0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f,
+	0x41, 0x41, 0x43, 0x45, 0x4e, 0x4f, 0x55, 0x41, 0x41, 0x41, 0x41, 0x41, 0x41, 0x43, 0x45, 0x45,
+	0x45, 0x45, 0x49, 0x49, 0x49, 0x49, 0x4e, 0x4f, 0x4f, 0x4f, 0x4f, 0x4f, 0x55, 0x55, 0x55, 0x55,
+	0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0x4f,
+	0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xae, 0x4f,
+	0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0x22, 0x22, 0xc9, 0x20, 0x41, 0x41, 0x4f, 0xce, 0xce,
+	0xd0, 0xd1, 0x22, 0x22, 0x27, 0x27, 0xd6, 0xd7, 0x59, 0x59, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0xdf,
+	0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0x41, 0x45, 0x41, 0x45, 0x45, 0x49, 0x49, 0x49, 0x49, 0x4f, 0x4f,
+	0xf0, 0x4f, 0x55, 0x55, 0x55, 0x49, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff
+};
+
 
 static int getCharOrder(Common::u32char_type_t ch) {
 	int num = charToNum(ch);
@@ -1248,23 +1685,97 @@ static int getCharOrder(Common::u32char_type_t ch) {
 	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version < 700)
 		return orderTableD6win[num];
 
+	if (pl == Common::kPlatformMacintosh && lang != Common::JA_JPN && version < 900)
+		return orderTableD8mac[num];
+
+	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version < 1100)
+		return orderTableD8win[num];
+
+	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version >= 1100)
+		return num;
+
 	return num;
 }
 
-int compareStrings(const Common::String &s1, const Common::String &s2) {
+int compareStringOrder(const Common::String &s1, const Common::String &s2) {
 	Common::U32String u32S1 = s1.decode(Common::kUtf8);
 	Common::U32String u32S2 = s2.decode(Common::kUtf8);
 	const Common::u32char_type_t *p1 = u32S1.c_str();
 	const Common::u32char_type_t *p2 = u32S2.c_str();
 
-	uint32 c1, c2;
+	int c1, c2;
 	do {
 		c1 = getCharOrder(*p1);
 		c2 = getCharOrder(*p2);
 		p1++;
 		p2++;
-	} while (c1 == c2 && c1);
+	} while (c1 == c2 && (c1 || c2));
+
 	return c1 - c2;
+}
+
+static int getCharEquality(Common::u32char_type_t ch) {
+	int num = charToNum(ch);
+
+	if (num > 255)
+		return num;
+
+	Common::Platform pl = g_director->getPlatform();
+	Common::Language lang = g_director->getLanguage();
+	int version = g_director->getVersion();
+
+	if (pl == Common::kPlatformMacintosh && lang != Common::JA_JPN && version < 600)
+		return equalityTableD3mac[num];
+
+	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version < 500)
+		return equalityTableD4win[num];
+
+	if (pl == Common::kPlatformWindows && lang != Common::JA_JPN && version < 600)
+		return equalityTableD5win[num];
+
+	warning("BUILDBOT: No equality table for Director version: %d", version);
+	return num;
+}
+
+bool compareStringEquality(const Common::String &s1, const Common::String &s2) {
+	Common::U32String u32S1 = s1.decode(Common::kUtf8);
+	Common::U32String u32S2 = s2.decode(Common::kUtf8);
+	const Common::u32char_type_t *p1 = u32S1.c_str();
+	const Common::u32char_type_t *p2 = u32S2.c_str();
+
+	int c1, c2;
+	do {
+		c1 = getCharEquality(*p1);
+		c2 = getCharEquality(*p2);
+		p1++;
+		p2++;
+	} while (c1 == c2 && (c1 || c2));
+
+	return (c1 == 0) && (c2 == 0);
+}
+
+const char *d_strstr(const char *str, const char *substr) {
+	// Check if the substr is found inside the str
+	int len = strlen(substr);
+	const char *ref = substr;
+
+	while (*str && *ref) {
+		const uint32 c1 = getCharEquality(*str);
+		const uint32 c2 = getCharEquality(*ref);
+
+		str++;
+
+		if (c1 == c2)
+			ref++;
+
+		if (!*ref)
+			return (str - len);
+
+		if (len == (ref - substr))
+			ref = substr;
+	}
+
+	return nullptr;
 }
 
 void DirectorEngine::delayMillis(uint32 delay) {
@@ -1275,3 +1786,15 @@ void DirectorEngine::delayMillis(uint32 delay) {
 }
 
 } // End of namespace Director
+
+double readAppleFloat80(void *ptr_) {
+	// Floats in an "80 bit IEEE Standard 754 floating
+	// point number (Standard Apple Numeric Environment [SANE] data type
+	// Extended).
+	byte *ptr = (byte *)ptr_;
+
+	uint16 signAndExponent = READ_BE_UINT16(&ptr[0]);
+	uint64 mantissa = READ_BE_UINT64(&ptr[2]);
+
+	return Common::XPFloat(signAndExponent, mantissa).toDouble(Common::XPFloat::kSemanticsSANE);
+}

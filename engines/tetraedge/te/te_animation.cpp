@@ -43,7 +43,15 @@ TeAnimation::~TeAnimation() {
 void TeAnimation::cont() {
 	if (!_runTimer.running()) {
 		_runTimer.start();
-		animations()->push_back(this);
+
+		Common::Array<TeAnimation *> *anims = animations();
+		Common::Array<TeAnimation *>::iterator iter;
+		for (iter = anims->begin(); iter != anims->end(); iter++) {
+			if (*iter == this) {
+				error("anim being resumed is already in active anims");
+			}
+		}
+		anims->push_back(this);
 		update(_runTimer.getTimeFromStart() / 1000.0);
 	}
 }
@@ -122,7 +130,7 @@ void TeAnimation::updateAll() {
 	// getting deleted, so be careful about the numbers.
 	for (uint i = 0; i < anims.size(); i++) {
 		if (anims[i]->_runTimer.running()) {
-			float msFromStart = anims[i]->_runTimer.getTimeFromStart() / 1000.0;
+			double msFromStart = anims[i]->_runTimer.getTimeFromStart() / 1000.0;
 			anims[i]->update(msFromStart);
 		}
 	}

@@ -32,7 +32,7 @@ namespace Tetraedge {
 Confirm::Confirm() {
 }
 
-void Confirm::enter(const Common::String &guiPath, const Common::String &y) {
+void Confirm::enter(const Common::Path &guiPath, const Common::String &y) {
 	_gui.load(guiPath);
 	TeLayout *backgroundLayout = _gui.layout("background");
 	if (!backgroundLayout) {
@@ -64,8 +64,9 @@ void Confirm::enter(const Common::String &guiPath, const Common::String &y) {
 		TeTextLayout *textTextLayout = dynamic_cast<TeTextLayout *>(textLayout->child(0));
 		if (!textTextLayout)
 			error("Expected text layout child.");
-
-		textTextLayout->setText(textAttributs + *app->loc().value(textTextLayout->name()));
+		const Common::String *textLayoutName = app->loc().value(textTextLayout->name());
+		const char *fallbackText = "Do you really want to quit?";	// FIXME: Needed for Syberia II
+		textTextLayout->setText(textAttributs + (textLayoutName ? *textLayoutName : fallbackText));
 
 		if (!okButtonLoc || !cancelButtonLoc) {
 			error("Missing translations for ok and cancel");
@@ -100,7 +101,7 @@ void Confirm::enter(const Common::String &guiPath, const Common::String &y) {
 	app->frontOrientationLayout().removeChild(&app->mouseCursorLayout());
 	app->frontOrientationLayout().addChild(&app->mouseCursorLayout());
 
-	if (ConfMan.get("skip_confirm") == "true") {
+	if (ConfMan.getBool("skip_confirm")) {
 		onButtonYes();
 	}
 }

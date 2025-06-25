@@ -38,11 +38,11 @@ namespace Director {
 
 namespace RegisterComponent {
 
-extern const char *xlibName;
-extern const char *fileNames[];
+extern const char *const xlibName;
+extern const XlibFileDesc fileNames[];
 
-void open(int type);
-void close(int type);
+void open(ObjectType type, const Common::Path &path);
+void close(ObjectType type);
 
 void b_RegisterComponent(int nargs);
 

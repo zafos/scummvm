@@ -59,7 +59,7 @@ public:
 	typedef uint32 unsigned_type; /*!< Unsigned version of the underlying type. */
 public:
 	/** Construct a new empty string. */
-	U32String() : BaseString<u32char_type_t>() {}
+	constexpr U32String() : BaseString<u32char_type_t>() {}
 
 	/** Construct a new string from the given null-terminated C string. */
 	explicit U32String(const value_type *str) : BaseString<u32char_type_t>(str) {}
@@ -67,8 +67,11 @@ public:
 	/** Construct a new string containing exactly @p len characters read from address @p str. */
 	U32String(const value_type *str, uint32 len) : BaseString<u32char_type_t>(str, len) {}
 
+	WARN_DEPRECATED("Use u32char_type_t instead of uint32")
 	explicit U32String(const uint32 *str) : BaseString<u32char_type_t>((const value_type *) str) {}
+	WARN_DEPRECATED("Use u32char_type_t instead of uint32")
 	U32String(const uint32 *str, uint32 len) : BaseString<u32char_type_t>((const value_type *) str, len) {}
+	WARN_DEPRECATED("Use u32char_type_t instead of uint32")
 	U32String(const uint32 *beginP, const uint32 *endP) : BaseString<u32char_type_t>((const value_type *) beginP, (const value_type *) endP) {}
 
 	/** Construct a new string containing the characters between @p beginP (including) and @p endP (excluding). */
@@ -93,7 +96,10 @@ public:
 	U32String(const String &str, CodePage page = kUtf8);
 
 	/** Construct a string consisting of the given character. */
-	explicit U32String(value_type c);
+	explicit constexpr U32String(value_type c) : BaseString<u32char_type_t>(c) {}
+
+	/** Construct a string consisting of n copies of the given character. */
+	U32String(size_t n, value_type c) : BaseString<u32char_type_t>(n, c) {}
 
 	/** Assign a given string to this string. */
 	U32String &operator=(const U32String &str);
@@ -110,8 +116,14 @@ public:
 	/** @overload */
 	U32String &operator=(const char *str);
 
+	/** @overload */
+	U32String &operator=(value_type c);
+
 	/** Append the given string to this string. */
 	U32String &operator+=(const U32String &str);
+
+	/** @overload */
+	U32String &operator+=(const value_type *str);
 
 	/** @overload */
 	U32String &operator+=(value_type c);
@@ -156,13 +168,10 @@ public:
 	 */
 	static int vformat(const value_type *fmt, const value_type *fmtEnd, U32String &output, va_list args);
 
-	using BaseString<value_type>::insertString;
-	void insertString(const char *s, uint32 p, CodePage page = kUtf8);   /*!< Insert string @p s into this string at position @p p. */
-	void insertString(const String &s, uint32 p, CodePage page = kUtf8); /*!< @overload */
-
 	/** Return a substring of this string */
 	U32String substr(size_t pos = 0, size_t len = npos) const;
 
+	WARN_DEPRECATED("Use c_str() instead")
 	const uint32 *u32_str() const {   /*!< Return the string as a UTF-32 pointer. */
 		return (const uint32 *) _str;
 	}
@@ -185,6 +194,9 @@ public:
 	/** Transform a U32String into UTF-16 representation (native encoding). The result must be freed. */
 	uint16 *encodeUTF16Native(uint *len = nullptr) const;
 
+	/** Transform Traditional Chinese string into Simplified. */
+	U32String transcodeChineseT2S() const;
+
 private:
 	static U32String formatInternal(const U32String *fmt, ...);
 
@@ -192,17 +204,18 @@ private:
 	 * Helper function for vformat. Convert an int to a string.
 	 * Minimal implementation, only for base 10.
 	 */
-	static char* itoa(int num, char* str, uint base);
+	static value_type* ustr_helper_itoa(int num, value_type* str, uint base);
 
 	/**
 	 * Helper function for vformat. Convert an unsigned int to a string.
 	 * Minimal implementation, only for base 10.
 	 */
-	static char* uitoa(uint num, char* str, uint base);
+	static value_type* ustr_helper_uitoa(uint num, value_type* str, uint base);
 
 	void decodeInternal(const char *str, uint32 len, CodePage page);
 	void decodeOneByte(const char *str, uint32 len, CodePage page);
 	void decodeWindows932(const char *src, uint32 len);
+	void decodeWindows936(const char *src, uint32 len);
 	void decodeWindows949(const char *src, uint32 len);
 	void decodeWindows950(const char *src, uint32 len);
 	void decodeJohab(const char *src, uint32 len);

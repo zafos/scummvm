@@ -29,11 +29,11 @@
 #define GRAPHICS_TINYGL_ZBUFFER_H_
 
 #include "graphics/surface.h"
-#include "graphics/tinygl/pixelbuffer.h"
 #include "graphics/tinygl/texelbuffer.h"
 #include "graphics/tinygl/gl.h"
 
 #include "common/rect.h"
+#include "common/textconsole.h"
 
 namespace TinyGL {
 
@@ -112,7 +112,7 @@ struct FrameBuffer {
 	}
 
 	byte *getPixelBuffer() {
-		return _pbuf.getRawBuffer();
+		return _pbuf;
 	}
 
 	int getPixelBufferWidth() {
@@ -123,21 +123,70 @@ struct FrameBuffer {
 		return _pbufHeight;
 	}
 
+	int getPixelBufferPitch() {
+		return _pbufPitch;
+	}
+
+	int getPixelBufferBpp() {
+		return _pbufBpp;
+	}
+
 	const uint *getZBuffer() {
 		return _zbuf;
 	}
 
 	Graphics::Surface *copyFromFrameBuffer(const Graphics::PixelFormat &dstFormat) {
 		Graphics::Surface tmp;
-		tmp.init(_pbufWidth, _pbufHeight, _pbufPitch, _pbuf.getRawBuffer(), _pbufFormat);
+		tmp.init(_pbufWidth, _pbufHeight, _pbufPitch, _pbuf, _pbufFormat);
 		return tmp.convertTo(dstFormat);
 	}
 
 	void getSurfaceRef(Graphics::Surface &surface) {
-		surface.init(_pbufWidth, _pbufHeight, _pbufPitch, _pbuf.getRawBuffer(), _pbufFormat);
+		surface.init(_pbufWidth, _pbufHeight, _pbufPitch, _pbuf, _pbufFormat);
 	}
 
 private:
+
+	FORCEINLINE void setPixelAt(int pixel, uint32 value) {
+		switch (_pbufBpp) {
+		case 2:
+			((uint16 *) _pbuf)[pixel] = value;
+			return;
+		case 3:
+			pixel *= 3;
+#if defined(SCUMM_BIG_ENDIAN)
+			_pbuf[pixel + 0] = (value >> 16) & 0xFF;
+			_pbuf[pixel + 1] = (value >> 8) & 0xFF;
+			_pbuf[pixel + 2] = value & 0xFF;
+#elif defined(SCUMM_LITTLE_ENDIAN)
+			_pbuf[pixel + 0] = value & 0xFF;
+			_pbuf[pixel + 1] = (value >> 8) & 0xFF;
+			_pbuf[pixel + 2] = (value >> 16) & 0xFF;
+#endif
+			return;
+		case 4:
+			((uint32 *) _pbuf)[pixel] = value;
+			return;
+		}
+		error("setPixelAt: Unhandled bytesPerPixel %d", int(_pbufBpp));
+	}
+
+	FORCEINLINE uint32 getPixelAt(int i) const {
+		switch (_pbufBpp) {
+		case 2:
+			return ((uint16 *) _pbuf)[i];
+		case 3:
+			i *= 3;
+#if defined(SCUMM_BIG_ENDIAN)
+			return (_pbuf[i + 0] << 16) | (_pbuf[i + 1] << 8) | _pbuf[i + 2];
+#elif defined(SCUMM_LITTLE_ENDIAN)
+			return _pbuf[i + 0] | (_pbuf[i + 1] << 8) | (_pbuf[i + 2] << 16);
+#endif
+		case 4:
+			return ((uint32 *) _pbuf)[i];
+		}
+		error("getPixelAt: Unhandled bytesPerPixel %d", int(_pbufBpp));
+	}
 
 	FORCEINLINE bool compareDepth(uint &zSrc, uint &zDst) {
 		if (!_depthTestEnabled)
@@ -287,13 +336,13 @@ private:
 	template <bool kEnableAlphaTest, bool kBlendingEnabled, bool kDepthWrite>
 	FORCEINLINE void writePixel(int pixel, int value, uint z) {
 		if (kBlendingEnabled == false) {
-			_pbuf.setPixelAt(pixel, value);
+			setPixelAt(pixel, value);
 			if (kDepthWrite) {
 				_zbuf[pixel] = z;
 			}
 		} else {
 			byte rSrc, gSrc, bSrc, aSrc;
-			_pbuf.getFormat().colorToARGB(value, aSrc, rSrc, gSrc, bSrc);
+			_pbufFormat.colorToARGB(value, aSrc, rSrc, gSrc, bSrc);
 
 			writePixel<kEnableAlphaTest, kBlendingEnabled, kDepthWrite>(pixel, aSrc, rSrc, gSrc, bSrc, z);
 		}
@@ -307,7 +356,7 @@ private:
 		}
 	}
 
-	template <bool kDepthWrite, bool kSmoothMode, bool kFogMode, bool kEnableAlphaTest, bool kEnableScissor, bool kEnableBlending, bool kStencilEnabled, bool kDepthTestEnabled>
+	template <bool kDepthWrite, bool kSmoothMode, bool kFogMode, bool kEnableAlphaTest, bool kEnableScissor, bool kEnableBlending, bool kStencilEnabled, bool kStippleEnabled, bool kDepthTestEnabled>
 	void putPixelNoTexture(int fbOffset, uint *pz, byte *ps, int _a,
 	                       int x, int y, uint &z, uint &r, uint &g, uint &b, uint &a,
 	                       int &dzdx, int &drdx, int &dgdx, int &dbdx, uint dadx,
@@ -321,7 +370,7 @@ private:
 	                     int &dzdx, int &dsdx, int &dtdx, int &drdx, int &dgdx, int &dbdx, uint dadx,
 	                     uint &fog, int fog_r, int fog_g, int fog_b, int &dfdx);
 
-	template <bool kDepthWrite, bool kEnableScissor, bool kStencilEnabled, bool kDepthTestEnabled>
+	template <bool kDepthWrite, bool kEnableScissor, bool kStencilEnabled, bool StippleEnabled, bool kDepthTestEnabled>
 	void putPixelDepth(uint *pz, byte *ps, int _a, int x, int y, uint &z, int &dzdx);
 
 
@@ -370,7 +419,7 @@ private:
 
 	template <bool kEnableAlphaTest, bool kBlendingEnabled, bool kDepthWrite>
 	FORCEINLINE void writePixel(int pixel, byte aSrc, byte rSrc, byte gSrc, byte bSrc, uint z) {
-		writePixel<kEnableAlphaTest, kBlendingEnabled, false, false>(pixel, aSrc, rSrc, gSrc, bSrc, z, 0.0f, 0, 0, 0);
+		writePixel<kEnableAlphaTest, kBlendingEnabled, kDepthWrite, false>(pixel, aSrc, rSrc, gSrc, bSrc, z, 0.0f, 0, 0, 0);
 	}
 
 	template <bool kEnableAlphaTest, bool kBlendingEnabled, bool kDepthWrite, bool kFogMode>
@@ -407,10 +456,10 @@ private:
 		}
 
 		if (!kBlendingEnabled) {
-			_pbuf.setPixelAt(pixel, aSrc, rSrc, gSrc, bSrc);
+			setPixelAt(pixel, _pbufFormat.ARGBToColor(aSrc, rSrc, gSrc, bSrc));
 		} else {
 			byte rDst, gDst, bDst, aDst;
-			_pbuf.getARGBAt(pixel, aDst, rDst, gDst, bDst);
+			_pbufFormat.colorToARGB(getPixelAt(pixel), aDst, rDst, gDst, bDst);
 			switch (_sourceBlendingFactor) {
 			case TGL_ZERO:
 				rSrc = gSrc = bSrc = 0;
@@ -509,7 +558,7 @@ private:
 			if (finalB > 255) {
 				finalB = 255;
 			}
-			_pbuf.setPixelAt(pixel, 255, finalR, finalG, finalB);
+			setPixelAt(pixel, _pbufFormat.RGBToColor(finalR, finalG, finalB));
 		}
 	}
 
@@ -520,13 +569,32 @@ public:
 	void clearRegion(int x, int y, int w, int h, bool clearZ, int z,
 	                 bool clearColor, int r, int g, int b, bool clearStencil, int stencilValue);
 
-	void setScissorRectangle(const Common::Rect &rect) {
-		_clipRectangle = rect;
-		_enableScissor = true;
+	const Common::Rect &getClippingRectangle() const {
+		return _clipRectangle;
 	}
 
-	void resetScissorRectangle() {
-		_enableScissor = false;
+	void setupScissor(bool enable, const int (&scissor)[4], const Common::Rect *clippingRectangle) {
+		_clippingEnabled = enable || clippingRectangle;
+
+		if (enable && clippingRectangle) {
+			_clipRectangle = clippingRectangle->findIntersectingRect(Common::Rect(
+					scissor[0],
+					// all viewport calculations are already flipped upside down
+					_pbufHeight - scissor[1] - scissor[3],
+					scissor[0] + scissor[2],
+					_pbufHeight - scissor[1]));
+		} else if (enable) {
+			_clipRectangle = Common::Rect(
+					scissor[0],
+					// all viewport calculations are already flipped upside down
+					_pbufHeight - scissor[1] - scissor[3],
+					scissor[0] + scissor[2],
+					_pbufHeight - scissor[1]);
+		} else if (clippingRectangle) {
+			_clipRectangle = *clippingRectangle;
+		} else {
+			_clipRectangle = Common::Rect(0, 0, _pbufWidth, _pbufHeight);
+		}
 	}
 
 	void enableBlending(bool enable) {
@@ -565,6 +633,14 @@ public:
 
 	void setStencilWriteMask(uint stencilWriteMask) {
 		_stencilWriteMask = stencilWriteMask;
+	}
+
+	void enablePolygonStipple(bool enable) {
+		_polygonStippleEnabled = enable;
+	}
+
+	void setPolygonStipplePattern(const byte *stipple) {
+		_polygonStipplePattern = stipple;
 	}
 
 	void setStencilTestFunc(int stencilFunc, int stencilValue, uint stencilMask) {
@@ -627,7 +703,12 @@ private:
 
 	template <bool kInterpRGB, bool kInterpZ, bool kInterpST, bool kInterpSTZ, bool kSmoothMode,
 	          bool kDepthWrite, bool kFogMode, bool kAlphaTestEnabled, bool kEnableScissor,
-	          bool kBlendingEnabled, bool kStencilEnabled, bool kDepthTestEnabled>
+	          bool kBlendingEnabled, bool kStencilEnabled, bool kStippleEnabled, bool kDepthTestEnabled>
+	void fillTriangle(ZBufferPoint *p0, ZBufferPoint *p1, ZBufferPoint *p2);
+
+	template <bool kInterpRGB, bool kInterpZ, bool kInterpST, bool kInterpSTZ, bool kSmoothMode,
+	          bool kDepthWrite, bool kFogMode, bool kAlphaTestEnabled, bool kEnableScissor,
+	          bool kBlendingEnabled, bool kStencilEnabled, bool kStippleEnabled>
 	void fillTriangle(ZBufferPoint *p0, ZBufferPoint *p1, ZBufferPoint *p2);
 
 	template <bool kInterpRGB, bool kInterpZ, bool kInterpST, bool kInterpSTZ, bool kSmoothMode,
@@ -693,7 +774,7 @@ private:
 	void drawLine(const ZBufferPoint *p1, const ZBufferPoint *p2);
 
 	Buffer _offscreenBuffer;
-	Graphics::PixelBuffer _pbuf;
+	byte *_pbuf;
 	int _pbufWidth;
 	int _pbufHeight;
 	int _pbufPitch;
@@ -708,7 +789,7 @@ private:
 	int _textureSizeMask;
 
 	Common::Rect _clipRectangle;
-	bool _enableScissor;
+	bool _clippingEnabled;
 
 	const TexelBuffer *_currentTexture;
 	uint _wrapS, _wrapT;
@@ -728,6 +809,9 @@ private:
 	int _stencilSfail;
 	int _stencilDpfail;
 	int _stencilDppass;
+
+	bool _polygonStippleEnabled;
+	const byte *_polygonStipplePattern;
 	int _depthFunc;
 	int _offsetStates;
 	float _offsetFactor;

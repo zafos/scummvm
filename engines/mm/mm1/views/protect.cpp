@@ -74,8 +74,7 @@ void Protect::draw() {
 }
 
 void Protect::printProtectionFrom() {
-	if (_textPos.y == 2)
-		writeString(STRING["dialogs.protect.protection"]);
+	writeString(STRING["dialogs.protect.protection"]);
 	_textPos.x = 17;
 }
 

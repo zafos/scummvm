@@ -19,6 +19,8 @@
  *
  */
 
+#include "common/file.h"
+
 #include "video/theora_decoder.h"
 
 #include "tetraedge/te/te_theora.h"
@@ -38,9 +40,12 @@ bool TeTheora::matchExtension(const Common::String &extn) {
 	return extn == "ogv";
 }
 
-bool TeTheora::load(const Common::FSNode &node) {
+bool TeTheora::load(const TetraedgeFSNode &node) {
 	_loadedNode = node;
-	return _decoder->loadStream(node.createReadStream());
+	if (!_decoder->loadStream(node.createReadStream()))
+		return false;
+	_decoder->setOutputPixelFormat(Graphics::PixelFormat(4, 8, 8, 8, 8, 0, 8, 16, 24));
+	return true;
 }
 
 uint TeTheora::width() {
@@ -94,14 +99,18 @@ uint TeTheora::topBorderSize() {
 }
 
 float TeTheora::frameRate() {
-	return _decoder->getRate().toDouble();
+	return _decoder->getFrameRate().toDouble();
 }
 
 bool TeTheora::update(uint i, TeImage &imgout) {
-	if (_decoder->getCurFrame() > (int)i && _loadedNode.isReadable()) {
+	if (!_decoder->isPlaying())
+		_decoder->start();
+
+	if (_decoder->getCurFrame() > (int)i && _loadedNode.exists()) {
 		// rewind.. no good way to do that, but it should
 		// only happen on loop.
 		load(_loadedNode);
+		_decoder->start();
 	}
 
 	const Graphics::Surface *frame = nullptr;
@@ -114,7 +123,7 @@ bool TeTheora::update(uint i, TeImage &imgout) {
 		//debug("TeTheora: %s %ld", _path.toString().c_str(), i);
 		imgout.copyFrom(*frame);
 		return true;
-	} else if (_hitEnd && _loadedNode.isReadable()) {
+	} else if (_hitEnd && _loadedNode.exists()) {
 		// Loop to the start.
 		load(_loadedNode);
 		frame = _decoder->decodeNextFrame();

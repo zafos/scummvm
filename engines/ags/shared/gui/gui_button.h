@@ -22,7 +22,7 @@
 #ifndef AGS_SHARED_GUI_GUI_BUTTON_H
 #define AGS_SHARED_GUI_GUI_BUTTON_H
 
-#include "ags/lib/std/vector.h"
+#include "common/std/vector.h"
 #include "ags/engine/ac/button.h"
 #include "ags/shared/gui/gui_object.h"
 #include "ags/shared/util/string.h"
@@ -58,11 +58,25 @@ enum LegacyButtonAlignment {
 	kLegacyButtonAlign_BottomRight = 8,
 };
 
+// Defines button placeholder mode; the mode is set
+// depending on special tags found in button text
+enum GUIButtonPlaceholder {
+	kButtonPlace_None,
+	kButtonPlace_InvItemStretch,
+	kButtonPlace_InvItemCenter,
+	kButtonPlace_InvItemAuto
+};
+
 class GUIButton : public GUIObject {
 public:
 	GUIButton();
 
 	bool HasAlphaChannel() const override;
+	int32_t GetCurrentImage() const;
+	int32_t GetNormalImage() const;
+	int32_t GetMouseOverImage() const;
+	int32_t GetPushedImage() const;
+	GUIButtonPlaceholder GetPlaceholder() const;
 	const String &GetText() const;
 	bool IsImageButton() const;
 	bool IsClippingImage() const;
@@ -71,6 +85,11 @@ public:
 	Rect CalcGraphicRect(bool clipped) override;
 	void Draw(Bitmap *ds, int x = 0, int y = 0) override;
 	void SetClipImage(bool on);
+	void SetCurrentImage(int32_t image);
+	void SetMouseOverImage(int32_t image);
+	void SetNormalImage(int32_t image);
+	void SetPushedImage(int32_t image);
+	void SetImages(int32_t normal, int32_t over, int32_t pushed);
 	void SetText(const String &text);
 
 	// Events
@@ -87,10 +106,6 @@ public:
 
 	// TODO: these members are currently public; hide them later
 	public:
-	int32_t     Image;
-	int32_t     MouseOverImage;
-	int32_t     PushedImage;
-	int32_t     CurrentImage;
 	int32_t     Font;
 	color_t     TextColor;
 	FrameAlignment TextAlignment;
@@ -107,16 +122,14 @@ private:
 	void DrawText(Bitmap *ds, int x, int y, bool draw_disabled);
 	void DrawTextButton(Bitmap *ds, int x, int y, bool draw_disabled);
 	void PrepareTextToDraw();
+	// Update current image depending on the button's state
+	void UpdateCurrentImage();
 
-	// Defines button placeholder mode; the mode is set
-	// depending on special tags found in button text
-	enum GUIButtonPlaceholder {
-		kButtonPlace_None,
-		kButtonPlace_InvItemStretch,
-		kButtonPlace_InvItemCenter,
-		kButtonPlace_InvItemAuto
-	};
-
+	int32_t _image;
+	int32_t _mouseOverImage;
+	int32_t _pushedImage;
+	// Active displayed image
+	int32_t _currentImage;
 	// Text property set by user
 	String _text;
 	// type of content placeholder, if any

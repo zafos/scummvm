@@ -94,7 +94,7 @@ static ADGameDescription s_fallbackDesc = {
 
 static char s_fallbackExtraBuf[256];
 
-class WintermuteMetaEngine : public AdvancedMetaEngine {
+class WintermuteMetaEngine : public AdvancedMetaEngine<WMEGameDescription> {
 public:
 	const char *getName() const override {
 		return "wintermute";
@@ -104,9 +104,7 @@ public:
 		return gameGuiOptions;
 	}
 
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override {
-		const WMEGameDescription *gd = (const WMEGameDescription *)desc;
-
+	Common::Error createInstance(OSystem *syst, Engine **engine, const WMEGameDescription *gd) const override {
 #ifndef ENABLE_FOXTAIL
 		if (gd->targetExecutable >= FOXTAIL_OLDEST_VERSION && gd->targetExecutable <= FOXTAIL_LATEST_VERSION) {
 			return Common::Error(Common::kUnsupportedGameidError, _s("FoxTail support is not compiled in"));
@@ -161,9 +159,9 @@ public:
 		return 100;
 	}
 
-	void removeSaveState(const char *target, int slot) const override {
+	bool removeSaveState(const char *target, int slot) const override {
 		Wintermute::BasePersistenceManager pm(target, true);
-		pm.deleteSaveSlot(slot);
+		return pm.deleteSaveSlot(slot);
 	}
 
 	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override {
@@ -226,9 +224,9 @@ public:
 			if (!file->getName().hasSuffixIgnoreCase(".dcp")) continue;
 
 			FileProperties tmp;
-			if (AdvancedMetaEngine::getFilePropertiesExtern(md5Bytes, allFiles, kMD5Head, file->getName(), tmp)) {
+			if (AdvancedMetaEngine::getFilePropertiesExtern(md5Bytes, allFiles, kMD5Head, file->getPathInArchive(), tmp)) {
 				game.hasUnknownFiles = true;
-				game.matchedFiles[file->getName()] = tmp;
+				game.matchedFiles[file->getPathInArchive()] = tmp;
 			}
 		}
 

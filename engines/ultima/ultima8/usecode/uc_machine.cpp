@@ -81,8 +81,8 @@ enum UCSegments {
 
 UCMachine *UCMachine::_ucMachine = nullptr;
 
-UCMachine::UCMachine(Intrinsic *iset, unsigned int icount) {
-	debug(MM_INFO, "Creating UCMachine...");
+UCMachine::UCMachine(const Intrinsic *iset, unsigned int icount) {
+	debug(1, "Creating UCMachine...");
 
 	_ucMachine = this;
 
@@ -114,7 +114,7 @@ UCMachine::UCMachine(Intrinsic *iset, unsigned int icount) {
 
 
 UCMachine::~UCMachine() {
-	debug(MM_INFO, "Destroying UCMachine...");
+	debug(1, "Destroying UCMachine...");
 	_ucMachine = nullptr;
 
 	delete _globals;
@@ -124,7 +124,7 @@ UCMachine::~UCMachine() {
 }
 
 void UCMachine::reset() {
-	debug(MM_INFO, "Resetting UCMachine");
+	debug(1, "Resetting UCMachine");
 
 	// clear _globals
 	_globals->setSize(0x1000);
@@ -138,14 +138,13 @@ void UCMachine::reset() {
 	}
 
 	// clear strings, lists
-	Common::HashMap<uint16, UCList *>::iterator iter;
-	for (iter = _listHeap.begin(); iter != _listHeap.end(); ++iter)
-		delete(iter->_value);
+	for (auto &i : _listHeap)
+		delete i._value;
 	_listHeap.clear();
 	_stringHeap.clear();
 }
 
-void UCMachine::loadIntrinsics(Intrinsic *i, unsigned int icount) {
+void UCMachine::loadIntrinsics(const Intrinsic *i, unsigned int icount) {
 	_intrinsics = i;
 	_intrinsicCount = icount;
 }
@@ -281,7 +280,7 @@ void UCMachine::execProcess(UCProcess *p) {
 			// push sign-extended 8 bit xx onto the stack as 16 bit
 			ui16a = cs->readSByte();
 			p->_stack.push2(ui16a);
-			TRACE_OP("%s\tpush byte\t%04Xh", op_info, ui16a);
+			TRACE_OP("%s\tpush sbyte\t%04Xh", op_info, ui16a);
 			break;
 
 		case 0x0B:
@@ -1235,7 +1234,7 @@ void UCMachine::execProcess(UCProcess *p) {
 			if (GAME_IS_U8) {
 				assert(_globals->getEntries(ui16a, ui16b) == (ui32a & ((1 << ui16b) - 1)));
 			} else {
-				assert(_globals->getEntries(ui16a, ui16b) == ui32a);
+				assert(_globals->getEntries(ui16a, ui16b) == (ui32a & ((1 << (ui16b * 8)) - 1)));
 		    }
 
 			TRACE_OP("%s\tpop\t\tglobal [%04X %02X] = %02X", op_info, ui16a, ui16b, ui32a);
@@ -1471,7 +1470,7 @@ void UCMachine::execProcess(UCProcess *p) {
 				// skip over class name and null terminator
 				name[x] = cs->readByte();
 			}
-			TRACE_OP("%s\tdebug\tline number %d\t\"%s\"", op_info, opcode, ui16a, name);
+			TRACE_OP("%s\tdebug\tline number %d\t\"%s\"", op_info, ui16a, name);
 			debug(10, "name: \"%s\"", name); // Ensures that name variable is used when TRACE_OP is empty
 			break;
 		}
@@ -1731,11 +1730,10 @@ void UCMachine::execProcess(UCProcess *p) {
 				const uint16 range = GAME_IS_CRUSADER ? ui16b * 2 : ui16b;
 
 				if (item) {
-					int32 ix, iy, iz;
-					item->getLocationAbsolute(ix, iy, iz);
+					Point3 pt = item->getLocationAbsolute();
 					world->getCurrentMap()->areaSearch(itemlist, script,
 					                                   scriptsize, nullptr,
-					                                   range, recurse, ix, iy);
+					                                   range, recurse, pt.x, pt.y);
 				} else {
 					// return error or return empty list?
 					warning("Invalid item %u passed to area search", ui16a);
@@ -2264,29 +2262,27 @@ void UCMachine::usecodeStats() const {
 	g_debugger->debugPrintf("Usecode Machine memory stats:\n");
 	g_debugger->debugPrintf("Strings    : %u/65534\n", _stringHeap.size());
 #ifdef DUMPHEAP
-	Common::HashMap<uint16, Std::string>::const_iterator iter;
-	for (iter = _stringHeap.begin(); iter != _stringHeap.end(); ++iter)
-		g_debugger->debugPrintf("%d:%s\n", iter->_key << ":" << iter->_value.c_str());
+	for (const auto &i : _stringHeap)
+		g_debugger->debugPrintf("%d:%s\n", i._key << ":" << i._value.c_str());
 #endif
 	g_debugger->debugPrintf("Lists      : %u/65534\n", _listHeap.size());
 #ifdef DUMPHEAP
-	Common::HashMap<uint16, UCList *>::const_iterator iterl;
-	for (iterl = _listHeap.begin(); iterl != _listHeap.end(); ++iterl) {
-		if (!iterl->_value) {
-			g_debugger->debugPrintf("%d: <null>\n", iterl->_key);
+	for (const auto &l : _listHeap) {
+		if (!l._value) {
+			g_debugger->debugPrintf("%d: <null>\n", l._key);
 			continue;
 		}
-		if (iterl->_value->getElementSize() == 2) {
-			g_debugger->debugPrintf("%d:", iterl->_key);
+		if (l._value->getElementSize() == 2) {
+			g_debugger->debugPrintf("%d:", l._key);
 
-			for (unsigned int i = 0; i < iterl->_value->getSize(); ++i) {
+			for (unsigned int i = 0; i < l._value->getSize(); ++i) {
 				if (i > 0) g_debugger->debugPrintf(",");
-				g_debugger->debugPrintf("%d", iterl->_value->getuint16(i));
+				g_debugger->debugPrintf("%d", l._value->getuint16(i));
 			}
 			g_debugger->debugPrintf("\n");
 		} else {
 			g_debugger->debugPrintf("%d: %u elements of size %u\n",
-				iterl->_key, iterl->_value->getSize(), iterl->_value->getElementSize());
+				l._key, l._value->getSize(), l._value->getElementSize());
 		}
 	}
 #endif
@@ -2300,11 +2296,10 @@ void UCMachine::saveStrings(Common::WriteStream *ws) const {
 	_stringIDs->save(ws);
 	ws->writeUint32LE(static_cast<uint32>(_stringHeap.size()));
 
-	Common::HashMap<uint16, Std::string>::const_iterator iter;
-	for (iter = _stringHeap.begin(); iter != _stringHeap.end(); ++iter) {
-		ws->writeUint16LE((*iter)._key);
-		ws->writeUint32LE((*iter)._value.size());
-		ws->write((*iter)._value.c_str(), (*iter)._value.size());
+	for (const auto &i : _stringHeap) {
+		ws->writeUint16LE(i._key);
+		ws->writeUint32LE(i._value.size());
+		ws->write(i._value.c_str(), i._value.size());
 	}
 }
 
@@ -2312,10 +2307,9 @@ void UCMachine::saveLists(Common::WriteStream *ws) const {
 	_listIDs->save(ws);
 	ws->writeUint32LE(_listHeap.size());
 
-	Common::HashMap<uint16, UCList *>::const_iterator iter;
-	for (iter = _listHeap.begin(); iter != _listHeap.end(); ++iter) {
-		ws->writeUint16LE((*iter)._key);
-		(*iter)._value->save(ws);
+	for (const auto &i : _listHeap) {
+		ws->writeUint16LE(i._key);
+		i._value->save(ws);
 	}
 }
 

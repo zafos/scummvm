@@ -32,6 +32,9 @@
 
 #include "osystem.h"
 
+// Uncomment this to enable debug output to console
+//#define PLATFORM_WII_OSYSTEM_GFX_DEBUG
+
 #define ROUNDUP(x,n) (-(-(x) & -(n)))
 #define MAX_FPS 30
 #define TLUT_GAME GX_TLUT0
@@ -260,7 +263,7 @@ void OSystem_Wii::initSize(uint width, uint height,
 		assert((newWidth <= 640) && (newHeight <= 480));
 
 		if (width != newWidth || height != newHeight)
-			printf("extending texture for compability: %ux%u -> %ux%u\n",
+			printf("extending texture for compatibility: %ux%u -> %ux%u\n",
 					width, height, newWidth, newHeight);
 
 		_gameWidth = newWidth;
@@ -326,7 +329,33 @@ int16 OSystem_Wii::getHeight() {
 	return _gameHeight;
 }
 
+void OSystem_Wii::updateMousePalette() {
+#ifdef PLATFORM_WII_OSYSTEM_GFX_DEBUG
+	printf("%s() _cursorPaletteDisabled:%d\n", __func__, _cursorPaletteDisabled);
+#endif
+
+	if (_texMouse.palette) {
+		if (!_cursorPaletteDisabled) {
+			memcpy(_texMouse.palette, _cursorPalette, 256 * 2);
+#ifdef USE_RGB_COLOR
+		} else if (_pfGame.bytesPerPixel != 1) {
+			// When restoring the palette, there may be cases where game doesn't have any palette
+			// In this case, clear the palette
+			memset(_texMouse.palette, 0, 256 * 2);
+#endif
+		} else {
+			memcpy(_texMouse.palette, _texGame.palette, 256 * 2);
+		}
+
+		_cursorPaletteDirty = true;
+	}
+}
+
 void OSystem_Wii::setPalette(const byte *colors, uint start, uint num) {
+#ifdef PLATFORM_WII_OSYSTEM_GFX_DEBUG
+	printf("%s(%p, %d, %d) _cursorPaletteDisabled:%d\n", __func__, colors, start, num, _cursorPaletteDisabled);
+#endif
+
 #ifdef USE_RGB_COLOR
 	assert(_pfGame.bytesPerPixel == 1);
 #endif
@@ -339,21 +368,7 @@ void OSystem_Wii::setPalette(const byte *colors, uint start, uint num) {
 
 	gfx_tex_flush_palette(&_texGame);
 
-	s = colors;
-	d = _cursorPalette;
-
-	for (uint i = 0; i < num; ++i, s += 3) {
-		d[start + i] = _pfRGB3444.ARGBToColor(0xff, s[0], s[1], s[2]);
-	}
-
-	if (_cursorPaletteDisabled) {
-		assert(_texMouse.palette);
-
-		memcpy((u8 *)_texMouse.palette + start * 2,
-			(u8 *)_cursorPalette + start * 2, num * 2);
-
-		_cursorPaletteDirty = true;
-	}
+	updateMousePalette();
 }
 
 void OSystem_Wii::grabPalette(byte *colors, uint start, uint num) const {
@@ -374,6 +389,10 @@ void OSystem_Wii::grabPalette(byte *colors, uint start, uint num) const {
 }
 
 void OSystem_Wii::setCursorPalette(const byte *colors, uint start, uint num) {
+#ifdef PLATFORM_WII_OSYSTEM_GFX_DEBUG
+	printf("%s(%p,%u,%u) _cursorPaletteDisabled:%d\n", __func__, colors, start, num, _cursorPaletteDisabled);
+#endif
+
 	if (!_texMouse.palette) {
 		printf("switching to palette based cursor\n");
 
@@ -386,18 +405,16 @@ void OSystem_Wii::setCursorPalette(const byte *colors, uint start, uint num) {
 		gfx_tex_set_bilinear_filter(&_texMouse, _bilinearFilter);
 	}
 
-	if (_cursorPaletteDisabled) {
-		memcpy(_cursorPalette, _texMouse.palette, 256 * 2);
-		_cursorPaletteDisabled = false;
-	}
+	_cursorPaletteDisabled = false;
 
 	const byte *s = colors;
-	u16 *d = _texMouse.palette;
+	u16 *d = _cursorPalette;
 
-	for (uint i = 0; i < num; ++i, s += 3)
+	for (uint i = 0; i < num; ++i, s += 3) {
 		d[start + i] = _pfRGB3444.ARGBToColor(0xff, s[0], s[1], s[2]);
+	}
 
-	_cursorPaletteDirty = true;
+	updateMousePalette();
 }
 
 void OSystem_Wii::copyRectToScreen(const void *buf, int pitch, int x, int y,
@@ -519,6 +536,10 @@ void OSystem_Wii::updateScreen() {
 			gfx_tex_flush_palette(&_texMouse);
 			_cursorPaletteDirty = false;
 		}
+
+#ifdef PLATFORM_WII_OSYSTEM_GFX_DEBUG
+		//printf("%s() cc.x:%f cc.y:%f cc.w:%f cc.h:%f xscale:%f yscale:%f\n", __func__, cc.x, cc.y, cc.w, cc.h, _currentXScale, _currentYScale);
+#endif
 
 		gfx_draw_tex(&_texMouse, &cc);
 	}
@@ -646,6 +667,12 @@ bool OSystem_Wii::showMouse(bool visible) {
 	bool last = _mouseVisible;
 	_mouseVisible = visible;
 
+#ifdef PLATFORM_WII_OSYSTEM_GFX_DEBUG
+	if (_mouseVisible != last) {
+		printf("%s(%d)\n", __func__, _mouseVisible);
+	}
+#endif
+
 	return last;
 }
 
@@ -658,6 +685,9 @@ void OSystem_Wii::setMouseCursor(const void *buf, uint w, uint h, int hotspotX,
 									int hotspotY, uint32 keycolor,
 									bool dontScale,
 									const Graphics::PixelFormat *format, const byte *mask) {
+#ifdef PLATFORM_WII_OSYSTEM_GFX_DEBUG
+	printf("%s(%p, w:%u, h:%u, hsX:%d, hsY:%d, kc:%u, dontScale:%d, %p, %p)\n", __func__, buf, w, h, hotspotX, hotspotY, keycolor, dontScale, format, mask);
+#endif
 
 	if (mask)
 		printf("OSystem_Wii::setMouseCursor: Masks are not supported\n");
@@ -754,6 +784,6 @@ void OSystem_Wii::setMouseCursor(const void *buf, uint w, uint h, int hotspotX,
 	_mouseHotspotY = hotspotY;
 	_cursorDontScale = dontScale;
 
-	if ((_texMouse.palette) && (oldKeycolor != _mouseKeyColor))
-		_cursorPaletteDirty = true;
+	if (_pfCursor.bytesPerPixel == 1 && oldKeycolor != _mouseKeyColor)
+		updateMousePalette();
 }

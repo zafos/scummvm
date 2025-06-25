@@ -23,21 +23,23 @@
 #define HPL1_DEBUG_H
 
 #include "common/debug.h"
+#include "common/textconsole.h"
 
 #define HPL1_UNIMPLEMENTED(fnName) error("call to unimplemented function " #fnName)
 
 namespace Hpl1 {
 
 enum DebugChannels {
-	kDebugGraphics = 1 << 0,
-	kDebugResourceLoading = 1 << 1,
-	kDebugFilePath = 1 << 2,
-	kDebugOpenGL = 1 << 3,
-	kDebugRenderer = 1 << 4,
-	kDebugAudio = 1 << 5,
-	kDebugSaves = 1 << 6,
-	kDebugTextures = 1 << 7,
-	kDebugScripts = 1 << 8
+	kDebugGraphics = 1,
+	kDebugResourceLoading,
+	kDebugFilePath,
+	kDebugOpenGL,
+	kDebugRenderer,
+	kDebugAudio,
+	kDebugSaves,
+	kDebugTextures,
+	kDebugScripts,
+	kDebugShaders,
 };
 
 enum DebugLevels {
@@ -61,6 +63,6 @@ void logInfo(uint32 channels, const char *fmt, Args... args) {
 	debugCN(kDebugLevelLog, channels, fmt, args...);
 }
 
-}
+} // namespace Hpl1
 
 #endif

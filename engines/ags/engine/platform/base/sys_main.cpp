@@ -48,9 +48,20 @@ void sys_set_background_mode(bool /*on*/) {
 // ----------------------------------------------------------------------------
 // DISPLAY UTILS
 // ----------------------------------------------------------------------------
-#ifdef TODO
-const int DEFAULT_DISPLAY_INDEX = 0; // TODO: is this always right?
+
+const int DEFAULT_DISPLAY_INDEX = 0;
+
+int sys_get_window_display_index() {
+#if (AGS_PLATFORM_DESKTOP && !AGS_PLATFORM_SCUMMVM)
+	int index = -1;
+	SDL_Window *window = sys_get_window();
+	if (window)
+		index = SDL_GetWindowDisplayIndex(window);
+	return index >= 0 ? index : DEFAULT_DISPLAY_INDEX;
+#else
+	return DEFAULT_DISPLAY_INDEX;
 #endif
+}
 
 int sys_get_desktop_resolution(int &width, int &height) {
 	// TODO: ScummVM has a hardcoded dummy desktop resolution. See if there's any
@@ -64,7 +75,7 @@ int sys_get_desktop_resolution(int &width, int &height) {
 void sys_get_desktop_modes(std::vector<AGS::Engine::DisplayMode> &dms, int color_depth) {
 #ifdef TODO
 	SDL_DisplayMode mode;
-	const int display_id = DEFAULT_DISPLAY_INDEX;
+	const int display_id = sys_get_window_display_index();
 	const int count = SDL_GetNumDisplayModes(display_id);
 	dms.clear();
 	for (int i = 0; i < count; ++i) {
@@ -154,6 +165,10 @@ SDL_Window *sys_window_create(const char *window_title, int w, int h, WindowMode
 	case kWnd_FullDesktop: flags |= SDL_WINDOW_FULLSCREEN_DESKTOP; break;
 	}
 	flags |= ex_flags;
+#if (AGS_PLATFORM_MOBILE)
+	// Resizable flag is necessary for fullscreen app rotation
+	flags |= SDL_WINDOW_RESIZABLE;
+#endif
 	window = SDL_CreateWindow(
 		window_title,
 		SDL_WINDOWPOS_CENTERED_DISPLAY(DEFAULT_DISPLAY_INDEX),
@@ -162,6 +177,15 @@ SDL_Window *sys_window_create(const char *window_title, int w, int h, WindowMode
 		h,
 		flags
 	);
+#if (AGS_PLATFORM_DESKTOP)
+	// CHECKME: this is done because SDL2 has some bug(s) during
+	// centering. See: https://github.com/libsdl-org/SDL/issues/6875
+	// TODO: SDL2 docs mentioned that on some systems the window border size
+	// may be known only after the window is displayed, which means that
+	// this may have to be called with a short delay (but how to know when?)
+	if (mode == kWnd_Windowed)
+		sys_window_center();
+#endif
 	return window;
 }
 #else
@@ -225,6 +249,14 @@ void sys_window_set_icon() {
 bool sys_window_set_size(int w, int h, bool center) {
 	error("TODO: sys_window_set_size");
 	return false;
+}
+
+void sys_window_center(int display_index) {
+	// No implementation in ScummVM
+}
+
+void sys_window_fit_in_display(int display_index) {
+	// No implementation in ScummVM
 }
 
 #if AGS_PLATFORM_OS_WINDOWS

@@ -23,7 +23,7 @@
 #include "common/file.h"
 #include "common/stream.h"
 #include "common/substream.h"
-#include "common/compression/zlib.h"
+#include "common/compression/deflate.h"
 
 #include "tetraedge/tetraedge.h"
 #include "tetraedge/te/te_core.h"
@@ -177,26 +177,26 @@ int TeModelAnimation::lastFrame() const {
 	} else {
 		result = _numNMOFrames;
 	}
-	return MIN(_lastFrame, result);
+	return MIN(_lastFrame, result - 1);
 }
 
 bool TeModelAnimation::load(const Common::Path &path) {
-	Common::FSNode foundFile = g_engine->getCore()->findFile(path);
-	Common::File modelFile;
-	if (!modelFile.open(foundFile)) {
+	TetraedgeFSNode foundFile = g_engine->getCore()->findFile(path);
+	Common::ScopedPtr<Common::SeekableReadStream> modelFile(foundFile.createReadStream());
+	if (!modelFile) {
 		warning("[TeModel::load] Can't open file : %s.", path.toString().c_str());
 		return false;
 	}
 	bool retval;
-	if (Te3DObject2::loadAndCheckFourCC(modelFile, "TEZ0")) {
-		Common::SeekableReadStream *zlibStream = TeModel::tryLoadZlibStream(modelFile);
+	if (Te3DObject2::loadAndCheckFourCC(*modelFile, "TEZ0")) {
+		Common::SeekableReadStream *zlibStream = TeModel::tryLoadZlibStream(*modelFile);
 		if (!zlibStream)
 			return false;
 		retval = load(*zlibStream);
 		delete zlibStream;
 	} else {
-		modelFile.seek(0);
-		retval = load(modelFile);
+		modelFile->seek(0);
+		retval = load(*modelFile);
 	}
 	_loadedPath = path;
 	return retval;
@@ -356,6 +356,10 @@ void TeModelAnimation::update(double millis) {
 		if (_finishedSignalPending) {
 			_finishedSignalPending = false;
 			_onFinishedSignal.call();
+			if (g_engine->gameType() == TetraedgeEngine::kSyberia2) {
+				if (_repeatNum >= _repeatCount && _repeatCount != -1)
+					stop();
+			}
 		}
 	}
 }

@@ -391,11 +391,10 @@ bool cRenderList::Add(iRenderable *apObject) {
 	}
 		// Add a light to a special container
 	case eRenderableType_Light: {
-			iLight3D *pLight = static_cast<iLight3D *>(apObject);
+		iLight3D *pLight = static_cast<iLight3D *>(apObject);
 
-			m_setLights.insert(pLight);
-		}
-		break;
+		m_setLights.insert(pLight);
+	} break;
 	default:
 		break;
 	}
@@ -463,7 +462,7 @@ void cRenderList::AddToTree(iRenderable *apObject, eRenderListDrawType aObjectTy
 	iRenderState *pTempState = mTempNode.mpState;
 	cRenderNode *pTempNode = &mTempNode;
 
-	//-------------- EXPLAINATION ----------------------------------
+	//-------------- EXPLANATION ----------------------------------
 	// Go through each render state type and set the appropriate
 	// variables for each type. The most important states are set first.
 	// The state is then inserted to a tree structure, where each state type is a level.
@@ -684,7 +683,7 @@ void cRenderList::AddToTree(iRenderable *apObject, eRenderListDrawType aObjectTy
 	iRenderState *pTempState = NULL;//mTempNode.mpState;
 	cRenderNode *pTempNode = NULL;
 
-	//-------------- EXPLAINATION ----------------------------------
+	//-------------- EXPLANATION ----------------------------------
 	// Go through each render state type and set the appropriate
 	// variables for each type. The most important states are set first.
 	// The state is then inserted to a tree structure, where each state type is a level.

@@ -22,8 +22,6 @@
 #ifndef DIRECTOR_SCORE_H
 #define DIRECTOR_SCORE_H
 
-//#include "graphics/macgui/macwindowmanager.h"
-
 #include "director/cursor.h"
 
 namespace Graphics {
@@ -36,6 +34,7 @@ namespace Graphics {
 
 namespace Common {
 	class ReadStreamEndian;
+	class MemoryReadStreamEndian;
 	class SeekableReadStreamEndian;
 }
 
@@ -46,7 +45,6 @@ class Archive;
 class DirectorEngine;
 class DirectorSound;
 class Frame;
-struct Label;
 class Movie;
 struct Resource;
 class Cursor;
@@ -55,9 +53,11 @@ class Sprite;
 class CastMember;
 class AudioDecoder;
 
-enum RenderMode {
-	kRenderModeNormal,
-	kRenderForceUpdate
+struct Label {
+	Common::String comment;
+	Common::String name;
+	uint16 number;
+	Label(Common::String name1, uint16 number1, Common::String comment1) { name = name1; number = number1; comment = comment1;}
 };
 
 class Score {
@@ -68,6 +68,11 @@ public:
 	Movie *getMovie() const { return _movie; }
 
 	void loadFrames(Common::SeekableReadStreamEndian &stream, uint16 version);
+	bool loadFrame(int frame, bool loadCast);
+	bool readOneFrame();
+	void updateFrame(Frame *frame);
+	Frame *getFrameData(int frameNum);
+
 	void loadLabels(Common::SeekableReadStreamEndian &stream);
 	void loadActions(Common::SeekableReadStreamEndian &stream);
 	void loadSampleSounds(uint type);
@@ -83,13 +88,16 @@ public:
 	void startPlay();
 	void step();
 	void stopPlay();
+	void setDelay(uint32 ticks);
 
-	void setCurrentFrame(uint16 frameId) { _nextFrame = frameId; }
-	uint16 getCurrentFrame() { return _currentFrame; }
+	void setCurrentFrame(uint16 frameId);
+	uint16 getCurrentFrameNum() { return _curFrameNumber; }
 	int getNextFrame() { return _nextFrame; }
+	uint16 getFramesNum() { return _numFrames; }
 
-	int getCurrentPalette();
-	int resolvePaletteId(int id);
+	void setPuppetTempo(int16 puppetTempo);
+
+	CastMemberID getCurrentPalette();
 
 	Channel *getChannelById(uint16 id);
 	Sprite *getSpriteById(uint16 id);
@@ -104,61 +112,88 @@ public:
 	uint16 getSpriteIDFromPos(Common::Point pos);
 	uint16 getMouseSpriteIDFromPos(Common::Point pos);
 	uint16 getActiveSpriteIDFromPos(Common::Point pos);
-	bool checkSpriteIntersection(uint16 spriteId, Common::Point pos);
+	bool checkSpriteRollOver(uint16 spriteId, Common::Point pos);
+	uint16 getRollOverSpriteIDFromPos(Common::Point pos);
 	Common::List<Channel *> getSpriteIntersections(const Common::Rect &r);
 	uint16 getSpriteIdByMemberId(CastMemberID id);
+	bool refreshPointersForCastMemberID(CastMemberID id);
+	bool refreshPointersForCastLib(uint16 castLib);
 
-	bool renderTransition(uint16 frameId);
+	bool renderTransition(uint16 frameId, RenderMode mode);
 	void renderFrame(uint16 frameId, RenderMode mode = kRenderModeNormal);
-	void renderSprites(uint16 frameId, RenderMode mode = kRenderModeNormal);
-	bool renderPrePaletteCycle(uint16 frameId, RenderMode mode = kRenderModeNormal);
-	void setLastPalette(uint16 frameId);
+	void incrementFilmLoops();
+	void updateSprites(RenderMode mode = kRenderModeNormal, bool withClean = false);
+	bool renderPrePaletteCycle(RenderMode mode = kRenderModeNormal);
+	void setLastPalette();
 	bool isPaletteColorCycling();
-	void renderPaletteCycle(uint16 frameId, RenderMode mode = kRenderModeNormal);
+	void renderPaletteCycle(RenderMode mode = kRenderModeNormal);
 	void renderCursor(Common::Point pos, bool forceUpdate = false);
 	void updateWidgets(bool hasVideoPlayback);
 
 	void invalidateRectsForMember(CastMember *member);
 
-	void playSoundChannel(uint16 frameId, bool puppetOnly);
+	void playSoundChannel(bool puppetOnly);
 
 	Common::String formatChannelInfo();
+	bool processFrozenPlayScript();
 
 private:
+	bool isWaitingForNextFrame();
+	void updateCurrentFrame();
+	void updateNextFrameTime();
 	void update();
 	void playQueuedSound();
 
 	void screenShot();
+	bool checkShotSimilarity(const Graphics::Surface *surface1, const Graphics::Surface *surface2);
 
 	bool processImmediateFrameScript(Common::String s, int id);
-	bool processFrozenScripts();
+	bool processFrozenScripts(bool recursion = false, int count = 0);
 
 public:
 	Common::Array<Channel *> _channels;
-	Common::Array<Frame *> _frames;
 	Common::SortedArray<Label *> *_labels;
 	Common::HashMap<uint16, Common::String> _actions;
 	Common::HashMap<uint16, bool> _immediateActions;
 
-	byte _currentFrameRate;
+	Common::Array<Frame *> _scoreCache;
 
+	// On demand frames loading
+	uint32 _version;
+	Frame *_currentFrame;
+	uint32 _curFrameNumber;
+	uint32 _numFrames;
+	uint32 _framesVersion;
+	uint32 _numChannels;
+	uint8 _currentTempo;
+	CastMemberID _currentPaletteId;
+
+	uint _firstFramePosition;
+	uint _framesStreamSize;
+	Common::MemoryReadStreamEndian *_framesStream;
+
+	byte _currentFrameRate;
 	byte _puppetTempo;
+
 	bool _puppetPalette;
-	int _lastPalette;
 	int _paletteTransitionIndex;
 	byte _paletteSnapshotBuffer[768];
 
 	PlayState _playState;
 	uint32 _nextFrameTime;
+	uint32 _nextFrameDelay;
 	int _lastTempo;
 	int _waitForChannel;
 	int _waitForVideoChannel;
 	bool _waitForClick;
 	bool _waitForClickCursor;
 	bool _cursorDirty;
-	int _activeFade;
+	bool _activeFade;
+	bool _exitFrameCalled;
+	bool _stopPlayCalled;
 	Cursor _defaultCursor;
 	CursorRef _currentCursor;
+	bool _skipTransition;
 
 	int _numChannelsDisplayed;
 
@@ -168,11 +203,11 @@ private:
 	Movie *_movie;
 	Window *_window;
 
-	uint16 _currentFrame;
 	uint16 _nextFrame;
 	int _currentLabel;
 	DirectorSound *_soundManager;
-	int _currentPalette;
+
+	int _previousBuildBotBuild = -1;
 };
 
 } // End of namespace Director

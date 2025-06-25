@@ -23,10 +23,10 @@
 // Largely based on the WMA implementation found in FFmpeg.
 
 #include "common/util.h"
-#include "common/math.h"
+#include "common/intrinsics.h"
 #include "common/error.h"
 #include "common/memstream.h"
-#include "common/huffman.h"
+#include "common/compression/huffman.h"
 
 #include "math/mdct.h"
 #include "math/sinewindows.h"
@@ -115,8 +115,8 @@ WMACodec::~WMACodec() {
 		delete _coefHuffman[i];
 	}
 
-	for (Common::Array<Math::MDCT *>::iterator m = _mdct.begin(); m != _mdct.end(); ++m)
-		delete *m;
+	for (auto *m : _mdct)
+		delete m;
 }
 
 void WMACodec::init(Common::SeekableReadStream *extraData) {
@@ -635,8 +635,10 @@ Common::SeekableReadStream *WMACodec::decodeSuperFrame(Common::SeekableReadStrea
 
 		// Decode the frames
 		for (int i = 0; i < newFrameCount; i++, _curFrame++)
-			if (!decodeFrame(bits, outputData))
+			if (!decodeFrame(bits, outputData)) {
+				delete[] outputData;
 				return nullptr;
+			}
 
 		// Check if we've got new overhang data
 		int remainingBits = bits.size() - bits.pos();

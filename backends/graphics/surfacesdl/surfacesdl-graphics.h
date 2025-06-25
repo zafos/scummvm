@@ -44,18 +44,6 @@ enum {
 };
 
 
-class AspectRatio {
-	int _kw, _kh;
-public:
-	AspectRatio() { _kw = _kh = 0; }
-	AspectRatio(int w, int h);
-
-	bool isAuto() const { return (_kw | _kh) == 0; }
-
-	int kw() const { return _kw; }
-	int kh() const { return _kh; }
-};
-
 /**
  * SDL graphics manager
  */
@@ -107,12 +95,17 @@ protected:
 	 * @param in    The SDL pixel format to convert
 	 * @param out   A pixel format to be written to
 	 */
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	Graphics::PixelFormat convertSDLPixelFormat(SDL_PixelFormat in) const;
+#else
 	Graphics::PixelFormat convertSDLPixelFormat(SDL_PixelFormat *in) const;
+#endif
 public:
 	void copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) override;
 	Graphics::Surface *lockScreen() override;
 	void unlockScreen() override;
 	void fillScreen(uint32 col) override;
+	void fillScreen(const Common::Rect &r, uint32 col) override;
 	void updateScreen() override;
 	void setFocusRectangle(const Common::Rect& rect) override;
 	void clearFocusRectangle() override;
@@ -125,6 +118,7 @@ public:
 	int16 getOverlayWidth() const override { return _videoMode.overlayWidth; }
 
 	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale = false, const Graphics::PixelFormat *format = NULL, const byte *mask = NULL) override;
+	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format, const byte *mask, bool disableKeyColor);
 	void setCursorPalette(const byte *colors, uint start, uint num) override;
 
 #ifdef USE_OSD
@@ -138,6 +132,11 @@ public:
 	// SdlGraphicsManager interface
 	void notifyVideoExpose() override;
 	void notifyResize(const int width, const int height) override;
+
+#if defined(USE_IMGUI) && (defined(USE_IMGUI_SDLRENDERER2) || defined(USE_IMGUI_SDLRENDERER3))
+	void *getImGuiTexture(const Graphics::Surface &image, const byte *palette, int palCount) override;
+	void freeImGuiTexture(void *texture) override;
+#endif
 
 protected:
 #ifdef USE_OSD
@@ -165,6 +164,20 @@ protected:
 	void updateOSD();
 	void drawOSD();
 #endif
+
+	class AspectRatio {
+		int _kw, _kh;
+	public:
+		AspectRatio() { _kw = _kh = 0; }
+		AspectRatio(int w, int h);
+
+		bool isAuto() const { return (_kw | _kh) == 0; }
+
+		int kw() const { return _kw; }
+		int kh() const { return _kh; }
+	};
+
+	static AspectRatio getDesiredAspectRatio();
 
 	bool gameNeedsAspectRatioCorrection() const override {
 		return _videoMode.aspectRatioCorrection;
@@ -216,7 +229,7 @@ protected:
 	SDL_Surface *_overlayscreen;
 	bool _useOldSrc;
 	Graphics::PixelFormat _overlayFormat;
-	bool _isDoubleBuf;
+	bool _isDoubleBuf, _isHwPalette;
 
 	enum {
 		kTransactionNone = 0,
@@ -259,8 +272,8 @@ protected:
 		bool aspectRatioCorrection;
 		AspectRatio desiredAspectRatio;
 		bool filtering;
-		bool isHwPalette;
 
+		int mode;
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 		int stretchMode;
 #endif
@@ -283,6 +296,7 @@ protected:
 			// desiredAspectRatio set to (0, 0) by AspectRatio constructor
 			filtering = false;
 
+			mode = GFX_SURFACESDL;
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 			stretchMode = 0;
 #endif
@@ -380,6 +394,7 @@ protected:
 #else
 	byte _mouseKeyColor;
 #endif
+	bool _disableMouseKeyColor;
 	byte _mappedMouseKeyColor;
 	bool _cursorDontScale;
 	bool _cursorPaletteDisabled;
@@ -430,9 +445,12 @@ protected:
 	void setFilteringMode(bool enable);
 	void setVSync(bool enable);
 
-	bool saveScreenshot(const Common::String &filename) const override;
+	bool saveScreenshot(const Common::Path &filename) const override;
 	virtual void setGraphicsModeIntern();
 	virtual void getDefaultResolution(uint &w, uint &h);
+
+	// In SurfaceSDL mode we never render in 3D and can always switch the fullscreen state
+	bool canSwitchFullscreen() const override { return true; }
 
 private:
 	void setFullscreenMode(bool enable);

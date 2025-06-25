@@ -52,8 +52,8 @@ const reg_t TRUE_REG = {0, 1};
 static reg_t &validate_property(EngineState *s, Object *obj, int index) {
 	// A static dummy reg_t, which we return if obj or index turn out to be
 	// invalid. Note that we cannot just return NULL_REG, because client code
-	// may modify the value of the returned reg_t.
-	static reg_t dummyReg = NULL_REG;
+	// may modify the reference. Instead, we reset it to NULL_REG each time.
+	static reg_t dummyReg;
 
 	// If this occurs, it means there's probably something wrong with the garbage
 	// collector, so don't hide it with fake return values
@@ -65,11 +65,15 @@ static reg_t &validate_property(EngineState *s, Object *obj, int index) {
 	else
 		index >>= 1;
 
+	// Validate the property index. SSCI does no validation; it just adds the offset
+	// to the object's address. If a script contains an invalid offset, usually due
+	// to the script compiler accepting an invalid property symbol, then OOB memory
+	// is used. Several games have an Actor:canBeHere method in script 998 with this
+	// bug, so it occurs immediately in their speed tests. (iceman, lsl3, qfg1, kq1)
 	if (index < 0 || (uint)index >= obj->getVarCount()) {
-		// This is same way sierra does it and there are some games, that contain such scripts like
-		//  iceman script 998 (fred::canBeHere, executed right at the start)
 		debugC(kDebugLevelVM, "[VM] Invalid property #%d (out of [0..%d]) requested from object %04x:%04x (%s)",
 			index, obj->getVarCount(), PRINT_REG(obj->getPos()), s->_segMan->getObjectName(obj->getPos()));
+		dummyReg = NULL_REG;
 		return dummyReg;
 	}
 
@@ -131,7 +135,7 @@ static reg_t read_var(EngineState *s, int type, int index) {
 					s->variables[type][index] = NULL_REG;
 					break;
 #else
-					error("Uninitialized read for temp %d from %s", index, originReply.toString().c_str());
+					error("Uninitialized read for temp %d", index);
 #endif
 				}
 				assert(solution.type == WORKAROUND_FAKE);
@@ -330,7 +334,7 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 		case WORKAROUND_NONE: {
 			Common::String signatureDetailsStr;
 			kernel->signatureDebug(signatureDetailsStr, kernelCall.signature, argc, argv);
-			error("\n%s[VM] k%s[%x]: signature mismatch in %s", signatureDetailsStr.c_str(), kernelCall.name, kernelCallNr, originReply.toString().c_str());
+			error("\n%s[VM] k%s[%x]: signature mismatch", signatureDetailsStr.c_str(), kernelCall.name, kernelCallNr);
 			break;
 			}
 		case WORKAROUND_IGNORE: // don't do kernel call, leave acc alone
@@ -393,13 +397,11 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 				int callNameLen = strlen(kernelCall.name);
 				if (strncmp(kernelCall.name, kernelSubCall.name, callNameLen) == 0) {
 					const char *subCallName = kernelSubCall.name + callNameLen;
-					error("\n%s[VM] k%s(%s): signature mismatch in %s",
-						signatureDetailsStr.c_str(), kernelCall.name, subCallName,
-						originReply.toString().c_str());
+					error("\n%s[VM] k%s(%s): signature mismatch",
+						signatureDetailsStr.c_str(), kernelCall.name, subCallName);
 				}
-				error("\n%s[VM] k%s: signature mismatch in %s",
-					signatureDetailsStr.c_str(), kernelSubCall.name,
-					originReply.toString().c_str());
+				error("\n%s[VM] k%s: signature mismatch",
+					signatureDetailsStr.c_str(), kernelSubCall.name);
 				break;
 			}
 			case WORKAROUND_IGNORE: // don't do kernel call, leave acc alone
@@ -602,9 +604,6 @@ void run_vm(EngineState *s) {
 			s->variables[VAR_TEMP] = s->xs->fp;
 			s->variables[VAR_PARAM] = s->xs->variables_argp;
 		}
-
-		if (s->abortScriptProcessing != kAbortNone)
-			return; // Stop processing
 
 		g_sci->checkAddressBreakpoint(s->xs->addr.pc);
 

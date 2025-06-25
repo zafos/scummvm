@@ -25,36 +25,39 @@
  * Yearn2Learn: The Flintstones Coloring Book
  *
  *************************************/
+
 /*
  * © 1989,1990 Apple Computer, Inc., v.1.1, by Anup Murarka
  * FileExists(pathname «, “noDialog”:errGlobal»)
-*/
+ */
+
+#include "common/file.h"
+#include "common/savefile.h"
 
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
 #include "director/lingo/xlibs/fileexists.h"
-#include "common/savefile.h"
 
 
 namespace Director {
 
-const char *FileExists::xlibName = "FileExists";
-const char *FileExists::fileNames[] = {
-	"FileExists",
-	0
+const char *const FileExists::xlibName = "FileExists";
+const XlibFileDesc FileExists::fileNames[] = {
+	{ "FileExists",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static BuiltinProto builtins[] = {
+static const BuiltinProto builtins[] = {
 	{ "FileExists", FileExists::m_fileexists, 1, 1, 300, HBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
-void FileExists::open(int type) {
+void FileExists::open(ObjectType type, const Common::Path &path) {
 	g_lingo->initBuiltIns(builtins);
 }
 
-void FileExists::close(int type) {
+void FileExists::close(ObjectType type) {
 	g_lingo->cleanupBuiltIns(builtins);
 }
 
@@ -69,9 +72,9 @@ void FileExists::m_fileexists(int nargs) {
 	}
 	Common::String filename = lastPathComponent(path, g_director->_dirSeparator);
 	if (!(saves->exists(filename))) {
-		Common::File *f = new Common::File;
-
-		if (!f->open(Common::Path(pathMakeRelative(origpath), g_director->_dirSeparator))) {
+		Common::File file;
+		Common::Path location = findPath(origpath);
+		if (location.empty() || !file.open(location)) {
 			g_lingo->push(Datum(false));
 			return;
 		}

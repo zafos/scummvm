@@ -27,7 +27,7 @@
 #include "common/endian.h"
 #include "common/str.h"
 #include "common/util.h"
-#include "common/compression/zlib.h"
+#include "common/compression/deflate.h"
 
 #include "wintermute/base/gfx/xfile_loader.h"
 
@@ -714,7 +714,6 @@ bool XFileLoader::getString(char *str, uint maxLen) {
 }
 
 bool XFileLoader::decompressMsZipData() {
-#ifdef USE_ZLIB
 	bool error = false;
 
 	byte *compressedBlock = new byte[kCabInputmax];
@@ -724,6 +723,11 @@ bool XFileLoader::decompressMsZipData() {
 	if (!readLE32(&decompressedSize)) {
 		error = true;
 	} else {
+		if (decompressedSize < 16) {
+			delete[] compressedBlock;
+			delete[] decompressedBlock;
+			return false;
+		}
 		decompressedSize -= 16;
 	}
 
@@ -781,7 +785,6 @@ bool XFileLoader::decompressMsZipData() {
 	}
 
 	delete[] decompressedData;
-#endif
 
 	warning("XFileLoader: decompressMsZipData: Error decompressing data!");
 	return false;
@@ -968,7 +971,7 @@ bool XFileLoader::parseObjectParts(XObject *object) {
 				return false;
 			}
 
-			objClass->_vertices = new XVector[objClass->_numVertices];
+			objClass->_vertices = new XVector3[objClass->_numVertices];
 			for (uint n = 0; n < objClass->_numVertices; n++) {
 				if (!getFloat(objClass->_vertices[n]._x) ||
 				    !getFloat(objClass->_vertices[n]._y) ||
@@ -1018,7 +1021,7 @@ bool XFileLoader::parseObjectParts(XObject *object) {
 				return false;
 			}
 
-			objClass->_normals = new XVector[objClass->_numNormals];
+			objClass->_normals = new XVector3[objClass->_numNormals];
 			for (uint n = 0; n < objClass->_numNormals; n++) {
 				if (!getFloat(objClass->_normals[n]._x) ||
 				    !getFloat(objClass->_normals[n]._y) ||

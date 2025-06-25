@@ -42,7 +42,7 @@ class cParticleSystemData3D;
 
 //----------------------------------------------------
 
-typedef Hpl1::Std::map<tString, cParticleSystemData3D *> tParticleSystemData3DMap;
+typedef Common::StableMap<tString, cParticleSystemData3D *> tParticleSystemData3DMap;
 typedef tParticleSystemData3DMap::iterator tParticleSystemData3DMapIt;
 
 //----------------------------------------------------
@@ -81,6 +81,6 @@ private:
 	// tParticleSystemData3DMap m_mapData3D;
 };
 
-}     // namespace hpl
+} // namespace hpl
 
 #endif // HPL_PARTICLE_SYSTEM_MANAGER_H

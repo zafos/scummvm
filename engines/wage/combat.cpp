@@ -79,8 +79,8 @@ void WageEngine::encounter(Chr *player, Chr *chr) {
 		appendText(chr->_initialComment.c_str());
 
 	if (chr->_armor[Chr::HEAD_ARMOR] != NULL) {
-		snprintf(buf, 512, "%s%s is wearing %s.", chr->getDefiniteArticle(true), chr->_name.c_str(),
-					getIndefiniteArticle(chr->_armor[Chr::HEAD_ARMOR]->_name));
+		snprintf(buf, 512, "%s%s is wearing %s%s.", chr->getDefiniteArticle(true), chr->_name.c_str(),
+					getIndefiniteArticle(chr->_armor[Chr::HEAD_ARMOR]->_name), chr->_armor[Chr::HEAD_ARMOR]->_name.c_str());
 		appendText(buf);
 	}
 	if (chr->_armor[Chr::BODY_ARMOR] != NULL) {
@@ -165,10 +165,12 @@ void WageEngine::performCombatAction(Chr *npc, Chr *player) {
 	default:
 		{
 			int cnt = 0;
-			for (ObjList::const_iterator it = objs->begin(); it != objs->end(); ++it, ++cnt)
-				if (cnt == token)
+			for (ObjList::const_iterator it = objs->begin(); it != objs->end(); ++it, ++cnt) {
+				if (cnt == token) {
 					performTake(npc, *it);
-			break;
+					break;
+				}
+			}
 		}
 	}
 
@@ -313,7 +315,8 @@ bool WageEngine::attackHit(Chr *attacker, Chr *victim, Obj *weapon, int targetIn
 				Scene *currentScene = victim->_currentScene;
 
 				for (int i = victim->_inventory.size() - 1; i >= 0; i--) {
-					_world->move(victim->_inventory[i], currentScene);
+					if (i < victim->_inventory.size())
+						_world->move(victim->_inventory[i], currentScene);
 				}
 				Common::String *s = getGroundItemsList(currentScene);
 				appendText(s->c_str());
@@ -520,6 +523,7 @@ bool WageEngine::handleMoveCommand(Directions dir, const char *dirName) {
 			if (strlen(msg) > 0) {
 				appendText(msg);
 			}
+			_soundQueue.clear();
 			_world->move(_world->_player, scene);
 			return true;
 		}

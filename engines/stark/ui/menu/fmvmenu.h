@@ -25,6 +25,8 @@
 #include "engines/stark/ui/menu/locationscreen.h"
 #include "engines/stark/visual/text.h"
 
+#include "common/path.h"
+
 namespace Stark {
 
 class FMVWidget;
@@ -102,7 +104,7 @@ private:
 	int _fontHeight;
 	uint _fmvPerPage;
 
-	const Common::String &_filename;
+	const Common::Path &_filename;
 	VisualText _title;
 
 	int _width;

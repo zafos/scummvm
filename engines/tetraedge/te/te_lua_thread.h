@@ -46,7 +46,7 @@ public:
 	void execute(const Common::String &str, const TeVariant &p1, const TeVariant &p2);
 	void execute(const Common::String &str, const TeVariant &p1, const TeVariant &p2, const TeVariant &p3);
 
-	void executeFile(const Common::FSNode &node);
+	void executeFile(const TetraedgeFSNode &node);
 	void pushValue(const TeVariant &val);
 
 	void release();
@@ -63,6 +63,8 @@ public:
 
 private:
 	void _resume(int nargs);
+
+	void applyScriptWorkarounds(char *buf, const Common::String &fileName);
 
 	lua_State *_luaThread;
 	uint64 _resumeCount;

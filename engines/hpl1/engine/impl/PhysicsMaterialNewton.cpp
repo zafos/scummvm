@@ -34,8 +34,8 @@
 #include "hpl1/engine/physics/PhysicsMaterial.h"
 #include "hpl1/engine/physics/SurfaceData.h"
 
-#include "hpl1/engine/system/low_level_system.h"
 #include "common/util.h"
+#include "hpl1/engine/system/low_level_system.h"
 
 namespace hpl {
 
@@ -157,9 +157,9 @@ void cPhysicsMaterialNewton::UpdateMaterials() {
 		cPhysicsMaterialNewton *pMat = static_cast<cPhysicsMaterialNewton *>(MatIt.Next());
 
 		ePhysicsMaterialCombMode frictionMode = (ePhysicsMaterialCombMode)MAX(mFrictionMode,
-																				   pMat->mFrictionMode);
+																			  pMat->mFrictionMode);
 		ePhysicsMaterialCombMode elasticityMode = (ePhysicsMaterialCombMode)MAX(mElasticityMode,
-																					 pMat->mElasticityMode);
+																				pMat->mElasticityMode);
 
 		// If the material is the same do not blend.
 		if (pMat == this) {
@@ -207,7 +207,7 @@ float cPhysicsMaterialNewton::Combine(ePhysicsMaterialCombMode aMode, float afX,
 
 //-----------------------------------------------------------------------
 int cPhysicsMaterialNewton::BeginContactCallback(const NewtonMaterial *material,
-												 const NewtonBody *body0, const NewtonBody *body1, int) {
+												 const NewtonBody *body0, const NewtonBody *body1, int32) {
 	iPhysicsBody *contactBody0 = (cPhysicsBodyNewton *)NewtonBodyGetUserData(body0);
 	iPhysicsBody *contactBody1 = (cPhysicsBodyNewton *)NewtonBodyGetUserData(body1);
 
@@ -347,10 +347,11 @@ void ContactProcessor::endProcessing() {
 	_contactBody1->OnCollide(_contactBody0, &_contactData);
 }
 
-void cPhysicsMaterialNewton::ProcessContactCallback(const NewtonJoint *joint, float, int) {
+void cPhysicsMaterialNewton::ProcessContactCallback(const NewtonJoint *joint, float, int32) {
 	ContactProcessor processor(joint);
 
-	while (processor.processNext()) {}
+	while (processor.processNext()) {
+	}
 	processor.endProcessing();
 }
 

@@ -27,6 +27,8 @@
 #include "ultima/ultima8/world/actors/actor.h"
 #include "ultima/ultima8/world/actors/actor_anim_process.h"
 #include "ultima/ultima8/world/get_object.h"
+#include "ultima/ultima8/world/current_map.h"
+#include "ultima/ultima8/world/world.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -96,19 +98,19 @@ void GravityProcess::run() {
 	//     - bounce off the item (need to consider FLG_LOW_FRICTION?)
 	//     - call the relevant events: hit/gothit ?
 
-	int32 ix, iy, iz;
-	item->getLocation(ix, iy, iz);
+	Point3 pt = item->getLocation();
 
 	// Shouldn't go negative as original did not allow it
-	if (iz <= 0 && _zSpeed < 0) {
-		terminate();
+	if (pt.z <= 0 && _zSpeed < 0) {
+		terminateDeferred();
+		fallStopped();
 		return;
 	}
 
 	int32 tx, ty, tz;
-	tx = ix + _xSpeed;
-	ty = iy + _ySpeed;
-	tz = iz + _zSpeed;
+	tx = pt.x + _xSpeed;
+	ty = pt.y + _ySpeed;
+	tz = pt.z + _zSpeed;
 
 	if (tz < 0)
 		tz = 0;
@@ -148,7 +150,32 @@ void GravityProcess::run() {
 		Item *hititem = getItem(hititemid);
 		if (!hititem)
 			return; // shouldn't happen..
-		if (_zSpeed < -2 && !dynamic_cast<Actor *>(item)) {
+
+		CurrentMap *cm = World::get_instance()->getCurrentMap();
+		Box target = item->getWorldBox();
+		Box empty;
+		PositionInfo info = cm->getPositionInfo(target, empty, item->getShapeInfo()->_flags, _itemNum);
+		if (!info.valid || !info.supported) {
+			// Reset speed and continue to slip off
+			termFlag = false;
+			_zSpeed = 0;
+
+			pt = item->getCentre();
+			target = hititem->getWorldBox();
+			if (ABS(_xSpeed) < 16) {
+				if (pt.x + 16 > target._x)
+					_xSpeed = 16;
+				else if (pt.x - 16 < target._x - target._xd)
+					_xSpeed = -16;
+			}
+
+			if (ABS(_ySpeed) < 16) {
+				if (pt.y + 16 > target._y)
+					_ySpeed = 16;
+				else if (pt.y - 16 < target._y - target._yd)
+					_ySpeed = -16;
+			}
+		} else if (_zSpeed < -2 && !actor) {
 #ifdef BOUNCE_DIAG
 			debugC(kDebugObject, "item %u bounce [%u]: hit %u",
 				_itemNum, Kernel::get_instance()->getFrameNum(), hititem->getObjId());
@@ -189,7 +216,8 @@ void GravityProcess::run() {
 					_xSpeed /= 4;
 					_ySpeed /= 4;
 					_zSpeed /= 2;
-					if (_zSpeed == 0) termFlag = true;
+					if (_zSpeed == 0)
+						termFlag = true;
 				} else {
 					// Not on land; this bounce approximates what's seen
 					// in the original U8 when Kilandra's daughters ghost
@@ -216,14 +244,15 @@ void GravityProcess::run() {
 				  _itemNum, Kernel::get_instance()->getFrameNum());
 #endif
 		}
+
 		if (termFlag) {
 			item->clearFlag(Item::FLG_BOUNCING);
 			terminateDeferred();
 		} else {
 			item->setFlag(Item::FLG_BOUNCING);
 		}
-		fallStopped();
 
+		fallStopped();
 	} else {
 
 		// blocked in some other direction than strictly downward
@@ -310,7 +339,7 @@ void GravityProcess::actorFallStoppedU8(Actor *actor, int height) {
 		if (audioproc) audioproc->playSFX(51, 250, _itemNum, 0); // CONSTANT!
 	}
 
-	if (!actor->isDead() && actor->getLastAnim() != Animation::die) {
+	if (!actor->isDead() && actor->getLastAnim() != Animation::die && !actor->hasActorFlags(Actor::ACT_STUNNED)) {
 		Kernel *kernel = Kernel::get_instance();
 
 		// play land animation, overriding other animations

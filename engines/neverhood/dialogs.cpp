@@ -29,14 +29,13 @@
 #include "gui/widget.h"
 #include "gui/widgets/popup.h"
 
-#include "common/gui_options.h"
 #include "common/system.h"
 #include "common/translation.h"
 
 namespace Neverhood {
 
 NeverhoodOptionsWidget::NeverhoodOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain) :
-		OptionsContainerWidget(boss, name, "NeverhoodGameOptionsDialog", false, domain),
+		OptionsContainerWidget(boss, name, "NeverhoodGameOptionsDialog", domain),
 		_originalSaveLoadCheckbox(nullptr),
 		_skipHallOfRecordsCheckbox(nullptr),
 		_scaleMakingOfVideosCheckbox(nullptr),
@@ -63,8 +62,8 @@ NeverhoodOptionsWidget::NeverhoodOptionsWidget(GuiObject *boss, const Common::St
 		"NeverhoodGameOptionsDialog.RepeatWillieHint", _("Repeat useful Willie's hint"),
 		_("Repeat actual useful hint by Willie"));
 
-	Common::FSDirectory dir(ConfMan.get("path", _domain));
-	Common::String extraPath(ConfMan.get("extrapath", _domain));
+	Common::FSDirectory dir(ConfMan.getPath("path", _domain));
+	Common::Path extraPath(ConfMan.getPath("extrapath", _domain));
 	Common::FSDirectory extraDir(extraPath);
 	Common::Array<Common::FSDirectory *> langdirs = { &dir, dir.getSubDirectory("language") };
 	if (!extraPath.empty()) {
@@ -103,7 +102,7 @@ NeverhoodOptionsWidget::~NeverhoodOptionsWidget() {
 void NeverhoodOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::String &layoutName, const Common::String &overlayedLayout) const {
 	layouts.addDialog(layoutName, overlayedLayout)
 	            .addLayout(GUI::ThemeLayout::kLayoutVertical)
-	                .addPadding(16, 16, 16, 16)
+	                .addPadding(0, 0, 0, 0)
 	                .addWidget("OriginalSaveLoad", "Checkbox")
 	                .addWidget("SkipHallOfRecords", "Checkbox")
 		        .addWidget("ScaleMakingOfVideos", "Checkbox")

@@ -26,11 +26,13 @@
 #include "common/system.h"
 #include "common/error.h"
 #include "common/events.h"
+#include "common/file.h"
 #include "common/fs.h"
 #include "common/hash-str.h"
 #include "common/random.h"
 #include "common/serializer.h"
 #include "common/util.h"
+#include "common/formats/xmlparser.h"
 #include "engines/engine.h"
 #include "engines/savestate.h"
 #include "graphics/screen.h"
@@ -49,6 +51,33 @@ class TeSoundManager;
 class TeRenderer;
 class TeResourceManager;
 class TeInputMgr;
+
+class TetraedgeFSNode;
+
+class TetraedgeFSList : public Common::Array<TetraedgeFSNode> {};
+class TetraedgeFSNode {
+public:
+	TetraedgeFSNode() : _archive(nullptr) {}
+	explicit TetraedgeFSNode(Common::Archive *archive) : _archive(archive) {}
+	TetraedgeFSNode(Common::Archive *archive, const Common::Path &archivePath) : _archive(archive), _archivePath(archivePath) {}
+
+	Common::SeekableReadStream *createReadStream() const;
+	bool isReadable() const;
+	bool isDirectory() const;
+	Common::Path getPath() const;
+	Common::String toString() const;
+	int getDepth() const;
+	bool exists() const;
+	bool loadXML(Common::XMLParser &parser) const;
+	Common::String getName() const;
+	TetraedgeFSNode getChild(const Common::Path &path) const;
+	bool getChildren(TetraedgeFSList &fslist, Common::FSNode::ListMode mode = Common::FSNode::kListDirectoriesOnly, bool hidden = true) const;
+	bool operator<(const TetraedgeFSNode& node) const;
+	void maybeAddToSearchMan() const;
+private:
+	Common::Archive *_archive;
+	Common::Path _archivePath;
+};
 
 class TetraedgeEngine : public Engine {
 public:
@@ -70,6 +99,7 @@ private:
 	TeResourceManager *_resourceManager;
 	TeInputMgr *_inputMgr;
 	enum TetraedgeGameType _gameType;
+	Common::Array<Common::Archive *> _rootArchives;
 
 protected:
 	// Engine APIs
@@ -79,12 +109,24 @@ public:
 	TetraedgeEngine(OSystem *syst, const ADGameDescription *gameDesc);
 	~TetraedgeEngine() override;
 
+	const Common::Array<Common::Archive *>& getRootArchives() const { return _rootArchives; }
+
 	uint32 getFeatures() const;
+
+	void closeGameDialogs();
 
 	/**
 	 * Returns the game Id
 	 */
 	Common::String getGameId() const;
+
+	Common::Language getGameLanguage() const;
+
+	Common::Platform getGamePlatform() const;
+
+	bool isUtf8Release() const;
+
+	bool isGameDemo() const;
 
 	/**
 	 * Gets a random number
@@ -97,11 +139,13 @@ public:
 		return
 			(f == kSupportsLoadingDuringRuntime) ||
 			(f == kSupportsSavingDuringRuntime) ||
-			(f == kSupportsReturnToLauncher);
+			(f == kSupportsReturnToLauncher) ||
+			(f == kSupportsChangingOptionsDuringRuntime) ||
+			(f == kSupportsQuitDialogOverride);
 	};
 
-	bool canLoadGameStateCurrently() override;
-	bool canSaveGameStateCurrently() override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
 	bool canSaveAutosaveCurrently() override;
 
 	/**
@@ -109,6 +153,8 @@ public:
 	 * loading and saving using a single method
 	 */
 	Common::Error syncGame(Common::Serializer &s);
+
+	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave) override;
 
 	Common::Error saveGameStream(Common::WriteStream *stream, bool isAutosave = false) override {
 		Common::Serializer s(nullptr, stream);
@@ -130,6 +176,7 @@ public:
 	TeResourceManager *getResourceManager();
 	TeInputMgr *getInputMgr();
 	TetraedgeGameType gameType() const { return _gameType; }
+	bool gameIsAmerzone() const { return _gameType == kAmerzone; }
 
 	void openConfigDialog();
 	bool onKeyUp(const Common::KeyState &state);
@@ -142,6 +189,7 @@ public:
 
 private:
 	void configureSearchPaths();
+	void registerConfigDefaults();
 };
 
 extern TetraedgeEngine *g_engine;

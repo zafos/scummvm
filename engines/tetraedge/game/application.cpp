@@ -36,6 +36,7 @@
 #include "tetraedge/te/te_core.h"
 #include "tetraedge/te/te_resource_manager.h"
 #include "tetraedge/te/te_renderer.h"
+#include "tetraedge/te/te_font2.h"
 #include "tetraedge/te/te_font3.h"
 #include "tetraedge/te/te_input_mgr.h"
 #include "tetraedge/te/te_sound_manager.h"
@@ -48,12 +49,51 @@ bool Application::_dontUpdateWhenApplicationPaused = false;
 
 Application::Application() : _finishedGame(false), _finishedFremium(false),
 _captureFade(false), _difficulty(1), _created(false), _tutoActivated(false),
-_drawShadows(true), _ratioStretched(false) {
+_drawShadows(true), _compassLook(false), _inverseLook(false),
+_permanentHelp(true), _musicOn(true) {
+	//
+	// TODO: Game defaults _ratioStretched to false, but then
+	// the horizontally scrolling scenes don't scroll properly.
+	// For now just default to true.
+	//
+	_ratioStretched = true;
+
 	TeCore *core = g_engine->getCore();
 	core->_coreNotReady = true;
-	core->fileFlagSystemSetFlag("platform", "MacOSX");
+	const char *platform = "";
+	switch (g_engine->getGamePlatform()) {
+	case Common::Platform::kPlatformAndroid:
+		platform = "Android";
+		core->fileFlagSystemSetFlag("pad", "padDisabled");
+		break;
+	case Common::Platform::kPlatformMacintosh:
+		platform = "MacOSX";
+		break;
+	case Common::Platform::kPlatformIOS:
+		platform = "iPhone";
+		break;
+	case Common::Platform::kPlatformNintendoSwitch:
+		platform = "NX";
+		core->fileFlagSystemSetFlag("pad", "padDisabled");
+		break;
+	case Common::Platform::kPlatformPS3:
+		platform = "PS3";
+		break;
+	default:
+		error("Unsupported platform");
+	}
+	core->fileFlagSystemSetFlag("platform", platform);
+	//
+	// WORKAROUND: Syberia 2 A5_ValDomaine/54000/Logic54000.lua
+	// checks a typo of this flag..
+	//
+	core->fileFlagSystemSetFlag("plateform", platform);
+
 	core->fileFlagSystemSetFlag("part", "Full");
-	core->fileFlagSystemSetFlag("distributor", "DefaultDistributor");
+	if (g_engine->isGameDemo())
+		core->fileFlagSystemSetFlag("distributor", "Freemium");
+	else
+		core->fileFlagSystemSetFlag("distributor", "DefaultDistributor");
 
 	TeLuaGUI tempGui;
 	tempGui.load("texts/Part.lua");
@@ -71,6 +111,8 @@ _drawShadows(true), _ratioStretched(false) {
 	// TODO: Configure freemium things here?
 
 	// Note: original has an app run timer, but it's never used?
+
+	_defaultCursor = g_engine->gameIsAmerzone() ? "2D/arrow6.png" : "pictures/cursor.png";
 
 	loadOptions("options.xml");
 }
@@ -101,12 +143,23 @@ void Application::create() {
 
 	TeResourceManager *resmgr = g_engine->getResourceManager();
 	TeCore *core = g_engine->getCore();
-	_fontComic = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/ComicRelief.ttf"));
-	_fontArgh = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/Argh.ttf"));
-	_fontArial = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/arial.ttf"));
-	_fontChaucer = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/CHAUCER.TTF"));
-	_fontColaborate = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/Colaborate-Regular.otf"));
-	_fontProDisplay = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/ProDisplay.ttf"));
+	// Cache some fonts
+	if (g_engine->gameIsAmerzone()) {
+		resmgr->getResource<TeFont2>(core->findFile("Common/Fonts/Arial_r_10.tef"));
+		resmgr->getResource<TeFont2>(core->findFile("Common/Fonts/Arial_r_12.tef"));
+		resmgr->getResource<TeFont2>(core->findFile("Common/Fonts/Arial_r_16.tef"));
+		resmgr->getResource<TeFont2>(core->findFile("Common/Fonts/Colaborate-Regular_r_16.tef"));
+		resmgr->getResource<TeFont2>(core->findFile("Common/Fonts/Colaborate-Regular_r_24.tef"));
+		resmgr->getResource<TeFont2>(core->findFile("Common/Fonts/Credits.tef"));
+		resmgr->getResource<TeFont2>(core->findFile("Common/Fonts/FontLoadingMenu.tef"));
+	} else {
+		_fontComic = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/ComicRelief.ttf"));
+		_fontArgh = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/Argh.ttf"));
+		_fontArial = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/arial.ttf"));
+		_fontChaucer = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/CHAUCER.TTF"));
+		_fontColaborate = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/Colaborate-Regular.otf"));
+		_fontProDisplay = resmgr->getResource<TeFont3>(core->findFile("Common/Fonts/ProDisplay.ttf"));
+	}
 
 	// The app prebuilds some fonts.. cover letters, numbers, a few accented chars, and punctuation.
 	// Skip that here.
@@ -133,15 +186,15 @@ void Application::create() {
 	textBase.build();
 	 */
 
-	static const char allLangs[][3] = {"en", "fr", "de", "es", "it", "ru"};
+	static const char allLangs[][3] = {"en", "fr", "de", "es", "it", "ru", "he"};
 	const Common::Path textsPath("texts");
 
 	// Try alternate langs..
 	int i = 0;
-	Common::FSNode textFileNode;
+	TetraedgeFSNode textFileNode;
 	while (i < ARRAYSIZE(allLangs)) {
 		textFileNode = core->findFile(textsPath.join(core->language() + ".xml"));
-		if (textFileNode.isReadable())
+		if (textFileNode.exists())
 			break;
 		core->language(allLangs[i]);
 		i++;
@@ -153,21 +206,24 @@ void Application::create() {
 	_loc.load(textFileNode);
 	core->addLoc(&_loc);
 
-	const Common::Path helpMenuPath("menus/help/help_");
-	Common::Path helpMenuFilePath;
-	i = 0;
-	while (i < ARRAYSIZE(allLangs)) {
-		helpMenuFilePath = helpMenuPath.append(core->language() + ".xml");
-		if (Common::File::exists(helpMenuFilePath))
-			break;
-		core->language(allLangs[i]);
-		i++;
-	}
-	if (i == ARRAYSIZE(allLangs)) {
-		error("Couldn't find menus/help/help_[lang].xml for any language.");
-	}
+	if (!g_engine->gameIsAmerzone()) {
+		const Common::Path helpMenuPath("menus/help/help_");
+		Common::Path helpMenuFilePath;
+		Common::String lang(core->language());
+		i = 0;
+		while (i < ARRAYSIZE(allLangs)) {
+			helpMenuFilePath = helpMenuPath.append(lang + ".xml");
+			if (Common::File::exists(helpMenuFilePath))
+				break;
+			lang = allLangs[i];
+			i++;
+		}
+		if (i == ARRAYSIZE(allLangs)) {
+			error("Couldn't find menus/help/help_[lang].xml for any language.");
+		}
 
-	_helpGui.load(helpMenuFilePath);
+		_helpGui.load(helpMenuFilePath);
+	}
 
 	// TODO: set TeCore field 0x74 and 0x78 to true here? Do they do anything?");
 
@@ -214,7 +270,7 @@ void Application::create() {
 	g_system->showMouse(false);
 	//mainWindow->setNativeCursorVisible(false);
 
-	_mouseCursorLayout.load("pictures/cursor.png");
+	_mouseCursorLayout.load(_defaultCursor);
 	_mouseCursorLayout.setAnchor(TeVector3f32(0.3f, 0.1f, 0.0f));
 	_frontOrientationLayout.addChild(&_mouseCursorLayout);
 
@@ -280,7 +336,7 @@ void Application::create() {
 	onMainWindowSizeChanged();
 	_splashScreens.enter();
 
-	_drawShadows = (ConfMan.get("disable_shadows") != "true");
+	_drawShadows = !(g_engine->gameIsAmerzone() || ConfMan.getBool("disable_shadows"));
 
 	// Note: this is not in the original, but seems like a good place to do it..
 	g_engine->getGame()->loadUnlockedArtwork();
@@ -344,7 +400,7 @@ bool Application::run() {
 		if (_finishedGame) {
 			game->leave(false);
 			_mainMenu.enter();
-			if (Common::File::exists("finalURL.lua")) {
+			if (Common::File::exists("finalURL.lua") || Common::File::exists("finalURL.data")) {
 				TeLuaGUI finalGui;
 				finalGui.load("finalURL.lua");
 				/*TeVariant finalVal =*/ finalGui.value("finalURL");
@@ -411,7 +467,7 @@ static void dumpLayout(TeLayout *layout, Common::String indent = "++") {
 	assert(layout);
 	if (!layout->worldVisible())
 		return;
-	debug("%s %s  pos:%s  worldScale:%s  userSize:%s  size:%s  col:%s", indent.c_str(), layout->name().c_str(),
+	debug("%s '%s'%s  pos:%s  worldScale:%s  userSize:%s  size:%s  col:%s", indent.c_str(), layout->name().c_str(), (layout->worldVisible() ? "" : " (invis)"),
 			layout->position().dump().c_str(), layout->worldScale().dump().c_str(),
 			layout->userSize().dump().c_str(), layout->size().dump().c_str(),
 			layout->color().dump().c_str());

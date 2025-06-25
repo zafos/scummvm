@@ -31,7 +31,7 @@
 #include "engines/util.h"
 
 #include "graphics/cursorman.h"
-#include "graphics/palette.h"
+#include "graphics/paletteman.h"
 #include "graphics/sjis.h"
 
 
@@ -87,6 +87,7 @@ Screen::Screen(KyraEngine_v1 *vm, OSystem *system, const ScreenDim *dimTable, co
 	_fontStyles = 0;
 	_paletteChanged = true;
 	_textMarginRight = SCREEN_W;
+	_overdrawMargin = false;
 	_customDimTable = nullptr;
 	_curDim = nullptr;
 	_curDimIndex = 0;
@@ -150,10 +151,13 @@ bool Screen::init() {
 	// to the engines. We already limit the selection via our GUIO flags in
 	// the game specific settings, but this is not enough due to global
 	// settings allowing everything.
-	if (_vm->game() == GI_EOB1 || _vm->game() == GI_EOB2) {
+	if (_vm->gameFlags().platform == Common::kPlatformDOS && (_vm->game() == GI_EOB1 || _vm->game() == GI_EOB2)) {
 		if (ConfMan.hasKey("render_mode"))
 			_renderMode = Common::parseRenderMode(ConfMan.get("render_mode"));
-	}
+		if ((_vm->game() == GI_EOB1 && _renderMode != Common::kRenderVGA && _renderMode != Common::kRenderCGA && _renderMode != Common::kRenderEGA) ||
+			(_vm->game() == GI_EOB2 && _renderMode != Common::kRenderVGA && _renderMode != Common::kRenderEGA))
+				_renderMode = Common::kRenderDefault;
+	} 
 
 	// In VGA mode the odd and even page pointers point to the same buffers.
 	for (int i = 0; i < SCREEN_PAGE_NUM; i++)
@@ -193,13 +197,15 @@ bool Screen::init() {
 		}
 
 		if (_useSJIS) {
+			assert(_vm->gameFlags().platform == Common::kPlatformPC98 || _vm->gameFlags().platform == Common::kPlatformFMTowns);
+
 			_sjisFontShared = Common::SharedPtr<Graphics::FontSJIS>(Graphics::FontSJIS::createFont(_vm->gameFlags().platform));
 			if (!_sjisFontShared.get())
-				error("Could not load any SJIS font, neither the original nor ScummVM's 'SJIS.FNT'");
+				error("Could not load any SJIS font, neither the original %s nor ScummVM's 'SJIS.FNT'", _vm->gameFlags().platform == Common::kPlatformPC98 ? "'FONT.ROM'/'FONT.BMP'" : "'FMT_FNT.ROM'");
 
 			if (_use16ColorMode)
 				_fonts[FID_SJIS_TEXTMODE_FNT] = new SJISFont(_sjisFontShared, _sjisInvisibleColor, true, false, 0);
-			else
+			else if (_vm->gameFlags().platform != Common::kPlatformPC98 || _vm->game() != GI_EOB2)
 				_fonts[FID_SJIS_FNT] = new SJISFont(_sjisFontShared, _sjisInvisibleColor, false, _vm->game() != GI_LOL && _vm->game() != GI_EOB2, _vm->game() == GI_LOL ? 1 : 0);
 		}
 	}
@@ -262,6 +268,7 @@ bool Screen::init() {
 	_curDim = nullptr;
 	_charSpacing = 0;
 	_lineSpacing = 0;
+	_overdrawMargin = (_vm->game() == GI_EOB2 && _vm->gameFlags().lang == Common::ZH_TWN);
 	for (int i = 0; i < ARRAYSIZE(_textColorsMap); ++i)
 		_textColorsMap[i] = i;
 	_textColorsMap16bit[0] = _textColorsMap16bit[1] = 0;
@@ -568,7 +575,7 @@ void Screen::resetPagePtrsAndBuffers(int pageSize) {
 
 	int numPages = realPages.size();
 	uint32 bufferSize = numPages * _screenPageSize;
- 
+
 	uint8 *pos = new uint8[bufferSize]();
 	_pagePtrsBuff = pos;
 
@@ -1398,7 +1405,15 @@ bool Screen::loadFont(FontId fontId, const char *filename) {
 				if (_vm->game() == GI_KYRA2) {
 					fn1 = new ChineseOneByteFontHOF(SCREEN_W);
 					fn2 = new ChineseTwoByteFontHOF(SCREEN_W);
-				} else {
+				}
+#ifdef ENABLE_LOL
+				else if (_vm->game() == GI_LOL) {
+					// Same as next one but with different spacing
+					fn1 = new ChineseOneByteFontLoL(SCREEN_W);
+					fn2 = new ChineseTwoByteFontLoL(SCREEN_W);
+				}
+#endif
+				else {
 					fn1 = new ChineseOneByteFontMR(SCREEN_W);
 					fn2 = new ChineseTwoByteFontMR(SCREEN_W);
 				}
@@ -1535,9 +1550,17 @@ void Screen::printText(const char *str, int x, int y, uint8 color1, uint8 color2
 			x = x_start;
 			y += (charHeight + _lineSpacing);
 		} else {
+			bool needDrawing = true;
 			int charWidth = getCharWidth(c);
 			int needSpace = enableWordWrap ? getTextWidth(str, true) + charWidth : charWidth;
 			if (x + needSpace > _textMarginRight) {
+				if (_overdrawMargin && (x + needSpace <= Screen::SCREEN_W)) {
+					// The Chinese version of EOB II has a weird way of handling the right margin.
+					// It will squeeze in the final character even if it goes over the margin
+					// (see e. g. the chargen screen "Your party is complete. Select the PLAY button...").
+					drawChar(c, x, y, pitch);
+					needDrawing = false;
+				}
 				x = x_start;
 				y += (charHeight + _lineSpacing);
 				if (enableWordWrap) {
@@ -1550,9 +1573,10 @@ void Screen::printText(const char *str, int x, int y, uint8 color1, uint8 color2
 				if (y >= _screenHeight)
 					break;
 			}
-
-			drawChar(c, x, y, pitch);
-			x += charWidth;
+			if (needDrawing) {
+				drawChar(c, x, y, pitch);
+				x += charWidth;
+			}
 		}
 	}
 }
@@ -1564,7 +1588,7 @@ uint16 Screen::fetchChar(const char *&s) const {
 
 	uint16 ch = (uint8)*s++;
 
-	if ((fontType == Font::kSJIS && (ch <= 0x7F || (ch >= 0xA1 && ch <= 0xDF))) ||
+	if (((fontType == Font::kSJIS || fontType == Font::kJIS_X0201) && (ch <= 0x7F || (ch >= 0xA1 && ch <= 0xDF))) ||
 		((fontType == Font::kBIG5 || fontType == Font::kJohab) && ch < 0x80))
 			return ch;
 
@@ -3103,7 +3127,7 @@ void Screen::showMouse() {
 		CursorMan.showMouse(true);
 
 		// We need to call OSystem::updateScreen here, else the mouse cursor
-		// will only be visible on mouse movment.
+		// will only be visible on mouse movement.
 		updateBackendScreen(true);
 	}
 
@@ -3627,9 +3651,9 @@ void Screen::crossFadeRegion(int x1, int y1, int x2, int y2, int w, int h, int s
 			addDirtyRect(dX, dY, 1, 1);
 		}
 
-		// This tries to speed things up, to get similiar speeds as in DOSBox etc.
+		// This tries to speed things up, to get similar speeds as in DOSBox etc.
 		// We can't write single pixels directly into the video memory like the original did.
-		// We also (unlike the original) want to aim at similiar speeds for all platforms.
+		// We also (unlike the original) want to aim at similar speeds for all platforms.
 		if (!(i % 10))
 			updateScreen();
 

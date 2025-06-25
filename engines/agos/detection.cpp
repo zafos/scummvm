@@ -31,6 +31,7 @@
 
 #include "agos/detection.h"
 #include "agos/intern_detection.h"
+#include "agos/detection_fallback.h"
 #include "agos/obsolete.h" // Obsolete ID table.
 #include "agos/agos.h"
 
@@ -72,9 +73,9 @@ static const char *const directoryGlobs[] = {
 
 using namespace AGOS;
 
-class AgosMetaEngineDetection : public AdvancedMetaEngineDetection {
+class AgosMetaEngineDetection : public AdvancedMetaEngineDetection<AGOS::AGOSGameDescription> {
 public:
-	AgosMetaEngineDetection() : AdvancedMetaEngineDetection(AGOS::gameDescriptions, sizeof(AGOS::AGOSGameDescription), agosGames) {
+	AgosMetaEngineDetection() : AdvancedMetaEngineDetection(AGOS::gameDescriptions, agosGames) {
 		_guiOptions = GUIO1(GUIO_NOLAUNCHLOAD);
 		_maxScanDepth = 2;
 		_directoryGlobs = directoryGlobs;
@@ -82,6 +83,11 @@ public:
 
 	PlainGameDescriptor findGame(const char *gameId) const override {
 		return Engines::findGameID(gameId, _gameIds, obsoleteGameIDsTable);
+	}
+
+	Common::Error identifyGame(DetectedGame &game, const void **descriptor) override {
+		Engines::upgradeTargetIfNecessary(obsoleteGameIDsTable);
+		return AdvancedMetaEngineDetection::identifyGame(game, descriptor);
 	}
 
 	const char *getName() const override {
@@ -99,6 +105,16 @@ public:
 	const DebugChannelDef *getDebugChannels() const override {
 		return debugFlagList;
 	}
+
+	ADDetectedGame fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist, ADDetectedGameExtraInfo **extra) const override {
+		ADDetectedGame detectedGame = detectGameFilebased(allFiles, AGOS::fileBased);
+		if (!detectedGame.desc) {
+			return ADDetectedGame();
+		}
+
+		return detectedGame;
+	}
+
 };
 
 REGISTER_PLUGIN_STATIC(AGOS_DETECTION, PLUGIN_TYPE_ENGINE_DETECTION, AgosMetaEngineDetection);

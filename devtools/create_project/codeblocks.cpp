@@ -55,6 +55,10 @@ void CodeBlocksProvider::createWorkspace(const BuildSetup &setup) {
 StringList getFeatureLibraries(const BuildSetup &setup) {
 	StringList libraries;
 
+	std::string libSDL = "lib";
+	libSDL += setup.getSDLName();
+	libraries.push_back(libSDL);
+
 	for (FeatureList::const_iterator i = setup.features.begin(); i != setup.features.end(); ++i) {
 		if (i->enable && i->library) {
 			std::string libname;
@@ -68,11 +72,7 @@ StringList getFeatureLibraries(const BuildSetup &setup) {
 			} else if (!std::strcmp(i->name, "png")) {
 				libname = "libpng16";
 			} else if (!std::strcmp(i->name, "sdlnet")) {
-				if (setup.useSDL2) {
-					libname = "libSDL2_net";
-				} else {
-					libname = "libSDL_net";
-				}
+				libname = libSDL + "_net";
 				libraries.push_back("iphlpapi");
 			} else {
 				libname = "lib";
@@ -80,12 +80,6 @@ StringList getFeatureLibraries(const BuildSetup &setup) {
 			}
 			libraries.push_back(libname);
 		}
-	}
-
-	if (setup.useSDL2) {
-		libraries.push_back("libSDL2");
-	} else {
-		libraries.push_back("libSDL");
 	}
 
 	// Win32 libraries
@@ -97,7 +91,7 @@ StringList getFeatureLibraries(const BuildSetup &setup) {
 }
 
 void CodeBlocksProvider::createProjectFile(const std::string &name, const std::string &, const BuildSetup &setup, const std::string &moduleDir,
-										   const StringList &includeList, const StringList &excludeList) {
+										   const StringList &includeList, const StringList &excludeList, const std::string &pchIncludeRoot, const StringList &pchDirs, const StringList &pchExclude) {
 
 	const std::string projectFile = setup.outputDir + '/' + name + getProjectExtension();
 	std::ofstream project(projectFile.c_str());
@@ -210,9 +204,9 @@ void CodeBlocksProvider::createProjectFile(const std::string &name, const std::s
 	}
 
 	if (!modulePath.empty())
-		addFilesToProject(moduleDir, project, includeList, excludeList, setup.filePrefix + '/' + modulePath);
+		addFilesToProject(moduleDir, project, includeList, excludeList, pchIncludeRoot, pchDirs, pchExclude, setup.filePrefix + '/' + modulePath);
 	else
-		addFilesToProject(moduleDir, project, includeList, excludeList, setup.filePrefix);
+		addFilesToProject(moduleDir, project, includeList, excludeList, pchIncludeRoot, pchDirs, pchExclude, setup.filePrefix);
 
 
 	project << "\t\t<Extensions>\n"
@@ -249,13 +243,14 @@ void CodeBlocksProvider::writeDefines(const StringList &defines, std::ofstream &
 }
 
 void CodeBlocksProvider::writeFileListToProject(const FileNode &dir, std::ostream &projectFile, const int indentation,
-												const std::string &objPrefix, const std::string &filePrefix) {
+												const std::string &objPrefix, const std::string &filePrefix,
+												const std::string &pchIncludeRoot, const StringList &pchDirs, const StringList &pchExclude) {
 
 	for (FileNode::NodeList::const_iterator i = dir.children.begin(); i != dir.children.end(); ++i) {
 		const FileNode *node = *i;
 
 		if (!node->children.empty()) {
-			writeFileListToProject(*node, projectFile, indentation + 1, objPrefix + node->name + '_', filePrefix + node->name + '/');
+			writeFileListToProject(*node, projectFile, indentation + 1, objPrefix + node->name + '_', filePrefix + node->name + '/', pchIncludeRoot, pchDirs, pchExclude);
 		} else {
 			std::string name, ext;
 			splitFilename(node->name, name, ext);

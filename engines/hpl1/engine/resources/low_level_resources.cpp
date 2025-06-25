@@ -20,14 +20,14 @@
  */
 
 #include "hpl1/engine/resources/low_level_resources.h"
-#include "hpl1/engine/graphics/LowLevelGraphics.h"
-#include "hpl1/engine/resources/MeshLoaderHandler.h"
-#include "hpl1/engine/resources/VideoManager.h"
-#include "hpl1/engine/impl/MeshLoaderCollada.h"
-#include "hpl1/engine/impl/MeshLoaderMSH.h"
+#include "common/file.h"
 #include "common/fs.h"
 #include "hpl1/debug.h"
-#include "common/file.h"
+#include "hpl1/engine/graphics/LowLevelGraphics.h"
+#include "hpl1/engine/impl/MeshLoaderCollada.h"
+#include "hpl1/engine/impl/MeshLoaderMSH.h"
+#include "hpl1/engine/resources/MeshLoaderHandler.h"
+#include "hpl1/engine/resources/VideoManager.h"
 
 namespace hpl {
 
@@ -64,14 +64,13 @@ void LowLevelResources::addVideoLoaders(cVideoManager *vm) {
 }
 
 void LowLevelResources::findFilesInDir(tStringList &alstStrings, tString asDir, tString asMask) {
-	Common::String pattern = asDir + '/' +  asMask;
+	Common::Path pattern(asDir + '/' + asMask);
 	Common::ArchiveMemberList ls;
 	if (SearchMan.listMatchingMembers(ls, pattern) == 0)
-		Hpl1::logWarning(Hpl1::kDebugFilePath, "no files matching pattern %s were found", pattern.c_str());
+		Hpl1::logWarning(Hpl1::kDebugFilePath, "no files matching pattern %s were found", pattern.toString().c_str());
 
 	for (auto &f : ls)
 		alstStrings.push_back(f->getName());
 }
 
 } // namespace hpl
-

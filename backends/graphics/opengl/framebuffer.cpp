@@ -21,8 +21,9 @@
 
 #include "backends/graphics/opengl/framebuffer.h"
 #include "backends/graphics/opengl/pipelines/pipeline.h"
-#include "backends/graphics/opengl/texture.h"
 #include "graphics/opengl/debug.h"
+#include "graphics/opengl/texture.h"
+#include "common/rotationmode.h"
 
 namespace OpenGL {
 
@@ -111,6 +112,16 @@ void Framebuffer::applyBlendState() {
 		case kBlendModeDisabled:
 			GL_CALL(glDisable(GL_BLEND));
 			break;
+		case kBlendModeOpaque:
+			if (!glBlendColor) {
+				// If glBlendColor is not available (old OpenGL) fallback on disabling blending
+				GL_CALL(glDisable(GL_BLEND));
+				break;
+			}
+			GL_CALL(glEnable(GL_BLEND));
+			GL_CALL(glBlendColor(1.f, 1.f, 1.f, 0.f));
+			GL_CALL(glBlendFunc(GL_CONSTANT_COLOR, GL_ONE_MINUS_CONSTANT_COLOR));
+			break;
 		case kBlendModeTraditionalTransparency:
 			GL_CALL(glEnable(GL_BLEND));
 			GL_CALL(glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
@@ -178,7 +189,7 @@ void Backbuffer::activateInternal() {
 #endif
 }
 
-void Backbuffer::setDimensions(uint width, uint height) {
+bool Backbuffer::setSize(uint width, uint height) {
 	// Set viewport dimensions.
 	_viewport[0] = 0;
 	_viewport[1] = 0;
@@ -211,6 +222,7 @@ void Backbuffer::setDimensions(uint width, uint height) {
 		applyViewport();
 		applyProjectionMatrix();
 	}
+	return true;
 }
 
 //
@@ -219,7 +231,7 @@ void Backbuffer::setDimensions(uint width, uint height) {
 
 #if !USE_FORCED_GLES
 TextureTarget::TextureTarget()
-	: _texture(new GLTexture(GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE)), _glFBO(0), _needUpdate(true) {
+	: _texture(new Texture(GL_RGBA, GL_RGBA, GL_UNSIGNED_BYTE)), _glFBO(0), _needUpdate(true) {
 }
 
 TextureTarget::~TextureTarget() {

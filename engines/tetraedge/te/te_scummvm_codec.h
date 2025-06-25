@@ -32,21 +32,21 @@ public:
 	TeScummvmCodec();
 	virtual ~TeScummvmCodec();
 
-	virtual bool load(const Common::FSNode &node) override;
+	virtual bool load(const TetraedgeFSNode &node) override;
 	virtual bool load(Common::SeekableReadStream &stream) = 0;
 	virtual uint width() override;
 	virtual uint height() override;
 	virtual int nbFrames() override { return 1; }
 	virtual TeImage::Format imageFormat() override;
-	virtual void setLeftBorderSize(uint val) override { }
+	virtual void setLeftBorderSize(uint val) override;
 	virtual uint leftBorderSize() override { return 0; }
-	virtual void setRightBorderSize(uint val) override  { }
+	virtual void setRightBorderSize(uint val) override;
 	virtual uint rightBorderSize() override { return 0; }
-	virtual void setBottomBorderSize(uint val) override  { }
+	virtual void setBottomBorderSize(uint val) override;
 	virtual uint bottomBorderSize() override { return 0; }
-	virtual void setTopBorderSize(uint val) override  { }
+	virtual void setTopBorderSize(uint val) override;
 	virtual uint topBorderSize() override { return 0; }
-	virtual float frameRate() override { return 0.0; }
+	virtual float frameRate() override { return _frameRate; }
 	virtual bool update(uint i, TeImage &imgout) override;
 	virtual bool isAtEnd() override { return true; }
 	virtual void setColorKeyActivated(bool val) override { }
@@ -55,8 +55,10 @@ public:
 
 protected:
 	Graphics::Surface *_loadedSurface;
-	Common::String _loadedPath;
-
+	Common::Path _loadedPath;
+	float _frameRate;
+	uint _bottomBorder;
+	uint _topBorder;
 };
 
 } // end namespace Tetraedge

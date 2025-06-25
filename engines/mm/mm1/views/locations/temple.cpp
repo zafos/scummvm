@@ -34,7 +34,7 @@ Temple::Temple() : Location("Temple") {
 }
 
 bool Temple::msgFocus(const FocusMessage &msg) {
-	send("View", ValueMessage(LOC_TEMPLE));
+	send("View", GameMessage("LOCATION", LOC_TEMPLE));
 	changeCharacter(0);
 
 	return true;
@@ -119,7 +119,7 @@ void Temple::changeCharacter(uint index) {
 	_uncurseCost = UNCURSE_COST[townNum];
 	for (i = 0;  i < INVENTORY_COUNT; ++i) {
 		if (c._equipped[i]) {
-			if (g_globals->_items.getItem(c._equipped[i])->_equipMode == EQUIP_CURSED)
+			if (g_globals->_items.getItem(c._equipped[i])->_constBonus_id == EQUIP_CURSED)
 				break;
 		}
 	}
@@ -171,7 +171,7 @@ void Temple::restoreHealth() {
 		c._hpCurrent = c._hp;
 
 		if (_isEradicated) {
-			c._age._current += 10;
+			c._age += 10;
 			--c._endurance;
 		}
 
@@ -185,7 +185,7 @@ void Temple::uncurseItems() {
 		for (int i = 0; i < INVENTORY_COUNT; ++i) {
 			if (c._equipped[i]) {
 				g_globals->_items.getItem(c._equipped[i]);
-				if (g_globals->_currItem._equipMode == EQUIP_CURSED) {
+				if (g_globals->_currItem._constBonus_id == EQUIP_CURSED) {
 					c._equipped.removeAt(i);
 					--i;
 				}

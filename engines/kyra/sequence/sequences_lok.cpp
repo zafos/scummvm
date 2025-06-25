@@ -246,7 +246,7 @@ bool KyraEngine_LoK::seq_introStory() {
 	_screen->clearPage(3);
 	_screen->clearPage(0);
 
-	// HACK: The Italian fan translation uses an special text screen here
+	// HACK: The Italian fan translation uses a special text screen here
 	// so we show it even when text is disabled
 	if (!textEnabled() && speechEnabled() && _flags.lang != Common::IT_ITA)
 		return false;
@@ -1332,7 +1332,7 @@ void KyraEngine_LoK::seq_playCredits() {
 		}
 
 		line.font = _screen->_currentFont;
-		
+
 		if (alignment == 3)
 			line.x = alignX3 - _screen->getTextWidth((const char *)currentString);
 		else if (alignment == 4)

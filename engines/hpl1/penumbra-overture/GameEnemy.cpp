@@ -610,10 +610,10 @@ void iGameEnemy::OnDraw() {
 		sStateName = cString::To16Char(gvStateName[mlCurrentState]);
 	mpInit->mpDefaultFont->draw(cVector3f(5, 48, 100), 14, cColor(1, 1, 1, 1), eFontAlign_Left,
 								Common::U32String::format("Health: %f State: %S Moving: %d Stuck: %f MaxViewDist: %f", mfHealth,
-								sStateName.c_str(),
-								mpMover->IsMoving(),
-								mpMover->GetStuckCounter(),
-								gfCurrentMaxViewDist));
+														  sStateName.c_str(),
+														  mpMover->IsMoving(),
+														  mpMover->GetStuckCounter(),
+														  gfCurrentMaxViewDist));
 	mpInit->mpDefaultFont->draw(cVector3f(5, 64, 100), 14, cColor(1, 1, 1, 1), eFontAlign_Left,
 								Common::U32String::format("Speed: %f", mpMover->GetCharBody()->GetMoveSpeed(eCharDir_Forward)));
 
@@ -1378,7 +1378,7 @@ void iGameEnemy::UpdateAnimations(float afTimeStep) {
 
 		/////////////////////////////////
 		// Update animation speed
-		if (mbAnimationIsSpeedDependant) {
+		if (mbAnimationIsSpeedDependant && mpCurrentAnimation) {
 			if (ABS(fSpeed) > 0.05f)
 				mpCurrentAnimation->SetSpeed(ABS(fSpeed) * mfMoveAnimSpeedMul);
 			else
@@ -1456,7 +1456,7 @@ bool iGameEnemy::LineOfSight(const cVector3f &avPos, const cVector3f &avSize) {
 	const float fHalfWidth = avSize.x * 0.4f;
 	const float fHalfHeight = avSize.y * 0.4f;
 
-	// Count of 2 is need for a line of sight sucess.
+	// Count of 2 is needed for a line of sight success.
 	int lCount = 0;
 	// Iterate through all the rays.
 	for (int i = 0; i < 5; ++i) {

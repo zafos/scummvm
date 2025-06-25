@@ -19,27 +19,36 @@
  *
  */
 
+#include "director/director.h"
 #include "director/lingo/lingo.h"
+#include "director/lingo/lingo-object.h"
 #include "director/lingo/xlibs/registercomponent.h"
+
+/*************************************
+ *
+ * USED IN:
+ *
+ * Star Trek: The Next Generation Interactive Technical Manual
+ *************************************/
 
 namespace Director {
 
-const char *RegisterComponent::xlibName = "RegisterComponent";
-const char *RegisterComponent::fileNames[] = {
-	"RegisterComponent",
-	nullptr
+const char *const RegisterComponent::xlibName = "RegisterComponent";
+const XlibFileDesc RegisterComponent::fileNames[] = {
+	{ "RegisterComponent",	nullptr },
+	{ nullptr,				nullptr },
 };
 
-static BuiltinProto builtins[] = {
+static const BuiltinProto builtins[] = {
 	{ "RegisterComponent",	RegisterComponent::b_RegisterComponent, 1, 2, 400, FBLTIN },
 	{ nullptr, nullptr, 0, 0, 0, VOIDSYM }
 };
 
-void RegisterComponent::open(int type) {
+void RegisterComponent::open(ObjectType type, const Common::Path &path) {
 	g_lingo->initBuiltIns(builtins);
 }
 
-void RegisterComponent::close(int type) {
+void RegisterComponent::close(ObjectType type) {
 	g_lingo->cleanupBuiltIns(builtins);
 }
 

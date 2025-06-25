@@ -94,9 +94,9 @@ IMuseDigital::IMuseDigital(ScummEngine_v7 *scumm, int sampleRate, Audio::Mixer *
 
 	_emptyMarker[0] = '\0';
 	_internalMixer = new IMuseDigiInternalMixer(mixer, _internalSampleRate, _isEarlyDiMUSE, _lowLatencyMode);
-	_groupsHandler = new IMuseDigiGroupsHandler(this);
-	_fadesHandler = new IMuseDigiFadesHandler(this);
-	_triggersHandler = new IMuseDigiTriggersHandler(this);
+	_groupsHandler = new IMuseDigiGroupsHandler(this, mutex);
+	_fadesHandler = new IMuseDigiFadesHandler(this, mutex);
+	_triggersHandler = new IMuseDigiTriggersHandler(this, mutex);
 	_filesHandler = new IMuseDigiFilesHandler(this, scumm);
 
 	diMUSEInitialize();
@@ -226,7 +226,7 @@ int IMuseDigital::startVoice(int soundId, const char *soundName, byte speakingAc
 		// see Sound::extractSyncsFromDiMUSEMarker() for details.
 		// Setting up a trigger with an empty marker is a shortcut for
 		// activating the trigger for any marker.
-		diMUSESetTrigger(kTalkSoundID, 0, 21);
+		diMUSESetTrigger(kTalkSoundID, 0, DIMUSE_C_GET_MARKER_SYNCS);
 
 		diMUSEStartStream(kTalkSoundID, 127, DIMUSE_BUFFER_SPEECH);
 		diMUSESetParam(kTalkSoundID, DIMUSE_P_GROUP, DIMUSE_GROUP_SPEECH);

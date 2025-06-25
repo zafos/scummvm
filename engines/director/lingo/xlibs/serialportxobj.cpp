@@ -19,6 +19,13 @@
  *
  */
 
+/*************************************
+ *
+ * USED IN:
+ * Standard Macromedia Director XObject
+ *
+ *************************************/
+
 /*
  * Use the SerialPort XObject to send and receive data over the Macintosh’s
  * two standard serial ports (commonly called the modem and printer ports).
@@ -31,17 +38,18 @@
 #include "director/director.h"
 #include "director/lingo/lingo.h"
 #include "director/lingo/lingo-object.h"
+#include "director/lingo/lingo-utils.h"
 #include "director/lingo/xlibs/serialportxobj.h"
 
 namespace Director {
 
-const char *SerialPortXObj::xlibName = "SerialPort";
-const char *SerialPortXObj::fileNames[] = {
-	"SerialPort",
-	nullptr
+const char *const SerialPortXObj::xlibName = "SerialPort";
+const XlibFileDesc SerialPortXObj::fileNames[] = {
+	{ "SerialPort",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",				SerialPortXObj::m_new,			 1, 1,	200 },	// D2
 	{ "GetPortNum",			SerialPortXObj::m_getPortNum,	 0, 0,	200 },	// D2
 	{ "WriteString",		SerialPortXObj::m_writeString,	 1, 1,	200 },	// D2
@@ -56,7 +64,7 @@ static MethodProto xlibMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void SerialPortXObj::open(int type) {
+void SerialPortXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		SerialPortXObject::initMethods(xlibMethods);
 		SerialPortXObject *xobj = new SerialPortXObject(kXObj);
@@ -64,7 +72,7 @@ void SerialPortXObj::open(int type) {
 	}
 }
 
-void SerialPortXObj::close(int type) {
+void SerialPortXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		SerialPortXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -82,66 +90,15 @@ void SerialPortXObj::m_new(int nargs) {
 	g_lingo->push(g_lingo->_state->me);
 }
 
-void SerialPortXObj::m_getPortNum(int nargs) {
-	g_lingo->printSTUBWithArglist("SerialPortXObj::m_getPortNum", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SerialPortXObj::m_writeString(int nargs) {
-	g_lingo->printSTUBWithArglist("SerialPortXObj::m_writeString", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SerialPortXObj::m_writeChar(int nargs) {
-	g_lingo->printSTUBWithArglist("SerialPortXObj::m_writeChar", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SerialPortXObj::m_readString(int nargs) {
-	g_lingo->printSTUBWithArglist("SerialPortXObj::m_readString", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SerialPortXObj::m_readChar(int nargs) {
-	g_lingo->printSTUBWithArglist("SerialPortXObj::m_readChar", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SerialPortXObj::m_readCount(int nargs) {
-	g_lingo->printSTUBWithArglist("SerialPortXObj::m_readCount", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SerialPortXObj::m_readFlush(int nargs) {
-	g_lingo->printSTUBWithArglist("SerialPortXObj::m_readFlush", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SerialPortXObj::m_configChan(int nargs) {
-	g_lingo->printSTUBWithArglist("SerialPortXObj::m_configChan", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SerialPortXObj::m_hShakeChan(int nargs) {
-	g_lingo->printSTUBWithArglist("SerialPortXObj::m_hShakeChan", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-void SerialPortXObj::m_setUp(int nargs) {
-	g_lingo->printSTUBWithArglist("SerialPortXObj::m_setUp", nargs);
-	g_lingo->dropStack(nargs);
-	g_lingo->push(Datum());
-}
-
-
+XOBJSTUBV(SerialPortXObj::m_getPortNum)
+XOBJSTUBV(SerialPortXObj::m_writeString)
+XOBJSTUBV(SerialPortXObj::m_writeChar)
+XOBJSTUBV(SerialPortXObj::m_readString)
+XOBJSTUBV(SerialPortXObj::m_readChar)
+XOBJSTUBV(SerialPortXObj::m_readCount)
+XOBJSTUBV(SerialPortXObj::m_readFlush)
+XOBJSTUBV(SerialPortXObj::m_configChan)
+XOBJSTUBV(SerialPortXObj::m_hShakeChan)
+XOBJSTUBV(SerialPortXObj::m_setUp)
 
 } // End of namespace Director

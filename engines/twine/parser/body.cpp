@@ -23,6 +23,9 @@
 #include "twine/renderer/renderer.h"
 #include "common/memstream.h"
 
+#define	INFO_TRI	1
+#define	INFO_ANIM	2
+
 namespace TwinE {
 
 void BodyData::reset() {
@@ -73,6 +76,7 @@ void BodyData::loadBones(Common::SeekableReadStream &stream) {
 		/*int32 field_20 =*/ stream.readSint32LE();
 		/*int32 field_24 =*/ stream.readSint32LE();
 
+		// PatchObjet in original sources
 		BodyBone bone;
 		bone.parent = baseElementOffset == -1 ? 0xffff : baseElementOffset / 38;
 		bone.vertex = basePoint;
@@ -131,6 +135,7 @@ void BodyData::loadPolygons(Common::SeekableReadStream &stream) {
 			if (poly.materialType >= MAT_GOURAUD) {
 				normal = stream.readSint16LE();
 			}
+			// numPoint is point index precomupted * 6
 			const uint16 vertexIndex = stream.readUint16LE() / 6;
 			poly.indices.push_back(vertexIndex);
 			poly.normals.push_back(normal);
@@ -151,6 +156,7 @@ void BodyData::loadLines(Common::SeekableReadStream &stream) {
 		stream.skip(1);
 		line.color = stream.readByte();
 		stream.skip(2);
+		// indexPoint is point index precomupted * 6
 		line.vertex1 = stream.readUint16LE() / 6;
 		line.vertex2 = stream.readUint16LE() / 6;
 		_lines.push_back(line);
@@ -178,16 +184,18 @@ bool BodyData::loadFromStream(Common::SeekableReadStream &stream, bool lba1) {
 	reset();
 	if (lba1) {
 		const uint16 flags = stream.readUint16LE();
-		animated = (flags & 2) != 0;
+		animated = (flags & INFO_ANIM) != 0;
 		bbox.mins.x = stream.readSint16LE();
 		bbox.maxs.x = stream.readSint16LE();
 		bbox.mins.y = stream.readSint16LE();
 		bbox.maxs.y = stream.readSint16LE();
 		bbox.mins.z = stream.readSint16LE();
 		bbox.maxs.z = stream.readSint16LE();
+		offsetToData = stream.readSint16LE();
 
-		const uint16 offset = stream.readUint16LE();
-		stream.skip(offset);
+		// using this value as the offset crashes the demo of lba1 - see https://bugs.scummvm.org/ticket/14294
+		// stream.seek(offsetToData);
+		stream.seek(0x1A);
 
 		loadVertices(stream);
 		loadBones(stream);
@@ -196,9 +204,10 @@ bool BodyData::loadFromStream(Common::SeekableReadStream &stream, bool lba1) {
 		loadLines(stream);
 		loadSpheres(stream);
 	} else {
+		// T_BODY_HEADER (lba2)
 		const uint32 flags = stream.readUint32LE();
-		animated = (flags & 2) != 0;
-		stream.skip(4);
+		animated = (flags & INFO_ANIM) != 0;
+		stream.skip(4); // int16 size of header and int16 dummy
 		bbox.mins.x = stream.readSint32LE();
 		bbox.maxs.x = stream.readSint32LE();
 		bbox.mins.y = stream.readSint32LE();

@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/translation.h"
@@ -262,7 +268,7 @@ void Inter_v5::o5_spaceShooter(OpGobParams &params) {
 	_vm->_game->_script->readInt16();
 
 	if (params.extraData != 0) {
-		// we need to return 1 for the shooter mission 34. There is only one planet to choose from in the map.
+		// We need to return 1 for the shooter mission 34. There is only one planet to choose from in the map.
 		WRITE_VARO_UINT32(var1,(params.extraData == 34) ? 1 : 2);
 		WRITE_VARO_UINT32(var2,0);
 	} else {

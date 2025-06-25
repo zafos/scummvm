@@ -237,13 +237,8 @@ void GLContext::init(int screenW, int screenH, Graphics::PixelFormat pixelFormat
 	maxTextureName = 0;
 	texture_mag_filter = TGL_LINEAR;
 	texture_min_filter = TGL_NEAREST_MIPMAP_LINEAR;
-#if defined(SCUMM_LITTLE_ENDIAN)
-	colorAssociationList.push_back({Graphics::PixelFormat(4, 8, 8, 8, 8, 0, 8, 16, 24), TGL_RGBA, TGL_UNSIGNED_BYTE});
-	colorAssociationList.push_back({Graphics::PixelFormat(3, 8, 8, 8, 0, 0, 8, 16, 0),  TGL_RGB,  TGL_UNSIGNED_BYTE});
-#else
-	colorAssociationList.push_back({Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0), TGL_RGBA, TGL_UNSIGNED_BYTE});
-	colorAssociationList.push_back({Graphics::PixelFormat(3, 8, 8, 8, 0, 16, 8, 0, 0),  TGL_RGB,  TGL_UNSIGNED_BYTE});
-#endif
+	colorAssociationList.push_back({Graphics::PixelFormat::createFormatRGBA32(),        TGL_RGBA, TGL_UNSIGNED_BYTE});
+	colorAssociationList.push_back({Graphics::PixelFormat::createFormatRGB24(),         TGL_RGB,  TGL_UNSIGNED_BYTE});
 	colorAssociationList.push_back({Graphics::PixelFormat(2, 5, 6, 5, 0, 11, 5, 0, 0),  TGL_RGB,  TGL_UNSIGNED_SHORT_5_6_5});
 	colorAssociationList.push_back({Graphics::PixelFormat(2, 5, 5, 5, 1, 11, 6, 1, 0),  TGL_RGBA, TGL_UNSIGNED_SHORT_5_5_5_1});
 	colorAssociationList.push_back({Graphics::PixelFormat(2, 4, 4, 4, 4, 12, 8, 4, 0),  TGL_RGBA, TGL_UNSIGNED_SHORT_4_4_4_4});
@@ -264,6 +259,12 @@ void GLContext::init(int screenW, int screenH, Graphics::PixelFormat pixelFormat
 	current_cull_face = TGL_BACK;
 	current_shade_model = TGL_SMOOTH;
 	cull_face_enabled = 0;
+
+	// scissor
+	scissor_test_enabled = false;
+	scissor[0] = scissor[1] = 0;
+	scissor[2] = screenW;
+	scissor[3] = screenH;
 
 	// fog
 	fog_enabled = false;
@@ -297,6 +298,10 @@ void GLContext::init(int screenW, int screenH, Graphics::PixelFormat pixelFormat
 	depth_test_enabled = false;
 	depth_func = TGL_LESS;
 	depth_write_mask = true;
+
+	// stipple
+	polygon_stipple_enabled = false;
+	memset(polygon_stipple_pattern, 0xff, sizeof(polygon_stipple_pattern));
 
 	// stencil
 	stencil_test_enabled = false;
@@ -353,8 +358,6 @@ void GLContext::init(int screenW, int screenH, Graphics::PixelFormat pixelFormat
 	_drawCallAllocator[1].initialize(drawCallMemorySize);
 	_debugRectsEnabled = false;
 	_profilingEnabled = false;
-
-	TinyGL::Internal::tglBlitResetScissorRect();
 }
 
 void GLContext::deinit() {

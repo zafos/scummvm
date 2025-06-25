@@ -19,13 +19,12 @@
  *
  */
 
-#include "common/math.h"
-
 #include "tetraedge/tetraedge.h"
 
 #include "tetraedge/te/te_button_layout.h"
 #include "tetraedge/te/te_sound_manager.h"
 #include "tetraedge/te/te_input_mgr.h"
+#include "tetraedge/te/te_sprite_layout.h"
 
 namespace Tetraedge {
 
@@ -56,7 +55,7 @@ TeButtonLayout::TeButtonLayout() : _currentState(BUTTON_STATE_UP),
 _clickPassThrough(false), _validationSoundVolume(1.0),
 _ignoreMouseEvents(false), _doubleValidationProtectionEnabled(true),
 _upLayout(nullptr), _downLayout(nullptr), _rolloverLayout(nullptr),
-_disabledLayout(nullptr), _hitZoneLayout(nullptr)
+_disabledLayout(nullptr), _hitZoneLayout(nullptr), _ownedLayouts(false)
 {
 	_onMousePositionChangedMaxPriorityCallback.reset(new TeCallback1Param<TeButtonLayout, const Common::Point &>(this, &TeButtonLayout::onMousePositionChangedMaxPriority, FLT_MAX));
 
@@ -84,6 +83,18 @@ TeButtonLayout::~TeButtonLayout() {
 	inputmgr->_mouseLDownSignal.remove(_onMouseLeftDownCallback);
 	inputmgr->_mouseLUpSignal.remove(_onMouseLeftUpCallback);
 	inputmgr->_mouseLUpSignal.remove(_onMouseLeftUpMaxPriorityCallback);
+	if (_ownedLayouts) {
+		if (_upLayout)
+			delete _upLayout;
+		if (_downLayout)
+			delete _downLayout;
+		if (_rolloverLayout)
+			delete _rolloverLayout;
+		if (_hitZoneLayout)
+			delete _hitZoneLayout;
+		if (_disabledLayout)
+			delete _disabledLayout;
+	}
 }
 
 bool TeButtonLayout::isMouseIn(const TeVector2s32 &mouseloc) {
@@ -92,6 +103,35 @@ bool TeButtonLayout::isMouseIn(const TeVector2s32 &mouseloc) {
 	} else {
 		return _hitZoneLayout->isMouseIn(mouseloc);
 	}
+}
+
+void TeButtonLayout::load(const Common::Path &upImg, const Common::Path &downImg, const Common::Path &overImg) {
+	TeSpriteLayout *upSprite = nullptr;
+	if (!upImg.empty()) {
+		upSprite = new TeSpriteLayout();
+		if (!upSprite->load(upImg))
+			warning("Failed to load button up img %s", upImg.toString(Common::Path::kNativeSeparator).c_str());
+	}
+	setUpLayout(upSprite);
+
+	TeSpriteLayout *downSprite = nullptr;
+	if (!downImg.empty()) {
+		downSprite = new TeSpriteLayout();
+		if (!downSprite->load(downImg))
+			warning("Failed to load button down img %s", downImg.toString(Common::Path::kNativeSeparator).c_str());
+	}
+	setDownLayout(downSprite);
+
+	TeSpriteLayout *overSprite = nullptr;
+	if (!overImg.empty()) {
+		overSprite = new TeSpriteLayout();
+		if (!overSprite->load(overImg))
+			warning("Failed to load button over img %s", overImg.toString(Common::Path::kNativeSeparator).c_str());
+	}
+	setRollOverLayout(overSprite);
+	setHitZone(nullptr);
+	setDisabledLayout(nullptr);
+	_ownedLayouts = true;
 }
 
 bool TeButtonLayout::onMouseLeftDown(const Common::Point &pt) {
@@ -224,6 +264,7 @@ void TeButtonLayout::setDisabledLayout(TeLayout *disabledLayout) {
 
 	_disabledLayout = disabledLayout;
 	if (_disabledLayout) {
+		_sizeChanged = true;
 		addChild(_disabledLayout);
 		//_disabledLayout->setColor(TeColor(0, 0, 0, 0));
 		//_disabledLayout->setName(name() + "_disabledLayout");
@@ -238,6 +279,7 @@ void TeButtonLayout::setHitZone(TeLayout *hitZoneLayout) {
 
 	_hitZoneLayout = hitZoneLayout;
 	if (_hitZoneLayout) {
+		_sizeChanged = true;
 		addChild(_hitZoneLayout);
 		//_hitZoneLayout->setColor(TeColor(0, 0, 0xff, 0xff));
 		//_hitZoneLayout->setName(name() + "_hitZoneLayout");
@@ -252,7 +294,7 @@ void TeButtonLayout::setDownLayout(TeLayout *downLayout) {
 		addChild(downLayout);
 	_downLayout = downLayout;
 
-	if (sizeType() == RELATIVE_TO_PARENT &&
+	if (sizeType() == ABSOLUTE &&
 			size().x() == 1.0f && size().y() == 1.0f &&
 			!_upLayout && _downLayout) {
 		setSize(_downLayout->size());
@@ -292,7 +334,7 @@ void TeButtonLayout::setUpLayout(TeLayout *upLayout) {
 		addChild(upLayout);
 	_upLayout = upLayout;
 
-	if (sizeType() == RELATIVE_TO_PARENT &&
+	if (sizeType() == ABSOLUTE &&
 			size().x() == 1.0f && size().y() == 1.0f &&
 			!_downLayout && _upLayout) {
 		setSize(_upLayout->size());
@@ -311,10 +353,10 @@ void TeButtonLayout::setDoubleValidationProtectionEnabled(bool enable) {
 }
 
 void TeButtonLayout::setEnable(bool enable) {
-	if (enable) {
+	if (enable && _currentState == BUTTON_STATE_DISABLED) {
 		_currentState = BUTTON_STATE_UP;
 		setState(_currentState);
-	} else {
+	} else if (!enable && _currentState != BUTTON_STATE_DISABLED) {
 		_currentState = BUTTON_STATE_DISABLED;
 		setState(_currentState);
 	}
@@ -324,14 +366,16 @@ void TeButtonLayout::setPosition(const TeVector3f32 &pos) {
 	TeLayout::setPosition(pos);
 
 	if (_currentState != BUTTON_STATE_DISABLED) {
-		int somethingCount = 0;
+		//int somethingCount = 0;
 		if (!_intArr.empty()) {
 			// probably not needed as we reimplememted how this works.
 			error("TODO: Implement setPosition logic for up/down state");
 		}
-		if (!_ignoreMouseEvents) {
-			setState(somethingCount ? BUTTON_STATE_DOWN : BUTTON_STATE_UP);
-		}
+		// Original does something like this, but that breaks in
+		// Amerzone where the button position can move during a click.
+		//if (!_ignoreMouseEvents) {
+		//	setState(somethingCount ? BUTTON_STATE_DOWN : BUTTON_STATE_UP);
+		//}
 	}
 }
 

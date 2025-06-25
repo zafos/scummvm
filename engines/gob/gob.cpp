@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/debug-channels.h"
@@ -213,6 +219,10 @@ bool GobEngine::isBATDemo() const {
 	return (_features & kFeaturesBATDemo) != 0;
 }
 
+bool GobEngine::is640x400() const {
+	return (_features & kFeatures640x400) != 0;
+}
+
 bool GobEngine::is640x480() const {
 	return (_features & kFeatures640x480) != 0;
 }
@@ -221,12 +231,29 @@ bool GobEngine::is800x600() const {
 	return (_features & kFeatures800x600) != 0;
 }
 
+bool GobEngine::is16Colors() const {
+	return (_features & kFeatures16Colors) != 0;
+}
+
 bool GobEngine::isTrueColor() const {
 	return (_features & kFeaturesTrueColor) != 0;
 }
 
 bool GobEngine::isDemo() const {
 	return (isSCNDemo() || isBATDemo());
+}
+
+const char *GobEngine::getGameVersion() const {
+	// Making sure that we return a set of predetermined versions
+	const Common::String extra = _extra;
+	if (extra.hasSuffix("1.01"))
+		return "1.01";
+	else if (extra.hasSuffix("1.02"))
+		return "1.02";
+	else if (extra.hasSuffix("1.07"))
+		return "1.07";
+	else
+		return "1.00";
 }
 
 bool GobEngine::hasResourceSizeWorkaround() const {
@@ -241,20 +268,15 @@ const Graphics::PixelFormat &GobEngine::getPixelFormat() const {
 	return _pixelFormat;
 }
 
-void GobEngine::setTrueColor(bool trueColor) {
+void GobEngine::setTrueColor(bool trueColor, bool convertAllSurfaces, Graphics::PixelFormat *trueColorFormat) {
 	if (isTrueColor() == trueColor)
 		return;
 
 	_features = (_features & ~kFeaturesTrueColor) | (trueColor ? kFeaturesTrueColor : 0);
 
-	_video->setSize();
+	_video->setSize(trueColorFormat);
 
 	_pixelFormat = g_system->getScreenFormat();
-
-	Common::Array<SurfacePtr>::iterator surf;
-	for (surf = _draw->_spritesArray.begin(); surf != _draw->_spritesArray.end(); ++surf)
-		if (*surf)
-			(*surf)->setBPP(_pixelFormat.bytesPerPixel);
 
 	if (_draw->_backSurface)
 		_draw->_backSurface->setBPP(_pixelFormat.bytesPerPixel);
@@ -266,7 +288,13 @@ void GobEngine::setTrueColor(bool trueColor) {
 		_draw->_cursorSpritesBack->setBPP(_pixelFormat.bytesPerPixel);
 	if (_draw->_scummvmCursor)
 		_draw->_scummvmCursor->setBPP(_pixelFormat.bytesPerPixel);
-	SurfacePtr _scummvmCursor;
+
+	if (convertAllSurfaces) {
+		Common::Array<SurfacePtr>::iterator surf;
+		for (surf = _draw->_spritesArray.begin(); surf != _draw->_spritesArray.end(); ++surf)
+			if (*surf)
+				(*surf)->setBPP(_pixelFormat.bytesPerPixel);
+	}
 }
 
 Common::Error GobEngine::run() {
@@ -402,7 +430,7 @@ void GobEngine::pauseGame() {
 Common::Error GobEngine::initGameParts() {
 	_resourceSizeWorkaround = false;
 
-	// just detect some devices some of which will be always there if the music is not disabled
+	// Just detect some devices some of which will be always there if the music is not disabled
 	_noMusic = MidiDriver::getMusicType(MidiDriver::detectDevice(MDT_PCSPK | MDT_MIDI | MDT_ADLIB)) == MT_NULL ? true : false;
 
 	_endiannessMethod = kEndiannessMethodSystem;
@@ -511,18 +539,6 @@ Common::Error GobEngine::initGameParts() {
 		_resourceSizeWorkaround = true;
 		break;
 
-	case kGameTypeAJWorld:
-		_init     = new Init_v2(this);
-		_video    = new Video_v2(this);
-		_inter    = new Inter_v2(this);
-		_mult     = new Mult_v2(this);
-		_draw     = new Draw_v2(this);
-		_map      = new Map_v2(this);
-		_goblin   = new Goblin_v2(this);
-		_scenery  = new Scenery_v2(this);
-		_saveLoad = new SaveLoad_AJWorld(this, _targetName.c_str());
-		break;
-
 	case kGameTypeGob3:
 		_init     = new Init_v3(this);
 		_video    = new Video_v2(this);
@@ -572,17 +588,6 @@ Common::Error GobEngine::initGameParts() {
 		break;
 
 	case kGameTypeDynasty:
-		_init     = new Init_v3(this);
-		_video    = new Video_v2(this);
-		_inter    = new Inter_v5(this);
-		_mult     = new Mult_v2(this);
-		_draw     = new Draw_v2(this);
-		_map      = new Map_v2(this);
-		_goblin   = new Goblin_v4(this);
-		_scenery  = new Scenery_v2(this);
-		_saveLoad = new SaveLoad(this);
-		break;
-
 	case kGameTypeDynastyWood:
 		_init     = new Init_v3(this);
 		_video    = new Video_v2(this);
@@ -621,7 +626,6 @@ Common::Error GobEngine::initGameParts() {
 		break;
 
 	case kGameTypeAdibou2:
-	case kGameTypeAdi2:
 	case kGameTypeAdi4:
 		_init     = new Init_v7(this);
 		_video    = new Video_v6(this);
@@ -635,9 +639,10 @@ Common::Error GobEngine::initGameParts() {
 		break;
 
 	case kGameTypeAdibou1:
+	case kGameTypeAdi2:
 		_init     = new Init_v2(this);
 		_video    = new Video_v2(this);
-		_inter    = new Inter_v2(this);
+		_inter    = new Inter_Adibou1(this);
 		_mult     = new Mult_v2(this);
 		_draw     = new Draw_v2(this);
 		_map      = new Map_v2(this);
@@ -709,6 +714,10 @@ Common::Error GobEngine::initGraphics() {
 	} else if (is640x480()) {
 		_width  = 640;
 		_height = 480;
+		_mode   = 0x18;
+	} else if (is640x400()) {
+		_width  = 640;
+		_height = 400;
 		_mode   = 0x18;
 	} else {
 		_width  = 320;

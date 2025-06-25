@@ -168,7 +168,7 @@ public:
 	 *
 	 * @param filename Name of the file to load.
 	 */
-	bool loadFile(const String &filename);
+	bool loadFile(const Path &filename);
 
 	bool loadFile(const FSNode &node);
 
@@ -185,7 +185,7 @@ public:
 	 */
 	bool loadBuffer(const byte *buffer, uint32 size, DisposeAfterUse::Flag disposable = DisposeAfterUse::NO);
 
-	bool loadStream(SeekableReadStream *stream);
+	bool loadStream(SeekableReadStream *stream, const String &name = "File Stream");
 
 	void close();
 
@@ -377,7 +377,7 @@ private:
 	char _char;
 	bool _allowText; /** Allow text nodes in the doc (default false) */
 	SeekableReadStream *_stream;
-	String _fileName;
+	Path _fileName;
 
 	ParserState _state; /** Internal state of the parser */
 

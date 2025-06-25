@@ -42,10 +42,10 @@ namespace Image {
 PNGDecoder::PNGDecoder() :
 		_outputSurface(0),
 		_palette(0),
-		_paletteColorCount(0),
 		_skipSignature(false),
 		_keepTransparencyPaletted(false),
-		_transparentColor(-1) {
+		_hasTransparentColor(false),
+		_transparentColor(0) {
 }
 
 PNGDecoder::~PNGDecoder() {
@@ -58,16 +58,12 @@ void PNGDecoder::destroy() {
 		delete _outputSurface;
 		_outputSurface = 0;
 	}
-	delete[] _palette;
-	_palette = NULL;
+	_palette.clear();
+	_hasTransparentColor = false;
 }
 
 Graphics::PixelFormat PNGDecoder::getByteOrderRgbaPixelFormat(bool isAlpha) const {
-#ifdef SCUMM_BIG_ENDIAN
-	return Graphics::PixelFormat(4, 8, 8, 8, isAlpha ? 8 : 0, 24, 16, 8, 0);
-#else
-	return Graphics::PixelFormat(4, 8, 8, 8, isAlpha ? 8 : 0, 0, 8, 16, 24);
-#endif
+	return Graphics::PixelFormat::createFormatRGBA32(isAlpha);
 }
 
 #ifdef USE_PNG
@@ -175,12 +171,10 @@ bool PNGDecoder::loadStream(Common::SeekableReadStream &stream) {
 			png_destroy_read_struct(&pngPtr, &infoPtr, NULL);
 			return false;
 		}
-		_paletteColorCount = numPalette;
-		_palette = new byte[_paletteColorCount * 3];
-		for (int i = 0; i < _paletteColorCount; i++) {
-			_palette[(i * 3)] = palette[i].red;
-			_palette[(i * 3) + 1] = palette[i].green;
-			_palette[(i * 3) + 2] = palette[i].blue;
+
+		_palette.resize(numPalette, false);
+		for (int i = 0; i < numPalette; i++) {
+			_palette.set(i, palette[i].red, palette[i].green, palette[i].blue);
 		}
 
 		if (png_get_valid(pngPtr, infoPtr, PNG_INFO_tRNS)) {
@@ -190,6 +184,7 @@ bool PNGDecoder::loadStream(Common::SeekableReadStream &stream) {
 			if (numTrans == 1) {
 				// For a single transparency color, the alpha should be fully transparent
 				assert(*trans == 0);
+				_hasTransparentColor = true;
 				_transparentColor = 0;
 			} else {
 				// Multiple alphas are being specified for the palette, so we can't use
@@ -206,16 +201,14 @@ bool PNGDecoder::loadStream(Common::SeekableReadStream &stream) {
 		if (hasRgbaPalette) {
 			// Build up the RGBA palette using the transparency alphas
 			Common::fill(&rgbaPalette[0], &rgbaPalette[256], 0);
-			for (int i = 0; i < _paletteColorCount; ++i) {
+			for (int i = 0; i < numPalette; ++i) {
 				byte a = (i < numTrans) ? trans[i] : 0xff;
 				rgbaPalette[i] = _outputSurface->format.ARGBToColor(
 					a, palette[i].red, palette[i].green, palette[i].blue);
 			}
 
 			// We won't be needing a separate palette
-			_paletteColorCount = 0;
-			delete[] _palette;
-			_palette = nullptr;
+			_palette.clear();
 		}
 	} else {
  		bool isAlpha = (colorType & PNG_COLOR_MASK_ALPHA);
@@ -268,7 +261,7 @@ bool PNGDecoder::loadStream(Common::SeekableReadStream &stream) {
 			png_read_row(pngPtr, (png_bytep)_outputSurface->getBasePtr(0, i), NULL);
 		}
 	} else {
-		// PNGs with interlacing require us to allocate an auxillary
+		// PNGs with interlacing require us to allocate an auxiliary
 		// buffer with pointers to all row starts.
 
 		// Allocate row pointer buffer
@@ -302,13 +295,8 @@ bool PNGDecoder::loadStream(Common::SeekableReadStream &stream) {
 
 bool writePNG(Common::WriteStream &out, const Graphics::Surface &input, const byte *palette) {
 #ifdef USE_PNG
-#ifdef SCUMM_LITTLE_ENDIAN
-	const Graphics::PixelFormat requiredFormat_3byte(3, 8, 8, 8, 0, 0, 8, 16, 0);
-	const Graphics::PixelFormat requiredFormat_4byte(4, 8, 8, 8, 8, 0, 8, 16, 24);
-#else
-	const Graphics::PixelFormat requiredFormat_3byte(3, 8, 8, 8, 0, 16, 8, 0, 0);
-	const Graphics::PixelFormat requiredFormat_4byte(4, 8, 8, 8, 8, 24, 16, 8, 0);
-#endif
+	const Graphics::PixelFormat requiredFormat_3byte = Graphics::PixelFormat::createFormatRGB24();
+	const Graphics::PixelFormat requiredFormat_4byte = Graphics::PixelFormat::createFormatRGBA32();
 
 	int colorType;
 	Graphics::Surface *tmp = NULL;

@@ -97,6 +97,7 @@ private:
 	MacDialogButtonArray *_buttons;
 	uint _defaultButton;
 	bool _mouseOverPressedButton;
+	int _mouseOverButton;
 
 public:
 	int _pressedButton;
@@ -114,6 +115,6 @@ public:
 	int matchButton(int x, int y);
 };
 
-} // End of namespace Wage
+} // End of namespace Graphics
 
 #endif

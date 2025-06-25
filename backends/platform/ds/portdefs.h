@@ -25,12 +25,6 @@
 // Include ndstypes.h for uint16 etc. typedefs
 #include "nds/ndstypes.h"
 
-typedef unsigned int uint;
-
-// Define SCUMMVM_DONT_DEFINE_TYPES to prevent scummsys.h from trying to
-// re-define those data types.
-#define SCUMMVM_DONT_DEFINE_TYPES
-
 // Include required headers
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,9 +33,11 @@ typedef unsigned int uint;
 #include <stddef.h>
 #include <assert.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <math.h>
 #include <new>
+#include <limits>
 
 #include <nds/arm9/sassert.h>
 #undef assert
@@ -54,10 +50,5 @@ typedef unsigned int uint;
 #ifndef STREAM_AUDIO_FROM_DISK
 #define STREAM_AUDIO_FROM_DISK
 #endif
-
-// FIXME: Since I can't change the engine at the moment (post lockdown) this define can go here.
-// This define changes the mouse-relative motion which doesn't make sense on a touch screen to
-// a more conventional form of input where the menus can be clicked on.
-#define LURE_CLICKABLE_MENUS
 
 #endif

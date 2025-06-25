@@ -154,7 +154,7 @@ TeButtonLayout *TeLuaGUI::buttonLayoutChecked(const Common::String &name) {
 	TeButtonLayout *l = buttonLayout(name);
 	if (!l) {
 		error("No button '%s' in gui data '%s'", name.c_str(),
-			  _scriptPath.c_str());
+			  _scriptPath.toString(Common::Path::kNativeSeparator).c_str());
 	}
 	return l;
 }
@@ -163,7 +163,7 @@ TeLayout *TeLuaGUI::layoutChecked(const Common::String &name) {
 	TeLayout *l = layout(name);
 	if (!l) {
 		error("No layout '%s' in gui data '%s'", name.c_str(),
-			  _scriptPath.c_str());
+			  _scriptPath.toString(Common::Path::kNativeSeparator).c_str());
 	}
 	return l;
 }
@@ -172,17 +172,17 @@ TeSpriteLayout *TeLuaGUI::spriteLayoutChecked(const Common::String &name) {
 	TeSpriteLayout *l = spriteLayout(name);
 	if (!l) {
 		error("No sprite layout '%s' in gui data '%s'", name.c_str(),
-			  _scriptPath.c_str());
+			  _scriptPath.toString(Common::Path::kNativeSeparator).c_str());
 	}
 	return l;
 }
 
-bool TeLuaGUI::load(const Common::String &subPath) {
+bool TeLuaGUI::load(const Common::Path &subPath) {
 	TeCore *core = g_engine->getCore();
 	return load(core->findFile(subPath));
 }
 
-bool TeLuaGUI::load(const Common::FSNode &node) {
+bool TeLuaGUI::load(const TetraedgeFSNode &node) {
 	unload();
 	_scriptPath = node.getPath();
 	// Not the same as original, we abstract the search logic a bit.
@@ -208,6 +208,9 @@ bool TeLuaGUI::load(const Common::FSNode &node) {
 	_luaContext.registerCFunction("TeRotationLinearAnimation", rotationLinearAnimationBindings);
 	_luaContext.registerCFunction("TeScrollingLayout", scrollingLayoutBindings);
 	_luaContext.registerCFunction("TeExtendedTextLayout", extendedTextLayoutBindings);
+	// TODO: We replaced the video layout from Amerzone with a sprite layout.  Probably
+	// works ok?
+	_luaContext.registerCFunction("TeVideoLayout", spriteLayoutBindings);
 	_luaContext.setInRegistry("__TeLuaGUIThis", this);
 	_luaScript.attachToContext(&_luaContext);
 	_luaScript.load(node);

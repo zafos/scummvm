@@ -29,21 +29,21 @@
 
 namespace Freescape {
 
-uint8 k8bitMaxVariable = 64;
-uint8 k8bitMaxShield = 64;
-uint8 k8bitMaxEnergy = 64;
+uint8 k8bitVariableShield = 63;
 
-Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition, FCLInstructionVector &instructions) {
+Common::String detokenise8bitCondition(Common::Array<uint16> &tokenisedCondition, FCLInstructionVector &instructions, bool isAmigaAtari) {
 	Common::String detokenisedStream;
 	Common::Array<uint8>::size_type bytePointer = 0;
 	Common::Array<uint8>::size_type sizeOfTokenisedContent = tokenisedCondition.size();
 
+	if (sizeOfTokenisedContent == 0)
+		error("No tokenised content");
+
 	// on the 8bit platforms, all instructions have a conditional flag;
-	// we'll want to convert them into runs of "if shot? then" and "if collided? then",
+	// we'll want to convert them into runs of "if shot? then", "if collided? then" or "if timer? then",
 	// and we'll want to start that from the top
-	uint8 conditionalIsShot = 0x1;
 	FCLInstructionVector *conditionalInstructions = new FCLInstructionVector();
-	FCLInstruction currentInstruction;
+	FCLInstruction currentInstruction = FCLInstruction(Token::UNKNOWN);
 
 	// this lookup table tells us how many argument bytes to read per opcode
 	uint8 argumentsRequiredByOpcode[49] =
@@ -51,37 +51,62 @@ Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition,
 		 2, 1, 1, 2, 1, 1, 2, 1,
 		 1, 2, 2, 1, 2, 0, 0, 0,
 		 1, 1, 0, 1, 1, 1, 1, 1,
-		 2, 2, 1, 1, 0, 0, 0, 0,
-		 0, 0, 0, 0, 0, 0, 2, 2,
+		 2, 2, 1, 1, 1, 1, 0, 0,
+		 0, 1, 0, 0, 0, 0, 2, 2,
 		 1};
+
+	if (sizeOfTokenisedContent > 0)
+		detokenisedStream += Common::String::format("CONDITION FLAG: %x\n", tokenisedCondition[0]);
+	uint16 newConditional = 0;
+	uint16 oldConditional = 0;
 
 	while (bytePointer < sizeOfTokenisedContent) {
 		// get the conditional type of the next operation
-		uint8 newConditionalIsShot = tokenisedCondition[bytePointer] & 0x80;
+		uint8 conditionalByte = tokenisedCondition[bytePointer] & 0xc0;
+		//detokenisedStream += Common::String::format("CONDITION FLAG: %x\n", conditionalByte);
+		newConditional = 0;
+
+		if (conditionalByte == 0x40)
+			newConditional = kConditionalTimeout;
+		else if (conditionalByte == 0x80)
+			newConditional = kConditionalShot;
+		else if (conditionalByte == 0xc0)
+			newConditional = kConditionalActivated;
+		else
+			newConditional = kConditionalCollided;
 
 		// if the conditional type has changed then end the old conditional,
 		// if we were in one, and begin a new one
-		if (newConditionalIsShot != conditionalIsShot) {
+		if (bytePointer == 0 || newConditional != oldConditional) {
+			oldConditional = newConditional;
 			FCLInstruction branch;
-			if (conditionalIsShot)
-				branch = FCLInstruction(Token::SHOTQ);
-			else
-				branch = FCLInstruction(Token::COLLIDEDQ);
+			branch = FCLInstruction(Token::CONDITIONAL);
+
+			if (bytePointer > 0) {
+				detokenisedStream += "ENDIF\n";
+				assert(conditionalInstructions->size() > 0);
+				// Allocate the next vector of instructions
+				conditionalInstructions = new FCLInstructionVector();
+			}
 
 			branch.setBranches(conditionalInstructions, nullptr);
+			branch.setSource(oldConditional); // conditional flag
 			instructions.push_back(branch);
 
-			conditionalIsShot = newConditionalIsShot;
-			if (bytePointer)
-				detokenisedStream += "ENDIF\n";
+			detokenisedStream += "IF ";
 
-			if (conditionalIsShot)
-				detokenisedStream += "IF SHOT? THEN\n";
+			if (oldConditional & kConditionalShot)
+				detokenisedStream += "SHOT? ";
+			else if (oldConditional & kConditionalTimeout)
+				detokenisedStream += "TIMER? ";
+			else if (oldConditional & kConditionalCollided)
+				detokenisedStream += "COLLIDED? ";
+			else if (oldConditional & kConditionalActivated)
+				detokenisedStream += "ACTIVATED? ";
 			else
-				detokenisedStream += "IF COLLIDED? THEN\n";
+				error("Invalid conditional: %x", oldConditional);
 
-			// Allocate the next vector of instructions
-			conditionalInstructions = new FCLInstructionVector();
+			detokenisedStream += "THEN\n";
 		}
 
 		// get the actual operation
@@ -92,8 +117,7 @@ Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition,
 		// check we have enough bytes left to read
 		if (opcode > 48) {
 			debugC(1, kFreescapeDebugParser, "%s", detokenisedStream.c_str());
-			if (opcode != 0x3f)
-				error("ERROR: failed to read opcode: %x", opcode);
+			error("ERROR: failed to read opcode: %x", opcode);
 			break;
 		}
 
@@ -107,11 +131,15 @@ Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition,
 			detokenisedStream += "<UNKNOWN 8 bit: ";
 			detokenisedStream += Common::String::format("%x", (int)opcode);
 			detokenisedStream += " > ";
+			debugC(1, kFreescapeDebugParser, "%s", detokenisedStream.c_str());
+			error("ERROR: failed to read opcode: %x", opcode);
 			break;
 
 		case 0:
 			detokenisedStream += "NOP ";
 			currentInstruction = FCLInstruction(Token::NOP);
+			conditionalInstructions->push_back(currentInstruction);
+			currentInstruction = FCLInstruction(Token::UNKNOWN);
 			break; // NOP
 		case 1:    // add three-byte value to score
 		{
@@ -176,6 +204,7 @@ Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition,
 
 		case 9:
 			detokenisedStream += "ADDVAR (1, v";
+			detokenisedStream += Common::String::format("%d)", tokenisedCondition[bytePointer]);
 			currentInstruction = FCLInstruction(Token::ADDVAR);
 			currentInstruction.setSource(tokenisedCondition[bytePointer]);
 			currentInstruction.setDestination(1);
@@ -186,6 +215,7 @@ Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition,
 			break;
 		case 10:
 			detokenisedStream += "SUBVAR (1, v";
+			detokenisedStream += Common::String::format("%d)", tokenisedCondition[bytePointer]);
 			currentInstruction = FCLInstruction(Token::SUBVAR);
 			currentInstruction.setSource(tokenisedCondition[bytePointer]);
 			currentInstruction.setDestination(1);
@@ -277,6 +307,31 @@ Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition,
 			currentInstruction = FCLInstruction(Token::PRINT);
 			break;
 
+		case 35:
+			detokenisedStream += "SCREEN (";
+			currentInstruction = FCLInstruction(Token::SCREEN);
+			break;
+
+		case 36: // Only used in Dark Side to keep track of cristals and letters collected
+			detokenisedStream += "SETFLAGS (";
+			currentInstruction = FCLInstruction(Token::SETFLAGS);
+			break;
+
+		case 37:
+			detokenisedStream += "STARTANIM (";
+			currentInstruction = FCLInstruction(Token::STARTANIM);
+			break;
+
+		case 41: // Not sure about this one
+			detokenisedStream += "LOOP (";
+			currentInstruction = FCLInstruction(Token::LOOP);
+			break;
+
+		case 42: // Not sure about this one
+			detokenisedStream += "AGAIN";
+			currentInstruction = FCLInstruction(Token::AGAIN);
+			break;
+
 		case 12:
 			detokenisedStream += "SETBIT (";
 			currentInstruction = FCLInstruction(Token::SETBIT);
@@ -309,6 +364,14 @@ Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition,
 			bytePointer++;
 			numberOfArguments = 0;
 			break;
+
+		/*
+		case 22:
+		case 23:
+		case 24:
+			UNUSED
+		*/
+
 		case 26:
 			detokenisedStream += "REDRAW";
 			currentInstruction = FCLInstruction(Token::REDRAW);
@@ -333,8 +396,13 @@ Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition,
 			// this should toggle border colour or the room palette
 			detokenisedStream += "SPFX (";
 			currentInstruction = FCLInstruction(Token::SPFX);
-			currentInstruction.setSource(tokenisedCondition[bytePointer] >> 4);
-			currentInstruction.setDestination(tokenisedCondition[bytePointer] & 0xf);
+			if (isAmigaAtari) {
+				currentInstruction.setSource(tokenisedCondition[bytePointer] >> 8);
+				currentInstruction.setDestination(tokenisedCondition[bytePointer] & 0xff);
+			} else {
+				currentInstruction.setSource(tokenisedCondition[bytePointer] >> 4);
+				currentInstruction.setDestination(tokenisedCondition[bytePointer] & 0xf);
+			}
 			detokenisedStream += Common::String::format("%d, %d)", currentInstruction._source, currentInstruction._destination);
 			conditionalInstructions->push_back(currentInstruction);
 			currentInstruction = FCLInstruction(Token::UNKNOWN);
@@ -343,41 +411,38 @@ Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition,
 			break;
 
 		case 20:
-			detokenisedStream += "SETVAR ";
-			detokenisedStream += Common::String::format("(v%d, %d)", (int)tokenisedCondition[bytePointer], (int)tokenisedCondition[bytePointer + 1]);
-			bytePointer += 2;
-			numberOfArguments = 0;
-			break;
-
-		case 35:
-			detokenisedStream += "SCREEN (";
-			currentInstruction = FCLInstruction(Token::SCREEN);
+			detokenisedStream += "SETVAR (v";
+			currentInstruction = FCLInstruction(Token::SETVAR);
 			break;
 
 		case 44:
 			detokenisedStream += "ELSE ";
+			currentInstruction = FCLInstruction(Token::ELSE);
+			conditionalInstructions->push_back(currentInstruction);
+			currentInstruction = FCLInstruction(Token::UNKNOWN);
+			numberOfArguments = 0;
 			break;
 
 		case 45:
 			detokenisedStream += "ENDIF ";
+			currentInstruction = FCLInstruction(Token::ENDIF);
+			conditionalInstructions->push_back(currentInstruction);
+			currentInstruction = FCLInstruction(Token::UNKNOWN);
+			numberOfArguments = 0;
 			break;
 
 		case 46:
-			detokenisedStream += "IFGTE ";
-			detokenisedStream += Common::String::format("(v%d, %d)", (int)tokenisedCondition[bytePointer], (int)tokenisedCondition[bytePointer + 1]);
-			bytePointer += 2;
-			numberOfArguments = 0;
+			detokenisedStream += "IFGTE (v";
+			currentInstruction = FCLInstruction(Token::IFGTEQ);
 			break;
 
 		case 47:
-			detokenisedStream += "IFLTE ";
-			detokenisedStream += Common::String::format("(v%d, %d)", (int)tokenisedCondition[bytePointer], (int)tokenisedCondition[bytePointer + 1]);
-			bytePointer += 2;
-			numberOfArguments = 0;
+			detokenisedStream += "IFLTE (v";
+			currentInstruction = FCLInstruction(Token::IFLTEQ);
 			break;
 
 		case 48:
-			detokenisedStream += "EXECUTE ";
+			detokenisedStream += "EXECUTE (";
 			currentInstruction = FCLInstruction(Token::EXECUTE);
 			break;
 		}
@@ -409,19 +474,8 @@ Common::String detokenise8bitCondition(Common::Array<uint8> &tokenisedCondition,
 		detokenisedStream += "\n";
 	}
 
-	// if (!conditionalInstructions)
-	//	conditionalInstructions = new FCLInstructionVector();
-
-	// conditionalInstructions->push_back(currentInstruction);
-
-	FCLInstruction branch;
-	if (conditionalIsShot)
-		branch = FCLInstruction(Token::SHOTQ);
-	else
-		branch = FCLInstruction(Token::COLLIDEDQ);
-
-	branch.setBranches(conditionalInstructions, nullptr);
-	instructions.push_back(branch);
+	// This fails in Castle Master
+	//assert(conditionalInstructions->size() > 0);
 
 	return detokenisedStream;
 }

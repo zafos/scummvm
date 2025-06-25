@@ -811,9 +811,9 @@ void AGOSEngine::o_saveUserGame() {
 			fileError(_windowArray[5], true);
 		}
 	} else {
-		_system->setFeatureState(OSystem::kFeatureVirtualKeyboard, true);
+		enterSaveLoadScreen(true);
 		userGame(false);
-		_system->setFeatureState(OSystem::kFeatureVirtualKeyboard, false);
+		enterSaveLoadScreen(false);
 	}
 }
 
@@ -826,9 +826,9 @@ void AGOSEngine::o_loadUserGame() {
 			fileError(_windowArray[5], false);
 		}
 	} else {
-		_system->setFeatureState(OSystem::kFeatureVirtualKeyboard, true);
+		enterSaveLoadScreen(true);
 		userGame(true);
-		_system->setFeatureState(OSystem::kFeatureVirtualKeyboard, false);
+		enterSaveLoadScreen(false);
 	}
 }
 
@@ -1066,7 +1066,7 @@ void AGOSEngine::stopAnimate(uint16 a) {
 void AGOSEngine::waitForSync(uint a) {
 	const uint maxCount = (getGameType() == GType_SIMON1) ? 1000 : 2500;
 
-	if ((getGameType() == GType_SIMON1 || getGameType() == GType_SIMON2) && (getFeatures() & GF_TALKIE)) {
+	if (getGameType() == GType_SIMON1 && (getFeatures() & GF_TALKIE)) {
 		if (a != 200) {
 			uint16 tmp = _lastVgaWaitFor;
 			_lastVgaWaitFor = 0;

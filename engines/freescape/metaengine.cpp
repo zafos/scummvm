@@ -20,11 +20,18 @@
  */
 
 #include "common/translation.h"
+#include "backends/keymapper/action.h"
+#include "backends/keymapper/keymap.h"
+#include "backends/keymapper/standard-actions.h"
 #include "graphics/thumbnail.h"
 #include "graphics/scaler.h"
 
 
 #include "freescape/freescape.h"
+#include "freescape/games/castle/castle.h"
+#include "freescape/games/dark/dark.h"
+#include "freescape/games/driller/driller.h"
+#include "freescape/games/eclipse/eclipse.h"
 #include "freescape/detection.h"
 
 
@@ -55,7 +62,7 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 		GAMEOPTION_AUTOMATIC_DRILLING,
 		{
 			_s("Automatic drilling"),
-			_s("Allow to succefully drill in any part of the area in Driller"),
+			_s("Allow to successfully drill in any part of the area in Driller"),
 			"automatic_drilling",
 			false,
 			0,
@@ -95,10 +102,43 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 			0
 		}
 	},
+	{
+		GAMEOPTION_INVERT_Y,
+		{
+			_s("Invert Y-axis on mouse"),
+			_s("Use alternative camera controls"),
+			"invert_y",
+			false,
+			0,
+			0
+		}
+	},
+	{
+		GAMEOPTION_AUTHENTIC_GRAPHICS,
+		{
+			_s("Authentic graphics"),
+			_s("Keep graphics as close as possible to the original"),
+			"authentic_graphics",
+			false,
+			0,
+			0
+		}
+	},
+	{
+		GAMEOPTION_TRAVEL_ROCK,
+		{
+			_s("Enable rock travel"),
+			_s("Enable traveling using a rock shoot at start"),
+			"rock_travel",
+			false,
+			0,
+			0
+		}
+	},
 	AD_EXTRA_GUI_OPTIONS_TERMINATOR
 };
 
-class FreescapeMetaEngine : public AdvancedMetaEngine {
+class FreescapeMetaEngine : public AdvancedMetaEngine<ADGameDescription> {
 public:
 	const char *getName() const override {
 		return "freescape";
@@ -110,6 +150,7 @@ public:
 
 	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const override;
 	void getSavegameThumbnail(Graphics::Surface &thumb) override;
+	Common::KeymapArray initKeymaps(const char *target) const override;
 };
 
 Common::Error FreescapeMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const {
@@ -117,7 +158,7 @@ Common::Error FreescapeMetaEngine::createInstance(OSystem *syst, Engine **engine
 		*engine = (Engine *)new Freescape::DrillerEngine(syst, gd);
 	} else if (Common::String(gd->gameId) == "darkside") {
 		*engine = (Engine *)new Freescape::DarkEngine(syst, gd);
-	} else if (Common::String(gd->gameId) == "totaleclipse") {
+	} else if (Common::String(gd->gameId) == "totaleclipse" || Common::String(gd->gameId) == "totaleclipse2") {
 		*engine = (Engine *)new Freescape::EclipseEngine(syst, gd);
 	} else if (Common::String(gd->gameId) == "castlemaster") {
 		*engine = (Engine *)new Freescape::CastleEngine(syst, gd);
@@ -125,6 +166,23 @@ Common::Error FreescapeMetaEngine::createInstance(OSystem *syst, Engine **engine
 		*engine = new Freescape::FreescapeEngine(syst, gd);
 
 	return Common::kNoError;
+}
+
+Common::KeymapArray FreescapeMetaEngine::initKeymaps(const char *target) const {
+	using namespace Freescape;
+
+	FreescapeEngine *engine = (Freescape::FreescapeEngine *)g_engine;
+	Common::Keymap *engineKeyMap = new Common::Keymap(Common::Keymap::kKeymapTypeGame, "freescape", "Freescape game");
+	Common::Keymap *infoScreenKeyMap = new Common::Keymap(Common::Keymap::kKeymapTypeGame, "infoscreen-keymap", "Information screen keymapping");
+
+	if (engine)
+		engine->initKeymaps(engineKeyMap, infoScreenKeyMap, target);
+
+	Common::KeymapArray keymaps(2);
+	keymaps[0] = engineKeyMap;
+	keymaps[1] = infoScreenKeyMap;
+
+	return keymaps;
 }
 
 void FreescapeMetaEngine::getSavegameThumbnail(Graphics::Surface &thumb) {

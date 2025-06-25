@@ -42,6 +42,11 @@ namespace Common {
 
 namespace Mohawk {
 
+// Engine Debug Flags
+enum {
+	kDebugCode = 1,
+};
+
 #define LBKEY_MOD_CTRL 1
 #define LBKEY_MOD_ALT 2
 #define LBKEY_MOD_SHIFT 4
@@ -761,8 +766,8 @@ public:
 private:
 	Common::INIFile _bookInfoFile;
 
-	Common::String getBookInfoFileName() const;
-	void loadBookInfo(const Common::String &filename);
+	Common::Path getBookInfoFileName() const;
+	void loadBookInfo(const Common::Path &filename);
 
 	Common::String stringForMode(LBMode mode);
 

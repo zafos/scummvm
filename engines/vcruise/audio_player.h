@@ -34,7 +34,7 @@ class CachedAudio;
 
 class AudioPlayer : public Audio::AudioStream {
 public:
-	AudioPlayer(Audio::Mixer *mixer, const Common::SharedPtr<Audio::AudioStream> &baseStream, byte volume, int8 balance);
+	AudioPlayer(Audio::Mixer *mixer, const Common::SharedPtr<Audio::AudioStream> &baseStream, Audio::Mixer::SoundType soundType);
 	~AudioPlayer();
 
 	int readBuffer(int16 *buffer, const int numSamples) override;
@@ -42,17 +42,24 @@ public:
 	int getRate() const override;
 	bool endOfData() const override;
 
-	void sendToMixer(Audio::Mixer *mixer, byte volume, int8 balance);
+	void play(byte volume, int8 balance);
 	void stop();
+
+	void setVolume(byte volume);
+	void setBalance(int8 balance);
+	void setVolumeAndBalance(byte volume, int8 balance);
 
 private:
 	Common::Mutex _mutex;
 
 	Audio::SoundHandle _handle;
-	bool _isLooping;
+	//bool _isLooping;
+	bool _isPlaying;
 	bool _exhausted;
 	Audio::Mixer *_mixer;
 	Common::SharedPtr<Audio::AudioStream> _baseStream;
+
+	Audio::Mixer::SoundType _soundType;
 };
 
 } // End of namespace VCruise

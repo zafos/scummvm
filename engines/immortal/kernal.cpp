@@ -19,12 +19,14 @@
  *
  */
 
-/* This file covers both Kernal.GS and Driver.GS.
+/* This file covers both Kernel.GS and Driver.GS.
  * This is because most of Driver.GS is hardware specific,
  * and what is not (the slightly abstracted aspects), is
- * directly connected to kernal, and might as well be
+ * directly connected to kernel, and might as well be
  * considered part of the same process.
  */
+
+#include "graphics/paletteman.h"
 
 #include "immortal/immortal.h"
 
@@ -438,7 +440,7 @@ void ImmortalEngine::printChr(char c) {
 		_penX -= 2;
 	}
 
-	// If the letter was a captial T, the next letter should be a little closer
+	// If the letter was a capital T, the next letter should be a little closer
 	if (c == 'T') {
 		_penX -= 2;
 	}
@@ -485,31 +487,29 @@ int ImmortalEngine::loadUniv(char mazeNum) {
 		debug("Error, couldn't load maze %d.CNM", mazeNum);
 		return -1;
 	}
-	debug("Size of maze CNM: %ld", mazeCNM->size());
+	debug("Size of maze CNM: %" PRId64, mazeCNM->size());
 
 	// The logical CNM contains the contents of mazeN.CNM, with every entry being bitshifted left once
 	_logicalCNM = (uint16 *)malloc(mazeCNM->size());
 	mazeCNM->seek(0);
-	mazeCNM->read(_logicalCNM, mazeCNM->size());
-	for (int i = 0; i < (mazeCNM->size()); i++) {
-		_logicalCNM[i] <<= 1;
+	for (int i = 0; i < (mazeCNM->size() / 2); i++) {
+		_logicalCNM[i] = mazeCNM->readUint16LE();
 	}
 
 	// This is where the source defines the location of the pointers for modCNM, lModCNM, and then the universe properties
 	// So in similar fasion, here we will create the struct for universe
 	_univ = new Univ();
 
-	// Next we load the mazeN.UNV file, which contains the compressed data for multiple things
+	// Next we load the mazeN.UNV file, which contains the compressed data for the Univ, CNM, and CBM
 	Common::String sUNV = "MAZE" + Common::String(mazeNum) + ".UNV";
 	Common::SeekableReadStream *mazeUNV = loadIFF(sUNV);
 	if (!mazeUNV) {
 		debug("Error, couldn't load maze %d.UNV", mazeNum);
 		return -1;
 	}
-	debug("Size of maze UNV: %ld", mazeUNV->size());
+	debug("Size of maze UNV: %" PRId64, mazeUNV->size());
 
-	// This is also where the pointer to CNM is defined, because it is 26 bytes after the pointer to Univ. However for our purposes
-	// These are separate
+	// This is also where the pointer to CNM is defined, because it is 26 bytes after the pointer to Univ. However for our purposes these are separate
 
 	// After which, we set data length to be the total size of the file
 	lData = mazeUNV->size();
@@ -534,6 +534,7 @@ int ImmortalEngine::loadUniv(char mazeNum) {
 
 	// If there are animations (are there ever?), the univ data is expanded from 26 to include them
 	if (mazeUNV->readUint16LE() != 0) {
+		debug("there are animations??");
 		mazeUNV->seek(0x2C);
 		lStuff += mazeUNV->readUint16LE();
 	}
@@ -541,30 +542,35 @@ int ImmortalEngine::loadUniv(char mazeNum) {
 	// lData is everything from the .UNV file after the universe properties
 	lData -= lStuff;
 
-	// At this point in the source, the data after universe properties is moved to the end of the heap
+	// At this point in the source, the data after universe properties is moved to the end of the heap where it can be uncompressed back to the CNM pointer
 
-	// We then uncompress all of that data, into the place in the heap where the CNM is supposed to be (the Maze Heap)
+	// We then uncompress all of that data
 	mazeUNV->seek(lStuff);
-	_dataBuffer = unCompress((Common::File *) mazeUNV, lData);
-	debug("size of uncompressed CNM/CBM data %ld", _dataBuffer->size());
+	_dataBuffer = unCompress((Common::File *)mazeUNV, lData);
+	debug("size of uncompressed CNM/CBM data %" PRId64, _dataBuffer->size());
 
-	// Check every entry in the CNM, with the highest number being the highest number of chrs?
+	// Check every entry in the CNM (while we add them). The highest number is the total number of tiles in the file
+	_CNM = (uint16 *)malloc(_univ->_num2Cells);
 	_univ->_numChrs = 0;
 	_dataBuffer->seek(0);
-	for (int i = 0; i < _univ->_num2Cells; i++) {
-		uint16 chr = _dataBuffer->readUint16LE();
-		if (chr >= _univ->_numChrs) {
-			_univ->_numChrs = chr;
+
+	// The CNM is 0x500 bytes (usually), with each entry being a word, so we need 0x500 / 2
+	for (int i = 0; i < _univ->_num2Cells / 2; i++) {
+		_CNM[i] = _dataBuffer->readUint16LE();
+		if (_CNM[i] >= _univ->_numChrs) {
+			_univ->_numChrs = _CNM[i];
 		}
 	}
-
-	_dataBuffer->seek(0);
-	_univ->_numChrs++;                          // Inc one more time being 0 counts
+	_univ->_numChrs++;							// The 0th tile is still a tile, so inc one more time to account for it
+	debug("Number of Chars: %d", _univ->_numChrs);
 	_univ->_num2Chrs = _univ->_numChrs << 1;
 
-	//int lCNMCBM = mungeCBM(_univ->_num2Chrs);
-	int lCNMCBM = mungeCBM();
+	// Set the databuffer back to position 0 for now. The remaining data in databuffer is the CBM (we don't really need to do this, but for clarity we will)
+	_dataBuffer->seek(0);
 
+	// In the source, this is where we munge the CBM, which is to say that we sort of combine the CBM into the CNM to create routines that draw tiles from their component characters, which are stored in sequence by tile
+	int lCNMCBM = mungeCBM(_univ->_num2Chrs);
+	
 	debug("nchrs %04X, n2cells %04X, univX %04X, univY %04X, cols %04X, rows %04X, lstuff %04X", _univ->_numChrs, _univ->_num2Cells, _univ->_rectX, _univ->_rectY, _univ->_numCols, _univ->_numRows, lStuff);
 
 	// We don't actually want to blister any rooms yet, so we give it a POV of (0,0)
@@ -586,7 +592,7 @@ void ImmortalEngine::loadSprites() {
 	 * ie. file_pointer[file_index]+((sprite_num<<3)+4) = center_x.
 	 * We aren't going to have the sprite properties inside the file data, so instead
 	 * we have an array of all game sprites _dataSprites which is indexed
-	 * soley by a sprite number now. This also means that a sprite itself has a reference to
+	 * solely by a sprite number now. This also means that a sprite itself has a reference to
 	 * a datasprite, instead of the sprite index and separately the file pointer. Datasprite
 	 * is what needs the file, so that's where the pointer is. The index isn't used by
 	 * the sprite or datasprite themselves, so it isn't a member of either of them.
@@ -639,6 +645,8 @@ void ImmortalEngine::loadSprites() {
 			initDataSprite(file, &d, n / 2, centerXY[s * 2], centerXY[(s * 2) + 1]);
 			_dataSprites[s] = d;
 		}
+
+		delete file;
 	}
 }
 
@@ -709,7 +717,7 @@ Common::SeekableReadStream *ImmortalEngine::loadIFF(Common::String fileName) {
 	 */
 
 	Common::File f;
-	if (!f.open(fileName)) {
+	if (!f.open(Common::Path(fileName))) {
 		debug("*surprised pikachu face*");
 		return nullptr;
 	}
@@ -967,7 +975,7 @@ void ImmortalEngine::waitKey() {
 	}
 }
 
-// This was originally in Motives, which is weird since it seems more like an engine level function, so it's in kernal now
+// This was originally in Motives, which is weird since it seems more like an engine level function, so it's in kernel now
 void ImmortalEngine::waitClick() {
 	bool wait = true;
 	while (wait == true) {

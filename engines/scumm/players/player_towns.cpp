@@ -245,7 +245,7 @@ void Player_Towns_v1::startSound(int sound) {
 		velocity = velocity ? velocity >> 2 : ptr[14] >> 1;
 		uint16 len = READ_LE_UINT16(ptr) + 2;
 		playPcmTrack(sound, ptr + 6, velocity, 64, note ? note : (len > 50 ? ptr[50] : 60), READ_LE_UINT16(ptr + 10));
-	} else if (type == 1 || (_vm->_game.id == GID_INDY3 && sound == 40 && _vm->_enableEnhancements)) {
+	} else if (type == 1 || (_vm->_game.id == GID_INDY3 && sound == 40 && _vm->enhancementEnabled(kEnhAudioChanges))) {
 		// WORKAROUND: Indy 3 FMTOWNS: No/distorted music in Venice
 		// The Venice music does not exist as CD audio and the original doesn't feature music
 		// in this scene. It does, however, exist as Euphony track albeit with an odd sound
@@ -266,7 +266,6 @@ void Player_Towns_v1::stopSound(int sound) {
 	if (sound == 0 || sound == _cdaCurrentSound) {
 		_cdaCurrentSound = 0;
 		_vm->_sound->stopCD();
-		_vm->_sound->stopCDTimer();
 	}
 
 	if (sound != 0 && sound == _eupCurrentSound) {
@@ -281,7 +280,6 @@ void Player_Towns_v1::stopSound(int sound) {
 void Player_Towns_v1::stopAllSounds() {
 	_cdaCurrentSound = 0;
 	_vm->_sound->stopCD();
-	_vm->_sound->stopCDTimer();
 
 	_eupCurrentSound = 0;
 	_eupLooping = false;
@@ -397,7 +395,7 @@ void Player_Towns_v1::restoreAfterLoad() {
 			ptr += 2;
 
 		// WORKAROUND for bug #1873 INDY3 FMTOWNS: Music in Venice is distorted
-		// The resource for sound 40 accidently sets the sound type to 255 instead of 1.
+		// The resource for sound 40 accidentally sets the sound type to 255 instead of 1.
 		if (ptr[7] == 1 || (_vm->_game.id == GID_INDY3 && _eupCurrentSound == 40)) {
 			setSoundVolume(_eupCurrentSound, _eupVolLeft, _eupVolRight);
 			playEuphonyTrack(_eupCurrentSound, ptr);
@@ -452,7 +450,7 @@ void Player_Towns_v1::startSoundEx(int sound, int velo, int pan, int note) {
 
 		pan = pan ? (((pan << 7) - pan) + 50) / 100 : 64;
 
-		playPcmTrack(sound, ptr + 6, velo ? velo : ptr[14] >> 1, pan, note ? note : ptr[50], pri);
+		playPcmTrack(sound, ptr + 6, velo, pan, note ? note : ptr[50], pri);
 
 	} else if (ptr[13] == 2) {
 		int volLeft = velo;

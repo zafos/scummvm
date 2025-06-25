@@ -36,12 +36,14 @@
 // for the Android port
 #define FORBIDDEN_SYMBOL_EXCEPTION_printf
 
-#include "backends/fs/android/android-fs-factory.h"
-#include "backends/fs/android/android-saf-fs.h"
 #include "backends/platform/android/android.h"
 #include "backends/platform/android/jni-android.h"
+#include "backends/fs/android/android-fs-factory.h"
+#include "backends/fs/android/android-saf-fs.h"
 
+#include "gui/browser.h"
 #include "gui/gui-manager.h"
+#include "gui/message.h"
 #include "gui/ThemeEval.h"
 #include "gui/widget.h"
 #include "gui/widgets/list.h"
@@ -51,6 +53,8 @@
 
 enum {
 	kRemoveCmd = 'RemS',
+	kExportBackupCmd = 'ExpD',
+	kImportBackupCmd = 'ImpD',
 };
 
 class AndroidOptionsWidget final : public GUI::OptionsContainerWidget {
@@ -77,12 +81,18 @@ private:
 	GUI::PopUpWidget *_preferredTM2DGamesPopUp;
 	GUI::StaticTextWidget *_preferredTM3DGamesDesc;
 	GUI::PopUpWidget *_preferredTM3DGamesPopUp;
+	GUI::StaticTextWidget *_orientationDesc;
+	GUI::StaticTextWidget *_orientationMenusDesc;
+	GUI::PopUpWidget *_orientationMenusPopUp;
+	GUI::StaticTextWidget *_orientationGamesDesc;
+	GUI::PopUpWidget *_orientationGamesPopUp;
 
 	bool _enabled;
 
-
 	uint32 loadTouchMode(const Common::String &setting, bool acceptDefault, uint32 defaultValue);
 	void saveTouchMode(const Common::String &setting, uint32 touchMode);
+	uint32 loadOrientation(const Common::String &setting, bool acceptDefault, uint32 defaultValue);
+	void saveOrientation(const Common::String &setting, uint32 orientation);
 };
 
 class SAFRemoveDialog : public GUI::Dialog {
@@ -110,8 +120,15 @@ enum {
 	kTouchModeGamepad,
 };
 
+enum {
+	kOrientationDefault = -1,
+	kOrientationAuto = 0,
+	kOrientationPortrait,
+	kOrientationLandscape,
+};
+
 AndroidOptionsWidget::AndroidOptionsWidget(GuiObject *boss, const Common::String &name, const Common::String &domain) :
-		OptionsContainerWidget(boss, name, "AndroidOptionsDialog", false, domain), _enabled(true) {
+		OptionsContainerWidget(boss, name, "AndroidOptionsDialog", domain), _enabled(true) {
 
 	const bool inAppDomain = domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);;
 
@@ -147,10 +164,37 @@ AndroidOptionsWidget::AndroidOptionsWidget(GuiObject *boss, const Common::String
 	_preferredTM2DGamesPopUp->appendEntry(_("Gamepad emulation"), kTouchModeGamepad);
 	_preferredTM3DGamesPopUp->appendEntry(_("Gamepad emulation"), kTouchModeGamepad);
 
-	if (inAppDomain && AndroidFilesystemFactory::instance().hasSAF()) {
-		// Only show this checkbox in Options (via Options... in the launcher), and not at game domain level (via Edit Game...)
-		// I18N: This button opens a list of all folders added for Android Storage Attached Framework
-		(new GUI::ButtonWidget(widgetsBoss(), "AndroidOptionsDialog.ForgetSAFButton", _("Remove folder authorizations..."), Common::U32String(), kRemoveCmd))->setTarget(this);
+	_orientationDesc = new GUI::StaticTextWidget(widgetsBoss(), "AndroidOptionsDialog.OrientationText", _("Select the orientation:"));
+	if (inAppDomain) {
+		_orientationMenusDesc = new GUI::StaticTextWidget(widgetsBoss(), "AndroidOptionsDialog.OMenusText", _("In menus"));
+		_orientationMenusPopUp = new GUI::PopUpWidget(widgetsBoss(), "AndroidOptionsDialog.OMenus");
+		_orientationMenusPopUp->appendEntry(_("Automatic"), kOrientationAuto);
+		_orientationMenusPopUp->appendEntry(_("Portrait"), kOrientationPortrait);
+		_orientationMenusPopUp->appendEntry(_("Landscape"), kOrientationLandscape);
+	} else {
+		_orientationMenusDesc = nullptr;
+		_orientationMenusPopUp = nullptr;
+	}
+
+	_orientationGamesDesc = new GUI::StaticTextWidget(widgetsBoss(), "AndroidOptionsDialog.OGamesText", _("In games"));
+	_orientationGamesPopUp = new GUI::PopUpWidget(widgetsBoss(), "AndroidOptionsDialog.OGames");
+
+	if (!inAppDomain) {
+		_orientationGamesPopUp->appendEntry(_("<default>"), kOrientationDefault);
+	}
+
+	_orientationGamesPopUp->appendEntry(_("Automatic"), kOrientationAuto);
+	_orientationGamesPopUp->appendEntry(_("Portrait"), kOrientationPortrait);
+	_orientationGamesPopUp->appendEntry(_("Landscape"), kOrientationLandscape);
+
+	if (inAppDomain) {
+		// Only show these buttons in Options (via Options... in the launcher), and not at game domain level (via Edit Game...)
+		(new GUI::ButtonWidget(widgetsBoss(), "AndroidOptionsDialog.ExportDataButton", _("Export backup"), _("Export a backup of the configuration and save files"), kExportBackupCmd))->setTarget(this);
+		(new GUI::ButtonWidget(widgetsBoss(), "AndroidOptionsDialog.ImportDataButton", _("Import backup"), _("Import a previously exported backup file"), kImportBackupCmd))->setTarget(this);
+		if (AndroidFilesystemFactory::instance().hasSAF()) {
+			// I18N: This button opens a list of all folders added for Android Storage Attached Framework
+			(new GUI::ButtonWidget(widgetsBoss(), "AndroidOptionsDialog.ForgetSAFButton", _("Remove folder authorizations..."), Common::U32String(), kRemoveCmd))->setTarget(this);
+		}
 	}
 }
 
@@ -164,27 +208,46 @@ void AndroidOptionsWidget::defineLayout(GUI::ThemeEval &layouts, const Common::S
 	        .addLayout(GUI::ThemeLayout::kLayoutVertical)
 	            .addPadding(0, 0, 0, 0)
 	            .addWidget("OnScreenControl", "Checkbox")
-				.addWidget("PreferredTouchModeText", "", -1, layouts.getVar("Globals.Line.Height"));
+	            .addWidget("PreferredTouchModeText", "", -1, layouts.getVar("Globals.Line.Height"));
 
 	if (inAppDomain) {
 		layouts.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
-			.addPadding(0, 0, 0, 0)
+			.addPadding(16, 16, 0, 0)
 			.addWidget("TMMenusText", "OptionsLabel")
 			.addWidget("TMMenus", "PopUp")
 		.closeLayout();
 	}
 	layouts.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
-			.addPadding(0, 0, 0, 0)
+			.addPadding(16, 16, 0, 0)
 			.addWidget("TM2DGamesText", "OptionsLabel")
 			.addWidget("TM2DGames", "PopUp")
 		.closeLayout()
 		.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
-			.addPadding(0, 0, 0, 0)
+			.addPadding(16, 16, 0, 0)
 			.addWidget("TM3DGamesText", "OptionsLabel")
 			.addWidget("TM3DGames", "PopUp")
 		.closeLayout();
-	if (inAppDomain && AndroidFilesystemFactory::instance().hasSAF()) {
-		layouts.addWidget("ForgetSAFButton", "WideButton");
+
+	layouts.addWidget("OrientationText", "", -1, layouts.getVar("Globals.Line.Height"));
+	if (inAppDomain) {
+		layouts.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
+			.addPadding(16, 16, 0, 0)
+			.addWidget("OMenusText", "OptionsLabel")
+			.addWidget("OMenus", "PopUp")
+		.closeLayout();
+	}
+	layouts.addLayout(GUI::ThemeLayout::kLayoutHorizontal)
+			.addPadding(16, 16, 0, 0)
+			.addWidget("OGamesText", "OptionsLabel")
+			.addWidget("OGames", "PopUp")
+		.closeLayout();
+
+	if (inAppDomain) {
+		layouts.addWidget("ExportDataButton", "WideButton");
+		layouts.addWidget("ImportDataButton", "WideButton");
+		if (AndroidFilesystemFactory::instance().hasSAF()) {
+			layouts.addWidget("ForgetSAFButton", "WideButton");
+		}
 	}
 	layouts.closeLayout()
 	    .closeDialog();
@@ -198,6 +261,60 @@ void AndroidOptionsWidget::handleCommand(GUI::CommandSender *sender, uint32 cmd,
 		}
 		SAFRemoveDialog removeDlg;
 		removeDlg.runModal();
+		break;
+	}
+	case kExportBackupCmd:
+	{
+		Common::U32String prompt(_("Select backup destination"));
+		int ret = JNI::exportBackup(prompt);
+		if (ret == 1) {
+			// BackupManager.ERROR_CANCELLED
+			break;
+		}
+
+		if (ret == 0 && AndroidFilesystemFactory::instance().hasSAF()) {
+			prompt = _("The backup has been saved successfully.");
+		} else if (ret == 0) {
+			prompt = _("The backup has been saved successfully to the Downloads folder.");
+		} else if (ret == -2) {
+			prompt = _("The game saves couldn't be backed up");
+		} else {
+			prompt = _("An error occured while saving the backup.");
+		}
+		g_system->displayMessageOnOSD(prompt);
+		break;
+	}
+	case kImportBackupCmd:
+	{
+		GUI::MessageDialog alert(_("Restoring a backup will erase the current configuration and overwrite existing saves. Do you want to proceed?"), _("Proceed"), _("Cancel"));
+		if (alert.runModal() != GUI::kMessageOK) {
+			break;
+		}
+
+		Common::U32String prompt(_("Select backup file"));
+		Common::Path path;
+		if (!AndroidFilesystemFactory::instance().hasSAF()) {
+			GUI::BrowserDialog browser(prompt, false);
+			if (browser.runModal() <= 0) {
+				break;
+			}
+
+			path = browser.getResult().getPath();
+		}
+		int ret = JNI::importBackup(prompt, path.toString());
+		if (ret == 1) {
+			// BackupManager.ERROR_CANCELLED
+			break;
+		}
+
+		if (ret == 0) {
+			prompt = _("The backup has been restored successfully.");
+		} else if (ret == -2) {
+			prompt = _("The game saves couldn't be backed up");
+		} else {
+			prompt = _("An error occured while restoring the backup.");
+		}
+		g_system->displayMessageOnOSD(prompt);
 		break;
 	}
 	default:
@@ -222,6 +339,23 @@ uint32 AndroidOptionsWidget::loadTouchMode(const Common::String &setting, bool a
 	}
 }
 
+uint32 AndroidOptionsWidget::loadOrientation(const Common::String &setting, bool acceptDefault, uint32 defaultValue) {
+	if (!acceptDefault || ConfMan.hasKey(setting, _domain)) {
+		Common::String orientation = ConfMan.get(setting, _domain);
+		if (orientation == "auto") {
+			return kOrientationAuto;
+		} else if (orientation == "portrait") {
+			return kOrientationPortrait;
+		} else if (orientation == "landscape") {
+			return kOrientationLandscape;
+		} else {
+			return defaultValue;
+		}
+	} else {
+		return kOrientationDefault;
+	}
+}
+
 void AndroidOptionsWidget::load() {
 	const bool inAppDomain = _domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
 
@@ -233,6 +367,11 @@ void AndroidOptionsWidget::load() {
 	}
 	_preferredTM2DGamesPopUp->setSelectedTag(loadTouchMode("touch_mode_2d_games", !inAppDomain, kTouchModeTouchpad));
 	_preferredTM3DGamesPopUp->setSelectedTag(loadTouchMode("touch_mode_3d_games", !inAppDomain, kTouchModeGamepad));
+
+	if (inAppDomain) {
+		_orientationMenusPopUp->setSelectedTag(loadOrientation("orientation_menus", !inAppDomain, kOrientationAuto));
+	}
+	_orientationGamesPopUp->setSelectedTag(loadOrientation("orientation_games", !inAppDomain, kOrientationAuto));
 }
 
 void AndroidOptionsWidget::saveTouchMode(const Common::String &setting, uint32 touchMode) {
@@ -253,6 +392,24 @@ void AndroidOptionsWidget::saveTouchMode(const Common::String &setting, uint32 t
 	}
 }
 
+void AndroidOptionsWidget::saveOrientation(const Common::String &setting, uint32 orientation) {
+	switch (orientation) {
+	case kOrientationAuto:
+		ConfMan.set(setting, "auto", _domain);
+		break;
+	case kOrientationPortrait:
+		ConfMan.set(setting, "portrait", _domain);
+		break;
+	case kOrientationLandscape:
+		ConfMan.set(setting, "landscape", _domain);
+		break;
+	default:
+		// default
+		ConfMan.removeKey(setting, _domain);
+		break;
+	}
+}
+
 bool AndroidOptionsWidget::save() {
 	const bool inAppDomain = _domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
 
@@ -264,6 +421,11 @@ bool AndroidOptionsWidget::save() {
 		}
 		saveTouchMode("touch_mode_2d_games", _preferredTM2DGamesPopUp->getSelectedTag());
 		saveTouchMode("touch_mode_3d_games", _preferredTM3DGamesPopUp->getSelectedTag());
+
+		if (inAppDomain) {
+			saveOrientation("orientation_menus", _orientationMenusPopUp->getSelectedTag());
+		}
+		saveOrientation("orientation_games", _orientationGamesPopUp->getSelectedTag());
 	} else {
 		ConfMan.removeKey("onscreen_control", _domain);
 
@@ -272,6 +434,11 @@ bool AndroidOptionsWidget::save() {
 		}
 		ConfMan.removeKey("touch_mode_2d_games", _domain);
 		ConfMan.removeKey("touch_mode_3d_games", _domain);
+
+		if (inAppDomain) {
+			ConfMan.removeKey("orientation_menus", _domain);
+		}
+		ConfMan.removeKey("orientation_games", _domain);
 	}
 
 	return true;
@@ -282,7 +449,8 @@ bool AndroidOptionsWidget::hasKeys() {
 	       (_domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain) && ConfMan.hasKey("touch_mode_menus", _domain)) ||
 	       ConfMan.hasKey("touch_mode_2d_games", _domain) ||
 	       ConfMan.hasKey("touch_mode_3d_games", _domain) ||
-	       (_domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain) && ConfMan.hasKey("onscreen_saf_revoke_btn", _domain));
+	       (_domain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain) && ConfMan.hasKey("orientation_menus", _domain)) ||
+	       ConfMan.hasKey("orientation_games", _domain);
 }
 
 void AndroidOptionsWidget::setEnabled(bool e) {
@@ -300,6 +468,12 @@ void AndroidOptionsWidget::setEnabled(bool e) {
 	_preferredTM2DGamesPopUp->setEnabled(e);
 	_preferredTM3DGamesDesc->setEnabled(e);
 	_preferredTM3DGamesPopUp->setEnabled(e);
+	if (inAppDomain) {
+		_orientationMenusDesc->setEnabled(e);
+		_orientationMenusPopUp->setEnabled(e);
+	}
+	_orientationGamesDesc->setEnabled(e);
+	_orientationGamesPopUp->setEnabled(e);
 }
 
 
@@ -312,7 +486,8 @@ void OSystem_Android::registerDefaultSettings(const Common::String &target) cons
 	ConfMan.registerDefault("touch_mode_menus", "mouse");
 	ConfMan.registerDefault("touch_mode_2d_games", "touchpad");
 	ConfMan.registerDefault("touch_mode_3d_games", "gamepad");
-	ConfMan.registerDefault("onscreen_saf_revoke_btn", false);
+	ConfMan.registerDefault("orientation_menus", "auto");
+	ConfMan.registerDefault("orientation_games", "auto");
 }
 
 void OSystem_Android::applyTouchSettings(bool _3dMode, bool overlayShown) {
@@ -342,8 +517,32 @@ void OSystem_Android::applyTouchSettings(bool _3dMode, bool overlayShown) {
 	}
 }
 
+void OSystem_Android::applyOrientationSettings() {
+	const Common::String activeDomain = ConfMan.getActiveDomainName();
+	const bool inAppDomain = activeDomain.empty() ||
+		activeDomain.equalsIgnoreCase(Common::ConfigManager::kApplicationDomain);
+
+	Common::String setting;
+
+	if (inAppDomain) {
+		setting = "orientation_menus";
+	} else {
+		setting = "orientation_games";
+	}
+
+	Common::String orientation = ConfMan.get(setting);
+	if (orientation == "portrait") {
+		JNI::setOrientation(SCREEN_ORIENTATION_PORTRAIT);
+	} else if (orientation == "landscape") {
+		JNI::setOrientation(SCREEN_ORIENTATION_LANDSCAPE);
+	// auto and everything else
+	} else {
+		JNI::setOrientation(SCREEN_ORIENTATION_UNSPECIFIED);
+	}
+}
+
 void OSystem_Android::applyBackendSettings() {
-	JNI::showKeyboardControl(ConfMan.getBool("onscreen_control"));
+	updateOnScreenControls();
 }
 
 SAFRemoveDialog::SAFRemoveDialog() : GUI::Dialog("SAFBrowser") {

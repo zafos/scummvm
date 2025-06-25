@@ -23,6 +23,7 @@
 #define SCUMM_AKOS_H
 
 #include "scumm/base-costume.h"
+#include "scumm/he/wiz_he.h"
 
 namespace Scumm {
 
@@ -31,13 +32,18 @@ namespace Scumm {
 #define AKOS_RUN_MAJMIN_CODEC 16
 #define AKOS_TRLE_CODEC       32
 
+#define AKOS_AUXD_TYPE_EMPTY_FRAME  0x0000
+#define AKOS_AUXD_TYPE_DRLE_FRAME   0x0001
+#define AKOS_AUXD_TYPE_SRLE_FRAME   0x0010
+#define AKOS_AUXD_TYPE_WRLE_FRAME   0x0020
+
 struct CostumeData;
 struct AkosHeader;
 struct AkosOffset;
 
 class AkosCostumeLoader : public BaseCostumeLoader {
 protected:
-	const byte *_akos;
+	const byte *_akos = nullptr;
 
 public:
 	AkosCostumeLoader(ScummEngine *vm) : BaseCostumeLoader(vm) {}
@@ -47,7 +53,7 @@ public:
 	void costumeDecodeData(Actor *a, int frame, uint useMask) override;
 
 	//void animateLimb(int limb, int f);
-	bool hasManyDirections(int id) {
+	bool hasManyDirections(int id) override {
 		loadCostume(id);
 		return hasManyDirections();
 	}
@@ -58,10 +64,10 @@ protected:
 
 class AkosRenderer : public BaseCostumeRenderer {
 protected:
-	uint16 _codec;
+	uint16 _codec = 0;
 
 	// actor _palette
-	uint16 _palette[256];
+	uint16 _palette[256] = {};
 	bool _useBompPalette;
 
 	// pointer to various parts of the costume resource
@@ -105,9 +111,9 @@ public:
 		_actorHitMode = false;
 	}
 
-	bool _actorHitMode;
-	int16 _actorHitX, _actorHitY;
-	bool _actorHitResult;
+	bool _actorHitMode = false;
+	int16 _actorHitX = 0, _actorHitY = 0;
+	bool _actorHitResult = false;
 
 	void setPalette(uint16 *_palette) override;
 	void setFacing(const Actor *a) override;
@@ -120,7 +126,16 @@ protected:
 	void byleRLEDecode(ByleRLEData &v1);
 	byte paintCelCDATRLE(int xMoveCur, int yMoveCur);
 	byte paintCelMajMin(int xMoveCur, int yMoveCur);
-	byte paintCelTRLE(int xMoveCur, int yMoveCur);
+	byte paintCelTRLE(int actor, int drawToBack, int celX, int celY, int celWidth, int celHeight, byte tcolor, const byte *shadowTablePtr, int32 specialRenderFlags);
+
+#if defined(ENABLE_HE)
+	byte hePaintCel(
+		int actor, int drawToBack, int celX, int celY, int celWidth, int celHeight, byte tcolor, bool allowFlip, const byte *shadowTablePtr,
+		void (*drawPtr)(ScummEngine *vm, Wiz *wiz, WizRawPixel *, int, int, Common::Rect *, const byte *, int, int, Common::Rect *, byte, const byte *shadowTablePtr, const WizRawPixel *conversionTable, int32 specialRenderFlags),
+		const WizRawPixel *conversionTable,
+		int32 specialRenderFlags);
+#endif
+
 	void majMinCodecDecompress(byte *dest, int32 pitch, const byte *src, int32 t_width, int32 t_height, int32 dir, int32 numSkipBefore, int32 numSkipAfter, byte transparency, int maskLeft, int maskTop, int zBuf);
 
 	void markRectAsDirty(Common::Rect rect);

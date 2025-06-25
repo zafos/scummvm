@@ -175,7 +175,17 @@ Common::MemoryReadStreamEndian *Resource::loadSequentialFile(Common::String file
 }
 
 uint32 Resource::getSequentialFileOffset(uint32 offset, int fileIndex) {
-	Common::SeekableReadStream *dataRunFile = SearchMan.createReadStreamForMember("data.run"); // FIXME: Amiga & Mac need this implemented
+	Common::SeekableReadStream *dataRunFile;
+
+	if (_platform == Common::kPlatformAmiga) {
+		// TODO: Amiga version
+		dataRunFile = nullptr;
+	} else if (_platform == Common::kPlatformMacintosh) {
+		dataRunFile = _macResFork->getResource("Runs");
+	} else {
+		dataRunFile = SearchMan.createReadStreamForMember("data.run");
+	}
+
 	if (!dataRunFile)
 		error("Could not open sequential file");
 
@@ -201,9 +211,10 @@ Common::MemoryReadStreamEndian *Resource::loadFile(Common::String filename, int 
 	bool bigEndian = _platform == Common::kPlatformAmiga;
 
 	// Load external patches
-	if (Common::File::exists(filename)) {
+	Common::Path path(filename);
+	if (Common::File::exists(path)) {
 		Common::File *patch = new Common::File();
-		patch->open(filename);
+		patch->open(path);
 		int32 size = patch->size();
 		byte *data = (byte *)malloc(size);
 		patch->read(data, size);

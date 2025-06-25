@@ -27,9 +27,11 @@ namespace MM {
 namespace MM1 {
 namespace ViewsEnh {
 
+#if 0
 static const byte CONDITION_COLORS[17] = {
 	9, 9, 9, 9, 9, 9, 9, 9, 32, 32, 32, 32, 6, 6, 6, 6, 15
 };
+#endif
 
 static const byte FACE_CONDITION_FRAMES[17] = {
 	2, 2, 2, 1, 1, 4, 4, 4, 3, 2, 4, 3, 3, 5, 6, 7, 0
@@ -48,6 +50,11 @@ GameParty::GameParty(UIElement *owner) : TextView("GameParty", owner),
 
 void GameParty::draw() {
 	Graphics::ManagedSurface s = getSurface();
+
+	// Draw Xeen background
+	s.blitFrom(g_globals->_gameBackground, Common::Rect(0, 144, 320, 200),
+		Common::Point(0, 0));
+
 	_restoreSprites.draw(&s, 0, Common::Point(8, 5));
 
 	// Handle drawing the party faces
@@ -118,23 +125,31 @@ bool GameParty::msgMouseDown(const MouseDownMessage &msg) {
 	return false;
 }
 
+void GameParty::highlightChar(uint charNum) {
+	g_globals->_currCharacter = &g_globals->_party[charNum];
+	_highlightOn = true;
+	draw();
+}
+
 bool GameParty::msgAction(const ActionMessage &msg) {
 	if (msg._action >= KEYBIND_VIEW_PARTY1 &&
 			msg._action <= KEYBIND_VIEW_PARTY6) {
 		uint charNum = msg._action - KEYBIND_VIEW_PARTY1;
 		if (charNum < g_globals->_party.size()) {
-			// Change the selected character
-			g_globals->_currCharacter = &g_globals->_party[charNum];
-			_highlightOn = true;
-			draw();
-
 			if (dynamic_cast<ViewsEnh::Game *>(g_events->focusedView()) != nullptr) {
 				// Open character info dialog
+				highlightChar(charNum);
 				addView("CharacterInfo");
 
 			} else {
-				// Another view is focused, so simply call it to update
-				send(g_events->focusedView()->getName(), GameMessage("UPDATE"));
+				// Another view is focused
+				// Try passing the selected char to it to handle
+				if (!send(g_events->focusedView()->getName(), msg)) {
+					// Wasn't handled directly, so switch selected character,
+					// and try calling the given view again with an UPDATE message
+					highlightChar(charNum);
+					send(g_events->focusedView()->getName(), GameMessage("UPDATE"));
+				}
 			}
 
 			return true;

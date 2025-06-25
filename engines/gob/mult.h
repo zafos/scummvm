@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #ifndef GOB_MULT_H
@@ -115,8 +121,8 @@ public:
 		byte* field_3C;
 		char animName[16];
 		int8 field_50;
-		int16* animVariables;
-		bool ownAnimVariables;
+		VariableReferenceArray *animVariables;
+		//bool ownAnimVariables;
 	} PACKED_STRUCT;
 
 	struct Mult_StaticKey {

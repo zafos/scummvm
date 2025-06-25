@@ -55,6 +55,11 @@ darkness:
 		_isDark = true;
 	}
 
+	// Refresh the view immediately, so things like the minimap will
+	// update before special actions run
+	g_events->redraw();
+	g_events->drawElements();
+
 	// Encounter checks
 	g_globals->_encounters._encounterType = NORMAL_SURPRISED;
 	if (maps._currentState & Maps::CELL_SPECIAL) {
@@ -71,17 +76,10 @@ darkness:
 	} else {
 		g_globals->_party.checkPartyDead();
 	}
-
-	// Flag to redraw the screen
-	g_events->redraw();
 }
 
 bool ViewBase::msgAction(const ActionMessage &msg) {
 	switch (msg._action) {
-	case KEYBIND_SELECT:
-		// Shortcut for closing messages
-		g_events->redraw();
-		break;
 	case KEYBIND_FORWARDS:
 	case KEYBIND_STRAFE_LEFT:
 	case KEYBIND_STRAFE_RIGHT:
@@ -103,13 +101,6 @@ bool ViewBase::msgAction(const ActionMessage &msg) {
 	return true;
 }
 
-bool ViewBase::msgValue(const ValueMessage &msg) {
-	_descriptionLine = STRING[Common::String::format(
-		"dialogs.location.titles.%d", msg._value)];
-	draw();
-	return true;
-}
-
 bool ViewBase::msgFocus(const FocusMessage &msg) {
 	return false;
 }
@@ -121,6 +112,11 @@ bool ViewBase::msgGame(const GameMessage &msg) {
 	} else if (msg._name == "UPDATE") {
 		replaceView("Game");
 		update();
+		return true;
+	} else if (msg._name == "LOCATION") {
+		_descriptionLine = STRING[Common::String::format(
+			"dialogs.location.titles.%d", msg._value)];
+		draw();
 		return true;
 	}
 

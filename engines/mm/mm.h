@@ -28,10 +28,10 @@
 namespace MM {
 
 enum MightAndMagicDebugChannels {
-	kDebugPath = 1 << 0,
-	kDebugScripts = 1 << 1,
-	kDebugGraphics = 1 << 2,
-	kDebugSound = 1 << 3
+	kDebugPath = 1,
+	kDebugScripts,
+	kDebugGraphics,
+	kDebugSound,
 };
 
 class MMEngine : public Engine {
@@ -68,12 +68,19 @@ public:
 	uint32 getGameID() const;
 
 	/**
+	 * Returns true if the game is the CD version
+	 */
+	bool getIsCD() const;
+
+	/**
 	 * Get a random number
 	 */
 	uint getRandomNumber(int max) {
 		return _randomSource.getRandomNumber(max);
 	}
 };
+
+extern MMEngine *g_engine;
 
 } // namespace MM
 

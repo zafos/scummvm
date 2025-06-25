@@ -70,10 +70,10 @@ class QSystem;
 class VideoSystem;
 
 enum {
-	kPetkaDebugGeneral = 1 << 0,
-	kPetkaDebugResources = 1 << 1,
-	kPetkaDebugMessagingSystem = 1 << 2,
-	kPetkaDebugDialogs = 1 << 3
+	kPetkaDebugGeneral = 1,
+	kPetkaDebugResources,
+	kPetkaDebugMessagingSystem,
+	kPetkaDebugDialogs,
 };
 
 enum {
@@ -122,10 +122,10 @@ public:
 	void pushMouseMoveEvent();
 
 	Common::Error loadGameState(int slot) override;
-	bool canLoadGameStateCurrently() override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave) override;
-	bool canSaveGameStateCurrently() override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	int getAutosaveSlot() const override { return - 1;}
 

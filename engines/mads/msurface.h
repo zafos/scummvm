@@ -23,6 +23,7 @@
 #define MADS_MSURFACE_H
 
 #include "common/scummsys.h"
+#include "common/path.h"
 #include "common/rect.h"
 #include "graphics/screen.h"
 #include "mads/palette.h"
@@ -68,7 +69,7 @@ public:
 	/**
 	* Base method for descendents to load their contents
 	*/
-	virtual void load(const Common::String &resName) {}
+	virtual void load(const Common::Path &resName) {}
 public:
 	/**
 	 * Basic constructor

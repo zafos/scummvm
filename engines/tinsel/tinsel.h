@@ -47,6 +47,7 @@
  * Games using this engine:
  * - Discworld
  * - Discworld 2: Missing Presumed ...!?
+ * - Discworld Noir
  */
 namespace Tinsel {
 
@@ -66,15 +67,41 @@ class Scroll;
 class Dialogs;
 class Notebook;
 class SystemReel;
+class Spriter;
 
 typedef Common::List<Common::Rect> RectList;
 
-enum {
-	kTinselDebugAnimations = 1 << 0,
-	kTinselDebugActions = 1 << 1,
-	kTinselDebugSound = 1 << 2,
-	kTinselDebugMusic = 2 << 3
+enum TINSELAction {
+	kActionNone,
+	kActionWalkTo,
+	kActionAction,
+	kActionLook,
+	kActionEscape,
+	kActionOptionsDialog,
+	kActionInventory,
+	kActionNotebook,
+	kActionSave,
+	kActionLoad,
+	kActionQuit,
+	kActionPageUp,
+	kActionPageDown,
+	kActionHome,
+	kActionEnd,
+	kActionMoveUp,
+	kActionMoveDown,
+	kActionMoveLeft,
+	kActionMoveRight
 };
+
+enum {
+	kTinselDebugAnimations = 1,
+	kTinselDebugActions,
+	kTinselDebugSound,
+	kTinselDebugMusic,
+};
+
+// Just for development
+#define NOIR_SKIP_INTRO 0
 
 #define DEBUG_BASIC 1
 #define DEBUG_INTERMEDIATE 2
@@ -85,7 +112,7 @@ enum TinselKeyDirection {
 	MSK_DIRECTION = MSK_LEFT | MSK_RIGHT | MSK_UP | MSK_DOWN
 };
 
-typedef bool (*KEYFPTR)(const Common::KeyState &);
+typedef bool (*KEYFPTR)(const Common::KeyState &, const Common::CustomEventType &);
 
 #define	SCREEN_WIDTH	(_vm->screen().w)	// PC screen dimensions
 #define	SCREEN_HEIGHT	(_vm->screen().h)
@@ -139,7 +166,7 @@ protected:
 #if 0
 	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false);
 #endif
-	bool canLoadGameStateCurrently() override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
 #if 0
 	bool canSaveGameStateCurrently();
 #endif
@@ -182,6 +209,7 @@ public:
 	Dialogs *_dialogs;
 	Notebook *_notebook = nullptr;
 	SystemReel *_systemReel = nullptr;
+	Spriter *_spriter = nullptr;
 
 	KEYFPTR _keyHandler;
 

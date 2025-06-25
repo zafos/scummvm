@@ -41,6 +41,19 @@ class OSystem;
  */
 namespace Draci {
 
+enum DRACIAction {
+	kActionNone,
+	kActionEscape,
+	kActionMap,
+	kActionShowWalkMap,
+	kActionToggleWalkSpeed,
+	kActionInventory,
+	kActionOpenMainMenu,
+	kActionTogglePointerItem,
+	kActionInvRotatePrevious,
+	kActionInvRotateNext
+};
+
 class Screen;
 class Mouse;
 class Game;
@@ -69,9 +82,9 @@ public:
 	static Common::String getSavegameFile(int saveGameIdx);
 	Common::String getSaveStateName(int slot) const override { return getSavegameFile(slot); }
 	Common::Error loadGameState(int slot) override;
-	bool canLoadGameStateCurrently() override;
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override;
 	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
-	bool canSaveGameStateCurrently() override;
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override;
 
 	Screen *_screen;
 	Mouse *_mouse;
@@ -108,13 +121,13 @@ public:
 };
 
 enum {
-	kDraciGeneralDebugLevel   = 1 << 0,
-	kDraciBytecodeDebugLevel  = 1 << 1,
-	kDraciArchiverDebugLevel  = 1 << 2,
-	kDraciLogicDebugLevel     = 1 << 3,
-	kDraciAnimationDebugLevel = 1 << 4,
-	kDraciSoundDebugLevel     = 1 << 5,
-	kDraciWalkingDebugLevel   = 1 << 6
+	kDraciGeneralDebugLevel = 1,
+	kDraciBytecodeDebugLevel,
+	kDraciArchiverDebugLevel,
+	kDraciLogicDebugLevel,
+	kDraciAnimationDebugLevel,
+	kDraciSoundDebugLevel,
+	kDraciWalkingDebugLevel,
 };
 
 } // End of namespace Draci

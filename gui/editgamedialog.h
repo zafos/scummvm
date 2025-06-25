@@ -62,17 +62,20 @@ public:
 
 	void open() override;
 	void apply() override;
+	void close() override;
 	void handleCommand(CommandSender *sender, uint32 cmd, uint32 data) override;
 
 protected:
 	void setupGraphicsTab() override;
 
+	void addGameControls(GuiObject *boss, const Common::String &prefix, const Common::String &description);
+
 	EditTextWidget *_descriptionWidget;
 	DomainEditTextWidget *_domainWidget;
 
-	StaticTextWidget *_gamePathWidget;
-	StaticTextWidget *_extraPathWidget;
-	StaticTextWidget *_savePathWidget;
+	PathWidget *_gamePathWidget;
+	PathWidget *_extraPathWidget;
+	PathWidget *_savePathWidget;
 	ButtonWidget *_extraPathClearButton;
 	ButtonWidget *_savePathClearButton;
 
@@ -88,6 +91,7 @@ protected:
 	CheckboxWidget *_globalMT32Override;
 	CheckboxWidget *_globalVolumeOverride;
 
+	ScrollContainerWidget *_gameContainer;
 	OptionsContainerWidget *_engineOptions;
 };
 

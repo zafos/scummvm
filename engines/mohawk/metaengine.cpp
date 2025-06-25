@@ -82,7 +82,7 @@ uint8 MohawkEngine::getGameType() const {
 	return _gameDescription->gameType;
 }
 
-Common::String MohawkEngine_LivingBooks::getBookInfoFileName() const {
+Common::Path MohawkEngine_LivingBooks::getBookInfoFileName() const {
 	return _gameDescription->desc.filesDescriptions[0].fileName;
 }
 
@@ -121,19 +121,19 @@ bool MohawkEngine_Riven::hasFeature(EngineFeature f) const {
 
 } // End of Namespace Mohawk
 
-class MohawkMetaEngine : public AdvancedMetaEngine {
+class MohawkMetaEngine : public AdvancedMetaEngine<Mohawk::MohawkGameDescription> {
 public:
 	const char *getName() const override {
 		return "mohawk";
 	}
 
 	bool hasFeature(MetaEngineFeature f) const override;
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	Common::Error createInstance(OSystem *syst, Engine **engine, const Mohawk::MohawkGameDescription *desc) const override;
 
 	SaveStateList listSaves(const char *target) const override;
 	SaveStateList listSavesForPrefix(const char *prefix, const char *extension) const;
 	int getMaximumSaveSlot() const override { return 999; }
-	void removeSaveState(const char *target, int slot) const override;
+	bool removeSaveState(const char *target, int slot) const override;
 	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
 
 	Common::KeymapArray initKeymaps(const char *target) const override;
@@ -229,20 +229,21 @@ SaveStateList MohawkMetaEngine::listSaves(const char *target) const {
 	return saveList;
 }
 
-void MohawkMetaEngine::removeSaveState(const char *target, int slot) const {
+bool MohawkMetaEngine::removeSaveState(const char *target, int slot) const {
 	Common::String gameId = ConfMan.get("gameid", target);
 
 	// Removing saved games is only supported in Myst/Riven currently.
 #ifdef ENABLE_MYST
 	if (gameId == "myst") {
-		Mohawk::MystGameState::deleteSave(slot);
+		return Mohawk::MystGameState::deleteSave(slot);
 	}
 #endif
 #ifdef ENABLE_RIVEN
 	if (gameId == "riven") {
-		Mohawk::RivenSaveLoad::deleteSave(slot);
+		return Mohawk::RivenSaveLoad::deleteSave(slot);
 	}
 #endif
+	return false;
 }
 
 SaveStateDescriptor MohawkMetaEngine::querySaveMetaInfos(const char *target, int slot) const {
@@ -280,9 +281,7 @@ Common::KeymapArray MohawkMetaEngine::initKeymaps(const char *target) const {
 	return AdvancedMetaEngine::initKeymaps(target);
 }
 
-Common::Error MohawkMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	const Mohawk::MohawkGameDescription *gd = (const Mohawk::MohawkGameDescription *)desc;
-
+Common::Error MohawkMetaEngine::createInstance(OSystem *syst, Engine **engine, const Mohawk::MohawkGameDescription *gd) const {
 	switch (gd->gameType) {
 	case Mohawk::GType_MYST:
 	case Mohawk::GType_MAKINGOF:

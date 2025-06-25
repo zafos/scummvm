@@ -44,7 +44,7 @@ public:
 	void saveState(Archive &archive);
 
 	void execute(const Command &command);
-	void goToPage(const Common::String pageName);
+	void goToPage(const Common::String &pageName);
 
 	void update() { _cursorMgr.update(); }
 
@@ -64,7 +64,7 @@ private:
 
 	void initPerilButtons();
 
-	void updateWheels(bool playSfx = 0);
+	void updateWheels(bool playSfx = false);
 	void updateLocator();
 
 	void calculateIndexes();

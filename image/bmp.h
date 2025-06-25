@@ -25,6 +25,7 @@
  *  - buried
  *  - hugo
  *  - mohawk
+ *  - qdengine
  *  - wintermute
  */
 
@@ -33,6 +34,7 @@
 
 #include "common/scummsys.h"
 #include "common/str.h"
+#include "graphics/palette.h"
 #include "image/image_decoder.h"
 
 namespace Common {
@@ -70,17 +72,15 @@ public:
 	virtual ~BitmapDecoder();
 
 	// ImageDecoder API
-	void destroy();
-	virtual bool loadStream(Common::SeekableReadStream &stream);
-	virtual const Graphics::Surface *getSurface() const { return _surface; }
-	const byte *getPalette() const { return _palette; }
-	uint16 getPaletteColorCount() const { return _paletteColorCount; }
+	void destroy() override;
+	virtual bool loadStream(Common::SeekableReadStream &stream) override;
+	const Graphics::Surface *getSurface() const override { return _surface; }
+	const Graphics::Palette &getPalette() const override { return _palette; }
 
 private:
 	Codec *_codec;
 	const Graphics::Surface *_surface;
-	byte *_palette;
-	uint16 _paletteColorCount;
+	Graphics::Palette _palette;
 };
 
 /**

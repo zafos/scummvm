@@ -27,6 +27,10 @@
 #include "common/array.h" // For OSystem::getGlobalKeymaps()
 #include "common/list.h" // For OSystem::getSupportedFormats()
 #include "common/ustr.h"
+#include "common/str-array.h" // For OSystem::updateStartSettings()
+#include "common/hash-str.h" // For OSystem::updateStartSettings()
+#include "common/path.h"
+#include "common/log.h"
 #include "graphics/pixelformat.h"
 #include "graphics/mode.h"
 #include "graphics/opengl/context.h"
@@ -42,6 +46,10 @@ struct Surface;
 namespace GUI {
 class GuiObject;
 class OptionsContainerWidget;
+}
+
+namespace DLC {
+class Store;
 }
 
 namespace Common {
@@ -67,6 +75,8 @@ class WriteStream;
 class HardwareInputSet;
 class Keymap;
 class KeymapperDefaultBindings;
+
+enum RotationMode : int;
 
 typedef Array<Keymap *> KeymapArray;
 }
@@ -105,21 +115,6 @@ struct TimeDate {
 	int tm_wday;    /**< Days since Sunday (0 - 6). */
 };
 
-namespace LogMessageType {
-/**
- * Enumeration for log message types.
- * @ingroup common_system
- *
- */
-enum Type {
-	kInfo,    /**< Info logs. */
-	kError,   /**< Error logs. */
-	kWarning, /**< Warning logs. */
-	kDebug    /**< Debug logs. */
-};
-
-} // End of namespace LogMessageType
-
 /**
 * Pixel mask modes for cursor graphics.
 */
@@ -140,6 +135,14 @@ enum CursorMaskValue {
 	 *  Backend must support kFeatureCursorMaskPaletteXorColorXnor for this mode. */
 	kCursorMaskPaletteXorColorXnor = 3,
 };
+
+#if defined(USE_IMGUI)
+typedef struct ImGuiCallbacks {
+	void (*init)() = nullptr;
+	void (*render)() = nullptr;
+	void (*cleanup)() = nullptr;
+} ImGuiCallbacks;
+#endif
 
 /**
  * Interface for ScummVM backends.
@@ -262,6 +265,11 @@ protected:
 	FilesystemFactory *_fsFactory;
 
 	/**
+	 * Used by the DLC Manager implementation
+	 */
+	DLC::Store *_dlcStore;
+
+	/**
 	 * Used by the default clipboard implementation, for backends that don't
 	 * implement clipboard support.
 	 */
@@ -323,6 +331,48 @@ public:
 	 * Called after the engine finishes.
 	 */
 	virtual void engineDone() { }
+
+	/**
+	 * Identify a task that ScummVM can perform.
+	 */
+	enum Task {
+		/**
+		 * The local server is running, allowing connections from other devices to transfer files.
+		 */
+		kLocalServer,
+
+		/**
+		 * ScummVM is downloading games or synchronizing savegames from the cloud.
+		 */
+		kCloudDownload,
+
+		/**
+		 * ScummVM is downloading an icons or shaders pack.
+		 */
+		kDataPackDownload
+	};
+
+	/**
+	 * Allow the backend to be notified when a task is started.
+	 */
+	virtual void taskStarted(Task) { }
+
+	/**
+	 * Allow the backend to be notified when a task is finished.
+	 */
+	virtual void taskFinished(Task) { }
+
+	/**
+	 * Allow the backend to customize the start settings, such as for example starting
+	 * automatically a game under certain circumstances.
+	 *
+	 * This function is called after the command line parameters have been parsed,
+	 * and thus the initial value of command and settings will reflect those.
+	 *
+	 * The default implementation checks if the executable name is "scummvm-auto"
+	 * or if a file named "scummvm-autorun" sits next to it to enable autorun mode.
+	 */
+	virtual void updateStartSettings(const Common::String &executable, Common::String &command, Common::StringMap &startSettings, Common::StringArray& additionalArgs);
 
 	/**
 	 * @defgroup common_system_flags Feature flags
@@ -408,6 +458,12 @@ public:
 		kFeatureCursorPalette,
 
 		/**
+		 * Backends supporting this feature allow cursors to contain an alpha
+		 * channel.
+		 */
+		kFeatureCursorAlpha,
+
+		/**
 		 * Backends supporting this feature allow specifying a mask for a
 		 * cursor instead of a key color.
 		 */
@@ -459,17 +515,6 @@ public:
 		 * tearing is enabled.
 		 */
 		kFeatureVSync,
-
-		/**
-		 * When a backend supports this feature, it guarantees the graphics
-		 * context is not destroyed when switching to and from fullscreen.
-		 *
-		 * For OpenGL, that means the context is kept with all of its content:
-		 * texture, programs, etc.
-		 *
-		 * For TinyGL, that means the backbuffer surface is kept.
-		 */
-		kFeatureFullscreenToggleKeepsContext,
 
 		/**
 		 * The presence of this feature indicates whether the displayLogFile()
@@ -526,6 +571,11 @@ public:
 		kFeatureShaders,
 
 		/**
+		* Support for downloading DLC packages.
+		*/
+		kFeatureDLC,
+
+		/**
 		* Support for using the native system file browser dialog
 		* through the DialogManager.
 		*/
@@ -534,7 +584,46 @@ public:
 		/**
 		* For platforms that should not have a Quit button.
 		*/
-		kFeatureNoQuit
+		kFeatureNoQuit,
+
+		/**
+		* The presence of this feature indicates that the backend uses a touchscreen.
+		*
+		* This feature has no associated state.
+		*/
+		kFeatureTouchscreen,
+
+		/**
+		* Arm-v8 requires NEON extensions, but before that, NEON was just
+		* optional, so this signifies that the processor can use NEON.
+		*/
+		kFeatureCpuNEON,
+
+		/**
+		* For x86/x86_64 platforms that have SSE2 support
+		*/
+		kFeatureCpuSSE2,
+
+		/**
+		* For x86/x86_64 platforms that have SSE4.1 support
+		*/
+		kFeatureCpuSSE41,
+
+		/**
+		* For x86_64 platforms that have AVX2 support
+		*/
+		kFeatureCpuAVX2,
+
+		/**
+		* For PowerPC platforms that have the altivec standard as of 1999.
+		* Covers a wide range of platforms, Apple Macs, XBox 360, PS3, and more
+		*/
+		kFeatureCpuAltivec,
+
+		/**
+		* Graphics code is able to rotate the screen
+		*/
+		kFeatureRotationMode,
 	};
 
 	/**
@@ -591,15 +680,15 @@ public:
 	 * than a single pixel on the screen. p_w and p_h are defined to be
 	 * the width and, respectively, height of a game pixel on the screen.
 	 *
-	 * In addition, there is a vertical "shake offset" (as defined by
-	 * setShakePos) that is used in some games to provide a shaking
-	 * effect. Note that shaking is applied to all three layers, i.e.
-	 * also to the overlay and the mouse. The shake offset is denoted
-	 * by S.
+	 * In addition, there is a horizontal and vertical "shake offset" (as
+	 * defined by setShakePos) that are used in some games to provide a
+	 * shaking effect. Note that shaking is applied to all three layers,
+	 * i.e. also to the overlay and the mouse. The shake offsets are
+	 * denoted by XS and YS.
 	 *
 	 * Putting this together, a pixel (x,y) of the game graphics is
 	 * transformed to a rectangle of height p_h and width p_w
-	 * appearing at position (p_w * x, p_hw * (y + S)) on the real
+	 * appearing at position (p_w * (x + XS), p_hw * (y + YS)) on the real
 	 * screen. In addition, a backend may choose to offset
 	 * everything, e.g. to center the graphics on the screen.
 	 *
@@ -723,7 +812,7 @@ public:
 	/**
 	 * Fetch the pixel format currently in use for screen rendering.
 	 *
-	 * This is not neccessarily the native format for the system - if unset
+	 * This is not necessarily the native format for the system - if unset
 	 * it defaults toCLUT8.  To set a different format, engines should set
 	 * their preferred format using ::initGraphics().
 	 *
@@ -802,10 +891,37 @@ public:
 	 * OpenGL context does not support the function.
 	 *
 	 * @param name The name of the OpenGL function.
-	 * @return An function pointer for the requested OpenGL function or
+	 * @return A function pointer for the requested OpenGL function or
 	 *         nullptr in case of failure.
 	 */
 	virtual void *getOpenGLProcAddress(const char *name) const { return nullptr; }
+#endif
+
+#if defined(USE_IMGUI)
+	/**
+	 * Set the init/render/cleanup callbacks for ImGui.
+	 *
+	 * This is only supported on select backends desktop oriented.
+	 *
+	 * @param callbacks Structure containing init/render/cleanup callbacks called on screen initialization, rendering and when deinitialized.
+	 */
+	virtual void setImGuiCallbacks(const ImGuiCallbacks &callbacks) {}
+	/**
+	 * Creates a new ImGui texture from a Graphics::Surface.
+	 *
+	 * @param image The Surface to convert.
+	 * @param palette The palette to use if image is a paletized surface.
+	 * @param palCount The number of entries in the palette.
+	 *
+	 * @return An ImGui texture identifier casted to void *.
+	 */
+	virtual void *getImGuiTexture(const Graphics::Surface &image, const byte *palette = nullptr, int palCount = 0) { return nullptr; }
+	/**
+	 * Frees an ImGui texture previously obtained by getImGuiTexture.
+	 *
+	 * @param texture The texture to free.
+	 */
+	virtual void freeImGuiTexture(void *texture) {}
 #endif
 
 	/**
@@ -817,7 +933,7 @@ public:
 	 *
 	 * @return True if the switch was successful, false otherwise.
 	 */
-	virtual bool setShader(const Common::String &fileName) { return false; }
+	virtual bool setShader(const Common::Path &fileName) { return false; }
 
 	/**
 	 * Retrieve a list of all stretch modes supported by this backend.
@@ -877,6 +993,28 @@ public:
 	 * @return ID of the active stretch mode.
 	 */
 	virtual int getStretchMode() const { return 0; }
+
+	/**
+	 * Switch to the specified rotation
+	 *
+	 * If switching to the new rotation fails, this method returns false.
+	 *
+	 * @param rotation Rotation angle
+	 *
+	 * @return True if the switch was successful, false otherwise.
+	 */
+	virtual bool setRotationMode(Common::RotationMode rotation) { return false; }
+
+	/**
+	 * Switch to the specified rotation with the given int
+	 *
+	 * If switching to the new rotation fails, this method returns false.
+	 *
+	 * @param rotation Rotation angle
+	 *
+	 * @return True if the switch was successful, false otherwise.
+	 */
+	bool setRotationMode(int rotation);
 
 	/**
 	 * Return the ID of the 'default' scaler.
@@ -1142,6 +1280,11 @@ public:
 	virtual void fillScreen(uint32 col) = 0;
 
 	/**
+	 * Fill the specified area of the screen with the given color value.
+	 */
+	virtual void fillScreen(const Common::Rect &r, uint32 col) = 0;
+
+	/**
 	 * Flush the whole screen, i.e. render the current content of the screen
 	 * framebuffer to the display.
 	 *
@@ -1153,15 +1296,22 @@ public:
 	virtual void updateScreen() = 0;
 
 	/**
-	 * Set current shake position, a feature needed for some SCUMM screen
-	 * effects.
+	 * When in 3D mode, forces a rendering pass to let the engine read back pixels.
+	 */
+	virtual void presentBuffer() {}
+
+	/**
+	 * Set current shake position, a feature needed for screen effects in some
+	 * engines.
 	 *
-	 * The effect causes the displayed graphics to be shifted upwards
-	 * by the specified (always positive) offset. The area at the bottom of the
-	 * screen which is moved into view by this is filled with black. This does
-	 * not cause any graphic data to be lost. To restore the original
-	 * view, the game engine only has to call this method again with offset
-	 * equal to zero. No calls to copyRectToScreen are necessary.
+	 * The effect causes the displayed graphics to be shifted downwards and
+	 * rightwards by the specified offsets (the offsets can be negative to shift
+	 * upwards or leftwards). The area at the border of the screen which is
+	 * moved into view by this  (for example at the bottom when moving
+	 * upward) is filled with black. This does not cause any graphic data to
+	 * be lost. To restore the original view, the game engine only has to call
+	 * this method again with offset equal to zero. No calls to
+	 * copyRectToScreen are necessary.
 	 *
 	 * @param shakeXOffset	Shake x offset.
 	 * @param shakeYOffset	Shake y offset.
@@ -1372,6 +1522,14 @@ public:
 	 * @see kFeatureCursorPalette
 	 */
 	virtual void setCursorPalette(const byte *colors, uint start, uint num) {}
+
+
+
+	/**
+	 * Get the system-configured double-click time interval.
+	 * If the system doesn't support configuring double-click time, returns 0.
+	 */
+	virtual uint32 getDoubleClickTime() const { return 0; }
 
 	/** @} */
 
@@ -1633,6 +1791,15 @@ public:
 #endif
 
 	/**
+	 * Return the DLC Store, used to implement DLC manager functions.
+	 *
+	 * @return The Store for the current architecture/distribution platform.
+	 */
+	virtual DLC::Store *getDLCStore() {
+		return _dlcStore;
+	}
+
+	/**
 	 * Return the FilesystemFactory object, depending on the current architecture.
 	 *
 	 * @return The FSNode factory for the current architecture.
@@ -1660,7 +1827,7 @@ public:
 	 * Open the default config file for reading by returning a suitable
 	 * ReadStream instance.
 	 *
-	 * It is the caller's responsiblity to delete the stream after use.
+	 * It is the caller's responsibility to delete the stream after use.
 	 */
 	virtual Common::SeekableReadStream *createConfigReadStream();
 
@@ -1668,7 +1835,7 @@ public:
 	 * Open the default config file for writing by returning a suitable
 	 * WriteStream instance.
 	 *
-	 * It is the callers responsiblity to delete the stream after use.
+	 * It is the callers responsibility to delete the stream after use.
 	 *
 	 * May return 0 to indicate that writing to the config file is not possible.
 	 */
@@ -1680,7 +1847,15 @@ public:
 	 *
 	 * Note that not all ports can use this.
 	 */
-	virtual Common::String getDefaultConfigFileName();
+	virtual Common::Path getDefaultConfigFileName();
+
+	/**
+	 * Get the default file name (or even path) where the scummvm.log
+	 * will be saved.
+	 *
+	 * Note that not all ports can use this.
+	 */
+	virtual Common::Path getDefaultLogFileName() { return Common::Path(); }
 
 	/**
 	 * Register the default values for the settings the backend uses into the
@@ -1704,6 +1879,18 @@ public:
 	 * @param target   name of a config manager target
 	 */
 	virtual GUI::OptionsContainerWidget *buildBackendOptionsWidget(GUI::GuiObject *boss, const Common::String &name, const Common::String &target) const { return nullptr; }
+
+	/**
+	 * Return list of strings used for building help dialog
+	 *
+	 * The strings represented in triplets:
+	 *   - Name of a tab (will be translated)
+	 *   - ZIP pack name with images (optional)
+	 *   - Text of the tab with Markdown formatting (also be translated)
+	 *
+	 * The string list is null-terminated.
+	 */
+	 virtual const char * const *buildHelpDialogData() { return nullptr; }
 
 	/**
 	 * Notify the backend that the settings editable from the game tab in the

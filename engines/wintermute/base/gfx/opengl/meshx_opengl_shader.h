@@ -30,6 +30,9 @@
 
 #include "engines/wintermute/base/gfx/xmesh.h"
 
+class Effect3D;
+class Effect3DParams;
+
 #if defined(USE_OPENGL_SHADERS)
 
 #include "graphics/opengl/shader.h"
@@ -41,10 +44,13 @@ public:
 	XMeshOpenGLShader(BaseGame *inGame, OpenGL::Shader *shader, OpenGL::Shader *flatShadowShader);
 	~XMeshOpenGLShader() override;
 
-	bool loadFromXData(const Common::String &filename, XFileData *xobj, Common::Array<MaterialReference> &materialReferences) override;
+	bool loadFromXData(const Common::String &filename, XFileData *xobj) override;
 	bool render(XModel *model) override;
-	bool renderFlatShadowModel() override;
+	bool renderFlatShadowModel(uint32 shadowColor) override;
 	bool update(FrameNode *parentFrame) override;
+
+private:
+	void renderEffect(Material *material);
 
 protected:
 	GLuint _vertexBuffer;

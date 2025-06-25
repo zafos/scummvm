@@ -41,7 +41,7 @@ void EoBCoreEngine::loadMonsterShapes(const char *filename, int monsterIndex, bo
 	generateMonsterPalettes(filename, monsterIndex);
 
 	if (hasDecorations) {
-		Common::SeekableReadStream *s = _res->createReadStream(Common::String::format("%s.DCR", filename));
+		Common::SeekableReadStream *s = _res->createReadStream(Common::Path(Common::String::format("%s.DCR", filename)));
 		if (s)
 			loadMonsterDecoration(s, monsterIndex);
 		delete s;
@@ -350,7 +350,7 @@ void EoBCoreEngine::drawBlockItems(int index) {
 	int tile2 = 0;
 
 	for (bool loop = true; o != o2 || loop; ) {
-		EoBItem *itm = &_items[o];
+		const EoBItem *itm = &_items[o];
 		if (itm->pos == 8 || itm->pos < 4) {
 			tile2 = -1;
 

@@ -29,27 +29,55 @@
 #include "common/config-manager.h"
 #include "common/textconsole.h"
 
-#if defined(GP2X)
-#define SAMPLES_PER_SEC 11025
-#elif defined(PLAYSTATION3) || defined(PSP2) || defined(NINTENDO_SWITCH)
+#if defined(PLAYSTATION3) || defined(PSP2) || defined(NINTENDO_SWITCH)
 #define SAMPLES_PER_SEC 48000
+#elif defined(__MINT__)
+#define SAMPLES_PER_SEC 49170
 #else
 #define SAMPLES_PER_SEC 44100
 #endif
 
+SdlMixerManager::SdlMixerManager() : _isSubsystemInitialized(false), _isAudioOpen(false) {
+}
+
 SdlMixerManager::~SdlMixerManager() {
-	_mixer->setReady(false);
+	if (_mixer)
+		_mixer->setReady(false);
 
-	SDL_CloseAudio();
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	SDL_CloseAudioDevice(SDL_GetAudioStreamDevice(_stream));
+	SDL_DestroyAudioStream(_stream);
+#else
+	if (_isAudioOpen)
+		SDL_CloseAudio();
+#endif
 
-	SDL_QuitSubSystem(SDL_INIT_AUDIO);
+	if (_isSubsystemInitialized)
+		SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
 
 void SdlMixerManager::init() {
-	// Start SDL Audio subsystem
-	if (SDL_InitSubSystem(SDL_INIT_AUDIO) == -1) {
-		error("Could not initialize SDL: %s", SDL_GetError());
+	bool isDisabled = ConfMan.hasKey("disable_sdl_audio") && ConfMan.getBool("disable_sdl_audio");
+
+	if (isDisabled) {
+		warning("SDL audio subsystem was forcibly disabled by disable_sdl_audio option");
+		return;
 	}
+
+	// Get the desired audio specs
+	SDL_AudioSpec desired = getAudioSpec(SAMPLES_PER_SEC);
+
+	// Start SDL Audio subsystem
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+#else
+	if (SDL_InitSubSystem(SDL_INIT_AUDIO) == -1) {
+#endif
+		warning("Could not initialize SDL audio subsystem: %s", SDL_GetError());
+		return;
+	}
+
+	_isSubsystemInitialized = true;
 
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 	const char *sdlDriverName = SDL_GetCurrentAudioDriver();
@@ -61,9 +89,10 @@ void SdlMixerManager::init() {
 #endif
 	debug(1, "Using SDL Audio Driver \"%s\"", sdlDriverName);
 
-	// Get the desired audio specs
-	SDL_AudioSpec desired = getAudioSpec(SAMPLES_PER_SEC);
-
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	_isAudioOpen = true;
+	_obtained = desired;
+#else
 	// Needed as SDL_OpenAudio as of SDL-1.2.14 mutates fields in
 	// "desired" if used directly.
 	SDL_AudioSpec fmt = desired;
@@ -71,11 +100,10 @@ void SdlMixerManager::init() {
 	// Start SDL audio with the desired specs
 	if (SDL_OpenAudio(&fmt, &_obtained) != 0) {
 		warning("Could not open audio device: %s", SDL_GetError());
-
-		// The mixer is not marked as ready
-		_mixer = new Audio::MixerImpl(desired.freq, desired.channels >= 2, desired.samples);
 		return;
 	}
+
+	_isAudioOpen = true;
 
 	// The obtained sample format is not supported by the mixer, call
 	// SDL_OpenAudio again with NULL as the second argument to force
@@ -86,19 +114,18 @@ void SdlMixerManager::init() {
 
 		if (SDL_OpenAudio(&fmt, nullptr) != 0) {
 			warning("Could not open audio device: %s", SDL_GetError());
-
-			// The mixer is not marked as ready
-			_mixer = new Audio::MixerImpl(desired.freq, desired.channels >= 2, desired.samples);
 			return;
 		}
 
 		_obtained = desired;
 	}
+#endif
 
 	debug(1, "Output sample rate: %d Hz", _obtained.freq);
 	if (_obtained.freq != desired.freq)
 		warning("SDL mixer output sample rate: %d differs from desired: %d", _obtained.freq, desired.freq);
 
+#if !SDL_VERSION_ATLEAST(3, 0, 0)
 	debug(1, "Output buffer size: %d samples", _obtained.samples);
 	if (_obtained.samples != desired.samples)
 		warning("SDL mixer output buffer size: %d differs from desired: %d", _obtained.samples, desired.samples);
@@ -106,14 +133,23 @@ void SdlMixerManager::init() {
 	debug(1, "Output channels: %d", _obtained.channels);
 	if (_obtained.channels != 1 && _obtained.channels != 2)
 		error("SDL mixer output requires mono or stereo output device");
+#endif
 
-	_mixer = new Audio::MixerImpl(_obtained.freq, _obtained.channels >= 2, desired.samples);
+	int desiredSamples = 0;
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	SDL_GetAudioDeviceFormat(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &_obtained, &desiredSamples);
+#else
+	desiredSamples = desired.samples;
+#endif
+
+	_mixer = new Audio::MixerImpl(_obtained.freq, _obtained.channels >= 2, desiredSamples);
 	assert(_mixer);
 	_mixer->setReady(true);
 
 	startAudio();
 }
 
+#if !SDL_VERSION_ATLEAST(3, 0, 0)
 static uint32 roundDownPowerOfTwo(uint32 samples) {
 	// Public domain code from Sean Eron Anderson
 	// http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
@@ -131,6 +167,7 @@ static uint32 roundDownPowerOfTwo(uint32 samples) {
 
 	return rounded;
 }
+#endif
 
 SDL_AudioSpec SdlMixerManager::getAudioSpec(uint32 outputRate) {
 	SDL_AudioSpec desired;
@@ -172,18 +209,28 @@ SDL_AudioSpec SdlMixerManager::getAudioSpec(uint32 outputRate) {
 
 	memset(&desired, 0, sizeof(desired));
 	desired.freq = freq;
-	desired.format = AUDIO_S16SYS;
 	desired.channels = channels;
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	desired.format = SDL_AUDIO_S16;
+#else
+	desired.format = AUDIO_S16SYS;
 	desired.samples = roundDownPowerOfTwo(samples);
 	desired.callback = sdlCallback;
 	desired.userdata = this;
+#endif
 
 	return desired;
 }
 
 void SdlMixerManager::startAudio() {
 	// Start the sound system
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &_obtained, sdl3Callback, this);
+	if (_stream)
+		SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(_stream));
+#else
 	SDL_PauseAudio(0);
+#endif
 }
 
 void SdlMixerManager::callbackHandler(byte *samples, int len) {
@@ -198,18 +245,45 @@ void SdlMixerManager::sdlCallback(void *this_, byte *samples, int len) {
 	manager->callbackHandler(samples, len);
 }
 
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+void SdlMixerManager::sdl3Callback(void *userdata, SDL_AudioStream *stream, int additional_amount, int total_amount) {
+	if (additional_amount > 0) {
+		Uint8 *data = SDL_stack_alloc(Uint8, additional_amount);
+		if (data) {
+			SdlMixerManager *manager = (SdlMixerManager *)userdata;
+			manager->sdlCallback(userdata, data, additional_amount);
+			SDL_PutAudioStreamData(stream, data, additional_amount);
+			SDL_stack_free(data);
+		}
+	}
+}
+#endif
+
 void SdlMixerManager::suspendAudio() {
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	SDL_CloseAudioDevice(SDL_GetAudioStreamDevice(_stream));
+	SDL_DestroyAudioStream(_stream);
+#else
 	SDL_CloseAudio();
+#endif
 	_audioSuspended = true;
 }
 
 int SdlMixerManager::resumeAudio() {
 	if (!_audioSuspended)
 		return -2;
+#if SDL_VERSION_ATLEAST(3, 0, 0)
+	_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &_obtained, sdl3Callback, this);
+	if(!_stream)
+		return -1;
+	if (SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(_stream)))
+		return -1;
+#else
 	if (SDL_OpenAudio(&_obtained, nullptr) < 0) {
 		return -1;
 	}
 	SDL_PauseAudio(0);
+#endif
 	_audioSuspended = false;
 	return 0;
 }

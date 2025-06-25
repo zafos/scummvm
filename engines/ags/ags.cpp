@@ -31,12 +31,13 @@
 #include "common/debug-channels.h"
 #include "common/events.h"
 #include "common/file.h"
+#include "common/tokenizer.h"
 #include "common/util.h"
 #include "engines/util.h"
 
 #include "ags/shared/core/platform.h"
 
-#include "ags/lib/std/set.h"
+#include "common/std/set.h"
 #include "ags/shared/ac/common.h"
 #include "ags/engine/ac/game.h"
 #include "ags/globals.h"
@@ -88,14 +89,14 @@ AGSEngine::AGSEngine(OSystem *syst, const AGSGameDescription *gameDesc) : Engine
 		Common::parseBool(forceAA, _forceTextAA);
 
 	// WORKAROUND: Certain games need to force AA to render the text correctly
-	if (_gameDescription->desc.flags & GAMEFLAG_FORCE_AA)
+	if (_gameDescription->features & GAMEFLAG_FORCE_AA)
 		_forceTextAA = true;
 }
 
 AGSEngine::~AGSEngine() {
 	if (_globals && _G(proper_exit) == 0) {
 		_G(platform)->DisplayAlert("Error: the program has exited without requesting it.\n"
-		                           "Program pointer: %+03d  (write this number down), ACI version %s\n"
+		                           "Program pointer: %+03d  (write this number down), engine version %s\n"
 		                           "If you see a list of numbers above, please write them down and contact\n"
 		                           "developers. Otherwise, note down any other information displayed.",
 		                           _G(our_eip), _G(EngineVersion).LongString.GetCStr());
@@ -112,8 +113,24 @@ uint32 AGSEngine::getFeatures() const {
 	return _gameDescription->desc.flags;
 }
 
+static const PluginVersion AGSTEAM_WADJETEYE[] = { { "agsteam", kWadjetEye }, { nullptr, 0 } };
+static const PluginVersion AGS_FLASHLIGHT[] = { { "agsflashlight", 0 }, { nullptr, 0 } };
+static const PluginVersion AGSSPRITEFONT_CLIFFTOP[] = { { "agsspritefont", kClifftopGames }, { "agsplugin.spritefont", kClifftopGames }, { nullptr, 0 } };
+
+static const PluginVersion *const PLUGIN_VERSIONS[] = {
+	nullptr,
+	AGSTEAM_WADJETEYE,
+	AGS_FLASHLIGHT,
+	AGSSPRITEFONT_CLIFFTOP
+};
+
 const PluginVersion *AGSEngine::getNeededPlugins() const {
-	return _gameDescription->_plugins;
+	uint index = (_gameDescription->features & GAMEFLAG_PLUGINS_MASK);
+
+	if (index >= ARRAYSIZE(PLUGIN_VERSIONS))
+		return nullptr;
+	else
+		return PLUGIN_VERSIONS[index];
 }
 
 Common::String AGSEngine::getGameId() const {
@@ -121,15 +138,23 @@ Common::String AGSEngine::getGameId() const {
 }
 
 Common::Error AGSEngine::run() {
+#ifdef DETECTION_STATIC
+	// The game scanner is not available when detection is dynamic
 	if (debugChannelSet(-1, kDebugScan)) {
 		// Scan the given folder and subfolders for unknown games
 		AGS3::GameScanner scanner;
-		scanner.scan(ConfMan.get("path"));
+		scanner.scan(ConfMan.getPath("path"));
 		return Common::kNoError;
 	}
+#endif
 
 	if (isUnsupportedPre25()) {
 		GUIErrorMessage(_("The selected game uses a pre-2.5 version of the AGS engine, which is not supported."));
+		return Common::kNoError;
+	}
+
+	if (isUnsupportedAGS4()) {
+		GUIErrorMessage(_("The selected game uses version 4 of the AGS engine, which is not supported."));
 		return Common::kNoError;
 	}
 
@@ -152,14 +177,18 @@ Common::Error AGSEngine::run() {
 
 	setDebugger(new AGSConsole(this));
 
-	const char *filename = _gameDescription->desc.filesDescriptions[0].fileName;
-	if (_gameDescription->desc.flags & GAMEFLAG_INSTALLER) {
+	Common::String filename(_gameDescription->desc.filesDescriptions[0].fileName);
+	Common::StringTokenizer tok(filename, ":");
+
+	Common::String type = tok.nextToken();
+	if (type.equals("clk")) {
 		Common::File *f = new Common::File();
-		f->open(filename);
+		f->open(tok.nextToken().c_str());
 		SearchMan.add("installer", Common::ClickteamInstaller::open(f, DisposeAfterUse::YES));
-		filename = _gameDescription->_mainNameInsideInstaller;
+		filename = tok.nextToken();
 	}
-	const char *ARGV[] = { "scummvm.exe", filename };
+
+	const char *ARGV[] = { "scummvm.exe", filename.c_str() };
 	const int ARGC = 2;
 	AGS3::main_init(ARGC, ARGV);
 
@@ -167,6 +196,18 @@ Common::Error AGSEngine::run() {
 
 	if (ConfMan.hasKey("display_fps"))
 		_G(display_fps) = ConfMan.getBool("display_fps") ? AGS3::kFPS_Forced : AGS3::kFPS_Hide;
+
+	Common::String saveOverrideOption;
+	bool saveOverride = false;
+	ConfMan.getActiveDomain()->tryGetVal("save_override", saveOverrideOption);
+	if (!saveOverrideOption.empty())
+		parseBool(saveOverrideOption, saveOverride);
+	_G(noScummAutosave) = (Common::checkGameGUIOption(GAMEOPTION_NO_AUTOSAVE, ConfMan.get("guioptions"))) && !saveOverride;
+	_G(noScummSaveLoad) = (Common::checkGameGUIOption(GAMEOPTION_NO_SAVELOAD, ConfMan.get("guioptions"))) && !saveOverride;
+	if (_G(noScummSaveLoad))
+		_G(noScummAutosave) = true;
+
+	_G(saveThumbnail) = !(Common::checkGameGUIOption(GAMEOPTION_NO_SAVE_THUMBNAIL, ConfMan.get("guioptions")));
 
 	AGS3::ConfigTree startup_opts;
 	int res = AGS3::main_process_cmdline(startup_opts, ARGC, ARGV);
@@ -273,27 +314,58 @@ void AGSEngine::setGraphicsMode(size_t w, size_t h, int colorDepth) {
 
 bool AGSEngine::isUnsupportedPre25() const {
 	return _gameDescription->desc.extra &&
-		!strcmp(_gameDescription->desc.extra, "Pre 2.5");
+		   Common::String(_gameDescription->desc.extra).contains("Pre 2.5");
+}
+
+bool AGSEngine::isUnsupportedAGS4() const {
+	return _gameDescription->desc.extra &&
+		   Common::String(_gameDescription->desc.extra).contains("AGS 4");
 }
 
 bool AGSEngine::is64BitGame() const {
 	Common::File f;
-	return f.open(_gameDescription->desc.filesDescriptions[0].fileName)
-		&& f.size() == -1;
+
+	// TODO: There are no more entries in the tables with -1 filesize, so this check doesn't really do anything.
+	// Maybe find a more reliable way to detect if the system can't handle these files?
+
+	if (_gameDescription->desc.filesDescriptions[0].fileName[0] == '\0')
+		return false;
+	else
+		return f.open(_gameDescription->desc.filesDescriptions[0].fileName) && f.size() == -1;
 }
 
 Common::FSNode AGSEngine::getGameFolder() {
-	return Common::FSNode(ConfMan.get("path"));
+	return Common::FSNode(ConfMan.getPath("path"));
 }
 
-bool AGSEngine::canLoadGameStateCurrently() {
+bool AGSEngine::canLoadGameStateCurrently(Common::U32String *msg) {
+	if (msg) {
+		if (ConfMan.get("gameid") == "strangeland") {
+			*msg = _("This game does not support loading from the menu. Use in-game interface");
+			return false;
+		}
+		if (_G(noScummSaveLoad))
+			*msg = _("To preserve the original experience, this game should be loaded using the in-game interface.\nYou can, however, override this setting in Game Options.");
+	}
+
 	return !_GP(thisroom).Options.SaveLoadDisabled &&
-	       !_G(inside_script) && !_GP(play).fast_forward && !_G(no_blocking_functions);
+		   !_G(inside_script) && !_GP(play).fast_forward && !_G(no_blocking_functions) &&
+		   !_G(noScummSaveLoad);
 }
 
-bool AGSEngine::canSaveGameStateCurrently() {
+bool AGSEngine::canSaveGameStateCurrently(Common::U32String *msg) {
+	if (msg) {
+		if (ConfMan.get("gameid") == "strangeland") {
+			*msg = _("This game does not support saving from the menu. Use in-game interface");
+			return false;
+		}
+		if (_G(noScummSaveLoad))
+			*msg = _("To preserve the original experience, this game should be saved using the in-game interface.\nYou can, however, override this setting in Game Options.");
+	}
+
 	return !_GP(thisroom).Options.SaveLoadDisabled &&
-	       !_G(inside_script) && !_GP(play).fast_forward && !_G(no_blocking_functions);
+		   !_G(inside_script) && !_GP(play).fast_forward && !_G(no_blocking_functions) &&
+		   !_G(noScummSaveLoad);
 }
 
 Common::Error AGSEngine::loadGameState(int slot) {
@@ -304,6 +376,13 @@ Common::Error AGSEngine::loadGameState(int slot) {
 Common::Error AGSEngine::saveGameState(int slot, const Common::String &desc, bool isAutosave) {
 	(void)AGS3::save_game(slot, desc.c_str());
 	return Common::kNoError;
+}
+
+int AGSEngine::getAutosaveSlot() const {
+	if (!g_engine || !_G(noScummAutosave))
+		return 0;
+	else
+		return -1;
 }
 
 void AGSEngine::GUIError(const Common::String &msg) {

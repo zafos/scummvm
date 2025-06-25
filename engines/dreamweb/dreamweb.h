@@ -92,8 +92,8 @@ const unsigned int kNumPersonTexts = 1026;
 
 // Engine Debug Flags
 enum {
-	kDebugAnimation = (1 << 0),
-	kDebugSaveLoad = (1 << 1)
+	kDebugAnimation = 1,
+	kDebugSaveLoad,
 };
 
 struct DreamWebGameDescription;
@@ -119,9 +119,6 @@ public:
 	Common::Error loadGameState(int slot) override;
 	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
 
-	bool canLoadGameStateCurrently() override;
-	bool canSaveGameStateCurrently() override;
-
 	uint8 randomNumber() { return _rnd.getRandomNumber(255); }
 
 	void mouseCall(uint16 *x, uint16 *y, uint16 *state); //fill mouse pos and button state
@@ -143,13 +140,13 @@ public:
 
 	Common::Language getLanguage() const;
 	uint8 modifyChar(uint8 c) const;
-	Common::String modifyFileName(const char *);
+	Common::Path modifyFileName(const char *);
 
 	const Common::String& getDatafilePrefix() { return _datafilePrefix; }
-	const Common::String& getSpeechDirName() { return _speechDirName; }
+	const Common::Path& getSpeechDirName() { return _speechDirName; }
 
 private:
-	// Keyboard buffer. _bufferIn and _bufferOut are indexes
+	// Keyboard buffer. _bufferIn and _bufferOut are indices
 	// into this, making it a ring buffer
 	uint8 _keyBuffer[16];
 	uint16 _bufferIn;
@@ -162,7 +159,7 @@ private:
 	Graphics::Surface				_thumbnail;
 	Common::RandomSource			_rnd;
 	Common::String _datafilePrefix;
-	Common::String _speechDirName;
+	Common::Path _speechDirName;
 
 	uint _speed;
 	bool _turbo;
@@ -537,7 +534,7 @@ public:
 	void obPicture();
 	void removeObFromInv();
 	void deleteExObject(uint8 index);
-	void deleteExFrame(uint8 frameNum);
+	void deleteExFrame(uint16 frameNum);
 	void deleteExText(uint8 textNum);
 	void purgeALocation(uint8 index);
 	const uint8 *getObTextStart();

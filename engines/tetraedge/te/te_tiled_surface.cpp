@@ -60,33 +60,35 @@ byte TeTiledSurface::isLoaded() {
 	return _tiledTexture && _tiledTexture->isLoaded();
 }
 
-bool TeTiledSurface::load(const Common::FSNode &node) {
+bool TeTiledSurface::load(const TetraedgeFSNode &node) {
 	unload();
 
 	TeResourceManager *resmgr = g_engine->getResourceManager();
-	_loadedPath = node.getPath();
+	if (_loadedPath.empty())
+		_loadedPath = node.getPath();
 
+	Common::Path ttPath(_loadedPath.append(".tt"));
 	TeIntrusivePtr<TeTiledTexture> texture;
-	if (resmgr->exists(_loadedPath + ".tt")) {
-		texture = resmgr->getResourceByName<TeTiledTexture>(_loadedPath + ".tt");
+	if (resmgr->exists(ttPath)) {
+		texture = resmgr->getResourceByName<TeTiledTexture>(ttPath);
 		// we don't own this one..
 	}
 
 	if (!texture) {
 		TeCore *core = g_engine->getCore();
-		_codec = core->createVideoCodec(node);
+		_codec = core->createVideoCodec(node, _loadedPath);
 		if (!_codec)
 			return false;
 
 		texture = new TeTiledTexture();
 
 		if (_codec->load(node)) {
-			texture->setAccessName(_loadedPath + ".tt");
+			texture->setAccessName(ttPath);
 			resmgr->addResource(texture.get());
 			_imgFormat = _codec->imageFormat();
 
 			if (_imgFormat == TeImage::INVALID) {
-				warning("TeTiledSurface::load: Wrong image format on file %s", _loadedPath.c_str());
+				warning("TeTiledSurface::load: Wrong image format on file %s", _loadedPath.toString(Common::Path::kNativeSeparator).c_str());
 				delete _codec;
 				_codec = nullptr;
 				return false;
@@ -116,7 +118,7 @@ bool TeTiledSurface::load(const Common::FSNode &node) {
 				texture->load(img);
 			}
 		} else {
-			warning("TeTiledSurface::load: failed to load %s", _loadedPath.c_str());
+			warning("TeTiledSurface::load: failed to load %s", _loadedPath.toString(Common::Path::kNativeSeparator).c_str());
 			delete _codec;
 			_codec = nullptr;
 		}
@@ -136,7 +138,7 @@ bool TeTiledSurface::load(const TeIntrusivePtr<Te3DTexture> &texture) {
 	TeResourceManager *resmgr = g_engine->getResourceManager();
 	TeIntrusivePtr<TeTiledTexture> tiledTexture;
 
-	const Common::String ttPath = texture->getAccessName() + ".tt";
+	const Common::Path ttPath = texture->getAccessName().append(".tt");
 
 	if (resmgr->exists(ttPath)) {
 		tiledTexture = resmgr->getResourceByName<TeTiledTexture>(ttPath);
@@ -158,7 +160,7 @@ bool TeTiledSurface::onFrameAnimCurrentFrameChanged() {
 		return false;
 
 	if (_imgFormat == TeImage::INVALID) {
-		warning("TeTiledSurface::load: Wrong image format on file %s", _loadedPath.c_str());
+		warning("TeTiledSurface::load: Wrong image format on file %s", _loadedPath.toString(Common::Path::kNativeSeparator).c_str());
 		return false;
 	}
 
@@ -171,6 +173,7 @@ bool TeTiledSurface::onFrameAnimCurrentFrameChanged() {
 
 	Common::SharedPtr<TePalette> nullPal;
 	img.createImg(vidSize._x, vidSize._y, nullPal, _imgFormat, bufxsize, bufysize);
+
 	if (_codec->update(_frameAnim.lastFrameShown(), img))
 		update(img);
 	return _codec->isAtEnd();
@@ -184,8 +187,8 @@ void TeTiledSurface::play() {
 	if (_codec) {
 		_frameAnim.setNbFrames(_codec->nbFrames());
 		_frameAnim.setFrameRate(_codec->frameRate());
-		_frameAnim.play();
 	}
+	_frameAnim.play();
 }
 
 void TeTiledSurface::setColorKey(const TeColor &col) {
@@ -213,7 +216,7 @@ void TeTiledSurface::setTiledTexture(const TeIntrusivePtr<TeTiledTexture> &textu
 		for (uint i = 0; i < texture->numberOfColumns() * texture->numberOfRow(); i++)
 			_meshes.push_back(Common::SharedPtr<TeMesh>(TeMesh::makeInstance()));
 
-		setAccessName(texture->getAccessName() + ".surface");
+		setAccessName(texture->getAccessName().append(".surface"));
 		updateSurface();
 	} else {
 		_meshes.clear();
@@ -225,6 +228,9 @@ void TeTiledSurface::stop() {
 }
 
 void TeTiledSurface::unload() {
+	// Force stop
+	_frameAnim.reset();
+
 	if (_codec) {
 		delete _codec;
 		_codec = nullptr;

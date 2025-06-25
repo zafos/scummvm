@@ -23,10 +23,12 @@
 // available at https://github.com/TomHarte/Phantasma/ (MIT)
 
 #include "common/algorithm.h"
+#include "common/hash-ptr.h"
 
 #include "freescape/freescape.h"
 #include "freescape/area.h"
 #include "freescape/objects/global.h"
+#include "freescape/sweepAABB.h"
 
 namespace Freescape {
 
@@ -93,6 +95,7 @@ Area::Area(uint16 areaID_, uint16 areaFlags_, ObjectMap *objectsByID_, ObjectMap
 	} compareObjects;
 
 	Common::sort(_drawableObjects.begin(), _drawableObjects.end(), compareObjects);
+	_lastTick = 0;
 }
 
 Area::~Area() {
@@ -143,14 +146,11 @@ void Area::loadObjects(Common::SeekableReadStream *stream, Area *global) {
 		float y = stream->readFloatLE();
 		float z = stream->readFloatLE();
 		Object *obj = nullptr;
-		if (_objectsByID->contains(key)) {
-			obj = (*_objectsByID)[key];
-		} else {
-			obj = global->objectWithID(key);
-			assert(obj);
-			obj = (Object *)((GeometricObject *)obj)->duplicate();
-			addObject(obj);
-		}
+		if (!_objectsByID->contains(key))
+			addObjectFromArea(key, global);
+
+		obj = (*_objectsByID)[key];
+		assert(obj);
 		obj->setObjectFlags(flags);
 		obj->setOrigin(Math::Vector3d(x, y, z));
 	}
@@ -192,8 +192,20 @@ void Area::unremapColor(int index) {
 	_colorRemaps.clear(index);
 }
 
+void Area::resetAreaGroups() {
+	debugC(1, kFreescapeDebugMove, "Resetting groups from area: %s", _name.c_str());
+	if (_objectsByID) {
+		for (auto &it : *_objectsByID) {
+			Object *obj = it._value;
+
+			if (obj->getType() == ObjectType::kGroupType)
+				((Group *)obj)->reset();
+		}
+	}
+}
+
 void Area::resetArea() {
-	debugC(1, kFreescapeDebugMove, "Resetting area name: %s", _name.c_str());
+	debugC(1, kFreescapeDebugMove, "Resetting objects from area: %s", _name.c_str());
 	_colorRemaps.clear();
 	if (_objectsByID) {
 		for (auto &it : *_objectsByID) {
@@ -222,25 +234,189 @@ void Area::resetArea() {
 }
 
 
-void Area::draw(Freescape::Renderer *gfx) {
-	gfx->clear(_skyColor);
+void Area::draw(Freescape::Renderer *gfx, uint32 animationTicks, Math::Vector3d camera, Math::Vector3d direction) {
+	bool runAnimation = animationTicks != _lastTick;
 	assert(_drawableObjects.size() > 0);
+	ObjectArray planarObjects;
+	ObjectArray nonPlanarObjects;
+	Object *floor = nullptr;
+	Common::HashMap<Object *, float> sizes;
+	float offset = 1.0 / _scale;
+
 	for (auto &obj : _drawableObjects) {
 		if (!obj->isDestroyed() && !obj->isInvisible()) {
-			obj->draw(gfx);
+			if (obj->getObjectID() == 0 && _groundColor < 255 && _skyColor < 255) {
+				floor = obj;
+				continue;
+			}
+
+			if (obj->getType() == ObjectType::kGroupType) {
+				drawGroup(gfx, (Group *)obj, runAnimation);
+				continue;
+			}
+
+			if (obj->isPlanar())
+				planarObjects.push_back(obj);
+			else
+				nonPlanarObjects.push_back(obj);
 		}
 	}
+
+	if (floor) {
+		gfx->depthTesting(false);
+		floor->draw(gfx);
+		gfx->depthTesting(true);
+	}
+
+	Common::HashMap<Object *, float> offsetMap;
+	for (auto &planar : planarObjects)
+		offsetMap[planar] = 0;
+
+	for (auto &planar : planarObjects) {
+		Math::Vector3d centerPlanar = planar->_boundingBox.getMin() + planar->_boundingBox.getMax();
+		centerPlanar /= 2;
+		Math::Vector3d distance;
+		for (auto &object : nonPlanarObjects) {
+			if (object->_partOfGroup)
+				continue;
+
+			distance = object->_boundingBox.distance(centerPlanar);
+			if (distance.length() > 0.0001)
+				continue;
+
+			float sizeNonPlanar = object->_boundingBox.getSize().length();
+			if (sizes[planar] >= sizeNonPlanar)
+				continue;
+
+			sizes[planar] = sizeNonPlanar;
+
+			if (planar->getSize().x() == 0) {
+				if (object->getOrigin().x() >= centerPlanar.x())
+					offsetMap[planar] = -offset;
+				else
+					offsetMap[planar] = offset;
+			} else if (planar->getSize().y() == 0) {
+				if (object->getOrigin().y() >= centerPlanar.y())
+					offsetMap[planar] = -offset;
+				else
+					offsetMap[planar] = offset;
+			} else if (planar->getSize().z() == 0) {
+				if (object->getOrigin().z() >= centerPlanar.z())
+					offsetMap[planar] = -offset;
+				else
+					offsetMap[planar] = offset;
+			} else
+				; //It was not really planar?!
+		}
+	}
+
+	for (auto &planar : planarObjects) {
+		Math::Vector3d centerPlanar = planar->_boundingBox.getMin() + planar->_boundingBox.getMax();
+		centerPlanar /= 2;
+		Math::Vector3d distance;
+		for (auto &object : planarObjects) {
+			if (object == planar)
+				continue;
+
+			distance = object->_boundingBox.distance(centerPlanar);
+			if (distance.length() > 0)
+				continue;
+
+			if (planar->getSize().x() == 0) {
+				if (object->getSize().x() > 0)
+					continue;
+			} else if (planar->getSize().y() == 0) {
+				if (object->getSize().y() > 0)
+					continue;
+			} else if (planar->getSize().z() == 0) {
+				if (object->getSize().z() > 0)
+					continue;
+			} else
+				continue;
+
+			//debug("planar object %d collides with planar object %d", planar->getObjectID(), object->getObjectID());
+			if (offsetMap[planar] == offsetMap[object] && offsetMap[object] != 0) {
+				// Nothing to do?
+			} else if (offsetMap[planar] == offsetMap[object] && offsetMap[object] == 0) {
+				if (planar->getSize().x() == 0) {
+					if (object->getOrigin().x() < centerPlanar.x())
+						offsetMap[planar] = -offset;
+					else
+						offsetMap[planar] = offset;
+				} else if (planar->getSize().y() == 0) {
+					if (object->getOrigin().y() < centerPlanar.y())
+						offsetMap[planar] = -offset;
+					else
+						offsetMap[planar] = offset;
+				} else if (planar->getSize().z() == 0) {
+					if (object->getOrigin().z() < centerPlanar.z())
+						offsetMap[planar] = -offset;
+					else
+						offsetMap[planar] = offset;
+				} else
+					; //It was not really planar?!
+			}
+		}
+	}
+
+	for (auto &obj : nonPlanarObjects) {
+		obj->draw(gfx);
+	}
+
+	for (auto &pair : offsetMap) {
+		pair._key->draw(gfx, pair._value);
+	}
+
+	_lastTick = animationTicks;
 }
 
-Object *Area::shootRay(const Math::Ray &ray) {
-	float size = 16.0 * 8192.0; // TODO: check if this is max size
+void Area::drawGroup(Freescape::Renderer *gfx, Group* group, bool runAnimation) {
+	if (runAnimation) {
+		group->run();
+		group->draw(gfx);
+		group->step();
+	} else
+		group->draw(gfx);
+}
+
+bool Area::hasActiveGroups() {
+	for (auto &obj : _drawableObjects) {
+		if (obj->getType() == kGroupType) {
+			Group *group = (Group *)obj;
+			if (group->isActive())
+				return true;
+		}
+	}
+	return false;
+}
+
+Object *Area::checkCollisionRay(const Math::Ray &ray, int raySize) {
+	float distance = 1.0;
+	float size = 16.0 * 8192.0; // TODO: check if this is the max size
+	Math::AABB boundingBox(ray.getOrigin(), ray.getOrigin());
 	Object *collided = nullptr;
 	for (auto &obj : _drawableObjects) {
-		float objSize = obj->getSize().length();
-		if (!obj->isDestroyed() && !obj->isInvisible() && obj->_boundingBox.isValid() && ray.intersectAABB(obj->_boundingBox) && size >= objSize) {
-			debugC(1, kFreescapeDebugMove, "shot obj id: %d", obj->getObjectID());
-			collided = obj;
-			size = objSize;
+		if (obj->getType() == kLineType)
+			// If the line is not along an axis, the AABB is wildly inaccurate so we skip it
+			if (((GeometricObject *)obj)->isLineButNotStraight())
+				continue;
+
+		if (!obj->isDestroyed() && !obj->isInvisible()) {
+			GeometricObject *gobj = (GeometricObject *)obj;
+			Math::Vector3d collidedNormal;
+			float collidedDistance = sweepAABB(boundingBox, gobj->_boundingBox, raySize * ray.getDirection(), collidedNormal);
+			debugC(1, kFreescapeDebugMove, "reached obj id: %d with distance %f", obj->getObjectID(), collidedDistance);
+			if (collidedDistance >= 1.0)
+				continue;
+
+			if (collidedDistance == 0.0 && signbit(collidedDistance))
+				continue;
+
+			if (collidedDistance < distance || (ABS(collidedDistance - distance) <= 0.05 && gobj->getSize().length() < size)) {
+				collided = obj;
+				size = gobj->getSize().length();
+				distance = collidedDistance;
+			}
 		}
 	}
 	return collided;
@@ -259,6 +435,96 @@ ObjectArray Area::checkCollisions(const Math::AABB &boundingBox) {
 	return collided;
 }
 
+bool Area::checkIfPlayerWasCrushed(const Math::AABB &boundingBox) {
+	for (auto &obj : _drawableObjects) {
+		if (!obj->isDestroyed() && !obj->isInvisible() && obj->getType() == kGroupType) {
+			Group *group = (Group *)obj;
+			if (group->collides(boundingBox)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+Math::Vector3d Area::separateFromWall(const Math::Vector3d &_position) {
+	Math::Vector3d position = _position;
+	float sep = 8 / _scale;
+	for (auto &obj : _drawableObjects) {
+		if (!obj->isDestroyed() && !obj->isInvisible()) {
+			GeometricObject *gobj = (GeometricObject *)obj;
+			Math::Vector3d distance = gobj->_boundingBox.distance(position);
+			if (distance.length() > 0.0001)
+				continue;
+
+			position.z() = position.z() + sep;
+			distance = gobj->_boundingBox.distance(position);
+			if (distance.length() > 0.0001)
+				return position;
+
+			position = _position;
+			position.z() = position.z() - sep;
+			distance = gobj->_boundingBox.distance(position);
+			if (distance.length() > 0.0001)
+				return position;
+
+			position = _position;
+			position.x() = position.x() + sep;
+			distance = gobj->_boundingBox.distance(position);
+			if (distance.length() > 0.0001)
+				return position;
+
+			position = _position;
+			position.x() = position.x() - sep;
+			distance = gobj->_boundingBox.distance(position);
+			if (distance.length() > 0.0001)
+				return position;
+		}
+	}
+	return position;
+}
+
+Math::Vector3d Area::resolveCollisions(const Math::Vector3d &lastPosition_, const Math::Vector3d &newPosition_, int playerHeight) {
+	Math::Vector3d position = newPosition_;
+	Math::Vector3d lastPosition = lastPosition_;
+
+	float reductionHeight = 0.0;
+	// Ugly hack to fix the collisions in tight spaces in the stores and junk room
+	// for Castle Master
+	if (_name == "    STORES     " && _areaID == 62) {
+		reductionHeight = 0.3f;
+	} else if (_name == "   JUNK ROOM   " && _areaID == 61) {
+		reductionHeight = 0.3f;
+	}
+
+	Math::AABB boundingBox = createPlayerAABB(lastPosition, playerHeight, reductionHeight);
+
+	float epsilon = 1.5;
+	int i = 0;
+	while (true) {
+		float distance = 1.0;
+		Math::Vector3d normal;
+		Math::Vector3d direction = position - lastPosition;
+
+		for (auto &obj : _drawableObjects) {
+			if (!obj->isDestroyed() && !obj->isInvisible()) {
+				GeometricObject *gobj = (GeometricObject *)obj;
+				Math::Vector3d collidedNormal;
+				float collidedDistance = sweepAABB(boundingBox, gobj->_boundingBox, direction, collidedNormal);
+				if (collidedDistance < distance) {
+					distance = collidedDistance;
+					normal = collidedNormal;
+				}
+			}
+		}
+		position = lastPosition + distance * direction + epsilon * normal;
+		if (i > 1 || distance >= 1.0)
+			break;
+		i++;
+	}
+	return position;
+}
+
 bool Area::checkInSight(const Math::Ray &ray, float maxDistance) {
 	Math::Vector3d direction = ray.getDirection();
 	direction.normalize();
@@ -267,6 +533,7 @@ bool Area::checkInSight(const Math::Ray &ray, float maxDistance) {
 			0,
 			Math::Vector3d(0, 0, 0),
 			Math::Vector3d(maxDistance / 30, maxDistance / 30, maxDistance / 30), // size
+			nullptr,
 			nullptr,
 			nullptr,
 			FCLInstructionVector(),
@@ -310,8 +577,16 @@ void Area::removeObject(int16 id) {
 	_addedObjects.erase(id);
 }
 
+Common::List<int> Area::getEntranceIds() {
+	Common::List<int> ids;
+	for (auto &it : *_entrancesByID) {
+		ids.push_back(it._key);
+	}
+	return ids;
+}
+
 void Area::addObjectFromArea(int16 id, Area *global) {
-	debugC(1, kFreescapeDebugParser, "Adding object %d to room structure", id);
+	debugC(1, kFreescapeDebugParser, "Adding object %d to room structure in area %d", id, _areaID);
 	Object *obj = global->objectWithID(id);
 	if (!obj) {
 		assert(global->entranceWithID(id));
@@ -331,25 +606,51 @@ void Area::addObjectFromArea(int16 id, Area *global) {
 	}
 }
 
-void Area::addStructure(Area *global) {
-	Object *obj = nullptr;
-	if (!global || !_entrancesByID->contains(255)) {
-		int id = 254;
-		Common::Array<uint8> *gColors = new Common::Array<uint8>;
-		for (int i = 0; i < 6; i++)
-			gColors->push_back(_groundColor);
+void Area::addGroupFromArea(int16 id, Area *global) {
+	debugC(1, kFreescapeDebugParser, "Adding group %d to room structure in area %d", id, _areaID);
+	Object *obj = global->objectWithID(id);
+	assert(obj);
+	assert(obj->getType() == ObjectType::kGroupType);
 
-		obj = (Object *)new GeometricObject(
-			ObjectType::kCubeType,
-			id,
-			0,                             // flags
-			Math::Vector3d(0, -1, 0),      // Position
-			Math::Vector3d(4128, 1, 4128), // size
-			gColors,
-			nullptr,
-			FCLInstructionVector());
-		(*_objectsByID)[id] = obj;
-		_drawableObjects.insert_at(0, obj);
+	addObjectFromArea(id, global);
+	Group *group = (Group *)objectWithID(id);
+	for (auto &it : ((Group *)obj)->_objectIds) {
+		if (it == 0 || it == 0xffff)
+			break;
+		if (!global->objectWithID(it))
+			continue;
+
+		if (!objectWithID(it))
+			addObjectFromArea(it, global);
+		group->linkObject(objectWithID(it));
+	}
+}
+
+
+void Area::addFloor() {
+	int id = 0;
+	assert(!_objectsByID->contains(id));
+	Common::Array<uint8> *gColors = new Common::Array<uint8>;
+	for (int i = 0; i < 6; i++)
+		gColors->push_back(_groundColor);
+
+	int maxSize = 10000000 / 4;
+	Object *obj = (Object *)new GeometricObject(
+		ObjectType::kCubeType,
+		id,
+		0,                                           // flags
+		Math::Vector3d(-maxSize, -3, -maxSize),      // Position
+		Math::Vector3d(maxSize * 4, 3, maxSize * 4), // size
+		gColors,
+		nullptr,
+		nullptr,
+		FCLInstructionVector());
+	(*_objectsByID)[id] = obj;
+	_drawableObjects.insert_at(0, obj);
+}
+
+void Area::addStructure(Area *global) {
+	if (!global || !_entrancesByID->contains(255)) {
 		return;
 	}
 	GlobalStructure *rs = (GlobalStructure *)(*_entrancesByID)[255];
@@ -361,6 +662,23 @@ void Area::addStructure(Area *global) {
 
 		addObjectFromArea(id, global);
 	}
+}
+
+void Area::changeObjectID(uint16 objectID, uint16 newObjectID) {
+	assert(!objectWithID(newObjectID));
+	Object *obj = objectWithID(objectID);
+	assert(obj);
+	obj->_objectID = newObjectID;
+	_addedObjects.erase(objectID);
+	_addedObjects[newObjectID] = obj;
+
+	(*_objectsByID).erase(objectID);
+	(*_objectsByID)[newObjectID] = obj;
+}
+
+
+bool Area::isOutside() {
+	return _skyColor < 255 && _groundColor < 255;
 }
 
 } // End of namespace Freescape

@@ -566,7 +566,7 @@ AGOSEngine::AGOSEngine(OSystem *system, const AGOSGameDescription *gd)
 	memcpy (_hebrewCharWidths,
 		"\x5\x5\x4\x6\x5\x3\x4\x5\x6\x3\x5\x5\x4\x6\x5\x3\x4\x6\x5\x6\x6\x6\x5\x5\x5\x6\x5\x6\x6\x6\x6\x6", 32);
 
-	const Common::FSNode gameDataDir(ConfMan.get("path"));
+	const Common::FSNode gameDataDir(ConfMan.getPath("path"));
 
 	// Add default file directories for Acorn version of
 	// Simon the Sorcerer 1
@@ -1012,6 +1012,7 @@ AGOSEngine::~AGOSEngine() {
 void AGOSEngine::pauseEngineIntern(bool pauseIt) {
 	if (pauseIt) {
 		_keyPressed.reset();
+		_action = kActionNone;
 		_pause = true;
 
 		_midi->pause(true);
@@ -1029,9 +1030,10 @@ void AGOSEngine::pause() {
 
 	while (_pause && !shouldQuit()) {
 		delay(1);
-		if (_keyPressed.keycode == Common::KEYCODE_PAUSE) {
+		if (_action == kActionPause) {
 			pt.clear();
 			_keyPressed.reset();
+			_action = kActionNone;
 		}
 	}
 }

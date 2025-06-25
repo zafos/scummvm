@@ -24,8 +24,9 @@
 #include "common/debug-channels.h"
 #include "common/file.h"
 #include "common/system.h"
+#include "common/translation.h"
 #include "engines/util.h"
-#include "graphics/palette.h"
+#include "graphics/paletteman.h"
 #include "mm/mm1/mm1.h"
 #include "mm/mm1/console.h"
 #include "mm/mm1/gfx/gfx.h"
@@ -47,9 +48,17 @@ MM1Engine::MM1Engine(OSystem *syst, const MightAndMagicGameDescription *gameDesc
 
 MM1Engine::~MM1Engine() {
 	g_engine = nullptr;
+	delete _sound;
 }
 
 Common::Error MM1Engine::run() {
+	if (_gameDescription->features & GF_GFX_PACK) {
+		GUIErrorMessage(_("You cannot run the game directly from the Graphics Overhaul Mod. "
+			"Instead, it will automatically be available if you detect the original game "
+			"and select Enhanced mode."));
+		return Common::kNoError;
+	}
+
 	// Initialize graphics mode
 	initGraphics(320, 200);
 
@@ -59,6 +68,10 @@ Common::Error MM1Engine::run() {
 	} else {
 		setupNormal();
 	}
+
+	// Setup mixer
+	_sound = new Sound(_mixer);
+	syncSoundSettings();
 
 	// Setup console
 	setDebugger(new Console());
@@ -74,6 +87,13 @@ Common::Error MM1Engine::run() {
 	return Common::kNoError;
 }
 
+void MM1Engine::syncSoundSettings() {
+	Engine::syncSoundSettings();
+
+	if (_sound)
+		_sound->updateSoundSettings();
+}
+
 bool MM1Engine::isEnhanced() const {
 	return (_gameDescription->features & GF_ENHANCED) != 0;
 }
@@ -83,12 +103,12 @@ void MM1Engine::setupNormal() {
 }
 
 bool MM1Engine::setupEnhanced() {
-	if (!Common::File::exists("xeen.cc")) {// || !Common::File::exists("dark.cc")) {
-		GUIErrorMessage(
+	if (!Common::File::exists("xeen.cc")) {
+		GUIErrorMessage(_(
 			"In order to run in Enhanced mode,  please copy xeen.cc "
-			"and dark.cc from a copy of World of Xeen\n"
-			"or Dark Side of Xeen to your Might and Magic 1 game folder"
-		);
+			"from a copy of World of Xeen\n"
+			"or Clouds of Xeen to your Might and Magic 1 game folder"
+		));
 
 		return false;
 	}
@@ -104,10 +124,10 @@ bool MM1Engine::setupEnhanced() {
 		error("Could not load palette");
 
 	// Load the Xeen palette
-	byte pal[PALETTE_SIZE];
-	for (int i = 0; i < PALETTE_SIZE; ++i)
+	byte pal[Graphics::PALETTE_SIZE];
+	for (int i = 0; i < Graphics::PALETTE_SIZE; ++i)
 		pal[i] = f.readByte() << 2;
-	g_system->getPaletteManager()->setPalette(pal, 0, PALETTE_COUNT);
+	g_system->getPaletteManager()->setPalette(pal, 0, Graphics::PALETTE_COUNT);
 	Gfx::GFX::findPalette(pal);
 
 	// Show the mouse cursor
@@ -118,7 +138,7 @@ bool MM1Engine::setupEnhanced() {
 	return true;
 }
 
-bool MM1Engine::canSaveGameStateCurrently() {
+bool MM1Engine::canSaveGameStateCurrently(Common::U32String *msg) {
 	if (!g_events)
 		return false;
 
@@ -127,7 +147,7 @@ bool MM1Engine::canSaveGameStateCurrently() {
 		dynamic_cast<ViewsEnh::Game *>(view) != nullptr;
 }
 
-bool MM1Engine::canLoadGameStateCurrently() {
+bool MM1Engine::canLoadGameStateCurrently(Common::U32String *msg) {
 	if (!g_events)
 		return false;
 

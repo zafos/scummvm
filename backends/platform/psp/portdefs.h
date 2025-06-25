@@ -38,9 +38,11 @@
 #include <stddef.h>
 #include <assert.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <math.h>
 #include <new>
+#include <limits>
 
 #include <pspkernel.h>
 #include <pspdebug.h>

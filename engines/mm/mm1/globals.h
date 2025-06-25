@@ -54,15 +54,21 @@ public:
 	bool _heardRumor = false;
 	Game::Encounter _encounters;
 	Game::Combat *_combat = nullptr;
-	Monsters _monsters;
+	Monsters *_monsters = nullptr;
 	Treasure _treasure;
 	byte _delay = 5;
 	int _nonCombatEffectCtr = 0, _combatEffectCtr = 0;
+	bool _minimapOn = false;
 
 	// Console flags
 	bool _intangible = false;
 	bool _encountersOn = true;
 	bool _allSpells = false;
+
+	/**
+	 * Creates a blank button with no inner glyph
+	 */
+	void createBlankButton();
 
 public:
 	// Enhanced mode globals
@@ -70,6 +76,9 @@ public:
 	Shared::Xeen::SpriteResource _confirmIcons;
 	Shared::Xeen::SpriteResource _globalSprites;
 	Shared::Xeen::SpriteResource _tileSprites;
+	Shared::Xeen::SpriteResource _escSprites;
+	Graphics::ManagedSurface _blankButton;
+	Graphics::ManagedSurface _gameBackground;
 	byte SYMBOLS[20][64];
 	XeenFont _fontNormal;
 	XeenFont _fontReduced;
@@ -85,10 +94,7 @@ public:
 	/**
 	 * Returns a string
 	 */
-	const Common::String &operator[](const Common::String &name) {
-		assert(_strings.contains(name));
-		return _strings[name];
-	}
+	Common::String operator[](const Common::String &name) const;
 
 	/**
 	 * Saves global data to/from savegames

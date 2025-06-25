@@ -51,7 +51,7 @@ EventsManager::~EventsManager() {
 	freeCursors();
 }
 
-void EventsManager::loadCursors(const Common::String &spritesName) {
+void EventsManager::loadCursors(const Common::Path &spritesName) {
 	delete _cursorSprites;
 	_cursorSprites = new SpriteAsset(_vm, spritesName, 0x4000);
 }
@@ -149,6 +149,11 @@ void EventsManager::pollEvents() {
 		case Common::EVENT_RETURN_TO_LAUNCHER:
 			return;
 
+		case Common::EVENT_CUSTOM_ENGINE_ACTION_START:
+			_pendingActions.push(event.customType);
+			return;
+		case Common::EVENT_CUSTOM_ENGINE_ACTION_END:
+			return;
 		case Common::EVENT_KEYDOWN:
 			// Check for debugger
 			_pendingKeys.push(event.kbd);
@@ -156,10 +161,10 @@ void EventsManager::pollEvents() {
 		case Common::EVENT_KEYUP:
 			return;
 		case Common::EVENT_WHEELUP:
-			_pendingKeys.push(Common::KeyState(Common::KEYCODE_PAGEUP));
+			_pendingActions.push(kActionScrollUp);
 			return;
 		case Common::EVENT_WHEELDOWN:
-			_pendingKeys.push(Common::KeyState(Common::KEYCODE_PAGEDOWN));
+			_pendingActions.push(kActionScrollDown);
 			return;
 		case Common::EVENT_LBUTTONDOWN:
 		case Common::EVENT_RBUTTONDOWN:
@@ -205,6 +210,10 @@ bool EventsManager::checkForNextFrameCounter() {
 
 		// Do any palette cycling
 		_vm->_game->_scene.animatePalette();
+
+		// FIXME: Bodge to fix bug 15867: UI not updating
+		_vm->_screen->addDirtyRect(Common::Rect(
+			0, MADS_SCENE_HEIGHT, 320, 200));
 
 		// Display the frame
 		_vm->_screen->update();
@@ -258,6 +267,7 @@ void EventsManager::initVars() {
 
 void EventsManager::clearEvents() {
 	_pendingKeys.clear();
+	_pendingActions.clear();
 }
 
 

@@ -28,6 +28,7 @@
 #include "common/platform.h"
 #include "common/queue.h"
 #include "common/singleton.h"
+#include "engines/enhancements.h"
 
 class OSystem;
 class MetaEngineDetection;
@@ -101,7 +102,7 @@ class Engine;
 */
 class PauseToken {
 public:
-	PauseToken();
+	constexpr PauseToken() : _engine(nullptr) {}
 	/**
 	 * Construct a pause token.
 	 */
@@ -131,7 +132,7 @@ public:
 	bool isActive() const { return _engine != nullptr; }
 
 private:
-	PauseToken(Engine *);
+	constexpr PauseToken(Engine *engine) : _engine(engine) {}
 
 	Engine *_engine;
 	/**
@@ -179,6 +180,8 @@ protected:
 	 */
 	const Common::String _targetName;
 
+	int32 _activeEnhancements = kEnhGameBreakingBugFixes;
+
 private:
 	/**
 	 * The associated metaengine
@@ -198,6 +201,11 @@ private:
 	 * The time when the pause was started.
 	 */
 	uint32 _pauseStartTime;
+
+	/**
+	 * The screen change ID when the pause was started
+	 */
+	int _pauseScreenChangeID;
 
 	/**
 	 * The time when the engine was started.
@@ -233,9 +241,13 @@ private:
 	 * Optional debugger for the engine.
 	 */
 	GUI::Debugger *_debugger;
+
+	/**
+	 * Flag for whether the quitGame method has been called
+	 */
+	static bool _quitRequested;
+
 public:
-
-
 	/**
 	 * Engine features.
 	 *
@@ -375,6 +387,8 @@ public:
 	 */
 	virtual bool hasFeature(EngineFeature f) const { return false; }
 
+	bool enhancementEnabled(int32 cls);
+
 	/**
 	 * Notify the engine that the sound settings in the config manager might have
 	 * changed and that it should adjust any internal volume (and other) values
@@ -444,8 +458,10 @@ public:
 
 	/**
 	 * Indicate whether a game state can be loaded.
+	 *
+	 * @param msg        Optional pointer to message explaining why it is disabled
 	 */
-	virtual bool canLoadGameStateCurrently();
+	virtual bool canLoadGameStateCurrently(Common::U32String *msg = nullptr);
 
 	/**
 	 * Save a game state.
@@ -470,8 +486,10 @@ public:
 
 	/**
 	 * Indicate whether a game state can be saved.
+	 *
+	 * @param msg        Optional pointer to message explaining why it is disabled
 	 */
-	virtual bool canSaveGameStateCurrently();
+	virtual bool canSaveGameStateCurrently(Common::U32String *msg = nullptr);
 
 	/**
 	 * Show the ScummVM save dialog, allowing users to save their game.
@@ -509,11 +527,6 @@ public:
 	 * This can mean either quitting ScummVM altogether, or returning to the launcher.
 	 */
 	static bool shouldQuit();
-
-	/**
-	 * Return the MetaEngineDetection instance used by this engine.
-	 */
-	static MetaEngineDetection &getMetaEngineDetection();
 
 	/**
 	 * Return the MetaEngine instance used by this engine.
@@ -657,6 +670,12 @@ public:
 	virtual int getAutosaveSlot() const {
 		return 0;
 	}
+
+protected:
+	/**
+	 * Syncs the engine's mixer using the default volume syncing behavior.
+	 */
+	void defaultSyncSoundSettings();
 };
 
 
@@ -685,7 +704,7 @@ public:
 	/** Clear the chained games manager of any games. */
 	void clear();
 	/** Load a game into a slot in the chained games manager. */
-	void push(const Common::String target, const int slot = -1);
+	void push(const Common::String &target, const int slot = -1);
 	/** Pop the last game loaded into the chained games manager. */
 	bool pop(Common::String &target, int &slot);
 	/** Returns true if the chained games manager has no elements in the queue. */

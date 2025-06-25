@@ -213,7 +213,7 @@ iEntity2D *cGridMap2DRectIt::Next() {
 //-----------------------------------------------------------------------
 
 void cGridMap2DRectIt::GetGridObject() {
-	//bool bEnd = false;
+	// bool bEnd = false;
 
 	switch (mlType) {
 	//// GLOBAL OBJECTS //////////////////
@@ -340,7 +340,7 @@ void cGridMap2DRectIt::GetGridObject() {
 			} else {
 				mpObject = mIt->second;
 
-				// Check if object allready have been loaded.
+				// Check if object already have been loaded.
 				if (mpObject->FirstTime(mpGridMap->mlGlobalCount)) {
 					// Log("Found the object in grid[%d]!\n",mlGridNum);
 					break;

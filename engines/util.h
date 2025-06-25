@@ -39,8 +39,10 @@
 
 /**
  * Set up the graphics mode of the backend.
+ *
+ * @param is3D: set to true if the game to be launched uses 3D graphics
  */
-void initCommonGFX();
+void initCommonGFX(bool is3D);
 
 /**
  * Send a list of graphics modes to the backend so it can make a decision
@@ -79,5 +81,11 @@ void initGraphics(int width, int height, const Common::List<Graphics::PixelForma
  * @overload
  */
 void initGraphics3d(int width, int height);
+
+/**
+ * Inits any of the modes in "modes". "modes" is in the order of preference.
+ * Return value is index in modes of resulting mode.
+ */
+int initGraphicsAny(const Graphics::ModeWithFormatList &modes, int start = 0);
 /** @} */
 #endif

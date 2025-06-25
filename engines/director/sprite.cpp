@@ -22,13 +22,12 @@
 #include "graphics/macgui/macwidget.h"
 
 #include "director/director.h"
-#include "director/castmember.h"
 #include "director/frame.h"
 #include "director/movie.h"
 #include "director/score.h"
 #include "director/sprite.h"
-#include "director/lingo/lingo.h"
-#include "director/lingo/lingo-object.h"
+#include "director/castmember/castmember.h"
+#include "director/castmember/shape.h"
 
 namespace Director {
 
@@ -37,6 +36,13 @@ Sprite::Sprite(Frame *frame) {
 	_score = _frame ? _frame->getScore() : nullptr;
 	_movie = _score ? _score->getMovie() : nullptr;
 
+	_matte = nullptr;
+	_puppet = false;
+	_autoPuppet = kAPNone; // Based on Director in a Nutshell, page 15
+	reset();
+}
+
+void Sprite::reset() {
 	_scriptId = CastMemberID(0, 0);
 	_colorcode = 0;
 	_blendAmount = 0;
@@ -49,8 +55,10 @@ Sprite::Sprite(Frame *frame) {
 	_spriteType = kInactiveSprite;
 	_inkData = 0;
 	_ink = kInkTypeCopy;
-	_trails = 0;
+	_trails = false;
 
+	if (_matte)
+		delete _matte;
 	_matte = nullptr;
 	_cast = nullptr;
 
@@ -59,15 +67,14 @@ Sprite::Sprite(Frame *frame) {
 	_height = 0;
 	_moveable = false;
 	_editable = false;
-	_puppet = false;
 	_immediate = false;
 	_backColor = g_director->_wm->_colorWhite;
-	_foreColor = g_director->_wm->_colorBlack;
+	_foreColor = g_director->_wm->_colorWhite;
 
 	_blend = 0;
 
 	_volume = 0;
-	_stretch = 0;
+	_stretch = false;
 }
 
 Sprite& Sprite::operator=(const Sprite &sprite) {
@@ -105,6 +112,7 @@ Sprite& Sprite::operator=(const Sprite &sprite) {
 	_moveable = sprite._moveable;
 	_editable = sprite._editable;
 	_puppet = sprite._puppet;
+	_autoPuppet = sprite._autoPuppet;
 	_immediate = sprite._immediate;
 	_backColor = sprite._backColor;
 	_foreColor = sprite._foreColor;
@@ -149,19 +157,21 @@ void Sprite::createQDMatte() {
 	Common::Rect fillAreaRect((int)srcRect.width(), (int)srcRect.height());
 	Graphics::MacPlotData plotFill(&tmp, nullptr, &g_director->getPatterns(), getPattern(), 0, 0, 1, g_director->_wm->_colorBlack);
 
+	Graphics::Primitives &primitives = g_director->_wm->getDrawPrimitives();
+
 	// it's the same for filled and outlined qd shape when we are using floodfill, so we use filled rect directly since it won't be affected by line size.
 	switch (_spriteType) {
 	case kOutlinedRectangleSprite:
 	case kRectangleSprite:
-		Graphics::drawFilledRect1(fillAreaRect, g_director->_wm->_colorBlack, g_director->_wm->getDrawPixel(), &plotFill);
+		primitives.drawFilledRect1(fillAreaRect, g_director->_wm->_colorBlack, &plotFill);
 		break;
 	case kOutlinedRoundedRectangleSprite:
 	case kRoundedRectangleSprite:
-		Graphics::drawRoundRect1(fillAreaRect, 12, g_director->_wm->_colorBlack, true, g_director->_wm->getDrawPixel(), &plotFill);
+		primitives.drawRoundRect1(fillAreaRect, 12, g_director->_wm->_colorBlack, true, &plotFill);
 		break;
 	case kOutlinedOvalSprite:
 	case kOvalSprite:
-		Graphics::drawEllipse(fillAreaRect.left, fillAreaRect.top, fillAreaRect.right, fillAreaRect.bottom, g_director->_wm->_colorBlack, true, g_director->_wm->getDrawPixel(), &plotFill);
+		primitives.drawEllipse(fillAreaRect.left, fillAreaRect.top, fillAreaRect.right, fillAreaRect.bottom, g_director->_wm->_colorBlack, true, &plotFill);
 		break;
 	case kLineBottomTopSprite:
 	case kLineTopBottomSprite:
@@ -280,37 +290,6 @@ uint32 Sprite::getForeColor() {
 	}
 }
 
-Common::Point Sprite::getRegistrationOffset() {
-	Common::Point result(0, 0);
-	if (!_cast)
-		return result;
-
-	switch (_cast->_type) {
-	case kCastBitmap:
-		{
-			BitmapCastMember *bc = (BitmapCastMember *)(_cast);
-
-			// stretch the offset
-			if (!_stretch && (_width != bc->_initialRect.width() || _height != bc->_initialRect.height())) {
-				result.x = (bc->_initialRect.left - bc->_regX) * _width / bc->_initialRect.width();
-				result.y = (bc->_initialRect.top - bc->_regY) * _height / bc->_initialRect.height();
-			} else {
-				result.x = bc->_initialRect.left - bc->_regX;
-				result.y = bc->_initialRect.top - bc->_regY;
-			}
-		}
-		break;
-	case kCastDigitalVideo:
-	case kCastFilmLoop:
-		result.x = _cast->_initialRect.width() >> 1;
-		result.y = _cast->_initialRect.height() >> 1;
-		break;
-	default:
-		break;
-	}
-	return result;
-}
-
 void Sprite::updateEditable() {
 	if (!_cast)
 		return;
@@ -422,19 +401,93 @@ void Sprite::setPattern(uint16 pattern) {
 	}
 }
 
+void Sprite::setAutoPuppet(AutoPuppetProperty property, bool value) {
+	// Skip this if we're not in D6 or above (auto-puppet is introduced in D6)
+	if (_puppet || g_director->getVersion() < 600)
+		return;
+
+	if (value)
+		_autoPuppet |= (1 << property);
+	else
+		_autoPuppet &= ~(1 << property);
+}
+
+bool Sprite::getAutoPuppet(AutoPuppetProperty property) {
+	return (_autoPuppet & (1 << property)) != 0;
+}
+
+void Sprite::setWidth(int w) {
+	_width = MAX<int>(w, 0);
+
+	// Based on Director in a Nutshell, page 15
+	setAutoPuppet(kAPWidth, true);
+}
+
+void Sprite::setHeight(int h) {
+	_height = MAX<int>(h, 0);
+
+	// Based on Director in a Nutshell, page 15
+	setAutoPuppet(kAPHeight, true);
+}
+
+Common::Rect Sprite::getBbox(bool unstretched) {
+	Common::Rect result(_width, _height);
+	// If this is a cast member, use the cast member's getBbox function
+	// so we start with a rect containing the correct registration offset.
+	if (_cast)
+		result = _cast->getBbox(_width, _height);
+
+	// The origin of the rect should be at the registration offset,
+	// e.g. for bitmap sprites this defaults to the centre.
+	// Now we move the rect to the correct spot.
+	Common::Point startPos = _startPoint;
+	result.translate(startPos.x, startPos.y);
+	return result;
+
+}
+
+void Sprite::setBbox(int l, int t, int r, int b) {
+	_width = r - l;
+	_height = b - t;
+
+	Common::Rect source(_width, _height);
+	if (_cast) {
+		source = _cast->getBbox(_width, _height);
+	}
+	_startPoint.x = (int16)(l - source.left);
+	_startPoint.y = (int16)(t - source.top);
+
+	if (_width <= 0 || _height <= 0)
+		_width = _height = 0;
+
+	// Based on Director in a Nutshell, page 15
+	setAutoPuppet(kAPBbox, true);
+}
+
+Common::Point Sprite::getPosition() {
+	return _startPoint;
+}
+
+void Sprite::setPosition(int x, int y) {
+	_startPoint = Common::Point(x, y);
+
+	// Based on Director in a Nutshell, page 15
+	setAutoPuppet(kAPLoc, true);
+}
+
 bool Sprite::checkSpriteType() {
 	// check whether the sprite type match the cast type
 	// if it doesn't match, then we treat it as transparent
 	// this happens in warlock-mac data/stambul/c up
-	if (_spriteType == kBitmapSprite && _cast->_type != kCastBitmap) {
-		if (debugChannelSet(2, kDebugImages))
+	if (_spriteType == kBitmapSprite && !(_cast->_type == kCastBitmap || _cast->_type == kCastFilmLoop)) {
+		if (debugChannelSet(4, kDebugImages))
 			warning("Sprite::checkSpriteType: Didn't render sprite due to the sprite type mismatch with cast type");
 		return false;
 	}
 	return true;
 }
 
-void Sprite::setCast(CastMemberID memberID) {
+void Sprite::setCast(CastMemberID memberID, bool replaceDims) {
 	/**
 	 * There are two things we need to take into account here:
 	 *   1. The cast member's type
@@ -470,34 +523,22 @@ void Sprite::setCast(CastMemberID memberID) {
 			}
 		}
 
-		// TODO: Respect sprite width/height settings. Need to determine how to read
-		// them properly.
-		Common::Rect dims = _cast->getInitialRect();
-		// strange logic here, need to be fixed
-		switch (_cast->_type) {
-		case kCastBitmap:
-			// for the stretched sprites, we need the original size to get the correct bbox offset.
-			// there are two stretch situation here.
-			// 1. stretch happened when creating the widget, there is no lingo participated. we will use the original sprite size to create widget. check copyStretchImg
-			// 2. stretch set by lingo. this time we need to store the original dims because we will create the original sprite and stretch it when bliting. check inkBlitStretchSurface
-			{
-				if (!(_inkData & 0x80) || _stretch) {
-					_width = dims.width();
-					_height = dims.height();
-				}
+		if (replaceDims) {
+			Common::Rect dims = _cast->getInitialRect();
+			switch (_cast->_type) {
+			case kCastShape:
+			case kCastText:
+				break;
+			case kCastBitmap:
+			default:
+				_width = dims.width();
+				_height = dims.height();
+				break;
 			}
-			break;
-		case kCastShape:
-		case kCastText: 	// fall-through
-			break;
-		default:
-			_width = dims.width();
-			_height = dims.height();
-			break;
 		}
 
 	} else {
-		if (_castId.member != 0 && debugChannelSet(kDebugImages, 2))
+		if (_castId.member != 0 && debugChannelSet(4, kDebugImages))
 			warning("Sprite::setCast(): %s is null", memberID.asString().c_str());
 	}
 }

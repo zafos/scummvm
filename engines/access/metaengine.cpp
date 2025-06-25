@@ -67,7 +67,7 @@ Common::Platform AccessEngine::getPlatform() const {
 
 } // End of namespace Access
 
-class AccessMetaEngine : public AdvancedMetaEngine {
+class AccessMetaEngine : public AdvancedMetaEngine<Access::AccessGameDescription> {
 public:
 	const char *getName() const override {
 		return "access";
@@ -75,11 +75,11 @@ public:
 
 	bool hasFeature(MetaEngineFeature f) const override;
 
-	Common::Error createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const override;
+	Common::Error createInstance(OSystem *syst, Engine **engine, const Access::AccessGameDescription *desc) const override;
 
 	SaveStateList listSaves(const char *target) const override;
 	int getMaximumSaveSlot() const override;
-	void removeSaveState(const char *target, int slot) const override;
+	bool removeSaveState(const char *target, int slot) const override;
 	SaveStateDescriptor querySaveMetaInfos(const char *target, int slot) const override;
 };
 
@@ -100,8 +100,7 @@ bool Access::AccessEngine::hasFeature(EngineFeature f) const {
 		(f == kSupportsSavingDuringRuntime);
 }
 
-Common::Error AccessMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {
-	const Access::AccessGameDescription *gd = (const Access::AccessGameDescription *)desc;
+Common::Error AccessMetaEngine::createInstance(OSystem *syst, Engine **engine, const Access::AccessGameDescription *gd) const {
 	switch (gd->gameID) {
 	case Access::GType_Amazon:
 		*engine = new Access::Amazon::AmazonEngine(syst, gd);
@@ -117,20 +116,18 @@ Common::Error AccessMetaEngine::createInstance(OSystem *syst, Engine **engine, c
 
 SaveStateList AccessMetaEngine::listSaves(const char *target) const {
 	Common::SaveFileManager *saveFileMan = g_system->getSavefileManager();
-	Common::StringArray filenames;
 	Common::String saveDesc;
 	Common::String pattern = Common::String::format("%s.0##", target);
+	Common::StringArray filenames = saveFileMan->listSavefiles(pattern);
 	Access::AccessSavegameHeader header;
-
-	filenames = saveFileMan->listSavefiles(pattern);
-
 	SaveStateList saveList;
-	for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
-		const char *ext = strrchr(file->c_str(), '.');
+
+	for (const auto &filename : filenames) {
+		const char *ext = strrchr(filename.c_str(), '.');
 		int slot = ext ? atoi(ext + 1) : -1;
 
 		if (slot >= 0 && slot < MAX_SAVES) {
-			Common::InSaveFile *in = g_system->getSavefileManager()->openForLoading(*file);
+			Common::InSaveFile *in = g_system->getSavefileManager()->openForLoading(filename);
 
 			if (in) {
 				if (Access::AccessEngine::readSavegameHeader(in, header))
@@ -150,9 +147,9 @@ int AccessMetaEngine::getMaximumSaveSlot() const {
 	return MAX_SAVES;
 }
 
-void AccessMetaEngine::removeSaveState(const char *target, int slot) const {
+bool AccessMetaEngine::removeSaveState(const char *target, int slot) const {
 	Common::String filename = Common::String::format("%s.%03d", target, slot);
-	g_system->getSavefileManager()->removeSavefile(filename);
+	return g_system->getSavefileManager()->removeSavefile(filename);
 }
 
 SaveStateDescriptor AccessMetaEngine::querySaveMetaInfos(const char *target, int slot) const {

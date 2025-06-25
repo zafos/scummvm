@@ -64,7 +64,7 @@ BaseFontTT::BaseFontTT(BaseGame *inGame) : BaseFont(inGame) {
 }
 
 //////////////////////////////////////////////////////////////////////////
-BaseFontTT::~BaseFontTT(void) {
+BaseFontTT::~BaseFontTT() {
 	clearCache();
 
 	for (uint32 i = 0; i < _layers.size(); i++) {
@@ -269,7 +269,7 @@ BaseSurface *BaseFontTT::renderTextToTexture(const WideString &text, int width, 
 
 	// TODO: This debug call does not work with WideString because text.c_str() returns an uint32 array.
 	//debugC(kWintermuteDebugFont, "%s %d %d %d %d", text.c_str(), RGBCOLGetR(_layers[0]->_color), RGBCOLGetG(_layers[0]->_color), RGBCOLGetB(_layers[0]->_color), RGBCOLGetA(_layers[0]->_color));
-//	void drawString(Surface *dst, const Common::String &str, int x, int y, int w, uint32 color, TextAlign align = kTextAlignLeft, int deltax = 0, bool useEllipsis = true) const;
+//	void drawAlphaString(Surface *dst, const Common::String &str, int x, int y, int w, uint32 color, TextAlign align = kTextAlignLeft, int deltax = 0, bool useEllipsis = true) const;
 	Graphics::Surface *surface = new Graphics::Surface();
 	surface->create((uint16)width, (uint16)(_lineHeight * lines.size()), _gameRef->_renderer->getPixelFormat());
 	uint32 useColor = 0xffffffff;
@@ -282,31 +282,12 @@ BaseSurface *BaseFontTT::renderTextToTexture(const WideString &text, int width, 
 		} else {
 			str = Common::convertBiDiU32String(*it, Common::BIDI_PAR_LTR);
 		}
-		_font->drawString(surface, str, 0, heightOffset, width, useColor, alignment);
+		_font->drawAlphaString(surface, str, 0, heightOffset, width, useColor, alignment);
 		heightOffset += (int)_lineHeight;
 	}
 
 	BaseSurface *retSurface = _gameRef->_renderer->createSurface();
-
-	if (_deletableFont) {
-		// Reconstruct the alpha channel of the font.
-
-		// Since we painted it with color 0xFFFFFFFF onto a black background,
-		// the alpha channel is gone, but the color value of each pixel corresponds
-		// to its original alpha value.
-
-		Graphics::PixelFormat format = _gameRef->_renderer->getPixelFormat();
-		uint32 *pixels = (uint32 *)surface->getPixels();
-
-		// This is a Surface we created ourselves, so no empty space between rows.
-		for (int i = 0; i < surface->w * surface->h; ++i) {
-			uint8 a, r, g, b;
-			format.colorToRGB(*pixels, r, g, b);
-			a = r;
-			*pixels++ = format.ARGBToColor(a, r, g, b);
-		}
-	}
-
+	retSurface->create(surface->w, surface->h);
 	retSurface->putSurface(*surface, true);
 	surface->free();
 	delete surface;
@@ -574,29 +555,28 @@ bool BaseFontTT::initFont() {
 		return STATUS_FAILED;
 	}
 #ifdef USE_FREETYPE2
-	Common::String fallbackFilename;
+	const char *fallbackFilename;
 	// Handle Bold atleast for the fallback-case.
 	// TODO: Handle italic. (Needs a test-case)
 	if (_isBold) {
-		fallbackFilename = "FreeSansBold.ttf";
+		fallbackFilename = "LiberationSans-Bold.ttf";
 	} else {
-		fallbackFilename = "FreeSans.ttf";
+		fallbackFilename = "LiberationSans-Regular.ttf";
 	}
 
-	Common::SeekableReadStream *file = BaseFileManager::getEngineInstance()->openFile(_fontFile);
+	// Load a file, but avoid having the File-manager handle the disposal of it.
+	Common::SeekableReadStream *file = BaseFileManager::getEngineInstance()->openFile(_fontFile, true, false);
 	if (!file) {
 		if (Common::String(_fontFile) != "arial.ttf") {
-			warning("%s has no replacement font yet, using FreeSans for now (if available)", _fontFile);
+			warning("%s has no replacement font yet, using %s for now (if available)", _fontFile, fallbackFilename);
 		}
-		// Fallback1: Try to find FreeSans.ttf
+		// Fallback1: Try to find the LiberationSans font
 		file = SearchMan.createReadStreamForMember(fallbackFilename);
 	}
 
 	if (file) {
-		_deletableFont = Graphics::loadTTFFont(*file, _fontHeight, Graphics::kTTFSizeModeCharacter, 96); // Use the same dpi as WME (96 vs 72).
+		_deletableFont = Graphics::loadTTFFont(file, DisposeAfterUse::YES, _fontHeight, Graphics::kTTFSizeModeCharacter, 96); // Use the same dpi as WME (96 vs 72).
 		_font = _deletableFont;
-		BaseFileManager::getEngineInstance()->closeFile(file);
-		file = nullptr;
 	}
 
 	// Fallback2: Try load the font from the common fonts archive:
@@ -604,19 +584,11 @@ bool BaseFontTT::initFont() {
 		_deletableFont = Graphics::loadTTFFontFromArchive(fallbackFilename, _fontHeight, Graphics::kTTFSizeModeCharacter, 96); // Use the same dpi as WME (96 vs 72).
 		_font = _deletableFont;
 	}
-
-	// Fallback3: Try to ask FontMan for the FreeSans.ttf ScummModern.zip uses:
-	if (!_font) {
-		// Really not desireable, as we will get a font with dpi-72 then
-		Common::String fontName = Common::String::format("%s-%s@%d", fallbackFilename.c_str(), "ASCII", _fontHeight);
-		warning("Looking for %s", fontName.c_str());
-		_font = FontMan.getFontByName(fontName);
-	}
 #else
 	warning("BaseFontTT::InitFont - FreeType2-support not compiled in, TTF-fonts will not be loaded");
 #endif // USE_FREETYPE2
 
-	// Fallback4: Just use the Big GUI-font. (REALLY undesireable)
+	// Fallback3: Just use the Big GUI-font. (REALLY undesirable)
 	if (!_font) {
 		_font = _fallbackFont = FontMan.getFontByUsage(Graphics::FontManager::kBigGUIFont);
 		warning("BaseFontTT::InitFont - Couldn't load font: %s", _fontFile);
@@ -640,6 +612,8 @@ void BaseFontTT::measureText(const WideString &text, int maxWidth, int maxHeight
 		Common::Array<WideString>::iterator it;
 		textWidth = 0;
 		for (it = lines.begin(); it != lines.end(); ++it) {
+			if (!it)
+				continue;
 			textWidth = MAX(textWidth, _font->getStringWidth(*it));
 		}
 

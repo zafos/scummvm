@@ -125,7 +125,7 @@ SoundClipWaveBase::SoundClipWaveBase(Audio::AudioStream *stream, bool repeat) :
 	_vol255 = 255;
 
 	if (repeat) {
-		Audio::SeekableAudioStream *str = dynamic_cast<Audio::SeekableAudioStream *>(stream);
+		Audio::RewindableAudioStream *str = dynamic_cast<Audio::RewindableAudioStream *>(stream);
 		if (str)
 			_stream = new Audio::LoopingAudioStream(str, 0);
 	}
@@ -259,12 +259,22 @@ void SoundClipWaveBase::set_panning(int newPanning) {
 }
 
 void SoundClipWaveBase::set_speed(int new_speed) {
-	warning("TODO: SoundClipWaveBase::set_speed");
 	_speed = new_speed;
+
+	if (!_stream) {
+		warning("set_speed: sound stream is null");
+		return;
+	}
+
+	// get initial channel rate
+	const uint32_t rate = _stream->getRate();
+
+	// default speed = 1000, calculate new sample rate proportionally
+	_mixer->setChannelRate(_soundHandle, rate * new_speed / 1000);
 }
 
 void SoundClipWaveBase::adjust_volume() {
-	_mixer->setChannelVolume(_soundHandle, _vol255);
+	_mixer->setChannelVolume(_soundHandle, get_final_volume());
 }
 
 } // namespace AGS3

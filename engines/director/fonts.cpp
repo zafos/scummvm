@@ -26,7 +26,6 @@
 
 #include "director/director.h"
 #include "director/cast.h"
-#include "director/util.h"
 
 namespace Director {
 
@@ -122,7 +121,7 @@ enum FXmpTokenType {
 	FXMP_TOKEN_ERROR
 };
 
-const char *FXmpTokenTypeStrings[] = {
+const char *const FXmpTokenTypeStrings[] = {
 	"WORD",
 	"INT",
 	"STRING",
@@ -344,10 +343,10 @@ bool Cast::readFXmpLine(Common::SeekableReadStreamEndian &stream) {
 
 			if (fromPlatform == Common::kPlatformMacintosh) {
 				_macCharsToWin[fromChar] = toChar;
-				debugC(3, kDebugLoading, "Cast::readFXmpLine: Mapping Mac char %d to Win char %d", fromChar, toChar);
+				debugC(8, kDebugLoading, "Cast::readFXmpLine: Mapping Mac char %d to Win char %d", fromChar, toChar);
 			} else {
 				_winCharsToMac[fromChar] = toChar;
-				debugC(3, kDebugLoading, "Cast::readFXmpLine: Mapping Win char %d to Mac char %d", fromChar, toChar);
+				debugC(8, kDebugLoading, "Cast::readFXmpLine: Mapping Win char %d to Mac char %d", fromChar, toChar);
 			}
 
 			tok = readFXmpToken(stream);
@@ -430,8 +429,8 @@ bool Cast::readFXmpLine(Common::SeekableReadStreamEndian &stream) {
 				_fontXPlatformMap[fromFont] = info;
 				debugC(3, kDebugLoading, "Cast::readFXmpLine: Mapping Win font '%s' to Mac font '%s'", fromFont.c_str(), info->toFont.c_str());
 				debugC(4, kDebugLoading, "  Remap characters: %d", info->remapChars);
-				for (FontSizeMap::iterator it = info->sizeMap.begin(); it != info->sizeMap.end(); ++it) {
-					debugC(4, kDebugLoading, "  Mapping size %d to %d", it->_key, it->_value);
+				for (auto &it : info->sizeMap) {
+					debugC(4, kDebugLoading, "  Mapping size %d to %d", it._key, it._value);
 				}
 			}
 		} else {

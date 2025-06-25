@@ -19,14 +19,21 @@
  *
  */
 
-/* RearWindow is a Mac only XObject. Its purpose is to cover the screen
+/*************************************
+ *
+ * USED IN:
+ * Alice: An Interactive Museum
+ *
+ *************************************/
+
+/*
+ * RearWindow is a Mac only XObject. Its purpose is to cover the screen
  * with either a 1-bit pattern, indexed color, direct(RGB) color, bitmappedCastMember
  * or PICT file picture.
  *
  * It does this when the Stage size is smaller than the monitor screen.
  *
  * Implemented as a no-op, since ScummVM doesn't handle desktop backgrounds.
- *
  */
 
 #include "director/director.h"
@@ -37,13 +44,14 @@
 
 namespace Director {
 
-const char *RearWindowXObj::xlibName = "RearWindow";
-const char *RearWindowXObj::fileNames[] = {
-	"Backdrop",
-	"RearWindow",
-	"RearWindow.Xobj",
-	"winXObj",
-	nullptr
+const char *const RearWindowXObj::xlibName = "RearWindow";
+const XlibFileDesc RearWindowXObj::fileNames[] = {
+	{ "RearWindow",			nullptr },
+	{ "RearWindow.Xobj",	nullptr },
+	{ "RearWindow XObj",	nullptr },
+	{ "RW.XOB",				nullptr },
+	{ "winXObj",			nullptr },
+	{ nullptr,				nullptr },
 };
 
 /*
@@ -224,7 +232,7 @@ X mDispose -- closes the RearWindow, releases its data, and the XObject itself f
 /I    mDevPixMapToWindow
 */
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",				RearWindowXObj::m_new,					1,	1,	400 },	// D4
 	{ "getappname",			RearWindowXObj::m_getAppName,			0,	0,	400 },	// D4
 	{ "GetMemoryNeeded",	RearWindowXObj::m_getMemoryNeeded,		0,	0,	400 },	// D4
@@ -238,7 +246,7 @@ static MethodProto xlibMethods[] = {
 	{ nullptr, nullptr, 0, 0, 0 }
 };
 
-void RearWindowXObj::open(int type) {
+void RearWindowXObj::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		RearWindowXObject::initMethods(xlibMethods);
 		RearWindowXObject *xobj = new RearWindowXObject(kXObj);
@@ -246,7 +254,7 @@ void RearWindowXObj::open(int type) {
 	}
 }
 
-void RearWindowXObj::close(int type) {
+void RearWindowXObj::close(ObjectType type) {
 	if (type == kXObj) {
 		RearWindowXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
@@ -254,7 +262,7 @@ void RearWindowXObj::close(int type) {
 }
 
 
-RearWindowXObject::RearWindowXObject(ObjectType ObjectType) :Object<RearWindowXObject>("RearWindowXObj") {
+RearWindowXObject::RearWindowXObject(ObjectType ObjectType) :Object<RearWindowXObject>("RearWindow") {
 	_objType = ObjectType;
 }
 

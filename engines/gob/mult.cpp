@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/endian.h"
@@ -129,10 +135,7 @@ void Mult::freeMult(bool freeObjectSprites) {
 		for (int i = 0; i < _objCount; i++) {
 			delete _objects[i].pPosX;
 			delete _objects[i].pPosY;
-			if (_objects[i].ownAnimVariables) {
-				delete _objects[i].animVariables;
-				_objects[i].animVariables = nullptr;
-			}
+			delete _objects[i].animVariables;
 
 			if (freeObjectSprites)
 				_vm->_draw->freeSprite(50 + i);

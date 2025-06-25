@@ -74,7 +74,7 @@ BrowserDialog::BrowserDialog(const Common::U32String &title, bool dirBrowser)
 	_showHiddenWidget = new CheckboxWidget(this, "Browser.Hidden", _("Show hidden files"), _("Show files marked with the hidden attribute"), kHiddenCmd);
 
 	// Buttons
-	if (g_system->getOverlayWidth() > 320)
+	if (!g_gui.useLowResGUI())
 		new ButtonWidget(this, "Browser.Up", _("Go up"), _("Go to previous directory level"), kGoUpCmd);
 	else
 		new ButtonWidget(this, "Browser.Up", _c("Go up", "lowres"), _("Go to previous directory level"), kGoUpCmd);
@@ -104,7 +104,7 @@ void BrowserDialog::open() {
 	Dialog::open();
 
 	if (ConfMan.hasKey("browser_lastpath"))
-		_node = Common::FSNode(ConfMan.get("browser_lastpath"));
+		_node = Common::FSNode(ConfMan.getPath("browser_lastpath"));
 
 	if (!_node.isDirectory())
 		_node = Common::FSNode(".");
@@ -119,7 +119,7 @@ void BrowserDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data
 	switch (cmd) {
 	//Search for typed-in directory
 	case kPathEditedCmd:
-		_node = Common::FSNode(Common::convertFromU32String(_currentPath->getEditString()));
+		_node = Common::FSNode(Common::Path(Common::convertFromU32String(_currentPath->getEditString()), Common::Path::kNativeSeparator));
 		updateListing();
 		break;
 	//Search by text input
@@ -166,7 +166,7 @@ void BrowserDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data
 	case kListSelectionChangedCmd:
 		// We do not allow selecting directories in directory
 		// browser mode, thus we will invalidate the selection
-		// when the user selects an directory over here.
+		// when the user selects a directory over here.
 		if (data != (uint32)-1 && _isDirBrowser && !_nodeContent[data].isDirectory())
 			_fileList->setSelected(-1);
 		break;
@@ -186,12 +186,12 @@ void BrowserDialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data
 
 void BrowserDialog::updateListing() {
 	// Update the path display
-	_currentPath->setEditString(_node.getPath());
+	_currentPath->setEditString(_node.getPath().toString(Common::Path::kNativeSeparator));
 
 	// We memorize the last visited path.
 	// Don't memorize a path that is not a directory
 	if (_node.isDirectory()) {
-		ConfMan.set("browser_lastpath", _node.getPath());
+		ConfMan.setPath("browser_lastpath", _node.getPath());
 	}
 
 	// Read in the data from the file system
@@ -203,18 +203,18 @@ void BrowserDialog::updateListing() {
 	// Populate the ListWidget
 	Common::U32StringArray list;
 	Common::U32String color = ListWidget::getThemeColor(ThemeEngine::kFontColorNormal);
-	for (Common::FSList::iterator i = _nodeContent.begin(); i != _nodeContent.end(); ++i) {
+	for (auto &node : _nodeContent) {
 		if (_isDirBrowser) {
-			if (i->isDirectory())
+			if (node.isDirectory())
 				color = ListWidget::getThemeColor(ThemeEngine::kFontColorNormal);
 			else
 				color = ListWidget::getThemeColor(ThemeEngine::kFontColorAlternate);
 		}
 
-		if (i->isDirectory())
-			list.push_back(color + ListWidget::escapeString(Common::U32String(i->getName()) + "/"));
+		if (node.isDirectory())
+			list.push_back(color + ListWidget::escapeString(Common::U32String(node.getName()) + "/"));
 		else
-			list.push_back(color + ListWidget::escapeString(Common::U32String(i->getName())));
+			list.push_back(color + ListWidget::escapeString(Common::U32String(node.getName())));
 	}
 
 	_fileList->setList(list);

@@ -23,7 +23,6 @@
 #include "common/config-manager.h"
 #include "common/memstream.h"
 #include "common/serializer.h"
-#include "graphics/palette.h"
 #include "graphics/scaler.h"
 #include "graphics/thumbnail.h"
 #include "mads/mads.h"
@@ -35,6 +34,7 @@
 #include "mads/msurface.h"
 #include "mads/resources.h"
 #include "mads/dragonsphere/game_dragonsphere.h"
+#include "mads/forest/game_forest.h"
 #include "mads/nebular/game_nebular.h"
 #include "mads/phantom/game_phantom.h"
 
@@ -49,9 +49,11 @@ Game *Game::init(MADSEngine *vm) {
 		return new Dragonsphere::GameDragonsphere(vm);
 	case GType_Phantom:
 		return new Phantom::GamePhantom(vm);
+	case GType_Forest:
+		return new Forest::GameForest(vm);
 #endif
 	default:
-		error("Game: Unknown game");
+		error("Game::init(): Unknown game");
 	}
 
 	return nullptr;
@@ -92,6 +94,10 @@ Game::Game(MADSEngine *vm)
 
 	// Load the quotes
 	loadQuotes();
+
+	// HACK for Forest
+	if (_vm->getGameID() == GType_Forest)
+		_aaName = "DISP_ED1.AA";
 }
 
 Game::~Game() {
@@ -430,27 +436,28 @@ void Game::handleKeypress(const Common::KeyState &kbd) {
 			}
 		}
 	}
+}
 
+void Game::handleAction(const Common::CustomEventType &action) {
 	Scene &scene = _vm->_game->_scene;
-	switch (kbd.keycode) {
-	case Common::KEYCODE_F1:
+	switch (action) {
+	case kActionGameMenu:
 		_vm->_dialogs->_pendingDialog = DIALOG_GAME_MENU;
 		break;
-	case Common::KEYCODE_F5:
+	case kActionSave:
 		_vm->_dialogs->_pendingDialog = DIALOG_SAVE;
 		break;
-	case Common::KEYCODE_F7:
+	case kActionRestore:
 		_vm->_dialogs->_pendingDialog = DIALOG_RESTORE;
 		break;
-	case Common::KEYCODE_PAGEUP:
+	case kActionScrollUp:
 		scene._userInterface._scrollbarStrokeType = SCROLLBAR_UP;
 		scene._userInterface.changeScrollBar();
 		break;
-	case Common::KEYCODE_PAGEDOWN:
+	case kActionScrollDown:
 		scene._userInterface._scrollbarStrokeType = SCROLLBAR_DOWN;
 		scene._userInterface.changeScrollBar();
 		break;
-
 
 	default:
 		break;
@@ -463,7 +470,14 @@ void Game::synchronize(Common::Serializer &s, bool phase1) {
 		s.syncAsSint16LE(_trigger);
 		s.syncAsUint16LE(_triggerSetupMode);
 		s.syncAsUint16LE(_triggerMode);
-		s.syncString(_aaName);
+		if (s.isSaving()) {
+			Common::String name(_aaName.toString('/'));
+			s.syncString(name);
+		} else {
+			Common::String name;
+			s.syncString(name);
+			_aaName = Common::Path(name, '/');
+		}
 		s.syncAsSint16LE(_lastSave);
 
 		_scene.synchronize(s);

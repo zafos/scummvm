@@ -27,14 +27,14 @@
 #include "ultima/ultima8/world/actors/teleport_to_egg_process.h"
 #include "ultima/ultima8/world/target_reticle_process.h"
 #include "ultima/ultima8/world/camera_process.h"
-#include "ultima/ultima8/graphics/shape_info.h"
+#include "ultima/ultima8/gfx/shape_info.h"
 #include "ultima/ultima8/ultima8.h"
 #include "ultima/ultima8/world/actors/avatar_death_process.h"
 #include "ultima/ultima8/kernel/delay_process.h"
 #include "ultima/ultima8/games/game_data.h"
-#include "ultima/ultima8/graphics/anim_dat.h"
-#include "ultima/ultima8/graphics/wpn_ovlay_dat.h"
-#include "ultima/ultima8/graphics/main_shape_archive.h"
+#include "ultima/ultima8/gfx/anim_dat.h"
+#include "ultima/ultima8/gfx/wpn_ovlay_dat.h"
+#include "ultima/ultima8/gfx/main_shape_archive.h"
 #include "ultima/ultima8/gumps/cru_pickup_area_gump.h"
 #include "ultima/ultima8/audio/audio_process.h"
 #include "ultima/ultima8/world/world.h"
@@ -98,10 +98,9 @@ bool MainActor::CanAddItem(Item *item, bool checkwghtvol) {
 		// valid item type?
 		if (equiptype == ShapeInfo::SE_NONE && !backpack) return false;
 
-		Std::list<Item *>::iterator iter;
-		for (iter = _contents.begin(); iter != _contents.end(); ++iter) {
-			uint32 cet = (*iter)->getShapeInfo()->_equipType;
-			bool cbackpack = ((*iter)->getShape() == backpack_shape);
+		for (const auto *i : _contents) {
+			uint32 cet = i->getShapeInfo()->_equipType;
+			bool cbackpack = (i->getShape() == backpack_shape);
 
 			// already have an item with the same equiptype
 			if (cet == equiptype || (cbackpack && backpack)) return false;
@@ -135,8 +134,7 @@ int16 MainActor::addItemCru(Item *item, bool showtoast) {
 		return 0;
 
 	int shapeno = item->getShape();
-	int32 x, y, z;
-	getLocation(x, y, z);
+	Point3 pt = getLocation();
 
 	CruPickupAreaGump *pickupArea = CruPickupAreaGump::get_instance();
 	assert(pickupArea);
@@ -177,7 +175,7 @@ int16 MainActor::addItemCru(Item *item, bool showtoast) {
 			} else {
 				item->setQuality(winfo->_clipSize);
 			}
-			item->setLocation(x, y, z);
+			item->setLocation(pt);
 			item->moveToContainer(this);
 			if (!_activeWeapon)
 				_activeWeapon = item->getObjId();
@@ -391,8 +389,7 @@ void MainActor::teleport(int mapNum, int32 x, int32 y, int32 z) {
 // all running processes
 void MainActor::teleport(int mapNum, int teleport_id) {
 	int oldmap = getMapNum();
-	int32 oldx, oldy, oldz;
-	getLocation(oldx, oldy, oldz);
+	Point3 old = getLocation();
 
 	World *world = World::get_instance();
 	CurrentMap *currentmap = world->getCurrentMap();
@@ -412,23 +409,22 @@ void MainActor::teleport(int mapNum, int teleport_id) {
 	TeleportEgg *egg = currentmap->findDestination(teleport_id);
 	if (!egg) {
 		warning("MainActor::teleport(): destination egg not found");
-		teleport(oldmap, oldx, oldy, oldz);
+		teleport(oldmap, old.x, old.y, old.z);
 		return;
 	}
-	int32 xv, yv, zv;
-	egg->getLocation(xv, yv, zv);
+	Point3 pt = egg->getLocation();
 
-	debugC(kDebugActor, "Found destination: %d, %d, %d", xv, yv, zv);
+	debugC(kDebugActor, "Found destination: %d, %d, %d", pt.x, pt.y, pt.z);
 	debugC(kDebugActor, "%s", egg->dumpInfo().c_str());
 
 	if (GAME_IS_CRUSADER) {
 		// Keep the camera on the avatar (the snap process will update on next move)
 		// We don't add a new camera process here, as that would update the fast area
 		// before the cachein calls above have run.
-		CameraProcess::GetCameraProcess()->moveToLocation(xv, yv, zv);
+		CameraProcess::GetCameraProcess()->moveToLocation(pt);
 	}
 
-	Actor::teleport(mapNum, xv, yv, zv);
+	Actor::teleport(mapNum, pt.x, pt.y, pt.z);
 
 	_justTeleported = true;
 }
@@ -436,10 +432,9 @@ void MainActor::teleport(int mapNum, int teleport_id) {
 uint16 MainActor::getDefenseType() const {
 	uint16 type = 0;
 
-	Std::list<Item *>::const_iterator iter;
-	for (iter = _contents.begin(); iter != _contents.end(); ++iter) {
-		uint32 frameNum = (*iter)->getFrame();
-		const ShapeInfo *si = (*iter)->getShapeInfo();
+	for (const auto *i : _contents) {
+		uint32 frameNum = i->getFrame();
+		const ShapeInfo *si = i->getShapeInfo();
 		if (si->_armourInfo) {
 			type |= si->_armourInfo[frameNum]._defenseType;
 		}
@@ -451,10 +446,9 @@ uint16 MainActor::getDefenseType() const {
 uint32 MainActor::getArmourClass() const {
 	uint32 armour = 0;
 
-	Std::list<Item *>::const_iterator iter;
-	for (iter = _contents.begin(); iter != _contents.end(); ++iter) {
-		uint32 frameNum = (*iter)->getFrame();
-		const ShapeInfo *si = (*iter)->getShapeInfo();
+	for (const auto *i : _contents) {
+		uint32 frameNum = i->getFrame();
+		const ShapeInfo *si = i->getShapeInfo();
 		if (si->_armourInfo) {
 			armour += si->_armourInfo[frameNum]._armourClass;
 		}
@@ -804,7 +798,7 @@ bool MainActor::loadData(Common::ReadStream *rs, uint32 version) {
 	}
 
 	uint8 namelength = rs->readByte();
-	_name.resize(namelength);
+	_name.assign(namelength, ' ');
 	for (unsigned int i = 0; i < namelength; ++i)
 		_name[i] = rs->readByte();
 
@@ -1025,7 +1019,7 @@ int MainActor::receiveShieldHit(int damage, uint16 damage_type) {
 			uint16 shieldstartframe;
 			uint16 shieldendframe;
 			bool remembersprite;
-			int32 x, y, z;
+			Point3 pt;
 
 			switch (shieldtype) {
 			case 1:
@@ -1035,27 +1029,27 @@ int MainActor::receiveShieldHit(int damage, uint16 damage_type) {
 				remembersprite = false;
 				// NOTE: In the game, this is put in the location of the
 				// hit.  For now just put in centre.
-				getCentre(x, y, z);
+				pt = getCentre();
 				break;
 			case 2:
 				shieldsprite = 0x5a9;
 				shieldstartframe = 0;
 				shieldendframe = 6;
 				remembersprite = false;
-				getCentre(x, y, z);
+				pt = getCentre();
 				break;
 			default:
 				shieldsprite = 0x52b;
 				shieldstartframe = 0;
 				shieldendframe = 8;
-				getLocation(x, y, z);
-				x += 0x10;
-				y += 0x18;
+				pt = getLocation();
+				pt.x += 0x10;
+				pt.y += 0x18;
 				remembersprite = true;
 				break;
 			}
 			Process *p = new SpriteProcess(shieldsprite, shieldstartframe,
-										   shieldendframe, 1, 4, x, y, z);
+										   shieldendframe, 1, 4, pt.x, pt.y, pt.z);
 			kernel->addProcess(p);
 			if (remembersprite) {
 				_shieldSpriteProc = p->getPid();

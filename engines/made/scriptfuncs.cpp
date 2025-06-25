@@ -42,7 +42,6 @@ ScriptFunctions::ScriptFunctions(MadeEngine *vm) : _vm(vm), _soundStarted(false)
 	_vm->_system->getMixer()->playStream(Audio::Mixer::kMusicSoundType, &_pcSpeakerHandle1, _pcSpeaker1);
 	_vm->_system->getMixer()->playStream(Audio::Mixer::kMusicSoundType, &_pcSpeakerHandle2, _pcSpeaker2);
 	_soundResource = nullptr;
-	_musicRes = nullptr;
 }
 
 ScriptFunctions::~ScriptFunctions() {
@@ -271,41 +270,21 @@ int16 ScriptFunctions::sfPlayMusic(int16 argc, int16 *argv) {
 
 	_vm->_musicBeatStart = _vm->_system->getMillis();
 
-	if (_vm->getGameID() == GID_RTZ) {
-		if (musicNum > 0) {
-			_musicRes = _vm->_res->getXmidi(musicNum);
-			if (_musicRes)
-				_vm->_music->playXMIDI(_musicRes);
-		}
-	} else {
-		// HACK: music number 2 in LGOP2 is file MT32SET.TON, which
-		// is used to set the MT32 instruments. This is not loaded
-		// correctly and the game freezes, and since we don't support
-		// MT32 music yet, we ignore it here
-		// FIXME: Remove this hack and handle this file properly
-		if (_vm->getGameID() == GID_LGOP2 && musicNum == 2)
-			return 0;
-		if (musicNum > 0) {
-			_musicRes = _vm->_res->getMidi(musicNum);
-			if (_musicRes)
-				_vm->_music->playSMF(_musicRes);
-		}
-	}
+	if (_vm->_music)
+		_vm->_music->play(musicNum);
 
 	return 0;
 }
 
 int16 ScriptFunctions::sfStopMusic(int16 argc, int16 *argv) {
-	if (_vm->_music->isPlaying() && _musicRes) {
+	if (_vm->_music && _vm->_music->isPlaying()) {
 		_vm->_music->stop();
-		_vm->_res->freeResource(_musicRes);
-		_musicRes = nullptr;
 	}
 	return 0;
 }
 
 int16 ScriptFunctions::sfIsMusicPlaying(int16 argc, int16 *argv) {
-	if (_vm->_music->isPlaying())
+	if (_vm->_music && _vm->_music->isPlaying())
 		return 1;
 	else
 		return 0;
@@ -501,7 +480,7 @@ int16 ScriptFunctions::sfDrawText(int16 argc, int16 *argv) {
 
 	if (_vm->getGameID() == GID_RTZ) {
 		text = _vm->_dat->getObjectString(argv[argc - 1]);
-	} if (_vm->getGameID() == GID_LGOP2 || _vm->getGameID() == GID_MANHOLE || _vm->getGameID() == GID_RODNEY) {
+	} else if (_vm->getGameID() == GID_LGOP2 || _vm->getGameID() == GID_MANHOLE || _vm->getGameID() == GID_RODNEY) {
 		text = _vm->_dat->getString(argv[argc - 1]);
 	}
 
@@ -580,7 +559,7 @@ int16 ScriptFunctions::sfLoadMouseCursor(int16 argc, int16 *argv) {
 	PictureResource *flex = _vm->_res->getPicture(argv[2]);
 	if (flex) {
 		Graphics::Surface *surf = flex->getPicture();
-		CursorMan.replaceCursor(surf->getPixels(), surf->w, surf->h, argv[1], argv[0], 0);
+		CursorMan.replaceCursor(*surf, argv[1], argv[0], 0);
 		_vm->_res->freeResource(flex);
 	}
 	return 0;
@@ -782,12 +761,10 @@ int16 ScriptFunctions::sfLoadSound(int16 argc, int16 *argv) {
 }
 
 int16 ScriptFunctions::sfLoadMusic(int16 argc, int16 *argv) {
-	GenericResource *xmidi = _vm->_res->getXmidi(argv[0]);
-	if (xmidi) {
-		_vm->_res->freeResource(xmidi);
+	if (_vm->_music && _vm->_music->load(argv[0]))
 		return 1;
-	}
-	return 0;
+	else
+		return 0;
 }
 
 int16 ScriptFunctions::sfLoadPicture(int16 argc, int16 *argv) {

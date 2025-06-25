@@ -58,7 +58,7 @@ public:
 	virtual bool increaseAnims(Actor *a) = 0;
 	virtual void costumeDecodeData(Actor *a, int frame, uint usemask) = 0;
 
-	bool hasManyDirections(int id) { return false; }
+	virtual bool hasManyDirections(int id) { return false; }
 };
 
 
@@ -142,6 +142,8 @@ public:
 		_width = _height = 0;
 		_skipLimbs = false;
 		_paletteNum = 0;
+		_actorDrawVirScr = false;
+		_numBlocks = 0;
 	}
 	virtual ~BaseCostumeRenderer() {}
 

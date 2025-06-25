@@ -217,7 +217,7 @@ void SoundManager::installDriver(int driverNum) {
 	switch (driverNum) {
 	case ROLAND_DRIVER_NUM:
 	case ADLIB_DRIVER_NUM: {
-		// Handle loading bank infomation
+		// Handle loading bank information
 		byte *bankData = g_resourceManager->getResource(RES_BANK, driverNum, 0, true);
 		if (bankData) {
 			// Install the patch bank data
@@ -2553,7 +2553,7 @@ PlayStream::~PlayStream() {
 	remove();
 }
 
-bool PlayStream::setFile(const Common::String &filename) {
+bool PlayStream::setFile(const Common::Path &filename) {
 	remove();
 
 	// Open the resource file for access

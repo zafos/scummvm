@@ -30,9 +30,15 @@ enum {
 	kFewFamesMaxCounter = 19,
 };
 
+enum {
+	kShotColorDiffThreshold = 2,
+	kShotPercentPixelThreshold = 1
+};
+
 #define kQuirksCacheArchive "quirks"
 
 enum MovieFlag {
+	kMovieFlagRemapPalettesWhenNeeded =  (1 << 6),
 	kMovieFlagAllowOutdatedLingo	= (1 << 8)
 };
 
@@ -50,7 +56,8 @@ enum CastType {
 	kCastMovie = 9,
 	kCastDigitalVideo = 10,
 	kCastLingoScript = 11,
-	kCastRTE = 12
+	kCastRichText = 12,
+	kCastTransition = 14,
 };
 
 enum ScriptType {
@@ -60,7 +67,17 @@ enum ScriptType {
 	kMovieScript = 2,
 	kEventScript = 3,
 	kTestScript = 4,
-	kMaxScriptType = 4	// Sync with types.cpp:28, array scriptTypes[]
+	kParentScript = 7,
+	kMaxScriptType = 7	// Sync with types.cpp:28, array scriptTypes[]
+};
+
+enum EventHandlerSourceType {
+	kNoneHandler = 0,
+	kPrimaryHandler = 1,
+	kSpriteHandler = 2,
+	kCastHandler = 3,
+	kFrameHandler = 4,
+	kMovieHandler = 5
 };
 
 enum ScriptFlag {
@@ -116,15 +133,6 @@ enum TextFlag {
 	kTextFlagEditable	= (1 << 0),
 	kTextFlagAutoTab	= (1 << 1),
 	kTextFlagDoNotWrap	= (1 << 2)
-};
-
-enum SizeType {
-	kSizeNone,
-	kSizeSmallest,
-	kSizeSmall,
-	kSizeMedium,
-	kSizeLarge,
-	kSizeLargest
 };
 
 enum ButtonType {
@@ -184,17 +192,18 @@ enum InkType {
 	kInkTypeDark
 };
 
+// ID matches up to the fake cast member ID used by EventScript
 enum LEvent {
-	kEventPrepareMovie,
+	kEventPrepareMovie, // 0
 	kEventStartMovie,
 	kEventStepMovie,
 	kEventStopMovie,
 
-	kEventNew,
+	kEventNew, // 4
 	kEventBeginSprite,
 	kEventEndSprite,
 
-	kEventNone,
+	kEventNone, // 7
 	kEventGeneric,
 	kEventEnterFrame,
 	kEventPrepareFrame,
@@ -203,14 +212,15 @@ enum LEvent {
 	kEventExitFrame,
 	kEventTimeout,
 
-	kEventActivateWindow,
+	kEventActivateWindow, // 15
 	kEventDeactivateWindow,
 	kEventMoveWindow,
 	kEventResizeWindow,
 	kEventOpenWindow,
 	kEventCloseWindow,
+	kEventZoomWindow,
 
-	kEventKeyUp,
+	kEventKeyUp, // 22
 	kEventKeyDown,
 	kEventMouseUp,
 	kEventMouseDown,
@@ -221,9 +231,9 @@ enum LEvent {
 	kEventMouseUpOutSide,
 	kEventMouseWithin,
 
-	kEventStartUp,
+	kEventStartUp, // 32
 
-	kEventMenuCallback
+	kEventMenuCallback // 33
 };
 
 enum TransitionType {
@@ -282,6 +292,11 @@ enum TransitionType {
 	kTransDissolveBits
 };
 
+enum RenderMode {
+	kRenderModeNormal,
+	kRenderForceUpdate
+};
+
 // TODO: Can there be any more built-in palette types?
 enum PaletteType {
 	kClutSystemMac = -1,
@@ -291,7 +306,8 @@ enum PaletteType {
 	kClutVivid = -5,
 	kClutNTSC = -6,
 	kClutMetallic = -7,
-	kClutSystemWin = -101
+	kClutSystemWin = -101,
+	kClutSystemWinD5 = -102
 };
 
 enum {
@@ -305,8 +321,11 @@ enum DirectorCursor {
 
 enum PlayState {
 	kPlayNotStarted,
+	kPlayLoaded,
 	kPlayStarted,
-	kPlayStopped
+	kPlayStopped,
+	kPlayPaused,
+	kPlayPausedAfterLoading,
 };
 
 enum SymbolType {
@@ -316,6 +335,8 @@ enum SymbolType {
 	FBLTIN,	// builtin function
 	HBLTIN,	// builtin handler (can be called as either command or func)
 	KBLTIN,	// builtin constant
+	FBLTIN_LIST, // builtin function w/list override check
+	HBLTIN_LIST, // builtin handler w/list override check
 	HANDLER	// user-defined handler
 };
 
@@ -326,7 +347,7 @@ enum ChunkType {
 	kChunkLine
 };
 
-enum {
+enum FileVer {
 	kFileVer300 = 0x404,
 	kFileVer310 = 0x405,
 	kFileVer400 = 0x45B,
@@ -347,18 +368,22 @@ enum DatumType {
 	ARGCNORET,
 	ARRAY,
 	CASTREF,
+	CASTLIBREF,
 	CHUNKREF,
 	FIELDREF,
 	FLOAT,
 	GLOBALREF,
 	INT,
 	LOCALREF,
+	MEDIA,
 	MENUREF,
 	OBJECT,
 	PARRAY,
+	PICTUREREF,
 	POINT,
 	PROPREF,
 	RECT,
+	SPRITEREF,
 	STRING,
 	SYMBOL,
 	VARREF,
@@ -378,6 +403,7 @@ enum LPPFlag {
 	kLPPNone = 0,
 	kLPPSimple = 1 << 0,
 	kLPPForceD2 = 1 << 1,
+	kLPPTrimGarbage = 1 << 2,
 };
 
 struct CastMemberID {
@@ -388,23 +414,39 @@ struct CastMemberID {
 	CastMemberID(int memberID, int castLibID)
 		: member(memberID), castLib(castLibID) {}
 
-	bool operator==(const CastMemberID &c) {
+	bool operator==(const CastMemberID &c) const {
 		return member == c.member && castLib == c.castLib;
 	}
-	bool operator!=(const CastMemberID &c) {
+	bool operator!=(const CastMemberID &c) const {
 		return member != c.member || castLib != c.castLib;
 	}
 
-	bool isNull() { return member == 0 && castLib == 0; }
+	bool isNull() const { return member == 0 && castLib == 0; }
 
 	Common::String asString() const;
+
+	uint hash() const { return ((castLib & 0xffff) << 16) + (member & 0xffff); }
+
+	CastMemberID fromMultiplex(int multiplexID) {
+		if (multiplexID < 0)
+			return CastMemberID(multiplexID, -1);
+		return CastMemberID(multiplexID % 0x20000, 1 + (multiplexID >> 17));
+	}
+
+	int toMultiplex() {
+		if (castLib < 0)
+			return member;
+		return (member % 0x20000) + ((castLib - 1) << 17);
+	}
 };
 
 enum CompareResult {
-	kCompareLess,
-	kCompareEqual,
-	kCompareGreater,
-	kCompareError
+	kCompareLess	        = 1 << 0,
+	kCompareEqual           = 1 << 1,
+	kCompareGreater         = 1 << 2,
+	kCompareLessEqual       = 1 << 3,
+	kCompareGreaterEqual    = 1 << 4,
+	kCompareError			= 1 << 5,
 };
 
 enum DebugDrawModes {
@@ -420,7 +462,35 @@ typedef Common::Array<PCell> PropertyArray;
 const char *scriptType2str(ScriptType scr);
 const char *castType2str(CastType type);
 const char *spriteType2str(SpriteType type);
+const char *inkType2str(InkType type);
+const char *symbolType2str(SymbolType type);
+Common::String objectType2str(int fl);
+
+enum CollisionTest {
+	kCollisionNo = 0,
+	kCollisionYes,
+	kCollisionHole,
+};
 
 } // End of namespace Director
+
+namespace Common {
+
+template<>
+struct Hash<Director::CastMemberID> {
+	uint operator()(const Director::CastMemberID &id) const {
+		return id.hash();
+	}
+};
+
+template<>
+struct Hash<Director::LEvent> {
+	uint operator()(const Director::LEvent &event) const {
+		return event;
+	}
+};
+
+
+} // End of namespace Common
 
 #endif

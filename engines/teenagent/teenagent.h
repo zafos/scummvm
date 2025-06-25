@@ -64,17 +64,17 @@ class Pack;
 
 // Engine Debug Flags
 enum {
-	kDebugActor     = (1 << 0),
-	kDebugAnimation = (1 << 1),
-	kDebugCallbacks = (1 << 2),
-	kDebugDialog    = (1 << 3),
-	kDebugFont      = (1 << 4),
-	kDebugInventory = (1 << 5),
-	kDebugMusic     = (1 << 6),
-	kDebugObject    = (1 << 7),
-	kDebugPack      = (1 << 8),
-	kDebugScene     = (1 << 9),
-	kDebugSurface   = (1 << 10)
+	kDebugActor = 1,
+	kDebugAnimation,
+	kDebugCallbacks,
+	kDebugDialog,
+	kDebugFont,
+	kDebugInventory,
+	kDebugMusic,
+	kDebugObject,
+	kDebugPack,
+	kDebugScene,
+	kDebugSurface,
 };
 
 const uint16 kScreenWidth = 320;
@@ -89,8 +89,8 @@ public:
 	Common::String getSaveStateName(int slot) const override;
 	Common::Error loadGameState(int slot) override;
 	Common::Error saveGameState(int slot, const Common::String &desc, bool isAutosave = false) override;
-	bool canLoadGameStateCurrently() override { return true; }
-	bool canSaveGameStateCurrently() override { return !_sceneBusy; }
+	bool canLoadGameStateCurrently(Common::U32String *msg = nullptr) override { return true; }
+	bool canSaveGameStateCurrently(Common::U32String *msg = nullptr) override { return !_sceneBusy; }
 	bool hasFeature(EngineFeature f) const override;
 
 	void init();
@@ -112,9 +112,9 @@ public:
 	Common::String parseMessage(uint16 addr);
 
 	//event driven:
-	void displayMessage(uint16 addr, byte color = textColorMark, uint16 x = 0, uint16 y = 0);
-	void displayMessage(const Common::String &str, byte color = textColorMark, uint16 x = 0, uint16 y = 0);
-	void displayAsyncMessage(uint16 addr, uint16 x, uint16 y, uint16 firstFrame, uint16 lastFrame, byte color = textColorMark);
+	void displayMessage(uint16 addr, CharacterID characterID = kMark, uint16 x = 0, uint16 y = 0);
+	void displayMessage(const Common::String &str, CharacterID characterID = kMark, uint16 x = 0, uint16 y = 0);
+	void displayAsyncMessage(uint16 addr, uint16 x, uint16 y, uint16 firstFrame, uint16 lastFrame, CharacterID characterID = kMark);
 	void displayAsyncMessageInSlot(uint16 addr, byte slot, uint16 firstFrame, uint16 lastFrame, byte color = textColorMark);
 	void displayCredits(uint16 addr, uint16 timer = 0);
 	void displayCutsceneMessage(uint16 addr, uint16 x, uint16 y);
@@ -160,6 +160,13 @@ public:
 
 	void setMusic(byte id);
 
+	void sayText(const Common::String &text);
+	void stopTextToSpeech();
+	void setTTSVoice(CharacterID characterID) const;
+	Common::U32String convertCyrillic(const Common::String &text) const;
+
+	Common::String _previousSaid;
+	
 private:
 	void processObject();
 	bool trySelectedObject();

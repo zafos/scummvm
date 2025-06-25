@@ -63,7 +63,6 @@ private:
 	void sound_play();
 	void playSFX(int nr);
 	void playMusic();
-	byte fetchSoundByte(int nr);
 	void chainCommand(int chan);
 	void checkSilenceChannels(int chan);
 
@@ -100,12 +99,9 @@ private:
 
 	bool isSFXplaying, wasSFXplaying;
 
-	byte *dataStart;
 	int numNotes;
 	byte *auxData1;
 	byte *auxData2;
-
-	byte *soundptr;
 };
 
 } // End of namespace Scumm

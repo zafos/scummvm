@@ -52,6 +52,8 @@ public:
 
 	void setGroupHeaderFormat(const Common::U32String &prefix, const Common::U32String &suffix);
 	void groupByAttribute();
+	void loadClosedGroups(const Common::U32String &groupName);
+	void saveClosedGroups(const Common::U32String &groupName);
 
 	void setSelected(int item);
 	int getSelected() const { return (_selectedItem == -1) ? _selectedItem : _listIndex[_selectedItem]; }
@@ -65,12 +67,16 @@ public:
 
 	void setGroupsVisibility(bool val) { _groupsVisible = val; }
 
+	int getItemPos(int item);
+	int getNewSel(int index);
+
 	void startEditMode() override { error("Edit mode is not supported for Grouped Lists"); }
 
 protected:
 	void sortGroups();
 	void toggleGroup(int groupID);
 	void drawWidget() override;
+	int findDataIndex(int) const;
 };
 
 } // End of namespace GUI

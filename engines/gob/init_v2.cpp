@@ -17,6 +17,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
+ *
+ * This file is dual-licensed.
+ * In addition to the GPLv3 license mentioned above, this code is also
+ * licensed under LGPL 2.1. See LICENSES/COPYING.LGPL file for the
+ * full text of the license.
+ *
  */
 
 #include "common/endian.h"
@@ -46,11 +52,12 @@ void Init_v2::initVideo() {
 
 	_vm->_global->_colorCount = 16;
 	if (!_vm->isEGA() &&
-	   ((_vm->getPlatform() == Common::kPlatformDOS) ||
-	     (_vm->getPlatform() == Common::kPlatformMacintosh) ||
-	     (_vm->getPlatform() == Common::kPlatformWindows)) &&
-	    ((_vm->_global->_videoMode == 0x13) ||
-	     (_vm->_global->_videoMode == 0x14)))
+		!_vm->is16Colors() &&
+		((_vm->getPlatform() == Common::kPlatformDOS) ||
+		 (_vm->getPlatform() == Common::kPlatformMacintosh) ||
+		 (_vm->getPlatform() == Common::kPlatformWindows)) &&
+		((_vm->_global->_videoMode == 0x13) ||
+		 (_vm->_global->_videoMode == 0x14)))
 		_vm->_global->_colorCount = 256;
 
 	_vm->_global->_pPaletteDesc = &_vm->_global->_paletteStruct;

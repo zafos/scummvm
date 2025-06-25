@@ -22,6 +22,8 @@
 #include "common/config-manager.h"
 #include "common/translation.h"
 
+#include "engines/metaengine.h"
+
 #include "graphics/macgui/macwindowmanager.h"
 #include "graphics/macgui/macmenu.h"
 
@@ -179,12 +181,22 @@ void PinkEngine::initMenu() {
 
 	Graphics::MacMenuSubMenu *subMenu = _menu->getSubmenu(nullptr, 0);
 	if (subMenu) {
+
+		if (isPerilDemo()) {
+			// From the first submenu ("Game"), disable the (zero indexed) item 5 ("Songs").
+			// Use setEnabled() rather than removeMenuItem() since the latter removes the item
+			// out of the list changing the index for the items that follow.
+			// The effect is that "Songs" will be greyed out for the demo, since it's not available for it.
+			// The original demo does not have the "Songs" item in the menu at all.
+			_menu->setEnabled( _menu->getSubMenuItem(_menu->getMenuItem(0), 5), false);
+		}
+
 		SaveStateList saves = listSaves();
 		if (!saves.empty()) {
 			_menu->removeMenuItem(subMenu, kRecentSaveId);
 			int maxSaves = saves.size() > kMaxSaves ? kMaxSaves : saves.size();
 			for (int i = 0; i < maxSaves; ++i) {
-				_menu->insertMenuItem(subMenu, Common::U32String::format("%i. %S", i + 1, saves[i].getDescription().u32_str()),
+				_menu->insertMenuItem(subMenu, Common::U32String::format("%i. %S", i + 1, saves[i].getDescription().c_str()),
 										kRecentSaveId + i, saves[i].getSaveSlot() + kRecentSavesOffset);
 			}
 		}
@@ -210,8 +222,7 @@ void PinkEngine::executeMenuCommand(uint id) {
 
 	switch (id) {
 	case kNewGameAction: {
-		const Common::String moduleName = _modules[0]->getName();
-		initModule(moduleName, "", nullptr);
+		initModule(_modules[0]->getName(), "", nullptr);
 		break;
 	}
 	case kLoadSave:
@@ -229,6 +240,7 @@ void PinkEngine::executeMenuCommand(uint id) {
 	case kExitAction:
 		openMainMenuDialog();
 		break;
+
 	case kSongsAction:
 		initModule("Muzik", "", nullptr);
 		break;
@@ -301,10 +313,10 @@ bool PinkEngine::executePageChangeCommand(uint id) {
 }
 
 void PinkEngine::openLocalWebPage(const Common::String &pageName) const {
-	Common::FSNode gameFolder = Common::FSNode(ConfMan.get("path"));
+	Common::FSNode gameFolder = Common::FSNode(ConfMan.getPath("path"));
 	Common::FSNode filePath = gameFolder.getChild("INSTALL").getChild(pageName);
 	if (filePath.exists()) {
-		Common::String fullUrl = Common::String::format("file:///%s", filePath.getPath().c_str());
+		Common::String fullUrl = Common::String::format("file:///%s", filePath.getPath().toString('/').c_str());
 		_system->openUrl(fullUrl);
 	}
 }

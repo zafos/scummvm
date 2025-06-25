@@ -19,7 +19,7 @@
  *
  */
 
-#include "common/math.h"
+#include "common/file.h"
 #include "math/ray.h"
 
 #include "tetraedge/tetraedge.h"
@@ -166,30 +166,31 @@ Math::Ray TeCamera::getRay(const TeVector2s32 &pxloc) {
 }
 
 void TeCamera::loadXml(const Common::Path &path) {
-	setName(path.getLastComponent().toString());
+	setName(path.baseName());
 	_projectionMatrixType = 3;
 	TeCore *core = g_engine->getCore();
-	Common::FSNode node = core->findFile(path);
-	if (!node.isReadable()) {
-		warning("Can't open camera data %s", path.toString().c_str());
+	TetraedgeFSNode cameraNode = core->findFile(path);
+	if (!cameraNode.isReadable()) {
+		//
+		// WORKAROUND: scenes/A3_Village/34015 has Camera34010, not 34015
+		//
+		Common::String spath = path.toString();
+		size_t pos = spath.find("34015.xml");
+		if (pos != Common::String::npos) {
+			spath.replace(pos + 4, 1, "0");
+		}
+		cameraNode = core->findFile(Common::Path(spath, '/'));
+	}
+	if (!cameraNode.isReadable()) {
+		warning("Can't open camera data %s", cameraNode.toString().c_str());
 	}
 	TeCameraXmlParser parser;
 	parser._cam = this;
-	if (!parser.loadFile(node))
-		error("TeCamera::loadXml: can't load file %s", node.getPath().c_str());
+	if (!cameraNode.loadXML(parser))
+		error("TeCamera::loadXml: can't load file %s", cameraNode.toString().c_str());
 	if (!parser.parse())
-		error("TeCamera::loadXml: error parsing %s", node.getPath().c_str());
+		error("TeCamera::loadXml: error parsing %s", cameraNode.toString().c_str());
 }
-
-/*
-void TeCamera::loadBin(const Common::Path &path) {
-	error("TODO: Implement TeCamera::loadBin");
-}
-
-void TeCamera::loadBin(const Common::ReadStream &stream) {
-	error("TODO: Implement TeCamera::loadBin");
-}
-*/
 
 void TeCamera::orthogonalParams(float left, float right, float top, float bottom) {
 	_orthogonalParamL = left;
@@ -216,12 +217,30 @@ TeMatrix4x4 TeCamera::projectionMatrix() {
 	return _projectionMatrix;
 }
 
-TeVector3f32 TeCamera::projectPoint(const TeVector3f32 &pt) {
-	error("TODO: Implement TeCamera::projectPoint");
+TeVector2f32 TeCamera::projectPoint(const TeVector3f32 &pt) {
+	_rotation.normalize();
+	TeMatrix4x4 worldInverse = worldTransformationMatrix();
+	worldInverse.inverse();
+	const TeVector3f32 projectedPt = _projectionMatrix * worldInverse * pt;
+	int halfViewportW = (int)_viewportW / 2;
+	int halfViewportH = (int)_viewportH / 2;
+
+	float projectedX = halfViewportW * (projectedPt.x() + 1.0) + _viewportX;
+	float projectedY = halfViewportH * (1.0 - projectedPt.y()) + _viewportY;
+	return TeVector2f32(projectedX, projectedY);
 }
 
 TeVector3f32 TeCamera::projectPoint3f32(const TeVector3f32 &pt) {
-	error("TODO: Implement TeCamera::projectPoint3f32");
+	_rotation.normalize();
+	TeMatrix4x4 worldInverse = worldTransformationMatrix();
+	worldInverse.inverse();
+	const TeVector3f32 projectedPt = _projectionMatrix * worldInverse * pt;
+	int halfViewportW = (int)_viewportW / 2;
+	int halfViewportH = (int)_viewportH / 2;
+
+	float projectedX = halfViewportW * (projectedPt.x() + 1.0) + _viewportX;
+	float projectedY = halfViewportH * (1.0 - projectedPt.y()) + _viewportY;
+	return TeVector3f32(projectedX, projectedY, projectedPt.z());
 }
 
 void TeCamera::restore() {
@@ -242,8 +261,17 @@ TeMatrix4x4 TeCamera::transformationMatrix() {
 }
 
 TeVector3f32 TeCamera::transformCoord(const TeVector3f32 &pt) {
-	warning("TODO: Implement TeCamera::transformCoord");
-	return pt;
+	_rotation.normalize();
+	TeQuaternion rot(-_rotation.x(), -_rotation.y(), -_rotation.z(), _rotation.w());
+	const TeMatrix4x4 rotMatrix = rot.toTeMatrix();
+	const TeVector3f32 transPt = (_projectionMatrix * rotMatrix) * pt;
+	const int halfVPWidth = abs((int)(_viewportW / 2));
+	const int halfVPHeight = abs((int)(_viewportH / 2));
+	TeVector3f32 retval;
+	retval.x() = halfVPWidth * (transPt.x() + 1);
+	retval.y() = halfVPHeight * (transPt.y() + 1);
+	retval.z() = transPt.z();
+	return retval;
 }
 
 TeVector3f32 TeCamera::transformPoint2Dto3D(const TeVector3f32 &pt) {

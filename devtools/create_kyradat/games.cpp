@@ -36,6 +36,8 @@ const Game kyra1Games[] = {
 
 	{ kKyra1, kPlatformAmiga, kNoSpecial, EN_ANY },
 	{ kKyra1, kPlatformAmiga, kNoSpecial, DE_DEU },
+	{ kKyra1, kPlatformAmiga, kNoSpecial, FR_FRA },
+	{ kKyra1, kPlatformAmiga, kNoSpecial, IT_ITA },
 
 	{ kKyra1, kPlatformDOS, kNoSpecial, EN_ANY },
 	{ kKyra1, kPlatformDOS, kNoSpecial, DE_DEU },
@@ -43,6 +45,7 @@ const Game kyra1Games[] = {
 	{ kKyra1, kPlatformDOS, kNoSpecial, IT_ITA },
 	{ kKyra1, kPlatformDOS, kNoSpecial, ES_ESP },
 	{ kKyra1, kPlatformDOS, kOldFloppy, RU_RUS },
+	{ kKyra1, kPlatformDOS, kOldFloppy, CS_CZE },
 	{ kKyra1, kPlatformDOS, kNoSpecial, KO_KOR },
 	{ kKyra1, kPlatformDOS, kNoSpecial, ZH_TWN },
 
@@ -53,6 +56,7 @@ const Game kyra1Games[] = {
 	{ kKyra1, kPlatformDOS, kTalkieVersion, ES_ESP },
 	//{ kKyra1, kPlatformDOS, kTalkieVersion, RU_RUS },
 	{ kKyra1, kPlatformDOS, kTalkieVersion, HE_ISR },
+	{ kKyra1, kPlatformDOS, kTalkieVersion, CS_CZE },
 
 	{ kKyra1, kPlatformFMTowns, kNoSpecial, EN_ANY },
 	{ kKyra1, kPlatformFMTowns, kNoSpecial, JA_JPN },
@@ -82,6 +86,7 @@ const Game kyra2Games[] = {
 	{ kKyra2, kPlatformDOS, kNoSpecial, RU_RUS },
 	{ kKyra2, kPlatformDOS, kNoSpecial, ES_ESP },
 	{ kKyra2, kPlatformDOS, kNoSpecial, ZH_TWN },
+	{ kKyra2, kPlatformDOS, kNoSpecial, PL_POL },
 
 	{ kKyra2, kPlatformDOS, kTalkieVersion, EN_ANY },
 	{ kKyra2, kPlatformDOS, kTalkieVersion, FR_FRA },
@@ -90,6 +95,7 @@ const Game kyra2Games[] = {
 	//{ kKyra2, kPlatformDOS, kTalkieVersion, RU_RUS },
 	{ kKyra2, kPlatformDOS, kTalkieVersion, ES_ESP },
 	{ kKyra2, kPlatformDOS, kTalkieVersion, HE_ISR },
+	{ kKyra2, kPlatformDOS, kTalkieVersion, CS_CZE },
 
 	{ kKyra2, kPlatformFMTowns, kNoSpecial, EN_ANY },
 	{ kKyra2, kPlatformFMTowns, kNoSpecial, JA_JPN },
@@ -110,6 +116,7 @@ const Game kyra3Games[] = {
 	{ kKyra3, kPlatformDOS, kTalkieVersion, HE_ISR },
 	{ kKyra3, kPlatformDOS, kTalkieVersion, ZH_CHN },
 	{ kKyra3, kPlatformDOS, kTalkieVersion, ZH_TWN },
+	{ kKyra3, kPlatformDOS, kTalkieVersion, CS_CZE },
 
 	GAME_DUMMY_ENTRY
 };
@@ -133,13 +140,14 @@ const Game eob1Games[] = {
 
 const Game eob2Games[] = {
 	{ kEoB2, kPlatformDOS, kNoSpecial, EN_ANY },
+	{ kEoB2, kPlatformDOS, kTalkieVersion, ZH_TWN },
 	{ kEoB2, kPlatformDOS, kNoSpecial, DE_DEU },
 	{ kEoB2, kPlatformDOS, kNoSpecial, ES_ESP },
 
 	{ kEoB2, kPlatformAmiga, kNoSpecial, EN_ANY },
 	{ kEoB2, kPlatformAmiga, kNoSpecial, DE_DEU },
 
-	//{ kEoB2, kPlatformPC98, kNoSpecial, JA_JPN },
+	{ kEoB2, kPlatformPC98, kNoSpecial, JA_JPN },
 
 	{ kEoB2, kPlatformFMTowns, kNoSpecial, JA_JPN },
 
@@ -154,6 +162,7 @@ const Game lolGames[] = {
 	{ kLoL, kPlatformDOS, kNoSpecial, DE_DEU },
 	{ kLoL, kPlatformDOS, kNoSpecial, FR_FRA },
 	{ kLoL, kPlatformDOS, kNoSpecial, ES_ESP },
+	{ kLoL, kPlatformDOS, kNoSpecial, ZH_TWN },
 
 	{ kLoL, kPlatformDOS, kTalkieVersion, EN_ANY },
 	{ kLoL, kPlatformDOS, kTalkieVersion, FR_FRA },
@@ -1083,6 +1092,8 @@ const int lolFloppyNeed[] = {
 	kLoLHealShapeFrames,
 	kLoLLightningDefs,
 	kLoLFireballCoords,
+
+	k2FontData,
 
 	-1
 };
@@ -3669,7 +3680,7 @@ const int eob2AmigaNeed[] = {
 
 	-1
 };
-/*
+
 const int eob2PC98Need[] = {
 	kEoBBaseChargenStrings1,
 	kEoBBaseChargenStrings2,
@@ -3837,9 +3848,6 @@ const int eob2PC98Need[] = {
 	kEoBBaseDscTelptrShpCoords,
 
 	kEoBBasePortalSeqData,
-	kEoBBaseManDef,
-	kEoBBaseManWord,
-	kEoBBaseManPrompt,
 
 	kEoBBaseDscMonsterFrmOffsTbl1,
 	kEoBBaseDscMonsterFrmOffsTbl2,
@@ -3912,14 +3920,18 @@ const int eob2PC98Need[] = {
 	kEoB2IntroAnimData41,
 	kEoB2IntroAnimData42,
 	kEoB2IntroAnimData43,
+	kEoB2IntroAnimData44,
+	kEoB2IntroAnimData45,
+	kEoB2IntroAnimData46,
+	kEoB2IntroAnimData47,
 
 	kEoB2IntroShapes00,
 	kEoB2IntroShapes01,
 	kEoB2IntroShapes04,
 	kEoB2IntroShapes07,
+	kEoB2IntroShapes13,
 
 	kEoB2FinaleStrings,
-	kEoB2CreditsData,
 	kEoB2FinaleCPSFiles,
 	kEoB2FinaleAnimData00,
 	kEoB2FinaleAnimData01,
@@ -3992,11 +4004,15 @@ const int eob2PC98Need[] = {
 	kRpgCommonDscDimMap,
 	kRpgCommonDscBlockIndex,
 
+	kEoB2Ascii2SjisTables,
+	kEoB2Ascii2SjisTables2,
+	kEoB2FontConvertTbl,
+
 	kEoBBaseSoundFilesIntro,
 	kEoBBaseSoundFilesFinale,
 
 	-1
-};*/
+};
 
 const int eob2FMTownsNeed[] = {
 	kEoBBaseChargenStrings1,
@@ -4550,7 +4566,7 @@ const int eob2FMTownsNeed[] = {
 	kEoB2Config2431Strings,
 	kEoBBaseTextInputCharacterLines,
 	kEoBBaseTextInputSelectStrings,
-	kEoB2FontDmpSearchTbl,
+	kEoB2FontLookupTbl,
 	kEoB2Ascii2SjisTables,
 	kEoB2Ascii2SjisTables2,
 	kEoBBaseSaveNamePatterns,
@@ -4621,8 +4637,9 @@ const GameNeed gameNeedTable[] = {
 	{ kEoB1, kPlatformSegaCD, kNoSpecial, eob1SegaCDNeed },
 
 	{ kEoB2, kPlatformDOS, kNoSpecial, eob2FloppyNeed },
+	{ kEoB2, kPlatformDOS, kTalkieVersion, eob2FloppyNeed },
 	{ kEoB2, kPlatformAmiga, kNoSpecial, eob2AmigaNeed },
-	//{ kEoB2, kPlatformPC98, kNoSpecial, eob2PC98Need },
+	{ kEoB2, kPlatformPC98, kNoSpecial, eob2PC98Need },
 	{ kEoB2, kPlatformFMTowns, kNoSpecial, eob2FMTownsNeed },
 
 	{ -1, -1, -1, nullptr }

@@ -42,7 +42,7 @@ void Spells::load() {
 		if (Common::RU_RUS == g_vm->getLanguage() && GType_Clouds == g_vm->getGameID()) {
 			f1.readString();
 			_spellNames.push_back(Res.CLOUDS_SPELLS[i++]);
-		} else 
+		} else
 			_spellNames.push_back(f1.readString());
 
 	}
@@ -163,7 +163,7 @@ void Spells::castItemSpell(int itemSpellId) {
 		MS_Hynotize, MS_WalkOnWater, NO_SPELL, MS_DetectMonster, MS_Fireball,
 		MS_ColdRay, MS_CurePoison, MS_AcidSpray, MS_TimeDistortion, MS_DragonSleep,
 		MS_CureDisease, MS_Teleport, MS_FingerOfDeath, MS_CureParalysis, MS_GolemStopper,
-		MS_PoisonVolley, MS_DeadlySwarm, MS_SuperShelter, MS_DayOfProtection, MS_DayOfProtection,
+		MS_PoisonVolley, MS_DeadlySwarm, MS_SuperShelter, MS_DayOfProtection, MS_DayOfSorcery,
 		MS_CreateFood, MS_FieryFlail, MS_RechargeItem, MS_FantasticFreeze, MS_TownPortal,
 		MS_StoneToFlesh, MS_RaiseDead, MS_Etheralize, MS_DancingSword, MS_MoonRay,
 		MS_MassDistortion, MS_PrismaticLight, MS_EnchantItem, MS_Incinerate, MS_HolyWord,
@@ -401,10 +401,10 @@ void Spells::dayOfProtection() {
 	party._heroism = lvl;
 	party._holyBonus = lvl;
 	party._blessed = lvl;
-	party._poisonResistence = lvl;
-	party._coldResistence = lvl;
-	party._electricityResistence = lvl;
-	party._fireResistence = lvl;
+	party._poisonResistance = lvl;
+	party._coldResistance = lvl;
+	party._electricityResistance = lvl;
+	party._fireResistance = lvl;
 	party._lightCount = lvl;
 	sound.playFX(20);
 }
@@ -940,16 +940,16 @@ void Spells::protectionFromElements() {
 	if (elementType != -1) {
 		switch (elementType) {
 		case DT_FIRE:
-			party._fireResistence = resist;
+			party._fireResistance = resist;
 			break;
 		case DT_ELECTRICAL:
-			party._fireResistence = resist;
+			party._electricityResistance = resist;
 			break;
 		case DT_COLD:
-			party._coldResistence = resist;
+			party._coldResistance = resist;
 			break;
 		case DT_POISON:
-			party._poisonResistence = resist;
+			party._poisonResistance = resist;
 			break;
 		default:
 			break;

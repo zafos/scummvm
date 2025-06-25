@@ -23,7 +23,6 @@
 #include "common/macresman.h"
 #include "common/util.h"
 #include "graphics/cursorman.h"
-#include "graphics/maccursor.h"
 #ifdef ENABLE_HE
 #include "graphics/wincursor.h"
 #endif
@@ -32,6 +31,7 @@
 #include "scumm/he/intern_he.h"
 #include "scumm/object.h"
 #include "scumm/he/resource_he.h"
+#include "scumm/macgui/macgui.h"
 #include "scumm/scumm.h"
 #include "scumm/scumm_v2.h"
 #include "scumm/scumm_v5.h"
@@ -174,6 +174,25 @@ static const byte atari_snail_cursor[] = {
 	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
 };
 
+static const byte segacd_cross_cursor[256] = {
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0xFF,0x0F,0x00,0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0xFF,
+	0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0xFF,0x00,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+	0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,
+};
+
 #ifdef ENABLE_SCUMM_7_8
 static const byte default_v7_cursor[] = {
 	0x01,0x01,0x01,0x01, 0x00,0x0F,0x00, 0x01,0x01,0x01,0x01,
@@ -255,17 +274,26 @@ void ScummEngine_v6::setCursorTransparency(int a) {
 
 void ScummEngine::updateCursor() {
 	int transColor = (_game.heversion >= 80) ? 5 : 255;
+	byte *cursor = _grabbedCursor;
+	int width = _cursor.width;
+	int height = _cursor.height;
+	int hotspotX = _cursor.hotspotX;
+	int hotspotY = _cursor.hotspotY;
+
+	if (_macScreen && _game.version == 6 && _game.heversion == 0)
+		mac_scaleCursor(cursor, hotspotX, hotspotY, width, height);
+
 #ifdef USE_RGB_COLOR
 	Graphics::PixelFormat format = _system->getScreenFormat();
-	CursorMan.replaceCursor(_grabbedCursor, _cursor.width, _cursor.height,
-							_cursor.hotspotX, _cursor.hotspotY,
-							(_game.platform == Common::kPlatformNES ? _grabbedCursor[63] : transColor),
+	CursorMan.replaceCursor(cursor, width, height,
+							hotspotX, hotspotY,
+							(_game.platform == Common::kPlatformNES ? cursor[63] : transColor),
 							(_game.heversion == 70 ? true : false),
 							&format);
 #else
-	CursorMan.replaceCursor(_grabbedCursor, _cursor.width, _cursor.height,
-							_cursor.hotspotX, _cursor.hotspotY,
-							(_game.platform == Common::kPlatformNES ? _grabbedCursor[63] : transColor),
+	CursorMan.replaceCursor(cursor, width, height,
+							hotspotX, hotspotY,
+							(_game.platform == Common::kPlatformNES ? cursor[63] : transColor),
 							(_game.heversion == 70 ? true : false));
 #endif
 }
@@ -388,16 +416,25 @@ void ScummEngine_v7::updateCursor() {
 		transColor = isSmushActive() ? 0x01 : 0xFF;
 	}
 
+	byte *cursor = _grabbedCursor;
+	int width = _cursor.width;
+	int height = _cursor.height;
+	int hotspotX = _cursor.hotspotX;
+	int hotspotY = _cursor.hotspotY;
+
+	if (_macScreen)
+		mac_scaleCursor(cursor, hotspotX, hotspotY, width, height);
+
 #ifdef USE_RGB_COLOR
 	Graphics::PixelFormat format = _system->getScreenFormat();
-	CursorMan.replaceCursor(_grabbedCursor, _cursor.width, _cursor.height,
-							_cursor.hotspotX, _cursor.hotspotY,
+	CursorMan.replaceCursor(cursor, width, height,
+							hotspotX, hotspotY,
 							transColor,
 							false,
 							&format);
 #else
-	CursorMan.replaceCursor(_grabbedCursor, _cursor.width, _cursor.height,
-							_cursor.hotspotX, _cursor.hotspotY,
+	CursorMan.replaceCursor(cursor, width, height,
+							hotspotX, hotspotY,
 							transColor,
 							false);
 #endif
@@ -532,7 +569,7 @@ void ScummEngine_v80he::setDefaultCursor() {
 				if (_bytesPerPixel == 2)
 					WRITE_UINT16(_grabbedCursor + (y * _cursor.width + x) * 2, get16BitColor(palette[pixel * 3], palette[pixel * 3 + 1], palette[pixel * 3 + 2]));
 				else
-					_grabbedCursor[y * _cursor.width + x] = (pixel == 0) ? 0xfd : 0xfe;
+					_grabbedCursor[y * _cursor.width + x] = pixel + 0xfd;
 			}
 		}
 	}
@@ -763,8 +800,8 @@ void ScummEngine_v2::setBuiltinCursor(int idx) {
 
 	memset(_grabbedCursor, 0xFF, sizeof(_grabbedCursor));
 
-	if (_game.platform == Common::kPlatformC64)
-		color = default_v0_cursor_colors[idx];
+	if (_game.platform == Common::kPlatformC64 || _game.platform == Common::kPlatformApple2GS)
+		color = (_game.platform == Common::kPlatformApple2GS && !enhancementEnabled(kEnhVisualChanges)) ? 1 : default_v0_cursor_colors[idx];
 	else if (_renderMode == Common::kRenderCGA || _renderMode == Common::kRenderCGAComp)
 		color = (idx & 1) * 3;
 	else if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG || _renderMode == Common::kRenderCGA_BW)
@@ -832,6 +869,35 @@ void ScummEngine_v2::setBuiltinCursor(int idx) {
 			*(hotspot - _cursor.width * (3 + i) + i) = color;
 			*(hotspot + _cursor.width * (3 + i) + i) = color;
 		}
+	} else if (_game.platform == Common::kPlatformApple2GS && !enhancementEnabled(kEnhVisualChanges)) {
+		_cursor.width = 23;
+		_cursor.height = 21;
+		_cursor.hotspotX = 11;
+		_cursor.hotspotY = 10;
+
+		byte *hotspot = _grabbedCursor + _cursor.hotspotY * _cursor.width + _cursor.hotspotX;
+
+		// A simple crosshair
+		for (i = 0; i < 8; i++) {
+			*(hotspot - 4 - i) = color;
+			*(hotspot + 4 + i) = color;
+		}
+
+		for (i = 0; i < 8; i++) {
+			*(hotspot - _cursor.width * (3 + i)) = color;
+			*(hotspot + _cursor.width * (3 + i)) = color;
+		}
+	} else if (_macGui) {
+		int width, height, hotspotX, hotspotY, animate;
+
+		_macGui->setupCursor(width, height, hotspotX, hotspotY, animate);
+
+		_cursor.width = width;
+		_cursor.height = height;
+		_cursor.hotspotX = hotspotX;
+		_cursor.hotspotY = hotspotY;
+
+		return;
 	} else {
 		_cursor.width = 23;
 		_cursor.height = 21;
@@ -840,7 +906,7 @@ void ScummEngine_v2::setBuiltinCursor(int idx) {
 
 		byte *hotspot = _grabbedCursor + _cursor.hotspotY * _cursor.width + _cursor.hotspotX;
 
-		// Crosshair, slightly assymetric
+		// Crosshair, slightly asymmetric
 		// TODO: Instead of setting this up via code, we should simply extend
 		//       default_cursor_images to contain this shape.
 
@@ -878,35 +944,27 @@ void ScummEngine_v2::setBuiltinCursor(int idx) {
 		*(hotspot + (_cursor.width * 5) - 1) = color;
 		*(hotspot + (_cursor.width * 5) + 1) = color;
 
-		if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG || _renderMode == Common::kRenderCGA_BW) {
-			const byte *src = &_grabbedCursor[_cursor.width * _cursor.height - 1];
-
-			_cursor.width <<= 1;
-			_cursor.height <<= 1;
-			_cursor.hotspotX <<= 1;
-			_cursor.hotspotY <<= 1;
-
-			byte *dst1 = &_grabbedCursor[_cursor.width * _cursor.height - 1];
-			byte *dst2 = dst1 - _cursor.width;
-
-			while (dst2 >= _grabbedCursor) {
-				for (i = _cursor.width >> 1; i; --i) {
-					uint8 col2 = (_renderMode == Common::kRenderCGA_BW) ? *src : 0xFF;
-					*dst1-- = col2;
-					*dst1-- = col2;
-					*dst2-- = *src;
-					*dst2-- = *src--;
-				}
-				dst1 -= _cursor.width;
-				dst2 -= _cursor.width;
-			}
-		}
+		adaptCursorToVideoMode();
 	}
 
 	updateCursor();
 }
 
 void ScummEngine_v2::setSnailCursor() {
+	// When running Maniac Mansion as a Macintosh game, there is no snail
+	// cursor. Only the regular arrow cursor.
+	if (_macGui)
+		return;
+
+	byte color;
+	if (_game.platform == Common::kPlatformC64 || _game.platform == Common::kPlatformApple2GS)
+		color = default_v0_cursor_colors[1];
+	else if (_renderMode == Common::kRenderCGA || _renderMode == Common::kRenderCGAComp)
+		color = 3;
+	else if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG || _renderMode == Common::kRenderCGA_BW)
+		color = 1;
+	else
+		color = default_cursor_colors[1];
 
 	if (_game.platform == Common::kPlatformAmiga) {
 		memcpy(_grabbedCursor, amiga_snail_cursor, sizeof(amiga_snail_cursor));
@@ -926,12 +984,9 @@ void ScummEngine_v2::setSnailCursor() {
 
 	} else {
 		memcpy(_grabbedCursor, c64_dos_snail_cursor, sizeof(c64_dos_snail_cursor));
-
-		if (_game.platform == Common::kPlatformC64) {
-			for (uint i = 0; i < sizeof(c64_dos_snail_cursor); i++) {
-				if (_grabbedCursor[i] == 0x0F)
-					_grabbedCursor[i] = 0x01;
-			}
+		for (uint i = 0; i < sizeof(c64_dos_snail_cursor); i++) {
+			if (_grabbedCursor[i] == 0x0F)
+				_grabbedCursor[i] = color;
 		}
 
 		_cursor.width = 24;
@@ -940,7 +995,35 @@ void ScummEngine_v2::setSnailCursor() {
 		_cursor.hotspotY = 10;
 	}
 
+	adaptCursorToVideoMode();
 	updateCursor();
+}
+
+void ScummEngine_v2::adaptCursorToVideoMode() {
+	if (_renderMode != Common::kRenderHercA && _renderMode != Common::kRenderHercG && _renderMode != Common::kRenderCGA_BW)
+		return;
+
+	const byte *src = &_grabbedCursor[_cursor.width * _cursor.height - 1];
+
+	_cursor.width <<= 1;
+	_cursor.height <<= 1;
+	_cursor.hotspotX <<= 1;
+	_cursor.hotspotY <<= 1;
+
+	byte *dst1 = &_grabbedCursor[_cursor.width * _cursor.height - 1];
+	byte *dst2 = dst1 - _cursor.width;
+
+	while (dst2 >= _grabbedCursor) {
+		for (int i = _cursor.width >> 1; i; --i) {
+			uint8 col2 = (_renderMode == Common::kRenderCGA_BW) ? *src : 0xFF;
+			*dst1-- = col2;
+			*dst1-- = col2;
+			*dst2-- = *src;
+			*dst2-- = *src--;
+		}
+		dst1 -= _cursor.width;
+		dst2 -= _cursor.width;
+	}
 }
 
 void ScummEngine_v5::resetCursors() {
@@ -973,43 +1056,36 @@ void ScummEngine_v5::resetCursors() {
 }
 
 void ScummEngine_v5::setBuiltinCursor(int idx) {
-	if (!_macCursorFile.empty()) {
-		Common::MacResManager resource;
-		if (resource.open(_macCursorFile)) {
-			Common::MacResIDArray resArray = resource.getResIDArray(MKTAG('C', 'U', 'R', 'S'));
-			Common::SeekableReadStream *curs = resource.getResource(MKTAG('C', 'U', 'R', 'S'), resArray[0]);
-			Graphics::MacCursor macCursor;
-			if (macCursor.readFromStream(*curs)) {
-				_cursor.animate = 0;
-				CursorMan.replaceCursor(&macCursor);
-				delete curs;
-				return;
-			}
-			delete curs;
-		}
+	if (_macGui) {
+		int width, height, hotspotX, hotspotY, animate;
+
+		_macGui->setupCursor(width, height, hotspotX, hotspotY, animate);
+
+		_cursor.animate = animate;
+		_cursor.width = width;
+		_cursor.height = height;
+		_cursor.hotspotX = hotspotX;
+		_cursor.hotspotY = hotspotY;
+
+		return;
 	}
 
-	if (_game.id == GID_INDY3 && _macScreen) {
-		const byte buf[15 * 15] = {
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x00, 0xFF, 0x00, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x0F, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
-		};
+	if (_game.platform == Common::kPlatformSegaCD) {
+		//_cursor.animate = 0;
+		_cursor.width = 16;
+		_cursor.height = 16;
+		_cursor.hotspotX = 7;
+		_cursor.hotspotY = 7;
+		byte arr[256];
+		for (int i = 0; i < 256; i++) {
+			if (segacd_cross_cursor[i] != 0x00)
+				arr[i] = segacd_cross_cursor[i];
+			else
+				arr[i] = 0x01; // TODO: Brown during cutscenes or dialogs (or something else?)
+		}
 
-		_cursor.animate = 0;
-		CursorMan.replaceCursor(buf, 15, 15, 7, 7, 0xFF);
+
+		CursorMan.replaceCursor(arr, 16, 16, 7, 7, 0xFF);
 		return;
 	}
 

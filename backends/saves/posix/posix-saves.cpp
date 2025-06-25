@@ -32,6 +32,9 @@
 
 #include "backends/saves/posix/posix-saves.h"
 #include "backends/fs/posix/posix-fs.h"
+#if defined(MACOSX)
+#include "backends/platform/sdl/macosx/macosx_wrapper.h"
+#endif
 
 #include "common/config-manager.h"
 #include "common/savefile.h"
@@ -41,17 +44,14 @@
 
 POSIXSaveFileManager::POSIXSaveFileManager() {
 	// Register default savepath.
-	Common::String savePath;
+	Common::Path savePath;
 
 #if defined(MACOSX)
-	const char *home = getenv("HOME");
-	if (home && *home && strlen(home) < MAXPATHLEN) {
-		savePath = home;
-		savePath += "/Documents/ScummVM Savegames";
-
+	savePath = getAppSupportPathMacOSX();
+	if (!savePath.empty()) {
+		savePath.joinInPlace("Savegames");
 		ConfMan.registerDefault("savepath", savePath);
 	}
-
 #else
 	const char *envVar;
 
@@ -60,10 +60,10 @@ POSIXSaveFileManager::POSIXSaveFileManager() {
 	envVar = getenv("HOME");
 	if (envVar && *envVar) {
 		savePath = envVar;
-		savePath += "/.scummvm";
+		savePath.joinInPlace("/.scummvm");
 
 		struct stat sb;
-		if (stat(savePath.c_str(), &sb) != 0 || !S_ISDIR(sb.st_mode)) {
+		if (stat(savePath.toString(Common::Path::kNativeSeparator).c_str(), &sb) != 0 || !S_ISDIR(sb.st_mode)) {
 			savePath.clear();
 		}
 	}
@@ -79,23 +79,23 @@ POSIXSaveFileManager::POSIXSaveFileManager() {
 			envVar = getenv("HOME");
 			if (envVar && *envVar) {
 				prefix = envVar;
-				savePath = ".local/share/";
+				savePath = Common::Path(".local/share");
 			}
 		} else {
 			prefix = envVar;
 		}
 
 		// Our default save path is '$XDG_DATA_HOME/scummvm/saves'
-		savePath += "scummvm/saves";
+		savePath.joinInPlace("scummvm/saves");
 
-		if (!Posix::assureDirectoryExists(savePath, prefix.c_str())) {
+		if (!Posix::assureDirectoryExists(savePath.toString(Common::Path::kNativeSeparator), prefix.c_str())) {
 			savePath.clear();
 		} else {
-			savePath = prefix + '/' + savePath;
+			savePath = Common::Path(prefix).join(savePath);
 		}
 	}
 
-	if (!savePath.empty() && savePath.size() < MAXPATHLEN) {
+	if (!savePath.empty() && savePath.toString(Common::Path::kNativeSeparator).size() < MAXPATHLEN) {
 		ConfMan.registerDefault("savepath", savePath);
 	}
 #endif
@@ -116,7 +116,7 @@ POSIXSaveFileManager::POSIXSaveFileManager() {
 			} else if (!saveDir.isWritable()) {
 				warning("Ignoring non-writable SCUMMVM_SAVEPATH '%s'", dir);
 			} else {
-				ConfMan.set("savepath", dir, Common::ConfigManager::kTransientDomain);
+				ConfMan.setPath("savepath", dir, Common::ConfigManager::kTransientDomain);
 			}
 		}
 	}

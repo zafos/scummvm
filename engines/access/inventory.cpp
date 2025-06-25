@@ -54,6 +54,18 @@ int InventoryEntry::checkItem(int itemId) {
 
 /*------------------------------------------------------------------------*/
 
+InventoryManager::SavedFields::SavedFields() {
+	_vWindowHeight = _vWindowLinesTall = _vWindowWidth = _vWindowBytesWide = 0;
+	_playFieldHeight = _playFieldWidth = 0;
+	_windowXAdd = _windowYAdd = 0;
+	_screenYOff = 0;
+	_scrollX = _scrollY = 0;
+	_clipWidth = _clipHeight = 0;
+	_scrollCol = _scrollRow = 0;
+}
+
+/*------------------------------------------------------------------------*/
+
 InventoryManager::InventoryManager(AccessEngine *vm) : Manager(vm) {
 	_startInvItem = 0;
 	_startInvBox = 0;
@@ -413,6 +425,10 @@ void InventoryManager::combineItems() {
 	screen._topSkip = screen._bottomSkip = 0;
 	screen._screenYOff = 0;
 
+	const Common::Rect screenBounds = screen.getBounds();
+	const int screenW = screenBounds.width();
+	const int screenH = screenBounds.height();
+
 	Common::Point tempMouse = events._mousePos;
 	Common::Point lastMouse = events._mousePos;
 
@@ -436,7 +452,7 @@ void InventoryManager::combineItems() {
 			continue;
 
 		lastMouse = events._mousePos;
-		Common::Rect lastRect(lastBox.x, lastBox.y, lastBox.x + 46, lastBox.y + 35);
+		Common::Rect lastRect(lastBox.x, lastBox.y, MIN(lastBox.x + 46, screenW), MIN(lastBox.y + 35, screenH));
 		screen.copyBlock(&_vm->_buffer2, lastRect);
 
 		Common::Point newPt;

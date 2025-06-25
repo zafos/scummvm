@@ -44,7 +44,7 @@
 #include "common/rect.h"
 #include "common/ptr.h"
 #include "common/str.h"
-#include "graphics/surface.h"
+#include "graphics/managed_surface.h"
 #include "sword25/kernel/common.h"
 #include "sword25/kernel/resservice.h"
 #include "sword25/kernel/persistable.h"
@@ -118,6 +118,20 @@ public:
 	 * This should only be called once for a given previous call to #StartFrame.
 	*/
 	bool endFrame();
+
+	// Debug methods
+
+	/**
+	 * Draws a line in the frame buffer
+	 *
+	 * This method must be called between calls to StartFrame() and EndFrame(), and is intended only for debugging
+	 * purposes. The line will only appear for a single frame. If the line is to be shown permanently, it must be
+	 * called for every frame.
+	 * @param Start      The starting point of the line
+	 * @param End        The ending point of the line
+	 * @param Color      The color of the line. The default is BS_RGB (255,255,255) (White)
+	 */
+	void drawDebugLine(const Vertex &start, const Vertex &end, uint color = BS_RGB(255, 255, 255));
 
 	/**
 	 * Creates a thumbnail with the dimensions of 200x125. This will not include the top and bottom of the screen..
@@ -204,6 +218,13 @@ public:
 	bool getVsync() const;
 
 	/**
+	 * Returns true if the engine is running in Windowed mode.
+	 */
+	bool isWindowed() {
+		return false;
+	}
+
+	/**
 	 * Fills a rectangular area of the frame buffer with a color.
 	 * Notes: It is possible to create transparent rectangles by passing a color with an Alpha value of 255.
 	 * @param FillRectPtr   Pointer to a Common::Rect, which specifies the section of the frame buffer to be filled.
@@ -214,8 +235,8 @@ public:
 	 */
 	bool fill(const Common::Rect *fillRectPtr = 0, uint color = BS_RGB(0, 0, 0));
 
-	Graphics::Surface _backSurface;
-	Graphics::Surface *getSurface() { return &_backSurface; }
+	Graphics::ManagedSurface _backSurface;
+	Graphics::ManagedSurface *getSurface() { return &_backSurface; }
 
 	Common::SeekableReadStream *_thumbnail;
 	Common::SeekableReadStream *getThumbnail() { return _thumbnail; }
@@ -280,6 +301,7 @@ private:
 		uint _color;
 	};
 
+	Common::Array<DebugLine> _debugLines;
 };
 
 } // End of namespace Sword25

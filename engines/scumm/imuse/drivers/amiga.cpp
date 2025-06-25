@@ -147,7 +147,7 @@ public:
 	void pitchBend(int16 bend) override;
 	void pitchBendFactor(byte value) override;
 	void transpose(int8 value) override;
-	void detune(uint8 value) override;
+	void detune(int16 value) override;
 
 	void priority(byte value) override;
 	void sysEx_customInstrument(uint32 type, const byte *instr, uint32 dataSize) override {}
@@ -574,7 +574,7 @@ void IMusePart_Amiga::transpose(int8 value) {
 		cur->transposePitchBend(_transpose, ((_pitchBend * _pitchBendSensitivity) >> 6) + _detune);
 }
 
-void IMusePart_Amiga::detune(uint8 value) {
+void IMusePart_Amiga::detune(int16 value) {
 	_detune = (int8)value;
 	for (SoundChannel_Amiga *cur = _out; cur; cur = cur->next())
 		cur->transposePitchBend(_transpose, ((_pitchBend * _pitchBendSensitivity) >> 6) + _detune);
@@ -781,7 +781,7 @@ void IMuseDriver_Amiga::loadInstrument(int program) {
 	if (program == 128) {
 		// The hard-coded default instrument definitions and sample data are the same in MI2 and INDY4.
 		static const int8 defaultData[16] = { 0, 49, 90, 117, 127, 117, 90, 49, 0, -49, -90, -117, -127, -117, -90, -49 };
-		static Instrument_Amiga::Samples defaultSamples = { 428, 60, 0, 127, 33, 0, /*0, 0,*/16, 0, 0, 5, 300, 5, 100, defaultData };
+		static const Instrument_Amiga::Samples defaultSamples = { 428, 60, 0, 127, 33, 0, /*0, 0,*/16, 0, 0, 5, 300, 5, 100, defaultData };
 		_instruments[128].numBlocks = 1;
 		memcpy(&_instruments[128].samples[0], &defaultSamples, sizeof(Instrument_Amiga::Samples));
 	}
@@ -802,7 +802,7 @@ void IMuseDriver_Amiga::loadInstrument(int program) {
 	}
 
 	for (int fileNo = 1; fileNo != -1 && !ims.isOpen(); ) {
-		if (!ims.open(Common::String::format("amiga%d.ims", fileNo))) {
+		if (!ims.open(Common::Path(Common::String::format("amiga%d.ims", fileNo)))) {
 			_missingFiles |= (1 << (fileNo - 1));
 			return;
 		}

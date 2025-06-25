@@ -193,9 +193,9 @@ PrinceEngine::~PrinceEngine() {
 
 void PrinceEngine::init() {
 
-	const Common::FSNode gameDataDir(ConfMan.get("path"));
+	const Common::FSNode gameDataDir(ConfMan.getPath("path"));
 
-	debugEngine("Adding all path: %s", gameDataDir.getPath().c_str());
+	debugEngine("Adding all path: %s", gameDataDir.getPath().toString(Common::Path::kNativeSeparator).c_str());
 
 	if (!(getFeatures() & GF_EXTRACTED)) {
 		PtcArchive *all = new PtcArchive();
@@ -403,7 +403,7 @@ void PrinceEngine::showLogo() {
 		_graph->draw(_graph->_frontScreen, logo.getSurface());
 		_graph->change();
 		_graph->update(_graph->_frontScreen);
-		setPalette(logo.getPalette());
+		setPalette(logo.getPalette().data());
 
 		uint32 logoStart = _system->getMillis();
 		while (_system->getMillis() < logoStart + 5000) {
@@ -449,10 +449,13 @@ Common::Error PrinceEngine::run() {
 
 void PrinceEngine::pauseEngineIntern(bool pause) {
 	Engine::pauseEngineIntern(pause);
-	if (pause) {
-		_midiPlayer->pause();
-	} else {
-		_midiPlayer->resume();
+
+	if (_midiPlayer) {
+		if (pause) {
+			_midiPlayer->pause();
+		} else {
+			_midiPlayer->resume();
+		}
 	}
 }
 
@@ -463,13 +466,6 @@ void PrinceEngine::setShadowScale(int32 shadowScale) {
 	} else {
 		_shadScaleValue = 10000 / shadowScale;
 	}
-}
-
-void PrinceEngine::plotShadowLinePoint(int x, int y, int color, void *data) {
-	PrinceEngine *vm = (PrinceEngine *)data;
-	WRITE_LE_UINT16(&vm->_shadowLine[vm->_shadLineLen * 4], x);
-	WRITE_LE_UINT16(&vm->_shadowLine[vm->_shadLineLen * 4 + 2], y);
-	vm->_shadLineLen++;
 }
 
 bool PrinceEngine::playNextFLCFrame() {

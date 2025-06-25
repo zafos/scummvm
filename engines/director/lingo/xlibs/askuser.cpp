@@ -36,22 +36,22 @@ namespace Director {
  * DEVO Presents: Adventures of the Smart Patrol
  *
  **************************************************/
+
 /*
--- AskUser XObject. Copyright 1996 Inscape v1.0 24May96 BDL
-AskUser
-I      mNew                                                                --Creates a new instance
-X      mDispose                                                            --Disposes XObject instance
-SSSS               mAsk                                                                                          --Data to display in the message box.
+ * -- AskUser XObject. Copyright 1996 Inscape v1.0 24May96 BDL
+ * AskUser
+ * I      mNew                                                                --Creates a new instance
+ * X      mDispose                                                            --Disposes XObject instance
+ * SSSS               mAsk                                                                                          --Data to display in the message box.
 */
 
-const char *AskUser::xlibName = "AskUser";
-const char *AskUser::fileNames[] = {
-	"AskUser",
-	"ASKUSER",
-	nullptr
+const char *const AskUser::xlibName = "AskUser";
+const XlibFileDesc AskUser::fileNames[] = {
+	{ "AskUser",	nullptr },
+	{ nullptr,		nullptr },
 };
 
-static MethodProto xlibMethods[] = {
+static const MethodProto xlibMethods[] = {
 	{ "new",					AskUser::m_new,			 0, 0,	400 },	// D4
 	{ "ask",					AskUser::m_ask,			 3, 3,	400 },	// D4
 	{ nullptr, nullptr, 0, 0, 0 }
@@ -61,30 +61,24 @@ AskUserXObject::AskUserXObject(ObjectType ObjectType) :Object<AskUserXObject>("A
 	_objType = ObjectType;
 }
 
-void AskUser::open(int type) {
+void AskUser::open(ObjectType type, const Common::Path &path) {
 	if (type == kXObj) {
 		AskUserXObject::initMethods(xlibMethods);
 		AskUserXObject *xobj = new AskUserXObject(kXObj);
 		g_lingo->exposeXObject(xlibName, xobj);
-	} else if (type == kXtraObj) {
-		// TODO - Implement Xtra
 	}
 }
 
-void AskUser::close(int type) {
+void AskUser::close(ObjectType type) {
 	if (type == kXObj) {
 		AskUserXObject::cleanupMethods();
 		g_lingo->_globalvars[xlibName] = Datum();
-	} else if (type == kXtraObj) {
-		// TODO - Implement Xtra
 	}
 }
 
 void AskUser::m_new(int nargs) {
-	if (nargs != 0) {
-		warning("AskUser::m_new: expected 0 arguments");
-		g_lingo->dropStack(nargs);
-	}
+	g_lingo->printSTUBWithArglist("AskUser::m_new", nargs);
+	g_lingo->dropStack(nargs);
 	g_lingo->push(g_lingo->_state->me);
 }
 
@@ -94,7 +88,7 @@ void AskUser::m_ask(int nargs) {
 		g_lingo->dropStack(nargs);
 		g_lingo->push(Datum("Ok"));
 		return;
-	}	
+	}
 	Datum text = g_lingo->pop();
 	Datum caption = g_lingo->pop(); // ScummVM doesn't have a title for message boxes, not used
 	Datum mbType = g_lingo->pop();

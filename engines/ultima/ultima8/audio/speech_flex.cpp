@@ -23,7 +23,6 @@
 #include "ultima/ultima8/misc/common_types.h"
 #include "ultima/ultima8/audio/speech_flex.h"
 #include "ultima/ultima8/audio/audio_sample.h"
-#include "ultima/ultima8/misc/util.h"
 
 namespace Ultima {
 namespace Ultima8 {
@@ -34,22 +33,27 @@ SpeechFlex::SpeechFlex(Common::SeekableReadStream *rs) : SoundFlex(rs) {
 
 	const char *cbuf = reinterpret_cast<const char *>(buf);
 
-	// Note: SplitString doesn't work here because Std::string can't
-	// hold multiple null-terminated strings.
+	// Note: stream holds multiple null-terminated strings.
 	unsigned int off = 0;
 	while (off < size) {
 		unsigned int slen = 0;
 		while (off + slen < size && cbuf[off + slen])
 			slen++;
-		istring str(cbuf + off, slen);
+		Std::string text(cbuf + off, slen);
+		text.replace('\t', ' ');
 		off += slen + 1;
 
-		TabsToSpaces(str, 1);
-		TrimSpaces(str);
+		Std::string::size_type pos1 = text.findFirstNotOf(' ');
+		if (pos1 == Std::string::npos) {
+			text = "";
+		}
+		else {
+			Std::string::size_type pos2 = text.findLastNotOf(' ');
+			text = text.substr(pos1, pos2 - pos1 + 1);
+		}
 
-		//debug(MM_INFO, "Found string: \"%s\"", str.c_str());
-
-		_phrases.push_back(str);
+		debug(6, "Found string: \"%s\"", text.c_str());
+		_phrases.push_back(text);
 	}
 
 	delete [] buf;
@@ -61,24 +65,24 @@ SpeechFlex::~SpeechFlex(void) {
 
 int SpeechFlex::getIndexForPhrase(const Std::string &phrase,
 								  uint32 start, uint32 &end) const {
-	Std::vector<istring>::const_iterator it;
 	int i = 1;
 
 	Std::string text = phrase.substr(start);
-	TabsToSpaces(text, 1);
+	text.replace('\t', ' ');
 
 	Std::string::size_type pos1 = text.findFirstNotOf(' ');
-	if (pos1 == Std::string::npos) return 0;
+	if (pos1 == Std::string::npos)
+		return 0;
 
 	Std::string::size_type pos2 = text.findLastNotOf(' ');
 	text = text.substr(pos1, pos2 - pos1 + 1);
 
-	//debug(MM_INFO, "Looking for string: \"%s\"", text.c_str());
+	debug(6, "Looking for string: \"%s\"", text.c_str());
 
-	for (it = _phrases.begin(); it != _phrases.end(); ++it) {
-		if (text.find(it->c_str()) == 0) {
-			//debug(MM_INFO, "Found: %d", i);
-			end = (*it).size() + start + pos1;
+	for (const auto &p : _phrases) {
+		if (!p.empty() && text.hasPrefixIgnoreCase(p)) {
+			debug(6, "Found: %d", i);
+			end = p.size() + start + pos1;
 			if (end >= start + pos2)
 				end = phrase.size();
 			return i;
@@ -86,8 +90,7 @@ int SpeechFlex::getIndexForPhrase(const Std::string &phrase,
 		i++;
 	}
 
-	//debug(MM_INFO, "Not found");
-
+	debug(6, "Not found");
 	return 0;
 }
 
@@ -109,7 +112,6 @@ uint32 SpeechFlex::getSpeechLength(const Std::string &phrase) {
 		if (stereo) rate *= 2;
 
 		length += (samples * 1000) / rate;
-		length += 33; // one engine frame of overhead between speech samples_
 	}
 
 	return length;

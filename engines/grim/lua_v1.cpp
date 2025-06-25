@@ -513,7 +513,7 @@ void Lua_V1::GetControlState() {
 	if (num >= KEYCODE_AXIS_JOY1_X && num <= KEYCODE_AXIS_MOUSE_Z)
 		lua_pushnumber(g_grim->getControlAxis(num));
 	else {
-		pushbool(g_grim->getControlState(num)); // key down, originaly it push number if key down
+		pushbool(g_grim->getControlState(num)); // key down, originally it push number if key down
 		// pushnil or number, what is is ?
 	}
 }
@@ -724,7 +724,7 @@ void Lua_V1::LockFont() {
 		const char *fontName = lua_getstring(param1);
 		Font *result = g_resourceloader->loadFont(fontName);
 		if (result) {
-			lua_pushusertag(result->getId(), MKTAG('F','O','N','T'));
+			lua_pushusertag(result->getPoolId(), result->getPoolTag());
 			return;
 		}
 	}

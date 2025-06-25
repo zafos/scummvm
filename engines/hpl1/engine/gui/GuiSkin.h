@@ -29,7 +29,7 @@
 #define HPL_GUI_SKIN_H
 
 #include "hpl1/engine/gui/GuiTypes.h"
-#include "hpl1/std/map.h"
+#include "common/stablemap.h"
 
 namespace hpl {
 
@@ -78,6 +78,6 @@ private:
 	Common::Array<cVector3f> mvAttributes;
 };
 
-}     // namespace hpl
+} // namespace hpl
 
 #endif // HPL_GUI_SKIN_H

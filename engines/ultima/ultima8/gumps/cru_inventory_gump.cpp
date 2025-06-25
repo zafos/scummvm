@@ -22,8 +22,8 @@
 #include "ultima/ultima8/gumps/cru_inventory_gump.h"
 
 #include "ultima/ultima8/games/game_data.h"
-#include "ultima/ultima8/graphics/gump_shape_archive.h"
-#include "ultima/ultima8/graphics/shape.h"
+#include "ultima/ultima8/gfx/gump_shape_archive.h"
+#include "ultima/ultima8/gfx/shape.h"
 #include "ultima/ultima8/world/actors/main_actor.h"
 #include "ultima/ultima8/world/get_object.h"
 #include "ultima/ultima8/gumps/widgets/text_widget.h"
@@ -117,7 +117,7 @@ void CruInventoryGump::PaintThis(RenderSurface *surf, int32 lerp_factor, bool sc
 					_inventoryText->InitGump(this, false);
 				}
 			} else {
-				if (_inventoryText->getText().length() > 0) {
+				if (!_inventoryText->getText().empty()) {
 					resetText();
 				}
 			}

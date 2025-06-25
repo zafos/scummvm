@@ -60,8 +60,8 @@ DragonsEngine *getEngine() {
 	return _engine;
 }
 
-DragonsEngine::DragonsEngine(OSystem *syst, const ADGameDescription *desc) : Engine(syst) {
-	_language = desc->language;
+DragonsEngine::DragonsEngine(OSystem *syst, const DragonsGameDescription *gd) : Engine(syst) {
+	_language = gd->desc.language;
 	_bigfileArchive = nullptr;
 	_dragonRMS = nullptr;
 	_backgroundResourceLoader = nullptr;
@@ -283,7 +283,6 @@ Common::Error DragonsEngine::run() {
 	delete _sound;
 	delete _strPlayer;
 
-	debug("Ok");
 	return Common::kNoError;
 }
 
@@ -1231,12 +1230,12 @@ void DragonsEngine::reset_screen_maybe() {
 	//TODO
 }
 
-bool DragonsEngine::canLoadGameStateCurrently() {
+bool DragonsEngine::canLoadGameStateCurrently(Common::U32String *msg) {
 	//player has control and not currently talking to anyone.
 	return isInputEnabled() && isFlagSet(ENGINE_FLAG_8) && !isFlagSet(Dragons::ENGINE_FLAG_100);
 }
 
-bool DragonsEngine::canSaveGameStateCurrently() {
+bool DragonsEngine::canSaveGameStateCurrently(Common::U32String *msg) {
 	return isInputEnabled() && !_inventory->isOpen() && isFlagSet(ENGINE_FLAG_8) && !isFlagSet(Dragons::ENGINE_FLAG_100);
 }
 
@@ -1602,20 +1601,102 @@ int centerText(const char *text) {
 
 void DragonsEngine::mainMenu() {
 	_inMenu = true;
-	//TODO need to support other languages.
-	const char copyright[6][40] = {
+
+	int lang_index, y_offset;
+
+	int lastMenuItem = 1;
+
+	const char copyright[4][11][40] = {
+		{
+			// US
 			"Crystal Dynamics is a trademark",
 			"of Crystal Dynamics.",
 			"Blazing Dragons is a trademark and",
 			"copyright of Terry Jones and is",
 			"used with permission.",
 			"Licensed by Nelvana Marketing Inc."
+		},
+		{
+			// UK
+			"Crystal Dynamics is a trademark",
+			"of Crystal Dynamics. Blazing",
+			"Dragons' characters are trademarks",
+			"and copyrights of Terry Jones and",
+			"are used with permission.",
+			"Licensed by Nelvana Marketing Inc.",
+			" ",
+			"Game Copyright (C) Crystal Dynamics.",
+			"All rights reserved.",
+		},
+		{
+			// GERMANY
+			"Crystal Dynamics ist ein Warenzeichen",
+			"von Crystal Dynamics",
+			"Blazing Dragons ist ein gesch\x81tztes",
+			"Warenzeichen von Terry Jones",
+			"und wird unter Lizenz verwendet.",
+			"Lizenziert durch",
+			"Nelvana Marketing Inc.",
+			" ",
+			"Spiel Copyright",
+			"c 1996 Crystal Dynamics.",
+			"Alle Rechte Vorbehalten.",
+		},
+		{
+			// FRANCE
+			"Crystal Dynamics est une marque",
+			"de Crystal Dynamics. Blazing Dragons",
+			"est une marque et un copyright de",
+			"Terry Jones et est utilis\x82 avec",
+			"sa permission.",
+			"Licence de Nelvana Marketing Inc.",
+			" ",
+			"Copyright Du Jeu",
+			"c1996 Crystal Dynamics.",
+			"Tous Droids R\x82serv\x82s."
+		},
 	};
-	const char menuItems[3][40] = {
+
+	const char menuItems[4][3][40] = {
+		{
+			// US
 			"Start",
 			"Options",
-			"Previews"
+			"Previews",
+		},
+		{
+			// UK
+			"Start",
+			"Options",
+		},
+		{	// GERMANY
+			"Start",
+			"Optionen",
+		},
+		{
+			// FRANCE
+			"D\x82marrer",
+			"Options",
+		},
 	};
+
+	if (_language == Common::EN_GRB) {
+		lang_index = 1;
+		y_offset = 0x0f;
+	}
+	else if (_language == Common::DE_DEU) {
+		lang_index = 2;
+		y_offset = 0x0e;
+	}
+	else if (_language == Common::FR_FRA) {
+		lang_index = 3;
+		y_offset = 0x0e;
+	}
+	else {
+		lang_index = 0;
+		y_offset = 0x12;
+		lastMenuItem = 2;
+	}
 
 	_screen->clearScreen();
 	Actor *actor = _actorManager->loadActor(0xd9,0,0,0,3);
@@ -1626,8 +1707,8 @@ void DragonsEngine::mainMenu() {
 	//TODO fix palette for copyright image.
 	_screen->loadPalette(0, _cursor->getPalette()); //actor->_actorResource->getPalette());
 
-	for (int i = 0; i < 6; i++) {
-		_fontManager->addAsciiText(centerText(&copyright[i][0]) * 8, (0x12 + i) * 8, &copyright[i][0], strlen(copyright[i]), 1);
+	for (int i = 0; (i < 11) && (copyright[lang_index][i][0] != 0); i++) {
+		_fontManager->addAsciiText(centerText(&copyright[lang_index][i][0]) * 8, (y_offset + i) * 8, &copyright[lang_index][i][0], strlen(copyright[lang_index][i]), 1);
 	}
 
 	waitForFramesAllowSkip(400);
@@ -1638,12 +1719,12 @@ void DragonsEngine::mainMenu() {
 	do {
 		uint16 curMenuItem = 0;
 		do {
-			for (int i = 0; i < 3; i++) {
-				_fontManager->addAsciiText((i == 0 ? 17 : 16) * 8, (0x12 + i) * 8, &menuItems[i][0],
-										   strlen(menuItems[i]), i == curMenuItem ? 0 : 1);
+			for (int i = 0; i <= lastMenuItem; i++) {
+				_fontManager->addAsciiText(((i == 0) && (lang_index != 3) ? 17 : 16) * 8, (0x12 + i) * 8, &menuItems[lang_index][i][0], strlen(menuItems[lang_index][i]),
+										   i == curMenuItem ? 0 : 1);
 			}
 			if (checkForDownKeyRelease() || checkForWheelDown()) {
-				if (curMenuItem < 2) {
+				if (curMenuItem < lastMenuItem) {
 					curMenuItem++;
 				} else {
 					curMenuItem = 0;
@@ -1655,7 +1736,7 @@ void DragonsEngine::mainMenu() {
 				if (curMenuItem > 0) {
 					curMenuItem--;
 				} else {
-					curMenuItem = 2;
+					curMenuItem = lastMenuItem;
 				}
 				playOrStopSound(0x8009);
 			}

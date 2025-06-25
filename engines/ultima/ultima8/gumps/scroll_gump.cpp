@@ -23,7 +23,7 @@
 #include "ultima/ultima8/gumps/scroll_gump.h"
 #include "ultima/ultima8/gumps/widgets/text_widget.h"
 #include "ultima/ultima8/games/game_data.h"
-#include "ultima/ultima8/graphics/gump_shape_archive.h"
+#include "ultima/ultima8/gfx/gump_shape_archive.h"
 #include "ultima/ultima8/usecode/uc_machine.h"
 #include "ultima/ultima8/gumps/gump_notify_process.h"
 #include "ultima/ultima8/world/item.h"
@@ -52,7 +52,7 @@ void ScrollGump::InitGump(Gump *newparent, bool take_focus) {
 	ModalGump::InitGump(newparent, take_focus);
 
 	// Create the TextWidget
-	Gump *widget = new TextWidget(22, 29, _text, true, 9, 204, 115); //!! constants
+	Gump *widget = new TextWidget(22, 29, _text, true, 9, 204, 115, Font::TEXT_LEFT, true); //!! constants
 	widget->InitGump(this);
 	_textWidget = widget->getObjId();
 
